@@ -185,9 +185,8 @@ static void post_pass(BoatGpu *gpu, RenderTexture2D destination, Texture2D sourc
     EndTextureMode();
 }
 
-void boat_gpu_present_hdr(BoatGpu *gpu, float phase)
+static void present_grade(BoatGpu *gpu, WaterfrontGrade grade)
 {
-    WaterfrontGrade grade = waterfront_grade(phase);
     Vector3 bloom = { grade.bloom_threshold, grade.bloom_knee, grade.bloom_strength };
     Vector3 look = { grade.exposure, grade.contrast, grade.saturation };
     SetShaderValue(gpu->post, gpu->post_locations[POST_BLOOM], &bloom, SHADER_UNIFORM_VEC3);
@@ -204,6 +203,11 @@ void boat_gpu_present_hdr(BoatGpu *gpu, float phase)
         blurred = gpu->bloom[0].texture.id;
     }
     post_pass(gpu, gpu->target, gpu->hdr_target.texture, 3, blurred, false);
+}
+
+void boat_gpu_present_hdr(BoatGpu *gpu, float phase)
+{
+    present_grade(gpu, waterfront_grade(phase));
 }
 
 void boat_gpu_destroy(BoatGpu *gpu)
@@ -383,7 +387,8 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     }
     static WaterfrontSceneFrame frame; // Large; drawing is single-threaded.
     boat_scene_frame(view, presentation, world, camera, &frame);
-    frame.lighting = waterfront_lighting(gpu->daylight);
+    if (!gpu->hour_set || !waterfront_lighting_hour(gpu->hour, &frame.lighting))
+        frame.lighting = waterfront_lighting(gpu->daylight);
     boat_scene_rivals(rivals, world, view->time, &frame);
     if (ghost && opacity > 0) {
         WaterfrontPlayerState pose = { 0 };
@@ -512,8 +517,13 @@ restore_water:
     gpu->scene.water = original_water;
     gpu->scene.near_water = (Mesh) { 0 };
     gpu->scene.near_water_extra = (Mesh) { 0 };
-    if (hdr)
-        boat_gpu_present_hdr(gpu, frame.lighting.phase);
+    if (hdr) {
+        WaterfrontGrade grade;
+        if (gpu->hour_set && waterfront_grade_hour(gpu->hour, &grade))
+            present_grade(gpu, grade);
+        else
+            boat_gpu_present_hdr(gpu, gpu->daylight);
+    }
     if (gpu->supersampled.id) {
         BeginTextureMode(gpu->target);
         ClearBackground(BLACK);

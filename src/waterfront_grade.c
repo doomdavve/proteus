@@ -52,6 +52,16 @@ WaterfrontGrade waterfront_grade(float phase)
         phase);
 }
 
+bool waterfront_grade_hour(float hour, WaterfrontGrade *grade)
+{
+    float wrapped;
+    if (!waterfront_hour_normalize(hour, &wrapped))
+        return false;
+    (void)wrapped;
+    *grade = neutral(WATERFRONT_DAYLIGHT_DAY);
+    return true;
+}
+
 bool waterfront_grade_neutral(const WaterfrontGrade *grade)
 {
     return grade->exposure == 1 && grade->contrast == 1 && grade->saturation == 1

@@ -57,6 +57,8 @@ typedef struct {
     WaterfrontScenery scenery;
     WaterfrontHarborModels harbor;
     float daylight; // Presentation phase, 0 (day, the zero default) .. 1 (dusk).
+    float hour; // Full-day hour used when hour_set; never aliases daylight.
+    bool hour_set; // Zero-init false keeps the legacy daylight phase.
 } BoatCpuView;
 
 // Safe on a zeroed or destroyed view.

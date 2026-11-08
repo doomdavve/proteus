@@ -1,0 +1,3747 @@
+{
+  "date": "2026-11-07",
+  "machine": "Apple M1 Max, macOS, native Release",
+  "cadence": "sampled virtual 900 s, eight separate warmup draws per workload",
+  "aggregation": "median across three repeats of each percentile; range retained; raw reports included",
+  "scope": "production scene; native GPU hidden presentation; CPU software pixels; excludes game input/audio/HUD",
+  "aggregate": [
+    {
+      "case": "outer-gpu-low",
+      "repeats": 3,
+      "sample_count": 721,
+      "resolution": [
+        320,
+        200
+      ],
+      "hdr": false,
+      "fixed": {
+        "frame_ms": {
+          "mean": 2.10095167,
+          "p50": 1.94999945,
+          "p95": 3.24499989,
+          "p99": 4.23000002,
+          "max": 4.56800032,
+          "p95_range": [
+            3.1329999,
+            3.58600068
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.121514559,
+          "p50": 0.128000051,
+          "p95": 0.150000677,
+          "p99": 0.161999837,
+          "max": 0.18700026,
+          "p95_range": [
+            0.149999738,
+            0.156000257
+          ]
+        },
+        "submission_ms": {
+          "mean": 1.5255307,
+          "p50": 1.50999987,
+          "p95": 1.76699924,
+          "p99": 1.9119997,
+          "max": 2.04600024,
+          "p95_range": [
+            1.70799994,
+            1.778
+          ]
+        },
+        "present_ms": {
+          "mean": 0.453907102,
+          "p50": 0.284000307,
+          "p95": 1.57999992,
+          "p99": 2.64399958,
+          "max": 2.99999952,
+          "p95_range": [
+            1.52799952,
+            1.995
+          ]
+        },
+        "gpu_ms": {
+          "mean": 1.59317875,
+          "p50": 1.61966705,
+          "p95": 1.84562504,
+          "p99": 1.943542,
+          "max": 2.06766605,
+          "p95_range": [
+            1.842875,
+            1.86654103
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          293.848999,
+          278.085999,
+          292.397003
+        ]
+      },
+      "cycle": {
+        "frame_ms": {
+          "mean": 2.09618139,
+          "p50": 1.94500017,
+          "p95": 3.29700017,
+          "p99": 4.11100054,
+          "max": 4.72700024,
+          "p95_range": [
+            3.20000005,
+            3.53600001
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.121146977,
+          "p50": 0.126999795,
+          "p95": 0.149999738,
+          "p99": 0.161999837,
+          "max": 0.183000237,
+          "p95_range": [
+            0.149000436,
+            0.151999295
+          ]
+        },
+        "submission_ms": {
+          "mean": 1.52620196,
+          "p50": 1.51100016,
+          "p95": 1.74800026,
+          "p99": 1.8889997,
+          "max": 2.02700019,
+          "p95_range": [
+            1.72999966,
+            1.75900006
+          ]
+        },
+        "present_ms": {
+          "mean": 0.448833287,
+          "p50": 0.284999609,
+          "p95": 1.68700051,
+          "p99": 2.49999952,
+          "max": 3.19200015,
+          "p95_range": [
+            1.62700009,
+            1.94399989
+          ]
+        },
+        "gpu_ms": {
+          "mean": 1.60112429,
+          "p50": 1.62712395,
+          "p95": 1.829,
+          "p99": 1.90712404,
+          "max": 1.96458304,
+          "p95_range": [
+            1.80787504,
+            1.830459
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          7.33899975,
+          6.74599981,
+          7.64000034
+        ]
+      }
+    },
+    {
+      "case": "outer-gpu-high-hdr",
+      "repeats": 3,
+      "sample_count": 721,
+      "resolution": [
+        1280,
+        800
+      ],
+      "hdr": true,
+      "fixed": {
+        "frame_ms": {
+          "mean": 2.74047375,
+          "p50": 2.63699985,
+          "p95": 3.69599938,
+          "p99": 4.52599955,
+          "max": 5.85000038,
+          "p95_range": [
+            3.46099949,
+            3.83900023
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.122746184,
+          "p50": 0.128999352,
+          "p95": 0.149999738,
+          "p99": 0.159000039,
+          "max": 0.176000416,
+          "p95_range": [
+            0.149000436,
+            0.150999993
+          ]
+        },
+        "submission_ms": {
+          "mean": 2.09519053,
+          "p50": 2.07899976,
+          "p95": 2.47299957,
+          "p99": 2.60299993,
+          "max": 2.76899981,
+          "p95_range": [
+            2.46299982,
+            2.50700021
+          ]
+        },
+        "present_ms": {
+          "mean": 0.533835113,
+          "p50": 0.366999775,
+          "p95": 1.50099957,
+          "p99": 2.48899961,
+          "max": 3.43699932,
+          "p95_range": [
+            1.40199995,
+            1.63900018
+          ]
+        },
+        "gpu_ms": {
+          "mean": 2.6728611,
+          "p50": 2.64491606,
+          "p95": 3.25774908,
+          "p99": 3.41050005,
+          "max": 3.91987491,
+          "p95_range": [
+            3.24158406,
+            3.28541589
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          283.220001,
+          281.092987,
+          293.864014
+        ]
+      },
+      "cycle": {
+        "frame_ms": {
+          "mean": 2.79712462,
+          "p50": 2.68600035,
+          "p95": 3.65500069,
+          "p99": 4.43200016,
+          "max": 5.88500023,
+          "p95_range": [
+            3.61800003,
+            4.04100037
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.122934878,
+          "p50": 0.128999352,
+          "p95": 0.150000677,
+          "p99": 0.159000039,
+          "max": 0.176000416,
+          "p95_range": [
+            0.149999738,
+            0.150000677
+          ]
+        },
+        "submission_ms": {
+          "mean": 2.12536311,
+          "p50": 2.11299944,
+          "p95": 2.48199987,
+          "p99": 2.57799959,
+          "max": 2.72999978,
+          "p95_range": [
+            2.44799995,
+            2.48899961
+          ]
+        },
+        "present_ms": {
+          "mean": 0.525601685,
+          "p50": 0.375000775,
+          "p95": 1.4610002,
+          "p99": 2.29800034,
+          "max": 3.6430006,
+          "p95_range": [
+            1.36800015,
+            1.72099936
+          ]
+        },
+        "gpu_ms": {
+          "mean": 2.82031322,
+          "p50": 2.81020904,
+          "p95": 3.3466239,
+          "p99": 3.48487592,
+          "max": 3.79204202,
+          "p95_range": [
+            3.34495902,
+            3.35550094
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          7.02399969,
+          7.4289999,
+          8.02099991
+        ]
+      }
+    },
+    {
+      "case": "stress-gpu-low",
+      "repeats": 3,
+      "sample_count": 721,
+      "resolution": [
+        320,
+        200
+      ],
+      "hdr": false,
+      "fixed": {
+        "frame_ms": {
+          "mean": 3.30111456,
+          "p50": 3.18400002,
+          "p95": 4.46199989,
+          "p99": 5.37300014,
+          "max": 6.11600018,
+          "p95_range": [
+            4.31500006,
+            4.64699984
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.807300985,
+          "p50": 0.811999679,
+          "p95": 0.87299943,
+          "p99": 0.899000108,
+          "max": 0.928000569,
+          "p95_range": [
+            0.86800009,
+            0.874000609
+          ]
+        },
+        "submission_ms": {
+          "mean": 1.91540849,
+          "p50": 1.898,
+          "p95": 2.42500019,
+          "p99": 2.58000016,
+          "max": 3.02399969,
+          "p95_range": [
+            2.42299962,
+            2.42999935
+          ]
+        },
+        "present_ms": {
+          "mean": 0.579578221,
+          "p50": 0.384000123,
+          "p95": 1.61200023,
+          "p99": 2.57599998,
+          "max": 3.23900032,
+          "p95_range": [
+            1.56999934,
+            1.80600023
+          ]
+        },
+        "gpu_ms": {
+          "mean": 2.7514751,
+          "p50": 2.69712591,
+          "p95": 3.16004109,
+          "p99": 3.29266596,
+          "max": 3.490417,
+          "p95_range": [
+            3.14387393,
+            3.17016602
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          26.1309986,
+          28.6499996,
+          27.0830002
+        ]
+      },
+      "cycle": {
+        "frame_ms": {
+          "mean": 3.37501311,
+          "p50": 3.22099972,
+          "p95": 4.65700054,
+          "p99": 5.62100029,
+          "max": 6.20399952,
+          "p95_range": [
+            4.41699934,
+            4.78599977
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.804979146,
+          "p50": 0.808999896,
+          "p95": 0.869000316,
+          "p99": 0.900999665,
+          "max": 0.943000436,
+          "p95_range": [
+            0.866999865,
+            0.873999655
+          ]
+        },
+        "submission_ms": {
+          "mean": 1.94810319,
+          "p50": 1.93499959,
+          "p95": 2.42399979,
+          "p99": 2.56599951,
+          "max": 2.79299998,
+          "p95_range": [
+            2.41499949,
+            2.43399954
+          ]
+        },
+        "present_ms": {
+          "mean": 0.621931911,
+          "p50": 0.373999596,
+          "p95": 1.9319998,
+          "p99": 2.8269999,
+          "max": 3.3809998,
+          "p95_range": [
+            1.54200006,
+            2.02600002
+          ]
+        },
+        "gpu_ms": {
+          "mean": 2.79607272,
+          "p50": 2.77124906,
+          "p95": 3.14837503,
+          "p99": 3.34270906,
+          "max": 3.45749998,
+          "p95_range": [
+            3.14162493,
+            3.16925001
+          ]
+        },
+        "deadline_misses": [
+          0,
+          0,
+          0
+        ],
+        "gpu_samples": [
+          721,
+          721,
+          721
+        ],
+        "first_draw_ms": [
+          7.61800051,
+          8.22200012,
+          9.49600029
+        ]
+      }
+    },
+    {
+      "case": "outer-cpu",
+      "repeats": 3,
+      "sample_count": 241,
+      "resolution": [
+        320,
+        200
+      ],
+      "hdr": false,
+      "fixed": {
+        "frame_ms": {
+          "mean": 449.503876,
+          "p50": 446.002014,
+          "p95": 490.105988,
+          "p99": 492.550995,
+          "max": 495.872009,
+          "p95_range": [
+            489.917999,
+            521.419006
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.0961120501,
+          "p50": 0.0959997997,
+          "p95": 0.116000883,
+          "p99": 0.124000013,
+          "max": 0.168999657,
+          "p95_range": [
+            0.111999922,
+            0.116999261
+          ]
+        },
+        "submission_ms": {
+          "mean": 449.407776,
+          "p50": 445.891998,
+          "p95": 490.033997,
+          "p99": 492.476013,
+          "max": 495.800995,
+          "p95_range": [
+            489.843994,
+            521.338013
+          ]
+        },
+        "present_ms": {
+          "mean": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "p95_range": [
+            0,
+            0
+          ]
+        },
+        "gpu_ms": null,
+        "deadline_misses": [
+          241,
+          241,
+          241
+        ],
+        "gpu_samples": [
+          0,
+          0,
+          0
+        ],
+        "first_draw_ms": [
+          564.351013,
+          569.450012,
+          569.997009
+        ]
+      },
+      "cycle": {
+        "frame_ms": {
+          "mean": 454.491821,
+          "p50": 450.605988,
+          "p95": 496.651001,
+          "p99": 499.934998,
+          "max": 501.041016,
+          "p95_range": [
+            489.212006,
+            714.239014
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.0962198749,
+          "p50": 0.096000731,
+          "p95": 0.114000402,
+          "p99": 0.118000433,
+          "max": 0.19400008,
+          "p95_range": [
+            0.112999231,
+            0.118000433
+          ]
+        },
+        "submission_ms": {
+          "mean": 454.395386,
+          "p50": 450.493011,
+          "p95": 496.576996,
+          "p99": 499.855988,
+          "max": 500.964996,
+          "p95_range": [
+            489.139008,
+            714.159973
+          ]
+        },
+        "present_ms": {
+          "mean": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "p95_range": [
+            0,
+            0
+          ]
+        },
+        "gpu_ms": null,
+        "deadline_misses": [
+          241,
+          241,
+          241
+        ],
+        "gpu_samples": [
+          0,
+          0,
+          0
+        ],
+        "first_draw_ms": [
+          499.237,
+          490,
+          492.632996
+        ]
+      }
+    },
+    {
+      "case": "stress-cpu",
+      "repeats": 3,
+      "sample_count": 241,
+      "resolution": [
+        320,
+        200
+      ],
+      "hdr": false,
+      "fixed": {
+        "frame_ms": {
+          "mean": 93.4096146,
+          "p50": 93.6660004,
+          "p95": 95.0400009,
+          "p99": 95.8199997,
+          "max": 100.926003,
+          "p95_range": [
+            94.9869995,
+            95.1679993
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.777327657,
+          "p50": 0.771000028,
+          "p95": 0.839999855,
+          "p99": 0.860999346,
+          "max": 0.892000258,
+          "p95_range": [
+            0.834000289,
+            0.843999922
+          ]
+        },
+        "submission_ms": {
+          "mean": 92.6330719,
+          "p50": 92.8949966,
+          "p95": 94.2819977,
+          "p99": 95.0530014,
+          "max": 100.167999,
+          "p95_range": [
+            94.2480011,
+            94.3799973
+          ]
+        },
+        "present_ms": {
+          "mean": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "p95_range": [
+            0,
+            0
+          ]
+        },
+        "gpu_ms": null,
+        "deadline_misses": [
+          241,
+          241,
+          241
+        ],
+        "gpu_samples": [
+          0,
+          0,
+          0
+        ],
+        "first_draw_ms": [
+          97.473999,
+          97.0630035,
+          96.0230026
+        ]
+      },
+      "cycle": {
+        "frame_ms": {
+          "mean": 95.4264526,
+          "p50": 95.723999,
+          "p95": 97.2040024,
+          "p99": 97.8199997,
+          "max": 98.3410034,
+          "p95_range": [
+            96.9690018,
+            170.593002
+          ]
+        },
+        "simulation_ms": {
+          "mean": 0.776556075,
+          "p50": 0.76900053,
+          "p95": 0.844999194,
+          "p99": 0.870999873,
+          "max": 0.931000352,
+          "p95_range": [
+            0.837000072,
+            0.845000148
+          ]
+        },
+        "submission_ms": {
+          "mean": 94.6499252,
+          "p50": 94.9209976,
+          "p95": 96.4369965,
+          "p99": 97.0210037,
+          "max": 97.5530014,
+          "p95_range": [
+            96.1930008,
+            169.792999
+          ]
+        },
+        "present_ms": {
+          "mean": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "p95_range": [
+            0,
+            0
+          ]
+        },
+        "gpu_ms": null,
+        "deadline_misses": [
+          241,
+          241,
+          241
+        ],
+        "gpu_samples": [
+          0,
+          0,
+          0
+        ],
+        "first_draw_ms": [
+          89.7789993,
+          89.2910004,
+          89.0619965
+        ]
+      }
+    }
+  ],
+  "reports": [
+    {
+      "case": "outer-gpu-low",
+      "repeat": 0,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 192.425,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 293.848999,
+            "first_measured_ms": 2.3269999,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.121514559,
+              "p50": 0.128000051,
+              "p95": 0.149999738,
+              "p99": 0.161999837,
+              "max": 0.214000225
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.5255307,
+              "p50": 1.50999987,
+              "p95": 1.76699924,
+              "p99": 1.9119997,
+              "max": 2.03299999
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.453907102,
+              "p50": 0.284000307,
+              "p95": 1.57999992,
+              "p99": 2.64399958,
+              "max": 2.99999952
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.10095167,
+              "p50": 1.94999945,
+              "p95": 3.24499989,
+              "p99": 4.23000002,
+              "max": 4.55200005
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.60334802,
+              "p50": 1.63887501,
+              "p95": 1.84562504,
+              "p99": 1.98574996,
+              "max": 2.35612512
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.841888,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1665478.62,
+              "p50": 1732484,
+              "p95": 1880876,
+              "p99": 1882204,
+              "max": 1882358
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 7.33899975,
+            "first_measured_ms": 1.90699935,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.121146977,
+              "p50": 0.126999795,
+              "p95": 0.149000436,
+              "p99": 0.161999837,
+              "max": 0.177999958
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.52620196,
+              "p50": 1.51100016,
+              "p95": 1.74800026,
+              "p99": 1.89100015,
+              "max": 2.12099957
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.448833287,
+              "p50": 0.288999647,
+              "p95": 1.62700009,
+              "p99": 2.49999952,
+              "max": 3.70100045
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.09618139,
+              "p50": 1.94300056,
+              "p95": 3.20000005,
+              "p99": 4.08799934,
+              "max": 5.28500032
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.59916151,
+              "p50": 1.62712395,
+              "p95": 1.80787504,
+              "p99": 1.88270795,
+              "max": 1.94774997
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.104019,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1689350.62,
+              "p50": 1732290,
+              "p95": 1881888,
+              "p99": 1882200,
+              "max": 1882320
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-gpu-low",
+      "repeat": 1,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 201.784,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 278.085999,
+            "first_measured_ms": 1.89500022,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.121341072,
+              "p50": 0.125000253,
+              "p95": 0.156000257,
+              "p99": 0.171999454,
+              "max": 0.18700026
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.46805179,
+              "p50": 1.45900059,
+              "p95": 1.70799994,
+              "p99": 1.86599982,
+              "max": 2.04600024
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.418186009,
+              "p50": 0.266000628,
+              "p95": 1.52799952,
+              "p99": 2.38300014,
+              "max": 2.94200063
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.0075798,
+              "p50": 1.86399925,
+              "p95": 3.1329999,
+              "p99": 4.05099964,
+              "max": 4.56800032
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.54526162,
+              "p50": 1.60320902,
+              "p95": 1.86654103,
+              "p99": 1.943542,
+              "max": 2.06766605
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.841888,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1665478.62,
+              "p50": 1732484,
+              "p95": 1880876,
+              "p99": 1882204,
+              "max": 1882358
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 6.74599981,
+            "first_measured_ms": 1.88499963,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.120574214,
+              "p50": 0.12599957,
+              "p95": 0.151999295,
+              "p99": 0.161999837,
+              "max": 0.191000283
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.51660681,
+              "p50": 1.5109992,
+              "p95": 1.72999966,
+              "p99": 1.8889997,
+              "max": 1.96299982
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.446445405,
+              "p50": 0.284999609,
+              "p95": 1.68700051,
+              "p99": 2.61499929,
+              "max": 3.19200015
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.08362675,
+              "p50": 1.94500017,
+              "p95": 3.29700017,
+              "p99": 4.14499998,
+              "max": 4.72700024
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.60259306,
+              "p50": 1.62116694,
+              "p95": 1.830459,
+              "p99": 1.90712404,
+              "max": 1.96458304
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.104019,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1689350.62,
+              "p50": 1732290,
+              "p95": 1881888,
+              "p99": 1882200,
+              "max": 1882320
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-gpu-low",
+      "repeat": 2,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 202.801,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 292.397003,
+            "first_measured_ms": 2.00199986,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.121951498,
+              "p50": 0.128000051,
+              "p95": 0.150000677,
+              "p99": 0.157999814,
+              "max": 0.176999718
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.53659081,
+              "p50": 1.52499974,
+              "p95": 1.778,
+              "p99": 1.91499949,
+              "max": 2.12600088
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.493718833,
+              "p50": 0.296999693,
+              "p95": 1.995,
+              "p99": 2.72599983,
+              "max": 3.14799976
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.15226173,
+              "p50": 1.9749999,
+              "p95": 3.58600068,
+              "p99": 4.32800055,
+              "max": 4.96199989
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.59317875,
+              "p50": 1.61966705,
+              "p95": 1.842875,
+              "p99": 1.92550004,
+              "max": 2.00908399
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.841888,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1665478.62,
+              "p50": 1732484,
+              "p95": 1880876,
+              "p99": 1882204,
+              "max": 1882358
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 7.64000034,
+            "first_measured_ms": 1.87500012,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.121178985,
+              "p50": 0.126999795,
+              "p95": 0.149999738,
+              "p99": 0.159000039,
+              "max": 0.183000237
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.5285604,
+              "p50": 1.51699972,
+              "p95": 1.75900006,
+              "p99": 1.86699998,
+              "max": 2.02700019
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.472623914,
+              "p50": 0.281999826,
+              "p95": 1.94399989,
+              "p99": 2.46200061,
+              "max": 2.94699979
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.12236381,
+              "p50": 1.94999945,
+              "p95": 3.53600001,
+              "p99": 4.11100054,
+              "max": 4.57500029
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 1.60112429,
+              "p50": 1.62758398,
+              "p95": 1.829,
+              "p99": 1.93687499,
+              "max": 2.09433389
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.104019,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1689350.62,
+              "p50": 1732290,
+              "p95": 1881888,
+              "p99": 1882200,
+              "max": 1882320
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-gpu-high-hdr",
+      "repeat": 0,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          1280,
+          800
+        ],
+        "hdr": true,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 190.953,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 283.220001,
+            "first_measured_ms": 2.98300004,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.122746184,
+              "p50": 0.128999352,
+              "p95": 0.149000436,
+              "p99": 0.159000039,
+              "max": 0.176000416
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.09864664,
+              "p50": 2.07900071,
+              "p95": 2.50700021,
+              "p99": 2.64899993,
+              "max": 3.84900069
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.519079864,
+              "p50": 0.363000661,
+              "p95": 1.50099957,
+              "p99": 2.48899961,
+              "max": 3.43699932
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.74047375,
+              "p50": 2.62899971,
+              "p95": 3.69599938,
+              "p99": 4.89599991,
+              "max": 5.85000038
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.69936895,
+              "p50": 2.67337489,
+              "p95": 3.25774908,
+              "p99": 3.40050006,
+              "max": 4.11112404
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.847427,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1767437.38,
+              "p50": 1833076,
+              "p95": 1985948,
+              "p99": 1987464,
+              "max": 1987584
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 7.02399969,
+            "first_measured_ms": 3.96399951,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.124066561,
+              "p50": 0.128999352,
+              "p95": 0.150000677,
+              "p99": 0.157000497,
+              "max": 0.167000115
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.14745784,
+              "p50": 2.14499974,
+              "p95": 2.48199987,
+              "p99": 2.62300014,
+              "max": 2.76600003
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.525601685,
+              "p50": 0.375000775,
+              "p95": 1.4610002,
+              "p99": 2.29800034,
+              "max": 3.44999981
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.79712462,
+              "p50": 2.69700027,
+              "p95": 3.65500069,
+              "p99": 4.43200016,
+              "max": 5.82599926
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.81893682,
+              "p50": 2.81020904,
+              "p95": 3.3466239,
+              "p99": 3.469208,
+              "max": 3.6482091
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.109573,
+              "p50": 246,
+              "p95": 266,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1790027.75,
+              "p50": 1832882,
+              "p95": 1982616,
+              "p99": 1982798,
+              "max": 1982912
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-gpu-high-hdr",
+      "repeat": 1,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          1280,
+          800
+        ],
+        "hdr": true,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 196.579,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 281.092987,
+            "first_measured_ms": 2.99199939,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.122374535,
+              "p50": 0.127999112,
+              "p95": 0.149999738,
+              "p99": 0.157000497,
+              "max": 0.173999935
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.07410955,
+              "p50": 2.04900002,
+              "p95": 2.46299982,
+              "p99": 2.58599973,
+              "max": 2.74899983
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.533835113,
+              "p50": 0.373000264,
+              "p95": 1.40199995,
+              "p99": 2.50700021,
+              "max": 3.88600016
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.73031926,
+              "p50": 2.64099979,
+              "p95": 3.46099949,
+              "p99": 4.52599955,
+              "max": 5.86800003
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.67076969,
+              "p50": 2.64491606,
+              "p95": 3.24158406,
+              "p99": 3.41050005,
+              "max": 3.51349998
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.847427,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1767437.38,
+              "p50": 1833076,
+              "p95": 1985948,
+              "p99": 1987464,
+              "max": 1987584
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 7.4289999,
+            "first_measured_ms": 2.74100065,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.122692138,
+              "p50": 0.128999352,
+              "p95": 0.150000677,
+              "p99": 0.160999596,
+              "max": 0.176000416
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.12536311,
+              "p50": 2.11299944,
+              "p95": 2.44799995,
+              "p99": 2.57799959,
+              "max": 2.71200013
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.517321527,
+              "p50": 0.366000473,
+              "p95": 1.36800015,
+              "p99": 2.09600019,
+              "max": 3.89899969
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.76537657,
+              "p50": 2.66900015,
+              "p95": 3.61800003,
+              "p99": 4.26100016,
+              "max": 6.24399996
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.82031322,
+              "p50": 2.80683303,
+              "p95": 3.35550094,
+              "p99": 3.52825093,
+              "max": 3.7971251
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.109573,
+              "p50": 246,
+              "p95": 266,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1790027.75,
+              "p50": 1832882,
+              "p95": 1982616,
+              "p99": 1982798,
+              "max": 1982912
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-gpu-high-hdr",
+      "repeat": 2,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          1280,
+          800
+        ],
+        "hdr": true,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 203.760001,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 293.864014,
+            "first_measured_ms": 2.84600067,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.123443872,
+              "p50": 0.129999593,
+              "p95": 0.150999993,
+              "p99": 0.159000039,
+              "max": 0.193999141
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.09519053,
+              "p50": 2.07899976,
+              "p95": 2.47299957,
+              "p99": 2.60299993,
+              "max": 2.76899981
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.533976078,
+              "p50": 0.366999775,
+              "p95": 1.63900018,
+              "p99": 2.227,
+              "max": 2.97799993
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.75261164,
+              "p50": 2.63699985,
+              "p95": 3.83900023,
+              "p99": 4.46600008,
+              "max": 5.26100016
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.6728611,
+              "p50": 2.61512399,
+              "p95": 3.28541589,
+              "p99": 3.45849991,
+              "max": 3.91987491
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 244.847427,
+              "p50": 246,
+              "p95": 267,
+              "p99": 267,
+              "max": 267
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1767437.38,
+              "p50": 1833076,
+              "p95": 1985948,
+              "p99": 1987464,
+              "max": 1987584
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=1456 x=-0x1.69da94p+4 z=-0x1.a6d22cp+6 vx=0x1.450a32p+0 vz=-0x1.0a30fcp+4 heading=0x1.45ca26p-4 yaw_velocity=0x1.5a600ap-6 height=-0x1.2d3f3p-5 vertical_velocity=-0x1.87a296p-4 pitch=0x1.66884ap-5 roll=0x1.0eceacp-4 throttle=0x1.333334p-1 wheel=0x1.144c68p-6 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 8.02099991,
+            "first_measured_ms": 2.92299962,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.122934878,
+              "p50": 0.129000276,
+              "p95": 0.149999738,
+              "p99": 0.159000039,
+              "max": 0.206000179
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 2.12134409,
+              "p50": 2.10599971,
+              "p95": 2.48899961,
+              "p99": 2.57499981,
+              "max": 2.72999978
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.585172176,
+              "p50": 0.378999859,
+              "p95": 1.72099936,
+              "p99": 2.7680006,
+              "max": 3.6430006
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 2.82945228,
+              "p50": 2.68600035,
+              "p95": 4.04100037,
+              "p99": 4.97099924,
+              "max": 5.88500023
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.82138729,
+              "p50": 2.81308389,
+              "p95": 3.34495902,
+              "p99": 3.48487592,
+              "max": 3.79204202
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 246.109573,
+              "p50": 246,
+              "p95": 266,
+              "p99": 267,
+              "max": 268
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 1790027.75,
+              "p50": 1832882,
+              "p95": 1982616,
+              "p99": 1982798,
+              "max": 1982912
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-gpu-low",
+      "repeat": 0,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 1794.114,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 26.1309986,
+            "first_measured_ms": 2.77499938,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.806106687,
+              "p50": 0.811999679,
+              "p95": 0.86800009,
+              "p99": 0.895000041,
+              "max": 0.953999341
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.91540849,
+              "p50": 1.8820008,
+              "p95": 2.42999935,
+              "p99": 2.59500003,
+              "max": 3.02399969
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.576008499,
+              "p50": 0.373000264,
+              "p95": 1.61200023,
+              "p99": 2.57599998,
+              "max": 3.23900032
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.2975235,
+              "p50": 3.16100001,
+              "p95": 4.46199989,
+              "p99": 5.37300014,
+              "max": 6.09700012
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.7514751,
+              "p50": 2.69712591,
+              "p95": 3.16004109,
+              "p99": 3.29266596,
+              "max": 3.81775093
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 65.449379,
+              "p50": 64,
+              "p95": 75,
+              "p99": 80,
+              "max": 80
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 44218.5352,
+              "p50": 43512,
+              "p95": 52026,
+              "p99": 52176,
+              "max": 52224
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 7.61800051,
+            "first_measured_ms": 2.70399928,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.80829227,
+              "p50": 0.808999896,
+              "p95": 0.873999655,
+              "p99": 0.905999899,
+              "max": 0.943000436
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.96639431,
+              "p50": 1.9659996,
+              "p95": 2.43399954,
+              "p99": 2.60599971,
+              "max": 2.99000001
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.634202719,
+              "p50": 0.36100018,
+              "p95": 2.02600002,
+              "p99": 2.92400002,
+              "max": 3.64199924
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.4088943,
+              "p50": 3.2140007,
+              "p95": 4.78599977,
+              "p99": 5.62100029,
+              "max": 6.71799946
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.79607272,
+              "p50": 2.77841711,
+              "p95": 3.14162493,
+              "p99": 3.34270906,
+              "max": 3.50337505
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 62.5894585,
+              "p50": 61,
+              "p95": 73,
+              "p99": 76,
+              "max": 76
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 43852.7188,
+              "p50": 43146,
+              "p95": 51600,
+              "p99": 52080,
+              "max": 52200
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-gpu-low",
+      "repeat": 1,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 1785.701,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 28.6499996,
+            "first_measured_ms": 2.83799982,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.807300985,
+              "p50": 0.811000347,
+              "p95": 0.87299943,
+              "p99": 0.899000108,
+              "max": 0.928000569
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.91423321,
+              "p50": 1.898,
+              "p95": 2.42299962,
+              "p99": 2.58000016,
+              "max": 2.79999995
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.579578221,
+              "p50": 0.38800016,
+              "p95": 1.56999934,
+              "p99": 2.53000021,
+              "max": 3.07099986
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.30111456,
+              "p50": 3.18400002,
+              "p95": 4.31500006,
+              "p99": 5.15399981,
+              "max": 6.11600018
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.74185729,
+              "p50": 2.69229198,
+              "p95": 3.14387393,
+              "p99": 3.27025008,
+              "max": 3.39924908
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 65.449379,
+              "p50": 64,
+              "p95": 75,
+              "p99": 80,
+              "max": 80
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 44218.5352,
+              "p50": 43512,
+              "p95": 52026,
+              "p99": 52176,
+              "max": 52224
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 8.22200012,
+            "first_measured_ms": 2.70299983,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.803410172,
+              "p50": 0.807000339,
+              "p95": 0.866999865,
+              "p99": 0.896999598,
+              "max": 0.959999859
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.94236863,
+              "p50": 1.93499959,
+              "p95": 2.41499949,
+              "p99": 2.56399989,
+              "max": 2.69799948
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.588467181,
+              "p50": 0.382999897,
+              "p95": 1.54200006,
+              "p99": 2.67999983,
+              "max": 3.3809998
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.33424759,
+              "p50": 3.22500062,
+              "p95": 4.41699934,
+              "p99": 5.20799971,
+              "max": 6.20399952
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.78330803,
+              "p50": 2.76570797,
+              "p95": 3.14837503,
+              "p99": 3.2232511,
+              "max": 3.37225103
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 62.5894585,
+              "p50": 61,
+              "p95": 73,
+              "p99": 76,
+              "max": 76
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 43852.7188,
+              "p50": 43146,
+              "p95": 51600,
+              "p99": 52080,
+              "max": 52200
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-gpu-low",
+      "repeat": 2,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "gpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": "GL_TIME_ELAPSED around the scene draw, asynchronous",
+        "gl_renderer": "Apple M1 Max",
+        "gl_version": "4.1 Metal - 90.5",
+        "sample_count": 721,
+        "warmup_samples": 8,
+        "measured_samples": 721,
+        "frame_rows": 729,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 1.25,
+        "initialization_ms": 1801.438,
+        "cadence_note": "721 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 1,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 27.0830002,
+            "first_measured_ms": 3.1469996,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.81004554,
+              "p50": 0.815999687,
+              "p95": 0.874000609,
+              "p99": 0.900999665,
+              "max": 0.922000051
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.92426229,
+              "p50": 1.89899933,
+              "p95": 2.42500019,
+              "p99": 2.56900024,
+              "max": 3.03899956
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.618691981,
+              "p50": 0.384000123,
+              "p95": 1.80600023,
+              "p99": 2.78000069,
+              "max": 3.40399981
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.35299993,
+              "p50": 3.19700027,
+              "p95": 4.64699984,
+              "p99": 5.59200048,
+              "max": 6.30999994
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.75965905,
+              "p50": 2.712708,
+              "p95": 3.17016602,
+              "p99": 3.33129191,
+              "max": 3.490417
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 65.449379,
+              "p50": 64,
+              "p95": 75,
+              "p99": 80,
+              "max": 80
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 44218.5352,
+              "p50": 43512,
+              "p95": 52026,
+              "p99": 52176,
+              "max": 52224
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          },
+          "cycle": {
+            "final_state": "tick=3856 hash=5b80f02a0679f614 wake_live=121 wake_peak=125 wake_emitted=245 wake_expired=124 traffic_live=128 traffic_peak=128 traffic_emitted=384 slot0=-0x1.ce0e5p+5,-0x1.c9a74ap+5,0x1.20d086p+1,0x1.62c24cp+3 slot1=0x1.41b7f2p+6,-0x1.4806f2p+5,-0x1.598648p+1,-0x1.0a515ep+2 slot2=-0x1.eae4cp+5,0x1.d25e36p+5,-0x1.eba058p-1,-0x1.7414e8p+3 slot3=0x1.4fbb6cp+5,0x1.33f3ap+5,0x1.3f7dap-1,0x1.91d9cep+2",
+            "hour_bins_visited": 24,
+            "deadline_misses": 0,
+            "gpu_samples": 721,
+            "gpu_samples_skipped": 0,
+            "first_draw_ms": 9.49600029,
+            "first_measured_ms": 3.05499983,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 0,
+              "draw_reused": 0,
+              "draw_calls": 0,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 721,
+              "mean": 0.804979146,
+              "p50": 0.808999896,
+              "p95": 0.869000316,
+              "p99": 0.900999665,
+              "max": 0.922000051
+            },
+            "submission_ms": {
+              "samples": 721,
+              "mean": 1.94810319,
+              "p50": 1.92900002,
+              "p95": 2.42399979,
+              "p99": 2.56599951,
+              "max": 2.79299998
+            },
+            "present_ms": {
+              "samples": 721,
+              "mean": 0.621931911,
+              "p50": 0.373999596,
+              "p95": 1.9319998,
+              "p99": 2.8269999,
+              "max": 3.36400056
+            },
+            "frame_ms": {
+              "samples": 721,
+              "mean": 3.37501311,
+              "p50": 3.22099972,
+              "p95": 4.65700054,
+              "p99": 5.68400049,
+              "max": 6.14300013
+            },
+            "gpu_ms": {
+              "samples": 721,
+              "mean": 2.79739809,
+              "p50": 2.77124906,
+              "p95": 3.16925001,
+              "p99": 3.35162592,
+              "max": 3.45749998
+            },
+            "app_submissions": {
+              "samples": 721,
+              "mean": 62.5894585,
+              "p50": 61,
+              "p95": 73,
+              "p99": 76,
+              "max": 76
+            },
+            "scene_triangles": {
+              "samples": 721,
+              "mean": 43852.7188,
+              "p50": 43146,
+              "p95": 51600,
+              "p99": 52080,
+              "max": 52200
+            },
+            "sky_draw_samples": {
+              "samples": 721,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-cpu",
+      "repeat": 0,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 9.21400078,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 564.351013,
+            "first_measured_ms": 495.872009,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 13923,
+              "draw_reused": 15410077,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.0961120501,
+              "p50": 0.0959997997,
+              "p95": 0.116999261,
+              "p99": 0.133000314,
+              "max": 0.168999657
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 449.407776,
+              "p50": 446.200989,
+              "p95": 489.843994,
+              "p99": 492.179993,
+              "max": 495.800995
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 449.503876,
+              "p50": 446.306,
+              "p95": 489.917999,
+              "p99": 492.252991,
+              "max": 495.872009
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 57.7717857,
+              "p50": 55,
+              "p95": 119,
+              "p99": 132,
+              "max": 156
+            }
+          },
+          "cycle": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 499.237,
+            "first_measured_ms": 501.041016,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 11568166,
+              "draw_reused": 3855834,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.0962198749,
+              "p50": 0.096000731,
+              "p95": 0.114000402,
+              "p99": 0.118000433,
+              "max": 0.19400008
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 454.395386,
+              "p50": 450.493011,
+              "p95": 496.576996,
+              "p99": 499.855988,
+              "max": 500.964996
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 454.491821,
+              "p50": 450.605988,
+              "p95": 496.651001,
+              "p99": 499.934998,
+              "max": 501.041016
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 48000.6875,
+              "p50": 48224,
+              "p95": 50270,
+              "p99": 50358,
+              "max": 50413
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-cpu",
+      "repeat": 1,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 9.3170004,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 569.450012,
+            "first_measured_ms": 492.881012,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 13923,
+              "draw_reused": 15410077,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.0949668139,
+              "p50": 0.0959997997,
+              "p95": 0.111999922,
+              "p99": 0.115999952,
+              "max": 0.124000013
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 448.022858,
+              "p50": 443.421997,
+              "p95": 490.033997,
+              "p99": 492.476013,
+              "max": 494.414001
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 448.117828,
+              "p50": 443.53299,
+              "p95": 490.105988,
+              "p99": 492.550995,
+              "max": 494.488007
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 57.7717857,
+              "p50": 55,
+              "p95": 119,
+              "p99": 132,
+              "max": 156
+            }
+          },
+          "cycle": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 490,
+            "first_measured_ms": 490.497009,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 11568166,
+              "draw_reused": 3855834,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.0947427452,
+              "p50": 0.0949995592,
+              "p95": 0.112999231,
+              "p99": 0.117000192,
+              "max": 0.121999532
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 448.806244,
+              "p50": 445.019012,
+              "p95": 489.139008,
+              "p99": 492.911011,
+              "max": 497.088989
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 448.900909,
+              "p50": 445.130005,
+              "p95": 489.212006,
+              "p99": 492.984985,
+              "max": 497.162994
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 48000.6875,
+              "p50": 48224,
+              "p95": 50270,
+              "p99": 50358,
+              "max": 50413
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "outer-cpu",
+      "repeat": 2,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "outer-review",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 2048,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 9.25600063,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 569.997009,
+            "first_measured_ms": 492.690002,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 13923,
+              "draw_reused": 15410077,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.114477165,
+              "p50": 0.0959997997,
+              "p95": 0.116000883,
+              "p99": 0.124000013,
+              "max": 4.54100037
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 463.976105,
+              "p50": 445.891998,
+              "p95": 521.338013,
+              "p99": 642.320007,
+              "max": 1255.45801
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 464.090546,
+              "p50": 446.002014,
+              "p95": 521.419006,
+              "p99": 642.401978,
+              "max": 1255.53601
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 57.7717857,
+              "p50": 55,
+              "p95": 119,
+              "p99": 132,
+              "max": 156
+            }
+          },
+          "cycle": {
+            "final_state": "tick=496 x=-0x1.d673e2p+3 z=0x1.7fca84p+4 vx=-0x1.5bedc8p+0 vz=-0x1.cdb1c2p+3 heading=-0x1.839324p-4 yaw_velocity=-0x1.05ca68p-9 height=0x1.fb28ccp-9 vertical_velocity=0x1.53c608p-1 pitch=0x1.fe2f1ep-4 roll=0x1.12445cp-6 throttle=0x1.333334p-1 wheel=-0x1.1b5522p-8 landings=0",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 492.632996,
+            "first_measured_ms": 1173.60706,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 11568166,
+              "draw_reused": 3855834,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.117962636,
+              "p50": 0.0999998301,
+              "p95": 0.118000433,
+              "p99": 0.249000266,
+              "max": 3.85099936
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 537.282837,
+              "p50": 527.234985,
+              "p95": 714.159973,
+              "p99": 1173.53406,
+              "max": 1338.48901
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 537.400757,
+              "p50": 527.340027,
+              "p95": 714.239014,
+              "p99": 1173.60706,
+              "max": 1338.58105
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 7555.41064,
+              "p50": 7571,
+              "p95": 7667,
+              "p99": 7669,
+              "max": 7674
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 2009130.25,
+              "p50": 1999484,
+              "p95": 2177161,
+              "p99": 2177209,
+              "max": 2177209
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 48000.6875,
+              "p50": 48224,
+              "p95": 50270,
+              "p99": 50358,
+              "max": 50413
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-cpu",
+      "repeat": 0,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 1621.652,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 97.473999,
+            "first_measured_ms": 91.8590012,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 104890,
+              "draw_reused": 15319110,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.780303001,
+              "p50": 0.772999585,
+              "p95": 0.839999855,
+              "p99": 0.860999346,
+              "max": 0.927000284
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 92.8400574,
+              "p50": 92.9280014,
+              "p95": 94.2480011,
+              "p99": 95.0530014,
+              "max": 105.206001
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 93.6203613,
+              "p50": 93.7109985,
+              "p95": 94.9869995,
+              "p99": 95.8199997,
+              "max": 106.018997
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 435.22821,
+              "p50": 440,
+              "p95": 451,
+              "p99": 495,
+              "max": 549
+            }
+          },
+          "cycle": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 89.7789993,
+            "first_measured_ms": 90.3970032,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 12008770,
+              "draw_reused": 3415230,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.776556075,
+              "p50": 0.76900053,
+              "p95": 0.837000072,
+              "p99": 0.853000224,
+              "max": 0.909999967
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 94.6499252,
+              "p50": 94.9209976,
+              "p95": 96.4369965,
+              "p99": 97.0210037,
+              "max": 97.5530014
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 95.4264526,
+              "p50": 95.723999,
+              "p95": 97.2040024,
+              "p99": 97.8199997,
+              "max": 98.3410034
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 49828.9219,
+              "p50": 50017,
+              "p95": 50199,
+              "p99": 50231,
+              "max": 50283
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-cpu",
+      "repeat": 1,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 1599.881,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 97.0630035,
+            "first_measured_ms": 89.5569992,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 104890,
+              "draw_reused": 15319110,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.777327657,
+              "p50": 0.771000028,
+              "p95": 0.843999922,
+              "p99": 0.869000316,
+              "max": 0.892000258
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 92.4721451,
+              "p50": 92.7099991,
+              "p95": 94.3799973,
+              "p99": 95.9919968,
+              "max": 100.167999
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 93.2494888,
+              "p50": 93.5199966,
+              "p95": 95.1679993,
+              "p99": 96.7890015,
+              "max": 100.926003
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 435.22821,
+              "p50": 440,
+              "p95": 451,
+              "p99": 495,
+              "max": 549
+            }
+          },
+          "cycle": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 89.2910004,
+            "first_measured_ms": 90.3840027,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 12008770,
+              "draw_reused": 3415230,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.896365464,
+              "p50": 0.784999669,
+              "p95": 0.845000148,
+              "p99": 2.01100016,
+              "max": 14.6490002
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 108.219643,
+              "p50": 96.3349991,
+              "p95": 169.792999,
+              "p99": 427.981995,
+              "max": 570.603027
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 109.116035,
+              "p50": 97.1200027,
+              "p95": 170.593002,
+              "p99": 442.631012,
+              "max": 571.383972
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 49828.9219,
+              "p50": 50017,
+              "p95": 50199,
+              "p99": 50231,
+              "max": 50283
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "stress-cpu",
+      "repeat": 2,
+      "report": {
+        "schema_revision": 1,
+        "tool": "boat_water_review",
+        "mode": "lighting_qualification",
+        "build": "fc97773-dirty/Release/AppleClang-21.0.0.21000101",
+        "platform": "Darwin/arm64",
+        "renderer": "cpu",
+        "scenario": "stress-basin",
+        "waves": true,
+        "resolution": [
+          320,
+          200
+        ],
+        "hdr": false,
+        "aa": "off",
+        "window": "hidden",
+        "tile_size": 0,
+        "gpu_timer": null,
+        "gl_renderer": null,
+        "gl_version": null,
+        "sample_count": 241,
+        "warmup_samples": 8,
+        "measured_samples": 241,
+        "frame_rows": 249,
+        "virtual_cycle_seconds": 900,
+        "sample_stride_seconds": 3.75,
+        "initialization_ms": 1598.118,
+        "cadence_note": "241 measured samples span virtual elapsed 0..900 s; warmup and first draw are reported separately",
+        "start_hour": 6.5,
+        "fixed_hour": 6.5,
+        "cycle_final_hour": 6.5,
+        "cycle_hours_complete": true,
+        "cycle_wraps": true,
+        "final_state_match": true,
+        "deadline_ms": 16.6666667,
+        "deadline_rule": "value > deadline_ms",
+        "clock": "injected virtual elapsed; no wall-clock waits",
+        "note": "fixed and cycle runs share the same independent physical trajectory; CPU has no GPU or presentation pass, so its frame_ms is simulation plus CPU render",
+        "counter_semantics": "GPU app_submissions/scene_triangles count scene DrawMesh work; CPU values count renderer3d mesh submissions and submitted triangles",
+        "runs": {
+          "fixed": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 1,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 96.0230026,
+            "first_measured_ms": 90.8830032,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 104890,
+              "draw_reused": 15319110,
+              "draw_calls": 241,
+              "draw_generations": 0
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.776535273,
+              "p50": 0.771000028,
+              "p95": 0.834000289,
+              "p99": 0.849000156,
+              "max": 0.881999731
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 92.6330719,
+              "p50": 92.8949966,
+              "p95": 94.2819977,
+              "p99": 95.0070038,
+              "max": 96.4869995
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 93.4096146,
+              "p50": 93.6660004,
+              "p95": 95.0400009,
+              "p99": 95.7679977,
+              "max": 97.2419968
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 435.22821,
+              "p50": 440,
+              "p95": 451,
+              "p99": 495,
+              "max": 549
+            }
+          },
+          "cycle": {
+            "final_state": "tick=2896 hash=6cea75e2b031fbbc wake_live=121 wake_peak=125 wake_emitted=181 wake_expired=60 traffic_live=128 traffic_peak=128 traffic_emitted=320 slot0=-0x1.60e402p+5,-0x1.498eap+5,-0x1.839a04p+1,-0x1.2c74bap-3 slot1=0x1.08b69p+6,-0x1.aef39cp+4,-0x1.ae6fdep+0,-0x1.a0c246p+3 slot2=-0x1.2bd0bp+6,0x1.525732p+5,0x1.5c6c7ep-5,-0x1.bc63b2p-1 slot3=0x1.d2a7b4p+5,0x1.840244p+4,0x1.a69c26p+0,0x1.b28b04p+3",
+            "hour_bins_visited": 24,
+            "deadline_misses": 241,
+            "gpu_samples": 0,
+            "gpu_samples_skipped": 241,
+            "first_draw_ms": 89.0619965,
+            "first_measured_ms": 90.5370026,
+            "sky": {
+              "reference_samples": 0,
+              "draw_samples": 12008770,
+              "draw_reused": 3415230,
+              "draw_calls": 241,
+              "draw_generations": 240
+            },
+            "simulation_ms": {
+              "samples": 241,
+              "mean": 0.776319504,
+              "p50": 0.768999577,
+              "p95": 0.844999194,
+              "p99": 0.870999873,
+              "max": 0.931000352
+            },
+            "submission_ms": {
+              "samples": 241,
+              "mean": 94.5944138,
+              "p50": 94.8730011,
+              "p95": 96.1930008,
+              "p99": 96.5350037,
+              "max": 96.8860016
+            },
+            "present_ms": {
+              "samples": 241,
+              "mean": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0
+            },
+            "frame_ms": {
+              "samples": 241,
+              "mean": 95.3707352,
+              "p50": 95.7020035,
+              "p95": 96.9690018,
+              "p99": 97.3180008,
+              "max": 97.6589966
+            },
+            "gpu_ms": null,
+            "app_submissions": {
+              "samples": 241,
+              "mean": 467.900421,
+              "p50": 469,
+              "p95": 474,
+              "p99": 476,
+              "max": 477
+            },
+            "scene_triangles": {
+              "samples": 241,
+              "mean": 73578.8047,
+              "p50": 73592,
+              "p95": 73652,
+              "p99": 73676,
+              "max": 73688
+            },
+            "sky_draw_samples": {
+              "samples": 241,
+              "mean": 49828.9219,
+              "p50": 50017,
+              "p95": 50199,
+              "p99": 50231,
+              "max": 50283
+            }
+          }
+        }
+      }
+    }
+  ]
+}

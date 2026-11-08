@@ -1,4 +1,5 @@
 #include "renderer3d.h"
+#include "waterfront.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -143,12 +144,44 @@ int main(void)
     }
     wall.rotation.y = 0;
     material.emissive = false;
+    // The R channel is now independent of the light level; the G channel records it.
+    for (int level = 0; level < 16; ++level)
+        for (int texel = 0; texel < 16; ++texel)
+            palette[level * 16 + texel].r = (unsigned char)(100 + texel);
+
+    // Non-emissive textured materials select a palette ramp from the frame's ambient/diffuse.
+    // At the centre the front face has N.L = 1 against this light.
     CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.ambient = .30f;
+    renderer.diffuse = .70f;
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    CHECK(pixels[30 * 80 + 40].g == 15);
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.ambient = .20f;
+    renderer.diffuse = 0;
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    CHECK(pixels[30 * 80 + 40].g == 3);
+    CHECK(pixels[30 * 80 + 40].r == 100);
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.ambient = 0;
+    renderer.diffuse = .50f;
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    CHECK(pixels[30 * 80 + 40].g == 7);
+
+    // The frame tint colours the selected ramp exactly once.
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.ambient = .30f;
+    renderer.diffuse = .70f;
+    renderer.tint = (Vector3) { .5f, .5f, .5f };
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    CHECK(pixels[30 * 80 + 40].r == 50 && pixels[30 * 80 + 40].g == 7);
+
+    // A point light raises the selected ramp, and its contribution stays bounded.
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, (Vector3) { 0, 0, 1 }));
     renderer3d_draw_textured_box(&renderer, wall, &material);
     memcpy(reference, pixels, sizeof(pixels));
-    renderer.point_light = (PointLight3D) { .position = { 0, 0, 0 }, .radius = 6, .intensity = 2 };
     // Begin must clear point-light state, then the caller sets this frame's light.
-    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, (Vector3) { 0, 0, 1 }));
     CHECK(renderer.point_light.radius == 0);
     renderer.point_light = (PointLight3D) { .position = { 0, 0, 0 }, .radius = 6, .intensity = 2 };
     renderer3d_draw_textured_box(&renderer, wall, &material);
@@ -160,9 +193,70 @@ int main(void)
     }
     // A light behind the surface contributes nothing (normal-facing test).
     CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    memcpy(reference, pixels, sizeof(pixels));
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
     renderer.point_light = (PointLight3D) { .position = { 0, 0, 6 }, .radius = 10, .intensity = 2 };
     renderer3d_draw_textured_box(&renderer, wall, &material);
     CHECK(memcmp(reference, pixels, sizeof(pixels)) == 0);
+    CHECK(pixels[30 * 80 + 40].g == 15);
+
+    // Emissive textured materials ignore the sun/fill and follow emissive_tint only.
+    material.emissive = true;
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, (Vector3) { 0, 0, -1 }));
+    renderer.ambient = .30f;
+    renderer.diffuse = .70f;
+    renderer.emissive_tint = (Vector3) { .5f, .5f, .5f };
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    memcpy(reference, pixels, sizeof(pixels));
+    CHECK(pixels[30 * 80 + 40].r == 50 && pixels[30 * 80 + 40].g == 7);
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, (Vector3) { 0, 0, 1 }));
+    renderer.ambient = .9f;
+    renderer.diffuse = 0;
+    renderer.tint = (Vector3) { .2f, .9f, .4f };
+    renderer.emissive_tint = (Vector3) { .5f, .5f, .5f };
+    renderer3d_draw_textured_box(&renderer, wall, &material);
+    CHECK(memcmp(reference, pixels, sizeof(pixels)) == 0);
+    material.emissive = false;
+
+    // Navigation lamps stay their authored colour when the caller darkens the shared unlit tint
+    // for wakes and gulls. The GPU draws these cubes as emitters with a white colour.
+    WaterfrontTrafficFrame traffic = { .vessel_count = 1 };
+    traffic.mesh[0] = 0;
+    traffic.vessels[0].pose = (Transform3D) { .position = { 100, 0, 100 }, .scale = { 1, 1, 1 } };
+    traffic.vessels[0].lights[0] = (Vector3) { 0, 0, 3 };
+    traffic.vessels[0].lights[1] = traffic.vessels[0].lights[2] = (Vector3) { 100, 0, 100 };
+    const Color lamp = { 222, 70, 52, 255 };
+    Vector3 incoming = { .5f, .5f, .5f };
+    memset(pixels, 0, sizeof(pixels));
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.emissive_tint = incoming;
+    waterfront_draw_traffic(&renderer, &traffic);
+    CHECK(memcmp(&pixels[30 * 80 + 40], &lamp, sizeof(Color)) == 0);
+    CHECK(renderer.emissive_tint.x == incoming.x && renderer.emissive_tint.y == incoming.y
+        && renderer.emissive_tint.z == incoming.z);
+    memset(pixels, 0, sizeof(pixels));
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.emissive_tint = (Vector3) { 1, 1, 1 };
+    waterfront_draw_traffic(&renderer, &traffic);
+    CHECK(memcmp(&pixels[30 * 80 + 40], &lamp, sizeof(Color)) == 0);
+
+    // Wakes are ordinary emissive meshes and still follow the frame's unlit tint exactly.
+    WaterfrontTrafficFrame wake = { .wake_count = 1 };
+    wake.wakes[0].pose = (Transform3D) {
+        .position = { 0, 0, 3 }, .rotation = { -PI / 2, 0, 0 }, .scale = { 1, 1, 1 }
+    };
+    wake.wakes[0].color = (Color) { 200, 100, 50, 255 };
+    memset(pixels, 0, sizeof(pixels));
+    CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
+    renderer.emissive_tint = incoming;
+    waterfront_draw_traffic(&renderer, &wake);
+    int tinted_wake = 0;
+    for (int i = 0; i < 80 * 60; ++i)
+        tinted_wake += pixels[i].r == 100 && pixels[i].g == 50 && pixels[i].b == 25;
+    CHECK(tinted_wake > 0);
+    CHECK(renderer.emissive_tint.x == incoming.x && renderer.emissive_tint.y == incoming.y
+        && renderer.emissive_tint.z == incoming.z);
 
     // Moving camera and object together preserves projection and world-space lighting.
     CHECK(renderer3d_begin(&renderer, pixels, 80, 60, camera, light));
