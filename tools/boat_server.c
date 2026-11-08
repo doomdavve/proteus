@@ -444,7 +444,6 @@ static int room(const RoomOptions *options)
     bool suspension_reported = false;
     if (objective_on) {
         boat_room_objective_init(&objective, options->objective);
-        config.marks = &options->objective->marks;
         config.rules = boat_room_objective_rules(&objective);
     }
     static BoatNetServer server;

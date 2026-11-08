@@ -575,6 +575,13 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     case BOAT_NET_RACE_EVENT:
         race_event(c, &m, now);
         break;
+    case BOAT_NET_OBJECTIVE_STATE:
+        if (!c->objective_valid
+            || boat_net_sequence_newer(m.objective.revision, c->objective.revision)) {
+            c->objective = m.objective;
+            c->objective_valid = true;
+        }
+        break;
     case BOAT_NET_DISCONNECT:
         c->leave = m.leave;
         c->phase = BOAT_NET_CLIENT_CLOSED;

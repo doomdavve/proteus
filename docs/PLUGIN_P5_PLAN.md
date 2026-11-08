@@ -1,7 +1,8 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a and P5b implemented on `feat/plugin-p5`: the hunt's objective runs on
-`boat_server`'s authority; clients do not see its HUD yet. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a-P5c implemented on `feat/plugin-p5`: the hunt's objective runs on
+`boat_server`'s authority and clients receive its marks and HUD over protocol v13 (`boat_bot`
+prints them); the game draws them from P5d. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -9,7 +10,7 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: [P5c](#p5c-protocol-v13-and-mirrored-hud).
+Next task: [P5d](#p5d-the-game-client-and-host-a-room-first-playable).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -60,7 +61,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
   rules after each fleet step (`src/boat_net_server.c`).
 - **Boundaries.** `proteus_boat_net` may not link Lua or the plugin host (`CMakeLists.txt`);
   `tools/boat_server.c` links `proteus_plugins` and can.
-- **Wire.** Protocol v12 (`src/boat_net_protocol.h:18`), message types up to
+- **Wire.** Protocol v12 before P5c, v13 after it (`src/boat_net_protocol.h`), message types up to
   `BOAT_NET_DEFINITION_END` (24); reliable control channel for match and race state.
 
 ## Design
@@ -124,7 +125,7 @@ anyone: clients only ever see the resulting HUD.
   crosses a commit.
 
 Naming correction: older documents call round-boundary revisions "protocol v10". The protocol is
-already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v12)),
+already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v13)),
 so this plan uses v13 and v14 and the closing step retires the "v10" label.
 
 ### Recording and reconstruction
@@ -215,6 +216,24 @@ message sizes within the budget; on the memory transport two bots hunt and both 
 HUD after each change; a late joiner gets the current HUD before its first snapshot; HUD
 converges after loss and reordering; free/race/deathmatch room tests pass with re-pinned fixtures.
 Gate: two bots finish a hunt over loss profile F with matching HUD.
+
+**P5c result, 2026-11-08 (commit on `feat/plugin-p5`).** `BOAT_NET_VERSION` is 13 and
+`BOAT_ROOM_VERSION` 4. `BoatRoomDefinition.marks` is carried by flags bit 2; the server uses the
+definition's marks (`BoatNetServerConfig.marks` is gone; `boat_room_package` copies them).
+ObjectiveState (type 25, control channel, server to client) and `boat_net_objective_state_equal`
+are new. `BoatNetRules.state` is polled at init and after every `after_tick`; the server assigns
+the revision, broadcasts on change and sends the current state to each joiner after Roster.
+`tools/boat_room_objective.c` implements `state` from `hud_changes` and quarantine. The client
+keeps `objective` and `objective_valid` (newest revision wins) and `boat_bot` prints
+`boat_bot objective: LABEL=value ... [suspended]`. The wire is big-endian like the rest of the
+codec. Measured: the hunt's room definition is 213 bytes (5 marks); a definition with 16
+maximum-length marks is 979 bytes (34 without; budget 1200); the largest ObjectiveState payload is
+456 bytes (488 with the header). Verification (macOS, Debug): `cmake --build build -j`
+warning-clean; `ctest --test-dir build --preset full -j8` 443 of 443 passed;
+`validate_boat_net --case objective_state` (three clients identical at revision 6, loss profile F
+for the last 7 s) plus the extended `golden`, `codec`, `room_definition_codec`, `rule_events`,
+`boat_room_objective.room` and `room_package` catalog checks. Limits: no ENet process run
+exercised the `boat_bot` print, and the game draws nothing until P5d.
 
 ### P5d: the game client and HOST A ROOM (first playable)
 

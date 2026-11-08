@@ -5,11 +5,12 @@
 // and sends this value; clients decode and validate it without Lua, files or the compiled race and
 // harbour defaults. It belongs to proteus_boat_core: physics, prediction and presentation read the
 // same copied values.
+#include "boat_marks.h"
 #include "boat_match.h"
 #include "boat_race.h"
 #include "boat_scene_definition.h"
 
-#define BOAT_ROOM_VERSION 3
+#define BOAT_ROOM_VERSION 4
 #define BOAT_ROOM_ID_BYTES 64
 #define BOAT_ROOM_NAME_BYTES 64
 // The largest encoded definition: a scene, a course and their rules. The codec rejects more.
@@ -41,6 +42,7 @@ typedef struct {
     BoatCombatRules combat_rules;
     bool has_scene;
     BoatSceneDefinition scene;
+    BoatMarkSet marks; // Free rooms only; count 0 is none.
 } BoatRoomDefinition;
 
 // Structural validation without a map: version, mode/location, names, course geometry and rules,

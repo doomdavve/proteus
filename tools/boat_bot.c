@@ -216,7 +216,7 @@ int main(int argc, char **argv)
     uint32_t last_life = 0;
     uint64_t received_inputs = 0, input_samples = 0, last_snapshots = 0;
     unsigned capsized = 0, resets = 0, mtu = 0;
-    uint32_t reported_round = 0, reported_race = 0;
+    uint32_t reported_round = 0, reported_race = 0, reported_objective = 0;
     unsigned race_finishes = 0, race_dnf = 0, feed_seen = 0;
     uint64_t held_ticks = 0, last_held_tick = 0;
     bool was_held = false;
@@ -318,6 +318,15 @@ int main(int argc, char **argv)
                         row->caused, row->capsized, row->self);
             }
             printf(" (score/kills/deaths/self)\n");
+            fflush(stdout);
+        }
+        if (client.objective_valid && client.objective.revision != reported_objective) {
+            reported_objective = client.objective.revision;
+            printf("boat_bot objective:");
+            for (unsigned i = 0; i < client.objective.row_count; ++i)
+                printf(
+                    " %s=%" PRId64, client.objective.rows[i].label, client.objective.rows[i].value);
+            printf("%s\n", client.objective.suspended ? " suspended" : "");
             fflush(stdout);
         }
         if (client.race_result.round != reported_race) {

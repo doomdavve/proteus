@@ -142,6 +142,7 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
         }
         room.has_scene = revision->free.has_scene;
         room.scene = revision->free.scene;
+        room.marks = revision->free.marks;
     } else {
         reason(error, size, "the package kind cannot define a room");
         return false;

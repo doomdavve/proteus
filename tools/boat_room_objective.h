@@ -20,6 +20,8 @@ typedef struct {
     int64_t sequence; // Last event sequence assigned.
     uint64_t hud_changes; // Committed batches that changed the HUD rows (init counts).
     bool hud_changed; // The latest boundary changed the HUD; cleared by the caller.
+    uint64_t reported_hud_changes; // What the rules adapter's state callback last reported.
+    bool reported_quarantined;
     BoatPluginDiagnostic diagnostic; // Why the objective was quarantined.
 } BoatRoomObjective;
 

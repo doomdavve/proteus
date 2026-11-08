@@ -1,4 +1,4 @@
-# Multiplayer protocol v12
+# Multiplayer protocol v13
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -56,6 +56,13 @@ request, slot blocks gain that request, checkpoints optionally append the comple
 combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
+v13 (2026-11-08) carries a free room's marks and its objective HUD. Room definition v4 adds
+flags bit 2 and a marks block after the scene, and ObjectiveState (type 25, server to client,
+reliable control channel) sends the HUD rows and suspension as data on every change and to each
+joiner after Roster. Lua state never leaves the authority. v12 peers are rejected at Hello; no
+other layout changes (commands, snapshots and checkpoints are unchanged). Rebuild all peers:
+v1–v12 are incompatible.
 
 v12 (2026-11-04) retires the river location into the outer map, which holds the same water in
 the same frame. Accept's and the room definition's location byte is now 0 basin or 1 outer
@@ -191,6 +198,7 @@ buffering does not change the wire layout or channels.
 | 22 | DefinitionBegin | S→C | room tick | 20 |
 | 23 | DefinitionPage | S→C | room tick | 8 + 1..1024 |
 | 24 | DefinitionEnd | S→C | room tick | 8 |
+| 25 | ObjectiveState | S→C | room tick | 8 + rows (at most 456) |
 
 ### Hello, Accept, Reject
 
@@ -250,14 +258,18 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 
 | Field | Type |
 | --- | --- |
-| version (3) | u8 |
+| version (4) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
 | location (0 basin, 1 outer; v12) | u8 |
-| flags: bit 0 has rules, bit 1 has a scene | u8 |
+| flags: bit 0 has rules, bit 1 has a scene, bit 2 has marks | u8 |
 | package ID and display name | u8 length + printable ASCII |
 | race: start, 1–8 gates, grid, ferry, storm, rules | five `f32` per line; `f64` start times; `f32` weather; `u32` ticks |
 | deathmatch: match rules and combat rules | `u32`/`f32` fields as in the checkpoint's rules |
 | scene, when present | the L1–L4 fieldwise scene (marina, traffic, gulls) |
+| marks, when flagged | `u8` count 1–16; per mark `u8` length + id, `u8` length + name, `f32` x, z, radius |
+
+Marks are valid only in free rooms; clients check them structurally (count, id and name text,
+finite bounded coordinates, radius, no overlap) like the rest of the definition.
 
 Map-dependent checks (open water, gate and recovery clearance, authored-contact clearance) run
 on the authority before the room starts. Clients validate only structure and bounds: version,
@@ -506,6 +518,24 @@ RaceEvent: `u8` kind (0 phase, 1 gate, 2 finish, 3 did not finish, 4 recovery, 5
 `u64` finish time in 1/1024-tick units (finish events only; 0 otherwise). Within a tick, events
 precede the RaceState that counts them.
 
+### ObjectiveState (free rooms with an objective)
+
+A free room whose package has an objective sends the HUD as data. The authority sends it to every
+connected peer whenever the rows or the suspension change (and once at start), and to each joiner
+right after Roster (and any MatchState or RaceState) and before the definition and checkpoint.
+Clients never send it. Lua state, timers and events are never sent. The newest revision wins;
+the reliable ordered control channel keeps it intact under datagram loss and reordering. Payload:
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | u32 | revision, from 1; the server adds one per change |
+| 4 | u8 | flags: bit 0 suspended (the objective is quarantined on the authority); other bits 0 |
+| 5 | u8 | row count, 0–8 |
+| 6 | u16 | reserved, 0 |
+| 8 | rows | per row: `u8` id length 1–23 + id, `u8` label length 1–23 + label (printable ASCII 0x20–0x7e), `i64` value |
+
+The largest payload is 8 + 8 × 56 = 456 bytes.
+
 ## LAN discovery
 
 Added 2026-10-24 so the title can list rooms on the local network. Discovery is plain UDP on
@@ -588,7 +618,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v11 rejects every other version, v1–v10 included; there is no negotiation or
+  protocol version. v13 rejects every other version, v1–v12 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
@@ -602,10 +632,16 @@ must not exceed their capacities, and expired ≤ emitted.
 
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
   a RaceEvent payload, and of the room definition's begin/page/end messages;
+- ObjectiveState: golden bytes of a suspended two-row HUD with a negative value, every
+  truncation, and rejection of row count 9, an empty id, a non-printable label, a nonzero
+  reserved field, flags 2 and revision 0; a free definition with 16 maximum-length marks that
+  round trips in 979 bytes (budget 1200) and is refused in a deathmatch definition; and the
+  `objective_state` memory-transport case, where two clients and a late joiner mirror the
+  server's HUD, including under loss profile F;
 - the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`7bb4635201d38223`; v8 was `413083c341105850`, v5 was
+  digest of a hand-built snapshot's bytes (`84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
   `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's `690c711d99578e10`);
-- round trips of all 24 types, rejection of every truncation, and a declared extra byte;
+- round trips of all 25 types, rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from
   the river and the MatchState, MatchEvent, RaceState and RaceEvent consistency rules;
 - a deathmatch room on the in-memory transport whose clients, including a mid-round joiner,

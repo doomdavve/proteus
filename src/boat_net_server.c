@@ -14,6 +14,8 @@ static uint8_t text_copy(char *storage, const char *text, size_t limit)
     return (uint8_t)length;
 }
 
+static void objective_poll(BoatNetServer *s);
+
 bool boat_net_server_init(
     BoatNetServer *server, BoatNetTransport transport, const BoatNetServerConfig *config)
 {
@@ -25,9 +27,6 @@ bool boat_net_server_init(
     const BoatRoomDefinition *room = config->room;
     BoatRoomDiagnostic check;
     if (!boat_room_definition_validate(room, &check))
-        return false;
-    if (config->marks
-        && (room->mode != BOAT_ROOM_MODE_FREE || !boat_marks_validate(config->marks, NULL)))
         return false;
     bool deathmatch = room->mode == BOAT_ROOM_MODE_DEATHMATCH;
     bool race = room->mode == BOAT_ROOM_MODE_RACE;
@@ -70,6 +69,7 @@ bool boat_net_server_init(
     server->race = boat_race;
     if (race)
         boat_net_race_state_of(&server->race, &server->race_sent);
+    objective_poll(server);
     return true;
 }
 
@@ -167,6 +167,34 @@ static void race_output(BoatNetServer *s, const BoatRaceOutput *out)
         s->race_sent = m.race;
         broadcast(s, &m);
     }
+}
+
+static BoatNetMessage objective_message(const BoatNetServer *s)
+{
+    BoatNetMessage m
+        = { .header = { .type = BOAT_NET_OBJECTIVE_STATE, .tick = s->fleet.state.tick } };
+    m.objective = s->objective;
+    return m;
+}
+
+// Ask the adapter whether its HUD changed; if so number it and tell every connected peer.
+static void objective_poll(BoatNetServer *s)
+{
+    BoatNetObjectiveState next;
+    if (!s->config.rules.state)
+        return;
+    next = (BoatNetObjectiveState) { 0 };
+    if (!s->config.rules.state(s->config.rules.context, &next))
+        return;
+    next.revision = s->objective.revision + 1;
+    s->objective = next;
+    s->has_objective = true;
+    BoatNetMessage m = objective_message(s);
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
+        if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP) {
+            send_message(s, peer, &m);
+            ++s->stats.objective_states;
+        }
 }
 
 static void rule_event(BoatNetServer *s, BoatNetRuleKind kind, unsigned slot, unsigned mark)
@@ -345,6 +373,11 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
     if (s->race_room) {
         m = race_state(s); // Join in progress: the phase, clock and rows.
         send_message(s, peer, &m);
+    }
+    if (s->has_objective) {
+        m = objective_message(s); // Join in progress: the current HUD.
+        send_message(s, peer, &m);
+        ++s->stats.objective_states;
     }
     send_definition(s, peer);
     send_checkpoint(s, peer);
@@ -667,14 +700,15 @@ static void tick(BoatNetServer *s)
         boat_race_observe(&s->race, &s->fleet, &out);
         race_output(s, &out);
     }
-    if (s->config.marks) {
+    if (s->room->marks.count) {
         BoatMarkEntry entries[BOAT_FLEET_SLOTS];
-        unsigned count = boat_marks_observe(s->config.marks, &s->marks, &s->fleet.state, entries);
+        unsigned count = boat_marks_observe(&s->room->marks, &s->marks, &s->fleet.state, entries);
         for (unsigned i = 0; i < count; ++i)
             rule_event(s, BOAT_NET_RULE_MARK_REACHED, entries[i].slot, entries[i].mark);
     }
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
+    objective_poll(s);
     ++s->stats.ticks;
     // Births first, so a lossless link delivers them before the snapshot that counts them.
     if (next % BOAT_NET_BIRTH_TICKS == 0)

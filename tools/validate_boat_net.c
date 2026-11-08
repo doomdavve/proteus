@@ -93,7 +93,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e54000c0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e54000d0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -103,7 +103,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000c09000000000900000000000000000000"
+        "50424e54000d09000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -174,6 +174,55 @@ static int golden(void)
     CHECK(same_bytes(bytes + 32, 16,
         "02000100000000020000000000"
         "5a0000"));
+    // ObjectiveState (v13): a suspended HUD with a negative value, then its invalid forms.
+    BoatNetMessage hud = { .header = { .type = BOAT_NET_OBJECTIVE_STATE, .tick = 960 },
+        .objective = { .revision = 7, .suspended = true, .row_count = 2 } };
+    strcpy(hud.objective.rows[0].id, "hunt");
+    strcpy(hud.objective.rows[0].label, "HUNT");
+    hud.objective.rows[0].value = 3;
+    strcpy(hud.objective.rows[1].id, "c1");
+    strcpy(hud.objective.rows[1].label, "CREW 1");
+    hud.objective.rows[1].value = -2;
+    size = encode(hud, bytes);
+    CHECK(size == 32 + 44);
+    CHECK(same_bytes(bytes + 32, 44,
+        "00000007" // Revision.
+        "0102"
+        "0000" // Suspended, two rows, reserved.
+        "0468756e74"
+        "0448554e54"
+        "0000000000000003" // hunt: HUNT = 3.
+        "026331"
+        "06435245572031"
+        "fffffffffffffffe")); // c1: CREW 1 = -2.
+    BoatNetMessage hud_back;
+    CHECK(boat_net_decode(bytes, size, &hud_back) == BOAT_NET_OK);
+    CHECK(hud_back.objective.revision == 7 && hud_back.objective.suspended
+        && hud_back.objective.rows[1].value == -2
+        && boat_net_objective_state_equal(&hud_back.objective, &hud.objective));
+    CHECK(boat_net_channel(BOAT_NET_OBJECTIVE_STATE) == BOAT_NET_CONTROL);
+    for (size_t length = 0; length < size; ++length)
+        CHECK(boat_net_decode(bytes, length, &hud_back) != BOAT_NET_OK);
+    BoatNetMessage invalid[6];
+    for (unsigned i = 0; i < 6; ++i)
+        invalid[i] = hud;
+    invalid[0].objective.row_count = BOAT_NET_OBJECTIVE_ROWS + 1;
+    invalid[1].objective.rows[1].id[0] = 0; // Empty id.
+    invalid[2].objective.rows[0].label[1] = '\t'; // Not printable.
+    invalid[3].objective.revision = 0;
+    invalid[4].objective.rows[0].id[0] = 'x'; // Valid control: only the id differs.
+    memset(invalid[5].objective.rows[1].label, 'L', 24); // Unterminated, too long.
+    for (unsigned i = 0; i < 6; ++i) {
+        size = encode(invalid[i], bytes);
+        bool accepted = size && boat_net_decode(bytes, size, &hud_back) == BOAT_NET_OK;
+        CHECK(accepted == (i == 4));
+    }
+    size = encode(hud, bytes);
+    bytes[32 + 4] = 2; // Flags with an undefined bit.
+    CHECK(boat_net_decode(bytes, size, &hud_back) != BOAT_NET_OK);
+    bytes[32 + 4] = 1;
+    bytes[32 + 7] = 1; // Reserved.
+    CHECK(boat_net_decode(bytes, size, &hud_back) != BOAT_NET_OK);
     // Snapshot layout: sizes and a pinned digest of a hand-built state's bytes.
     BoatFleetState state = { .tick = 1000, .next_request = 5 };
     BoatNetSlotInput records[BOAT_FLEET_SLOTS]
@@ -207,7 +256,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x9e194ddbabc7ff9c)); // v12 header; snapshot payload unchanged.
+    CHECK(digest == UINT64_C(0x84f8b6b8504d881f)); // v13 header; snapshot payload unchanged.
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -310,6 +359,15 @@ static unsigned samples(Sample *out)
         .world_page = { .checkpoint = 2, .index = 5, .count = 6, .size = 212 } };
     m[23] = (BoatNetMessage) { .header = { .type = BOAT_NET_DEFINITION_END, .epoch = 3 },
         .checkpoint = 2 };
+    m[24] = (BoatNetMessage) { .header
+        = { .type = BOAT_NET_OBJECTIVE_STATE, .epoch = 3, .tick = 960 },
+        .objective = { .revision = 4, .suspended = true, .row_count = 2 } };
+    strcpy(m[24].objective.rows[0].id, "hunt");
+    strcpy(m[24].objective.rows[0].label, "HUNT");
+    m[24].objective.rows[0].value = 3;
+    strcpy(m[24].objective.rows[1].id, "c1");
+    strcpy(m[24].objective.rows[1].label, "CREW 1");
+    m[24].objective.rows[1].value = -2;
     for (unsigned i = 0; i < BOAT_NET_TYPE_LIMIT - 1; ++i) {
         out[n].size = boat_net_encode(&m[i], out[n].bytes);
         if (!out[n].size) {
@@ -643,8 +701,8 @@ static BoatRoomDefinition room_definition(
     return d;
 }
 
-static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config, BoatRoomMode mode,
-    const BoatMatchRules *rules)
+static bool room_open_marked(Room *room, uint64_t seed, BoatNetServerConfig config,
+    BoatRoomMode mode, const BoatMatchRules *rules, const BoatMarkSet *marks)
 {
     // Clear in place: a Room is over 1 MB, more than Windows' default stack, so a compound
     // literal temporary would overflow it.
@@ -659,10 +717,18 @@ static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config
     if (!config.resources)
         config.resources = basin();
     room->definition = room_definition(config.resources->definition->id, mode, rules);
+    if (marks)
+        room->definition.marks = *marks;
     config.room = &room->definition;
     BoatNetTransport transport;
     return room_listen(room, seed, &transport)
         && boat_net_server_init(&room->server, transport, &config);
+}
+
+static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config, BoatRoomMode mode,
+    const BoatMatchRules *rules)
+{
+    return room_open_marked(room, seed, config, mode, rules, NULL);
 }
 
 static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
@@ -1133,7 +1199,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c510001000c"));
+    CHECK(same_bytes(query, 8, "50424c510001000d"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -2765,6 +2831,55 @@ static int room_definition_codec(void)
     size_t scene_size = boat_room_definition_encode(&scene, bytes, sizeof(bytes));
     scene.scene.berths[0].recipe = BOAT_SCENE_BERTH_RECIPES;
     CHECK(!boat_room_definition_validate(&scene, &rd));
+    // Marks (v4): sixteen full-length marks round trip within the size budget; other modes and
+    // invalid marks are refused.
+    BoatRoomDefinition marked = d;
+    marked.marks.count = BOAT_MARKS_MAX;
+    for (unsigned i = 0; i < BOAT_MARKS_MAX; ++i) {
+        BoatMark *m = &marked.marks.items[i];
+        snprintf(m->id, sizeof(m->id), "mark_%017u", i);
+        snprintf(m->name, sizeof(m->name), "MARK %018u", i);
+        m->x = 500.0f * (float)i - 3000;
+        m->z = -250.5f;
+        m->radius = 25;
+    }
+    CHECK(boat_room_definition_validate(&marked, &rd));
+    size = boat_room_definition_encode(&marked, bytes, sizeof(bytes));
+    static uint8_t plain[BOAT_ROOM_BYTES_MAX];
+    size_t plain_size = boat_room_definition_encode(&d, plain, sizeof(plain));
+    CHECK(size > plain_size && size <= 1200);
+    CHECK(boat_room_definition_decode(bytes, size, &back, &rd));
+    CHECK(back.marks.count == BOAT_MARKS_MAX
+        && !memcmp(&back.marks, &marked.marks, sizeof(marked.marks))
+        && boat_room_definition_digest(&back) == boat_room_definition_digest(&marked));
+    for (size_t length = 0; length < size; ++length)
+        CHECK(!boat_room_definition_decode(bytes, length, &back, &rd));
+    printf("room_definition: 16 marks %zu bytes (%zu without)\n", size, plain_size);
+    bad = marked;
+    bad.mode = BOAT_ROOM_MODE_DEATHMATCH;
+    bad.match_rules = boat_fixture_match_default_rules;
+    bad.combat_rules = boat_fixture_combat_default_rules;
+    CHECK(!boat_room_definition_validate(&bad, &rd) && !strcmp(rd.field, "marks"));
+    bad = marked;
+    bad.marks.items[1].x = bad.marks.items[0].x; // Overlap.
+    bad.marks.items[1].z = bad.marks.items[0].z;
+    CHECK(!boat_room_definition_validate(&bad, &rd) && !strncmp(rd.field, "marks", 5));
+    bad = marked;
+    bad.marks.items[2].id[0] = 'X';
+    CHECK(!boat_room_definition_validate(&bad, &rd));
+    // Decoding refuses an unknown flag bit and an empty or oversized mark list.
+    size = boat_room_definition_encode(&marked, bytes, sizeof(bytes));
+    bytes[3] |= 8; // Flags: an undefined bit.
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[3] = 0; // Marks flag cleared: the mark bytes trail the definition.
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[3] = 4;
+    size_t at = 1 + 1 + 1 + 1 + 1 + 14 + 1 + 14; // Count byte after the id and name text.
+    CHECK(bytes[at] == BOAT_MARKS_MAX);
+    bytes[at] = 0;
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[at] = BOAT_MARKS_MAX + 1;
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
     // Definition paging, as the bootstrap channel carries it.
     static uint8_t definition[BOAT_ROOM_BYTES_MAX];
     size = boat_room_definition_encode(&race, definition, sizeof(definition));
@@ -2833,9 +2948,9 @@ static int rule_events(void)
     BoatMarkSet marks = { .count = 2,
         .items = { { .id = "near", .name = "NEAR", .x = 60, .z = 60, .radius = 20 },
             { .id = "far", .name = "FAR", .x = -60, .z = -60, .radius = 20 } } };
-    BoatNetServerConfig config = { .marks = &marks,
-        .rules = { .context = &log, .event = log_rule, .after_tick = log_after } };
-    CHECK(room_open(&room, 71, config));
+    BoatNetServerConfig config
+        = { .rules = { .context = &log, .event = log_rule, .after_tick = log_after } };
+    CHECK(room_open_marked(&room, 71, config, BOAT_ROOM_MODE_FREE, NULL, &marks));
     BoatNetServer *s = &room.server;
     unsigned a = room_join(&room, "a", NULL, 0), b = room_join(&room, "b", NULL, 0);
     room_run(&room, .5);
@@ -2873,10 +2988,104 @@ static int rule_events(void)
 
     // Marks belong to free rooms, and must be valid.
     BoatMatchRules rules = boat_fixture_match_default_rules;
-    CHECK(!room_open_mode(&room, 72, config, BOAT_ROOM_MODE_DEATHMATCH, &rules));
+    CHECK(!room_open_marked(&room, 72, config, BOAT_ROOM_MODE_DEATHMATCH, &rules, &marks));
     room_close(&room);
     marks.items[1].x = marks.items[1].z = 70; // Overlaps the near mark.
-    CHECK(!room_open(&room, 73, config));
+    CHECK(!room_open_marked(&room, 73, config, BOAT_ROOM_MODE_FREE, NULL, &marks));
+    room_close(&room);
+    return 0;
+}
+
+// P5c: the objective HUD reaches every client through the control channel. A fake, Lua-free
+// adapter changes its rows on given ticks; the server numbers each change, tells every peer and
+// every joiner (before its checkpoint), and a lossy, reordering link still ends in agreement.
+#define FAKE_CHANGES 5
+typedef struct {
+    unsigned version, next;
+    bool pending;
+} FakeObjective;
+
+static const uint64_t fake_change_ticks[FAKE_CHANGES] = { 60, 240, 420, 600, 780 };
+
+static void fake_after(void *context, uint64_t tick)
+{
+    FakeObjective *f = context;
+    if (f->next < FAKE_CHANGES && tick == fake_change_ticks[f->next]) {
+        ++f->version;
+        ++f->next;
+        f->pending = true;
+    }
+}
+
+static bool fake_state(void *context, BoatNetObjectiveState *out)
+{
+    FakeObjective *f = context;
+    if (!f->pending)
+        return false;
+    f->pending = false;
+    out->suspended = f->version == 3;
+    out->row_count = 2;
+    strcpy(out->rows[0].id, "score");
+    strcpy(out->rows[0].label, "SCORE");
+    out->rows[0].value = 10 * (int64_t)f->version;
+    strcpy(out->rows[1].id, "delta");
+    strcpy(out->rows[1].label, "DELTA");
+    out->rows[1].value = -(int64_t)f->version;
+    return true;
+}
+
+static bool hud_mirrored(const Room *room, unsigned i)
+{
+    const BoatNetClient *c = &room->clients[i];
+    const BoatNetServer *s = &room->server;
+    return c->objective_valid && c->objective.revision == s->objective.revision
+        && boat_net_objective_state_equal(&c->objective, &s->objective);
+}
+
+static int objective_state(void)
+{
+    static Room room;
+    static FakeObjective fake;
+    memset(&fake, 0, sizeof(fake));
+    fake.pending = true; // The initial HUD, reported at init.
+    BoatNetServerConfig config
+        = { .rules = { .context = &fake, .after_tick = fake_after, .state = fake_state } };
+    CHECK(room_open(&room, 81, config));
+    BoatNetServer *s = &room.server;
+    CHECK(s->has_objective && s->objective.revision == 1 && s->objective.row_count == 2);
+    unsigned a = room_join(&room, "a", NULL, 0), b = room_join(&room, "b", NULL, 0);
+    room_run(&room, .4); // Before the first change (tick 60).
+    CHECK(s->objective.revision == 1 && hud_mirrored(&room, a) && hud_mirrored(&room, b));
+    CHECK(room.clients[a].objective.rows[0].value == 0);
+    room_run(&room, .6);
+    CHECK(s->objective.revision == 2 && s->objective.rows[0].value == 10);
+    CHECK(hud_mirrored(&room, a) && hud_mirrored(&room, b));
+    room_run(&room, 1.6); // Past the second change (tick 240).
+    CHECK(
+        s->objective.revision == 3 && s->objective.rows[1].value == -2 && !s->objective.suspended);
+    CHECK(hud_mirrored(&room, a) && hud_mirrored(&room, b));
+
+    // A later joiner has the current HUD before its checkpoint, so before any snapshot.
+    unsigned c = room_join(&room, "c", NULL, 0);
+    for (unsigned n = 0; n < 1200 && !room.clients[c].objective_valid; ++n)
+        room_step(&room, 1.0 / 240);
+    CHECK(room.clients[c].objective_valid && hud_mirrored(&room, c));
+    CHECK(room.clients[c].stats.snapshots == 0);
+    room_run(&room, 1);
+    CHECK(room.clients[c].phase == BOAT_NET_CLIENT_PLAYING && hud_mirrored(&room, c));
+
+    // The rest of the changes cross a lossy, reordering link; the clients still agree.
+    BoatNetImpairment f = { .04, .01, .01, .002, .01, .02 };
+    for (unsigned i = 0; i < 3; ++i)
+        boat_net_memory_impair(room.network, room.link[i], f, f);
+    room_run(&room, 7);
+    CHECK(fake.next == FAKE_CHANGES && s->objective.revision == 1 + FAKE_CHANGES);
+    CHECK(s->objective.suspended == (fake.version == 3) && s->objective.rows[0].value == 50);
+    for (unsigned i = 0; i < 3; ++i)
+        CHECK(hud_mirrored(&room, i) && room.clients[i].stats.decode_errors == 0);
+    CHECK(s->stats.objective_states >= 3 + 2 * 2 + 3 * 3 && s->stats.malformed == 0);
+    printf("objective_state: revision %u, %" PRIu64 " messages, three clients identical\n",
+        s->objective.revision, s->stats.objective_states);
     room_close(&room);
     return 0;
 }
@@ -2893,6 +3102,7 @@ static const TestCase cases[] = {
     TEST_CASE(combat_compact),
     TEST_CASE(lossless),
     TEST_CASE(rule_events),
+    TEST_CASE(objective_state),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),
     TEST_CASE(prediction_release),

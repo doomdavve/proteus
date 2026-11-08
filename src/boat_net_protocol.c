@@ -580,6 +580,19 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put64(w, e->time);
         break;
     }
+    case BOAT_NET_OBJECTIVE_STATE: {
+        const BoatNetObjectiveState *os = &m->objective;
+        put32(w, os->revision);
+        put8(w, os->suspended ? 1 : 0);
+        put8(w, os->row_count);
+        put16(w, 0);
+        for (unsigned i = 0; i < os->row_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i) {
+            put_string(w, os->rows[i].id, BOAT_NET_OBJECTIVE_TEXT - 1);
+            put_string(w, os->rows[i].label, BOAT_NET_OBJECTIVE_TEXT - 1);
+            put64(w, (uint64_t)os->rows[i].value);
+        }
+        break;
+    }
     default:
         w->overflow = true;
     }
@@ -938,6 +951,24 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
                         && !rs->slots[i].recoveries));
         }
         expect(r, finished == rs->placed);
+        break;
+    }
+    case BOAT_NET_OBJECTIVE_STATE: {
+        BoatNetObjectiveState *os = &m->objective;
+        os->revision = get32(r);
+        expect(r, os->revision >= 1);
+        uint8_t flags = get8(r);
+        expect(r, flags <= 1);
+        os->suspended = flags & 1;
+        os->row_count = get8(r);
+        expect(r, os->row_count <= BOAT_NET_OBJECTIVE_ROWS);
+        reserved(r, 2);
+        for (unsigned i = 0; i < os->row_count && !r->error; ++i) {
+            get_string(r, os->rows[i].id, BOAT_NET_OBJECTIVE_TEXT - 1);
+            get_string(r, os->rows[i].label, BOAT_NET_OBJECTIVE_TEXT - 1);
+            expect(r, os->rows[i].id[0] && os->rows[i].label[0]);
+            os->rows[i].value = (int64_t)get64(r);
+        }
         break;
     }
     case BOAT_NET_RACE_EVENT: {
@@ -1537,5 +1568,16 @@ bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState
             || x->gates != y->gates || x->recoveries != y->recoveries || x->finish != y->finish)
             return false;
     }
+    return true;
+}
+
+bool boat_net_objective_state_equal(const BoatNetObjectiveState *a, const BoatNetObjectiveState *b)
+{
+    if (a->suspended != b->suspended || a->row_count != b->row_count)
+        return false;
+    for (unsigned i = 0; i < a->row_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i)
+        if (strcmp(a->rows[i].id, b->rows[i].id) || strcmp(a->rows[i].label, b->rows[i].label)
+            || a->rows[i].value != b->rows[i].value)
+            return false;
     return true;
 }

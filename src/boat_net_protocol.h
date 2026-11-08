@@ -15,7 +15,7 @@
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 12
+#define BOAT_NET_VERSION 13
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -75,6 +75,7 @@ typedef enum {
     BOAT_NET_DEFINITION_BEGIN = 22, // S→C: the room definition, before the world checkpoint.
     BOAT_NET_DEFINITION_PAGE = 23, // S→C: one bounded piece of the definition bytes.
     BOAT_NET_DEFINITION_END = 24, // S→C: the definition is complete on this reliable channel.
+    BOAT_NET_OBJECTIVE_STATE = 25, // S→C: a free room objective's HUD rows and suspension.
     BOAT_NET_TYPE_LIMIT
 } BoatNetType;
 
@@ -284,6 +285,22 @@ typedef struct {
     uint64_t time; // Finish subticks after GO; zero for other kinds.
 } BoatNetRaceEvent;
 
+#define BOAT_NET_OBJECTIVE_ROWS 8
+#define BOAT_NET_OBJECTIVE_TEXT 24 // Row id and label capacity, including the terminator.
+
+// A free room objective's HUD as data (P5c): a revision the server counts, whether the objective
+// is suspended, and up to BOAT_NET_OBJECTIVE_ROWS label/value rows. Lua state is never sent.
+typedef struct {
+    uint32_t revision; // Server-assigned, from 1; bumped on each change.
+    bool suspended;
+    uint8_t row_count;
+    struct {
+        char id[BOAT_NET_OBJECTIVE_TEXT];
+        char label[BOAT_NET_OBJECTIVE_TEXT];
+        int64_t value;
+    } rows[BOAT_NET_OBJECTIVE_ROWS];
+} BoatNetObjectiveState;
+
 typedef struct {
     uint8_t slot; // Pool slot; slot / BOAT_OBJECT_PER_BOAT is the emitter.
     BoatWakeObject record;
@@ -321,6 +338,7 @@ typedef struct {
         BoatNetMatchEvent match_event;
         BoatNetRaceState race;
         BoatNetRaceEvent race_event;
+        BoatNetObjectiveState objective;
     };
 } BoatNetMessage;
 
@@ -332,6 +350,8 @@ bool boat_net_match_state_equal(const BoatNetMatchState *a, const BoatNetMatchSt
 void boat_net_race_state_of(const BoatRace *race, BoatNetRaceState *state);
 BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEvent *event);
 bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b);
+// Everything but the revision, which only the server assigns.
+bool boat_net_objective_state_equal(const BoatNetObjectiveState *a, const BoatNetObjectiveState *b);
 // The GO tick a snapshot or checkpoint carries for RACE: zero before its first round.
 uint64_t boat_net_race_go(const BoatRace *race);
 // Bind a race room's package course source to FLEET's water for GO (zero removes it), as the

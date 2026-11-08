@@ -370,6 +370,24 @@ static void scene_wire(RoomWire *w, BoatSceneDefinition *s)
         flock_wire(w, &s->gulls);
 }
 
+static void marks_wire(RoomWire *w, BoatMarkSet *marks)
+{
+    marks->count = (unsigned)integer(w, marks->count, 1);
+    if (marks->count < 1 || marks->count > BOAT_MARKS_MAX) {
+        w->ok = false;
+        marks->count = 0;
+        return;
+    }
+    for (unsigned i = 0; i < marks->count; ++i) {
+        BoatMark *m = &marks->items[i];
+        text(w, m->id, sizeof(m->id));
+        text(w, m->name, sizeof(m->name));
+        m->x = real32(w, m->x);
+        m->z = real32(w, m->z);
+        m->radius = real32(w, m->radius);
+    }
+}
+
 static void definition_wire(RoomWire *w, BoatRoomDefinition *r)
 {
     r->version = (unsigned)integer(w, r->version, 1);
@@ -377,14 +395,15 @@ static void definition_wire(RoomWire *w, BoatRoomDefinition *r)
     r->location = (unsigned char)integer(w, r->location, 1);
     unsigned flags = (unsigned)integer(w,
         ((r->mode == BOAT_ROOM_MODE_RACE || r->mode == BOAT_ROOM_MODE_DEATHMATCH) ? 1u : 0u)
-            | (r->has_scene ? 2u : 0u),
+            | (r->has_scene ? 2u : 0u) | (r->marks.count ? 4u : 0u),
         1);
-    if (flags > 3) {
+    if (flags > 7) {
         w->ok = false;
         return;
     }
     bool has_rules = flags & 1u;
     r->has_scene = flags & 2u;
+    bool has_marks = flags & 4u;
     if (r->version != BOAT_ROOM_VERSION || r->mode >= BOAT_ROOM_MODE_LIMIT
         || r->location >= BOAT_LOCATION_COUNT)
         w->ok = false;
@@ -404,6 +423,10 @@ static void definition_wire(RoomWire *w, BoatRoomDefinition *r)
     }
     if (r->has_scene)
         scene_wire(w, &r->scene);
+    if (has_marks)
+        marks_wire(w, &r->marks);
+    else
+        r->marks = (BoatMarkSet) { 0 };
 }
 
 size_t boat_room_definition_encode(const BoatRoomDefinition *room, uint8_t *out, size_t capacity)
@@ -634,7 +657,7 @@ bool boat_room_definition_validate(const BoatRoomDefinition *r, BoatRoomDiagnost
         return false;
     }
     if (r->version != BOAT_ROOM_VERSION) {
-        fail(diagnostic, "version", "must be 3");
+        fail(diagnostic, "version", "must be 4");
         return false;
     }
     if (r->has_scene && (r->scene.work_present || r->scene.work_count)) {
@@ -674,6 +697,17 @@ bool boat_room_definition_validate(const BoatRoomDefinition *r, BoatRoomDiagnost
         BoatSceneDiagnostic scene;
         if (!boat_scene_validate(&r->scene, &scene)) {
             fail(diagnostic, scene.field, scene.message);
+            return false;
+        }
+    }
+    if (r->marks.count) {
+        if (r->mode != BOAT_ROOM_MODE_FREE) {
+            fail(diagnostic, "marks", "are only available in free rooms");
+            return false;
+        }
+        BoatMarkDiagnostic marks;
+        if (!boat_marks_validate(&r->marks, &marks)) {
+            fail(diagnostic, marks.field[0] ? marks.field : "marks", marks.message);
             return false;
         }
     }

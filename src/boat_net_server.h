@@ -25,7 +25,7 @@ typedef enum {
 typedef struct {
     uint8_t kind; // BoatNetRuleKind
     uint8_t slot;
-    uint8_t mark; // Index into the config's marks; MARK_REACHED only.
+    uint8_t mark; // Index into the room definition's marks; MARK_REACHED only.
 } BoatNetRuleEvent;
 
 // An optional rules adapter, the same pattern as BoatNetTransport. The server never calls Lua;
@@ -34,6 +34,9 @@ typedef struct {
     void *context;
     void (*event)(void *context, uint64_t tick, const BoatNetRuleEvent *event);
     void (*after_tick)(void *context, uint64_t tick); // After every tick and its events.
+    // True when the objective's HUD or suspension changed since the last call; fills OUT (the
+    // revision is the server's). Called once at init and after every after_tick.
+    bool (*state)(void *context, BoatNetObjectiveState *out);
 } BoatNetRules;
 
 typedef struct {
@@ -47,9 +50,6 @@ typedef struct {
     const BoatRoomDefinition *room;
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
-    // P5b: a free room's marks, borrowed for the server's lifetime (NULL for none). They stay on
-    // the authority until protocol v13 carries them in the definition.
-    const BoatMarkSet *marks;
     BoatNetRules rules; // Zero for none.
 } BoatNetServerConfig;
 
@@ -94,6 +94,7 @@ typedef struct {
     uint64_t commands, duplicate_commands, late_commands, future_commands, stale_life_commands;
     uint64_t stale_packets, rate_limited, malformed, forbidden, misbehaving;
     uint64_t input_states[BOAT_NET_INPUT_STATES]; // Ticks integrated with each input source.
+    uint64_t objective_states; // ObjectiveState messages queued, broadcasts and joins alike.
     uint64_t spawn_requests, resyncs, output_faults, emission_failures, births_truncated;
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
@@ -126,7 +127,9 @@ typedef struct {
     BoatNetRaceState race_sent; // The race state clients last received.
     BoatRaceEvent race_events[BOAT_NET_MATCH_EVENTS]; // Recent race events, a ring.
     uint64_t race_event_count;
-    BoatMarkTracker marks; // Which mark each slot is inside; used when CONFIG has marks.
+    BoatMarkTracker marks; // Which mark each slot is inside; used when ROOM has marks.
+    BoatNetObjectiveState objective; // The HUD clients last received (revision 0: none yet).
+    bool has_objective;
     BoatNetServerStats stats;
 } BoatNetServer;
 

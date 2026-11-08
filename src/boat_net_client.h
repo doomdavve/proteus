@@ -132,6 +132,8 @@ typedef struct {
     bool race_valid;
     BoatNetRaceState race;
     BoatNetRaceState race_result; // The latest round's rows as its results phase began.
+    bool objective_valid; // An ObjectiveState arrived (free rooms with an objective).
+    BoatNetObjectiveState objective; // The newest by revision.
     BoatNetRaceFeedEntry race_feed[BOAT_NET_MATCH_FEED];
     uint64_t race_feed_count;
     uint64_t race_go; // Of the newest snapshot: binds the course source and the hold release.

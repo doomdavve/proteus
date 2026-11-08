@@ -465,10 +465,19 @@ static int catalog_rooms(void)
             printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
             continue;
         }
-        // P5b: the hunt's room objective needs boat_server's objective host, not this loader.
+        // P5b/P5c: the plain loader refuses the hunt; the objective loader returns its room
+        // definition with the marks that protocol v13 carries to clients.
         if (!strcmp(entry->id, "proteus.outer-hunt")) {
             CHECK(!loaded && strstr(error, "room objective"));
-            printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
+            BoatRoomObjectiveSource objective;
+            CHECK(boat_room_package_load_objective(entry->id, false, false, location,
+                &WORLDS[location], &definition, &objective, error, sizeof(error)));
+            CHECK(definition.marks.count == 5 && objective.present);
+            size_t size = room_definition_size(&definition);
+            CHECK(size && size <= BOAT_ROOM_BYTES_MAX);
+            printf("room_package catalog %s: %zu bytes, %u marks\n", entry->id, size,
+                definition.marks.count);
+            ++rooms;
             continue;
         }
         if (!loaded) {

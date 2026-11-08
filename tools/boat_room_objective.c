@@ -94,7 +94,31 @@ static void on_after_tick(void *context, uint64_t tick)
     boat_room_objective_after_tick(context, tick);
 }
 
+// The HUD rows and suspension for the clients, once per change. `hud_changed` stays for the
+// caller's own reporting.
+static bool on_state(void *context, BoatNetObjectiveState *out)
+{
+    BoatRoomObjective *o = context;
+    if (o->reported_hud_changes == o->hud_changes
+        && o->reported_quarantined == o->objective.quarantined)
+        return false;
+    o->reported_hud_changes = o->hud_changes;
+    o->reported_quarantined = o->objective.quarantined;
+    *out = (BoatNetObjectiveState) { .suspended = o->objective.quarantined,
+        .row_count = (uint8_t)o->objective.hud_count };
+    for (unsigned i = 0; i < o->objective.hud_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i) {
+        snprintf(out->rows[i].id, sizeof(out->rows[i].id), "%s", o->objective.hud[i].id);
+        snprintf(out->rows[i].label, sizeof(out->rows[i].label), "%s", o->objective.hud[i].label);
+        out->rows[i].value = o->objective.hud[i].value;
+    }
+    if (out->row_count > BOAT_NET_OBJECTIVE_ROWS)
+        out->row_count = BOAT_NET_OBJECTIVE_ROWS;
+    return true;
+}
+
 BoatNetRules boat_room_objective_rules(BoatRoomObjective *o)
 {
-    return (BoatNetRules) { .context = o, .event = on_event, .after_tick = on_after_tick };
+    return (BoatNetRules) {
+        .context = o, .event = on_event, .after_tick = on_after_tick, .state = on_state
+    };
 }

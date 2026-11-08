@@ -266,8 +266,9 @@ guide to the same site. The sandbox checks the whole batch before applying any o
 
 ## Marks (P5a)
 
-Status, 2026-11-08: **P5a/P5b: the objective runs on `boat_server`'s authority; clients do not
-receive its HUD until protocol v13 (P5c).** A free package may author up to 16 named circles on
+Status, 2026-11-08: **P5a-P5c: the objective runs on `boat_server`'s authority; clients receive
+its marks (room definition v4) and HUD (ObjectiveState) over protocol v13 and `boat_bot` prints
+them; the game draws them from P5d.** A free package may author up to 16 named circles on
 the water for an objective that runs on a multiplayer room's authority
 ([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it.
 

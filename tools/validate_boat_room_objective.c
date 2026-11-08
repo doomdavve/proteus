@@ -63,6 +63,7 @@ static int package(void)
     CHECK(hunt.source_size > 0 && strstr(hunt.source, "mark.reached"));
     CHECK(hunt_room.mode == BOAT_ROOM_MODE_FREE && !hunt_room.has_scene);
     CHECK(!strcmp(hunt_room.id, "proteus.outer-hunt"));
+    CHECK(hunt_room.marks.count == 5 && !memcmp(&hunt_room.marks, &hunt.marks, sizeof(hunt.marks)));
     BoatRoomDefinition plain;
     char error[220];
     CHECK(!boat_room_package_load("proteus.outer-hunt", false, false, BOAT_LOCATION_OUTER,
@@ -199,6 +200,14 @@ static void visit(unsigned slot, const BoatMark *mark)
     step(.15); // More than one objective boundary.
 }
 
+static bool client_row(const BoatNetClient *c, const char *id)
+{
+    for (unsigned i = 0; i < c->objective.row_count; ++i)
+        if (!strcmp(c->objective.rows[i].id, id))
+            return true;
+    return false;
+}
+
 static int room(void)
 {
     CHECK(load_hunt());
@@ -211,7 +220,6 @@ static int room(void)
         .max_players = 2,
         .room = &hunt_room,
         .resources = test_world(BOAT_LOCATION_OUTER),
-        .marks = &hunt.marks,
         .rules = boat_room_objective_rules(&o) };
     CHECK(boat_net_server_init(&server, boat_net_memory_server(network), &config));
     for (unsigned i = 0; i < 2; ++i) {
@@ -239,10 +247,21 @@ static int room(void)
         if (m != 2)
             visit(1, &hunt.marks.items[m]);
     CHECK(value(&o, "hunt") == 2 && value(&o, "c1") == 0 && value(&o, "c2") == 0);
+    step(.2);
+    // Both clients mirror the server's HUD, revision included.
+    CHECK(server.has_objective && server.objective.revision > 1);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(clients[i].objective_valid
+            && clients[i].objective.revision == server.objective.revision
+            && boat_net_objective_state_equal(&clients[i].objective, &server.objective));
+    CHECK(client_row(&clients[0], "c2"));
     // Crew 2 leaves; its row goes.
     boat_net_client_leave(&clients[1]);
     step(.2);
     CHECK(boat_net_server_players(&server) == 1 && !row(&o, "c2") && value(&o, "c1") == 0);
+    CHECK(clients[0].objective.revision == server.objective.revision
+        && boat_net_objective_state_equal(&clients[0].objective, &server.objective)
+        && !client_row(&clients[0], "c2") && client_row(&clients[0], "c1"));
     CHECK(!o.objective.quarantined && server.stats.ticks == server.fleet.state.tick);
     printf("room: ticks=%" PRIu64 " hud_changes=%" PRIu64 " acknowledged=%" PRId64 "\n",
         server.fleet.state.tick, o.hud_changes, o.objective.acknowledged);
