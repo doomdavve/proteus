@@ -275,7 +275,8 @@ now built in one place, `net_host_arguments` (hunt maps to a free room on outer 
 sized by `NET_HOST_ARGUMENTS`, and `validate_wake_velocity_host` (quick) checks each mode's exact
 line and that the longest one fits. Verified: a windowed `./build/wake_velocity --host hunt
 --frames 300` started the room on outer and printed `objective tick 12: HUNT=1 CREW 1=0`; full
-suite 446 of 446.
+suite 446 of 446. The user then hosted SHELTER HUNT from the game and reported "Works great!"
+(2026-11-08); the two-person LAN judgement of play check 1 is not yet recorded.
 
 ### P5e: authority-only reload
 
