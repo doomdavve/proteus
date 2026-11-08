@@ -1740,9 +1740,9 @@ lane and skipped browser steps. No gameplay or audiovisual change.
 
 ### P5 — authority, prediction and recorded revisions
 
-**Owner: the [P5 implementation plan](PLUGIN_P5_PLAN.md)** (2026-11-07), with the co-op working
-harbour as its first room scenario; that plan holds the design, steps P5a–P5l, decisions and
-status. It numbers round-boundary revisions protocol v14 (v10 was used by the marina contract).
+**Owner: the [P5 implementation plan](PLUGIN_P5_PLAN.md)** (2026-11-07, revised 2026-11-08), with a
+shelter hunt in a free room as its first scenario (the co-op working harbour follows later); that
+plan holds the design, steps P5a–P5i, decisions and status. It numbers round-boundary revisions protocol v14 (v10 was used by the marina contract).
 
 **Deliverable:** one already proven authored scenario works in a room and can be recorded or
 reconstructed with its revision/state. Implement the explicit content, command/checkpoint,
