@@ -29,6 +29,50 @@ unsigned boat_work_next_site(const BoatWorkSession *e, unsigned from)
     return from;
 }
 
+// A zeroed (or otherwise unusable) clock starts at noon; a valid running clock is left alone so
+// world, job and recovery resets do not jump the time of day.
+static void lighting_ensure_defaults(BoatWorkSession *e)
+{
+    if (boat_sandbox_lighting_valid(e->lighting_hours, e->lighting_cycle_seconds))
+        return;
+    e->lighting_hours = BOAT_SANDBOX_LIGHTING_HOURS_DEFAULT;
+    e->lighting_cycle_seconds = BOAT_SANDBOX_LIGHTING_PERIOD_DEFAULT;
+}
+
+bool boat_work_lighting_seek(BoatWorkSession *e, double hours, double period)
+{
+    if (!boat_sandbox_lighting_valid(hours, period))
+        return false;
+    e->lighting_hours = hours;
+    e->lighting_cycle_seconds = period;
+    return true;
+}
+
+float boat_work_lighting_hour(const BoatWorkSession *e)
+{
+    if (!boat_sandbox_lighting_valid(e->lighting_hours, e->lighting_cycle_seconds))
+        return 0;
+    double hour = fmod(e->lighting_hours, 24.0);
+    if (hour < 0.0)
+        hour += 24.0;
+    float wrapped = (float)hour;
+    return wrapped >= 24.0f || wrapped == 0 ? 0 : wrapped;
+}
+
+bool boat_work_lighting_advance(BoatWorkSession *e, uint64_t ticks)
+{
+    if (!boat_sandbox_lighting_valid(e->lighting_hours, e->lighting_cycle_seconds))
+        return false;
+    double period = e->lighting_cycle_seconds;
+    double hours = e->lighting_hours;
+    if (ticks)
+        hours += (double)ticks * 24.0 / ((double)BOAT_TICK_HZ * period);
+    if (!boat_sandbox_lighting_valid(hours, period))
+        return false;
+    e->lighting_hours = hours;
+    return true;
+}
+
 // KIND's template: the package's own notice, else the native default. Each {site} token becomes
 // the site's name as a sign: capitals with underscores as spaces. The notice owns its text.
 void boat_work_notice_text(
@@ -201,6 +245,7 @@ void boat_work_session_reset_world(BoatWorkSession *e)
         .heading = boat_work_active(e)->heading };
     e->target = boat_work_next_site(e, e->sandbox.active);
     e->tick = 0;
+    lighting_ensure_defaults(e);
     e->crane_view = true;
     e->aim = 0;
     e->paused = false;
@@ -241,7 +286,7 @@ void boat_work_session_identity(const BoatWorkSession *e, BoatSandboxIdentity *i
 // else is re-derived. Jobless sessions (the basin reference) have nothing to save.
 bool boat_work_session_save(BoatWorkSession *e, int64_t saved_at, BoatSandboxSave *save)
 {
-    if (!e->revision)
+    if (!e->revision || !boat_sandbox_lighting_valid(e->lighting_hours, e->lighting_cycle_seconds))
         return false;
     boat_work_job_queue_events(e);
     memset(save, 0, sizeof(*save));
@@ -274,6 +319,8 @@ bool boat_work_session_save(BoatWorkSession *e, int64_t saved_at, BoatSandboxSav
     save->event_count = e->event_count;
     save->generation = e->generation;
     save->sequence = e->sequence;
+    save->lighting_hours = e->lighting_hours;
+    save->lighting_cycle_seconds = e->lighting_cycle_seconds;
     return true;
 }
 
@@ -282,7 +329,8 @@ bool boat_work_session_save(BoatWorkSession *e, int64_t saved_at, BoatSandboxSav
 // re-runs the job's init. The boat resumes where the core puts it (at rest), the crane at rest.
 bool boat_work_session_resume(BoatWorkSession *e, const BoatSandboxSave *save)
 {
-    if (!e->revision || !save->has_objective || save->summary.sites != e->site_count
+    if (!boat_sandbox_lighting_valid(save->lighting_hours, save->lighting_cycle_seconds)
+        || !e->revision || !save->has_objective || save->summary.sites != e->site_count
         || save->guide > e->site_count || save->target >= e->site_count)
         return false;
     for (unsigned i = 0; i < e->site_count; ++i)
@@ -297,6 +345,9 @@ bool boat_work_session_resume(BoatWorkSession *e, const BoatSandboxSave *save)
     e->sandbox = sandbox;
     e->boat = boat;
     e->tick = save->summary.tick;
+    // Resume the exact unwrapped clock (cycle count included); no offline progression.
+    e->lighting_hours = save->lighting_hours;
+    e->lighting_cycle_seconds = save->lighting_cycle_seconds;
     e->crane_view = e->sandbox.moored;
     e->guide = save->guide;
     e->target = save->target;
@@ -314,6 +365,10 @@ bool boat_work_session_resume(BoatWorkSession *e, const BoatSandboxSave *save)
 void boat_work_session_tick(
     BoatWorkSession *e, float slew, float reach, float hoist, BoatInput input)
 {
+    // One physical tick advances the light exactly once; the caller's tick loop already applies
+    // pause, focus and the 0.25..8x speed by choosing how many ticks to run.
+    lighting_ensure_defaults(e);
+    boat_work_lighting_advance(e, 1);
     BoatCargoSandbox *s = &e->sandbox;
     if (e->crane_view && s->moored) {
         if (slew || reach || hoist)
@@ -605,6 +660,8 @@ BoatWorkWatch boat_work_watch(const BoatWorkSession *e)
     BoatWorkWatch w = { .position = e->boat.position,
         .heading = e->boat.heading,
         .progress = UINT64_C(14695981039346656037),
+        .lighting_hours = e->lighting_hours,
+        .lighting_cycle_seconds = e->lighting_cycle_seconds,
         .load = e->sandbox.cargo.load,
         .active = e->sandbox.active,
         .moored = e->sandbox.moored,
@@ -629,7 +686,8 @@ static void boat_work_watch_note(
     BoatAutosave *autosave, uint64_t tick, const BoatWorkWatch *before, const BoatWorkWatch *now)
 {
     bool pose = before->position.x != now->position.x || before->position.y != now->position.y
-        || before->heading != now->heading;
+        || before->heading != now->heading || before->lighting_hours != now->lighting_hours
+        || before->lighting_cycle_seconds != now->lighting_cycle_seconds;
     bool milestone = before->progress != now->progress || before->built != now->built
         || before->load != now->load || before->active != now->active
         || before->moored != now->moored || before->delivered != now->delivered

@@ -14,6 +14,8 @@
         }                                                                                          \
     } while (0)
 
+static bool same_color3(Vector3 a, Vector3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
+
 int main(void)
 {
     BoatModel receiver, out;
@@ -73,6 +75,47 @@ int main(void)
     CHECK(boat_cargo_decal(
         &out, &receiver.mesh, (Vector3) { 0, -2, 0 }, NULL, 0, (Vector2) { 0 }, (Color) { 0 }));
     CHECK(!out.mesh.triangle_count);
+    // The work solids' ambient floor is bit-identical by day, when window_light is zero.
+    WaterfrontLighting day = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
+    CHECK(day.window_light == 0);
+    WaterfrontLighting day_work = boat_cargo_view_work_lighting(day);
+    CHECK(day_work.cpu_ambient == day.cpu_ambient);
+    CHECK(day_work.cpu_direct == day.cpu_direct);
+    CHECK(day_work.direct_intensity == day.direct_intensity);
+    CHECK(same_color3(day_work.cpu_tint, day.cpu_tint));
+    CHECK(same_color3(day_work.sun_direction, day.sun_direction));
+    CHECK(same_color3(day_work.direct, day.direct));
+
+    // At night the floor follows occupied window light while every other field is preserved.
+    WaterfrontLighting night;
+    CHECK(waterfront_lighting_hour(0, &night));
+    night.window_light = 1;
+    WaterfrontLighting night_work = boat_cargo_view_work_lighting(night);
+    CHECK(night_work.cpu_ambient == fmaxf(night.cpu_ambient, .8f));
+    CHECK(night_work.cpu_ambient >= night.cpu_ambient);
+    CHECK(night_work.cpu_direct == night.cpu_direct);
+    CHECK(night_work.direct_intensity == night.direct_intensity);
+    CHECK(same_color3(night_work.cpu_tint, night.cpu_tint));
+    CHECK(same_color3(night_work.sun_direction, night.sun_direction));
+    CHECK(same_color3(night_work.direct, night.direct));
+
+    // The floor is continuous and nondecreasing across the window-light ramp.
+    float previous = -1;
+    for (int sample = 0; sample <= 20; ++sample) {
+        WaterfrontLighting light = night;
+        light.window_light = sample / 20.0f;
+        WaterfrontLighting work = boat_cargo_view_work_lighting(light);
+        CHECK(work.cpu_ambient == fmaxf(light.cpu_ambient, .8f * light.window_light));
+        CHECK(work.cpu_ambient >= previous);
+        CHECK(same_color3(work.cpu_tint, light.cpu_tint));
+        previous = work.cpu_ambient;
+    }
+    // A frame already above the floor keeps its original ambient exactly.
+    WaterfrontLighting bright = night;
+    bright.cpu_ambient = .9f;
+    bright.window_light = .5f;
+    CHECK(boat_cargo_view_work_lighting(bright).cpu_ambient == .9f);
+
     puts("cargo decal: posed bow, clipped footprint, receiver planes and empty output passed");
     return 0;
 }

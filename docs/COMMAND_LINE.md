@@ -73,6 +73,21 @@ scripted drive, writes one save and exits.
 delivery script (load, lash, depart, moor at the landing, unload), so `--time 3` shows the berth
 and `--time 14` the delivered crate. Screenshots draw no HUD.
 
+By default Working Harbour follows its session clock: a new session starts at noon, and a full
+day takes 900 active scaled seconds at 1×. The solo ¼×–8× control (`[` / `]`, typed brackets,
+`,` / `.`, with `\` restoring 1×) also moves the light, so 8× takes 112.5 active wall seconds
+(4.6875 s per game hour). Menu, help and focus loss freeze the clock; load/crate/job resets and
+recovery keep the hour, and a new session resets to noon. A saved title LIGHTING choice is
+ignored here; explicit `--daylight` or `--lighting-hour` fixes the render while the clock keeps
+advancing and saving. The [lighting plan](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the
+full contract.
+
+Two developer-only review options belong to bounded `--work` runs. `--work-clock-report FILE`
+needs `--work` and `--frames` in a visible native window, rejects `--screenshot` and
+`--performance-report`, and writes one CSV with actual GL sun/mask observations and optional GPU
+times. `--work-review-pose swing|deck|approach` prepares a real cargo-api pose for bounded
+screenshots or frame runs; it adds no normal menu or HUD feature.
+
 ## Locations and voyages
 
 ```sh
@@ -225,14 +240,18 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 ## Rendering, captures and profiling
 
 `--daylight day|sunset|dusk` selects a fixed legacy lighting preset (default day); a numeric
-phase 0..1 blends between them. In the title, SETTINGS → LIGHTING remembers DAY,
-SUNSET or DUSK for your new solo and multiplayer sessions. Explicit CLI launches use
-their own options rather than the saved title choice.
+phase 0..1 blends between them. In the title, SETTINGS → LIGHTING cycles 27 fixed choices:
+DAY (default), SUNSET, DUSK, then 00:00 through 23:00. The choice is remembered per local player
+and injected into new solo, joined and hosted sessions. The same `lighting` key stores exact
+legacy names or versioned `hour-v1:HH`; malformed values and unknown versions fall back to Day.
+Explicit CLI launches use their own options rather than the saved title choice.
 
-`--lighting-hour H` is the developer full-day review input. Any finite hour wraps into
-`[0,24)` (`24` is midnight, `-1` is 23:00); non-finite values are rejected. It overrides
-`--daylight` regardless of argument order. `--time` still selects the scripted drive and
-wave time, not the light, so the same hour can be captured at different moments:
+`--lighting-hour H` is the fixed full-day override. Any finite hour wraps into
+`[0,24)` (`24` is midnight, `-1` is 23:00); fractional hours remain supported, and non-finite
+values are rejected. It overrides `--daylight` regardless of argument order. If either explicit
+option is present, the title's saved lighting is not injected. `--time` still selects the
+scripted drive and wave time, not the light, so the same hour can be captured at different
+moments:
 
 ```sh
 ./build/wake_velocity --renderer cpu --location outer --lighting-hour 21 --time 3 \
@@ -256,8 +275,8 @@ timing threshold.
   --scenario stress --lighting-samples 25 --waves
 ```
 
-The deathmatch capture fixture accepts the same developer hour for weapons and mirror review;
-invalid or missing values are rejected before a window opens:
+The deathmatch capture fixture accepts the same fixed full-day hour for weapons and mirror
+review; invalid or missing values are rejected before a window opens:
 
 ```sh
 ./build/boat_combat_review --lighting-hour 21 --screenshot build/combat-night.png
@@ -268,8 +287,8 @@ invalid or missing values are rejected before a window opens:
 The named Day, Sunset and Dusk recipes keep their exact legacy behavior. The CPU basin now
 shares the selected hour's sky and light, and both CPU flat-water paths apply the frame's water
 multiplier once with ordinary flat shading, so basin captures from earlier daytime-only builds
-differ intentionally. The user approved the fixed-hour T1 preview; broader readability and
-performance qualification remains T2c.
+differ intentionally. T2c readability/performance limits and T3's fixed-hour title controls are
+recorded in the [lighting plan](SUNSET_PLAN.md#t3-implementation-2026-11-08).
 
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
@@ -288,6 +307,12 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 Screenshots use a deterministic scripted drive, not interactive elapsed time. `--time`
 selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to its finish.
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
+
+`--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The
+existing `[` / `]` (or typed brackets and `,` / `.`) steps and `\` restore continue to work. It
+is rejected with `--connect` or `--host`; rooms keep their own time. A scripted `--time` capture
+still uses its own scripted ticks rather than this scale. In `--work`, the same scale moves the
+session light as well as the world because both use fixed ticks.
 
 ```sh
 ./build/wake_velocity --location outer --demo --frames 720

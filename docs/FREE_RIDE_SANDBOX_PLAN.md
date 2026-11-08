@@ -47,11 +47,13 @@ Working Harbour menu entry with discovered saves, objective migration at load) m
 decluttered HUD (da52ff3) on 2026-11-07. Still owed: S1's review of fun, then broader S0
 qualification.
 
-Planning update, 2026-11-07: add a sandbox day/night cycle at **15 real minutes per
-24 game hours**, after the shared full-day lighting prerequisites. The
-[lighting plan's T4](SUNSET_PLAN.md#sandbox-clock-contract-t4) owns the clock/rendering
-contract; the [sandbox step below](#sandbox-daynight-cycle-t4) owns handling acceptance.
-This is planned work; the current experiment's lighting is unchanged.
+Update, 2026-11-08: the sandbox day/night cycle (lighting T4) is implemented locally in the
+game's Working Harbour. A new session starts at noon and runs **900 active scaled seconds per
+24 game hours** at 1×; the existing ¼×–8× control moves light with the world, so 8× takes
+112.5 active wall seconds. The [lighting plan](SUNSET_PLAN.md#sandbox-clock-contract-t4) owns the
+clock/rendering contract and evidence; the [sandbox step below](#sandbox-daynight-cycle-t4)
+owns handling acceptance. The standalone `cargo_sandbox` fixture intentionally stays fixed-day.
+Actual windowed 8× play and agent verification pass; user night/cargo/cycle acceptance remains pending.
 
 ## S0a: try the cargo toy
 
@@ -134,8 +136,9 @@ existing decorative quay assumed to be a load-bearing surface.
 Both renderers consume the same evaluated box/beam meshes, including the hook, cable,
 crate, straps and deck markers, at 480 × 300 with nearest-neighbour integer presentation.
 The basin retains its simple test view; `outer` uses the production scenery, harbour actors
-and water meshes (including the GPU near-water patch). The custom boat/crane/cargo pass has
-simple lighting and does not yet participate in GPU reflections or cast directional sunlight
+and water meshes (including the GPU near-water patch). The standalone `cargo_sandbox` harness
+keeps simple fixed-day lighting; the game's Working Harbour pass now follows the session clock's
+frame light (T4) but still does not participate in GPU reflections or cast directional sunlight
 shadows. A shared vertical landing footprint is projected onto the deck, pad and water
 before contact to provide a depth cue; it is not a sunlight shadow-map implementation.
 The correction clips to the renderer's actual triangles, including the bow,
@@ -594,7 +597,7 @@ the remaining gates below are still open.
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
 | S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps); [S1e](#s1e-remaining-fixtures-as-package-data) moves the remaining fixtures into data. | S1a–S1d merged; S1b crossing, S1c landing and S1d both outings played and accepted |
-| Sandbox day/night (lighting T4) | Lighting T1–T3 and their upload/performance gates; sandbox view integration | A full day passes in 900 active real seconds. Crane, deck, load, landing cues and route remain readable through dawn, sunset and night; pause/resume and recovery preserve a coherent hour. | Planned 2026-11-07; follows lighting prerequisites, not a blocker for the useful-crossing work |
+| Sandbox day/night (lighting T4) | Lighting T1–T3; sandbox view integration | A full day passes in 900 active scaled seconds at 1× (112.5 at 8×). Crane, deck, load, landing cues and route remain readable through dawn, sunset and night; pause/resume and recovery preserve a coherent hour. | Implemented locally 2026-11-08; native GPU suite, actual 8× cycle, captures and supported Web packaging pass; user night/cargo/cycle acceptance remains pending; owner records evidence |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -611,41 +614,41 @@ required chain of chores merely because later slices are listed.
 
 ### Sandbox day/night cycle (T4)
 
-Add the [lighting plan's T4](SUNSET_PLAN.md#sandbox-clock-contract-t4) as a separate
-integration step: **15 real minutes = 24 game hours**, or **37.5 real seconds per game
-hour**. T1–T3 supply the full-day recipe, fixed-hour controls and renderer qualification;
-T2's [GPU upload work](SUNSET_PLAN.md#sky-rendering-and-gpu-uploads-t2-prerequisite-for-t4)
-must pass before the cycle runs continuously. This does not reorder the receiving-site
-and useful-crossing work.
+Implemented locally, 2026-11-08. Working Harbour (`--work`) drives its shared lighting frame
+from the work session's clock: a new session starts at noon, each fixed 120 Hz tick advances
+`24 / (120 * 900)` hours, and a day takes 900 active scaled seconds at 1×. The existing ¼×–8×
+solo time control applies to the same ticks, so 8× is 112.5 active wall seconds (4.6875 s per
+game hour); paused/help/focus-loss frames and focused gaps over one second do not catch up.
+Shorter stalls retain the existing clamped scheduler. Load/crate/job resets and recovery keep the unwrapped hour; a new session resets to noon. The v2 save stores the
+unwrapped hour and period, a valid v1 save supplies noon/900 s, and a malformed v2 clock uses
+the existing `.bak` fallback and `.rejected` set-aside rather than a silent reset. Clock changes
+dirty the idle autosave.
 
-Feed the same lighting frame into the working-harbour workboat/crane/cargo pass. The
-merged game now carries this geometry through `BoatViewProps`; its GPU cargo draw still
-uses a fixed light, so sharing the frame there remains a T4 integration task. Review the landing footprint, suspended
-load, lash/attachment markers, berth approach and both work sites at night as well as
-in daylight. Keep the depth cue useful while sunlight shadows change direction. Record
-any remaining reflection/shadow limitations explicitly rather than claiming that a
-cycling background qualifies the handling view.
+Working Harbour ignores a saved menu LIGHTING choice by default; explicit `--daylight` or
+`--lighting-hour` fixes the render while the clock still advances and saves. The game's
+workboat/crane/cargo geometry now follows the frame's CPU flat light and tint with a bounded
+work-only ambient floor, `max(cpu_ambient, .8 * window_light)`, for night readability; Day is
+unchanged. The standalone `cargo_sandbox` harness stays fixed-day. The initial parent review
+found night geometry too dark, so the fill awaits user review. Automated fill tests,
+before/after captures and normal-HUD suspended-load agent review pass.
 
-Follow the lighting owner's proposed clock rules: begin at the Day anchor, advance
-during helm and crane play, freeze on solo pause/suspension, and preserve the hour across
-load resets and boat recovery. T4 extends the existing Working Harbour save with versioned
-presentation-clock state and an older-save Day fallback; no offline catch-up. This changes
-presentation time without speeding up physics, waves or jobs.
-Keep the 900-second duration as initial tuning and measure its effect on a 5–8 minute
-outing; night must support relaxed cargo play.
+Browser work stays native-only behind the no-Lua guard; only Web package and non-work render
+smoke passed. The [lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the
+clock, save, glitter integral, fill and verification evidence. Actual 8× play, the final native
+GPU CTests/captures and supported Web packaging pass. Next: user night/cargo/cycle acceptance. The
+900-second target remains tuning, not a measured fun result.
 
-**Completion gate:** virtual-clock rate/wrap/pause/reset checks; matched CPU/GPU captures
-of handling at key hours and a windowed cycle demo; sky upload/frame-cost evidence from
-the lighting owner; separate human handling/visual acceptance. **Current status:**
-planning only, no implementation or new cycle playback. **Next:** the lighting plan’s
-night-readability review and T3 fixed-hour controls before this sandbox integration. Broader
-sandbox S0/S1 verification and the existing lighting/reflection limits remain open.
+**Historical proposal, superseded 2026-11-08:** “15 real minutes = 24 game hours” (37.5 real
+seconds per game hour) was replaced by the user’s 2026-11-08 requirement that 8× time also
+moves the sun. T4 uses simulated active ticks and no independent wall clock. The windowed cycle
+and measured frame cost are recorded by the lighting owner; the saved-format fallback is now
+v1-to-v2 rather than a generic Day fallback.
 
-**Plan verification, 2026-11-07 (Apple Silicon/macOS):** incremental Debug build and full
-CTest with local sockets passed all 381 enabled tests (GPU matrix off; 13 retired checks
-disabled). The 48 changed/owning-plan local link references and `git diff --check` passed;
-see the [lighting owner's evidence](SUNSET_PLAN.md#plan-review-2026-11-07). No cycle
-playback, upload measurements or new handling/visual acceptance is claimed.
+**Plan verification, 2026-11-07 (Apple Silicon/macOS, historical):** incremental Debug build
+and full CTest with local sockets passed all 381 enabled tests (GPU matrix off; 13 retired
+checks disabled). The 48 changed/owning-plan local link references and `git diff --check`
+passed; see the [lighting owner's evidence](SUNSET_PLAN.md#plan-review-2026-11-07). No cycle
+playback, upload measurements or new handling/visual acceptance is claimed at that checkpoint.
 
 ### S1 steps
 
@@ -1430,6 +1433,10 @@ periodic writes show nothing. The decision of *when* is pure logic over ticks an
 
 - **Binary, versioned, little-endian, written field by field** (never a struct dump). The file
   is a small **summary header** followed by the body.
+
+The following is the historical SV1b v1 layout. T4 appends a required clock tail in current
+format v2; see [the lighting contract](SUNSET_PLAN.md#sandbox-clock-contract-t4).
+
 - **Header** (at most 512 bytes, so discovery reads only this): magic `PRSV`, format 1, header
   length and an FNV-1a 64 header checksum. Then the identity fields; the package's display name
   and location; and `saved_at` (Unix seconds, supplied by the application, display only).

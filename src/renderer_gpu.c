@@ -2693,10 +2693,16 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         for (int i = 0; i < GLITTER_WAVES; ++i) {
             const float *k = glitter_waves[i];
             // Deep-water dispersion, omega = sqrt(g |k|), so short glints move faster.
-            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1])) * lighting->glint_speed;
+            double base_dispersion_rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1]));
             glitter[4 * i] = k[0];
             glitter[4 * i + 1] = k[1];
-            glitter[4 * i + 2] = boat_phase(rate, frame->time);
+            if (frame->glitter_time_set) {
+                // The cycle clock already integrates the authored glint speed over the day.
+                glitter[4 * i + 2] = boat_phase(base_dispersion_rate, frame->glitter_time);
+            } else {
+                double rate = base_dispersion_rate * lighting->glint_speed;
+                glitter[4 * i + 2] = boat_phase(rate, frame->time);
+            }
             glitter[4 * i + 3] = 0;
         }
         SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "gustWaves[0]"),

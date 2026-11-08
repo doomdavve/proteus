@@ -30,7 +30,7 @@ bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources 
         snprintf(diagnostic, capacity, "No bundled work package for %s.", location->name);
         return false;
     }
-    *work = (WakeWork) { .open = true };
+    *work = (WakeWork) { .open = true, .lighting_cycle = true };
     BoatWorkSession *s = &work->session;
     s->resources = resources;
     s->writer = "wake_velocity";
@@ -46,8 +46,44 @@ bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources 
 void wake_work_reset(WakeWork *work, BoatSession *game)
 {
     boat_work_session_reset(&work->session);
+    // A reset returns the tick to zero. Mark the reset as a save milestone so an old last-write
+    // tick cannot postpone the periodic write behind the new, lower tick.
+    if (work->save.enabled)
+        boat_autosave_note(&work->save.autosave, work->session.tick, true, true);
     boat_presentation_reset(&game->presentation);
     wake_work_sync(work, game);
+}
+
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
+{
+    BoatWorkSession *s = &work->session;
+    if (!work->open || !pose)
+        return false;
+    bool ok = false;
+    if (!strcmp(pose, "swing")) {
+        boat_work_hook_action(s);
+        if (s->sandbox.cargo.state != BOAT_CARGO_HANGING)
+            return false;
+        for (int i = 0; i < 360; ++i)
+            wake_work_tick(work, game, .7f, .5f, 1, (BoatInput) { 0 });
+        ok = true;
+    } else if (!strcmp(pose, "deck")) {
+        ok = boat_work_script_load_and_lash(s, 2);
+    } else if (!strcmp(pose, "approach")) {
+        unsigned landing = boat_work_find_site(s, "landing");
+        ok = landing < s->site_count && boat_work_script_load_and_lash(s, 2);
+        if (ok) {
+            // The real departure action releases the home berth; the shared approach helper then
+            // poses and validates the landing berth through its normal moor query.
+            boat_work_moor_action(s);
+            ok = !s->sandbox.moored && !s->sandbox.mooring
+                && boat_work_script_moor_at(s, landing, true);
+        }
+    }
+    if (!ok)
+        return false;
+    wake_work_sync(work, game);
+    return true;
 }
 
 void wake_work_tick(
@@ -98,9 +134,12 @@ const BoatViewProps *wake_work_props(WakeWork *work)
     boat_model_begin(&work->decal);
     bool decal = boat_cargo_decal(&work->decal, &receiving, s->sandbox.cargo.position, NULL, 0,
         (Vector2) { 0 }, (Color) { 0 });
-    work->props = (BoatViewProps) {
-        .solids = &work->solids.mesh, .decal = decal ? &work->decal.mesh : NULL, .hide_player = true
-    };
+    work->props = (BoatViewProps) { .solids = &work->solids.mesh,
+        .decal = decal ? &work->decal.mesh : NULL,
+        .hide_player = true,
+        .lighting_cycle = work->lighting_cycle,
+        .lighting_hours = s->lighting_hours,
+        .lighting_cycle_seconds = s->lighting_cycle_seconds };
     return &work->props;
 }
 
