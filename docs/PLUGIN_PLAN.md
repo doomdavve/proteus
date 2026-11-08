@@ -31,7 +31,9 @@ Completed task: **P4.9 browser objective isolation**, following
 **M2 boat appearance is implemented; next marina task: [M3 authored routes and docking](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
-Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
+Authority callbacks, commands and session recordings remain P5 work after it; **P5 is the next plugin task, scheduled by the user 2026-11-07 (previously held 2026-11-01)**, owned by the
+[P5 plan](PLUGIN_P5_PLAN.md); the round-boundary revisions (now planned as protocol v14) are part of its scope. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
+are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
 init/migration still evaluate trusted Lua synchronously. Browser voyages evaluate all imported
@@ -47,8 +49,8 @@ twelve-berth/two-row package, plus M2 boat appearance; M3 authored routes are ne
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
 sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are
-merged to main (2026-11-07); S1e's F1–F4 are implemented locally and its save/resume step
-(SV1) is designed, not started; persisted objective state is saved automatically, never by a
+merged to main (2026-11-07), as are S1e's F1–F4 and SV1a–SV1i (save/resume, #169);
+persisted objective state is saved automatically, never by a
 player action. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
@@ -1715,7 +1717,7 @@ three-engine browser qualification, including the cached INIT deadline regressio
 results remain historical evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
-**Next:** P5's authority/prediction/recording contract review as described in the current status.
+**Next:** P5 (authority/prediction/recording, including v10 round-boundary revisions), scheduled by the user 2026-11-07 (previously held 2026-11-01).
 Browser races, interactive preview controls, durable full-session saves, native asynchronous
 objective execution and an in-game agent are not implemented. Physical Safari/mobile devices,
 real background-tab policies and P3 human migration/Undo/recovery acceptance remain open.
@@ -1726,7 +1728,7 @@ At the user's request, the full browser matrix no longer runs on every relevant 
 Node contracts and the packaged Wasm build; manual dispatch retains full three-engine runtime
 qualification and evidence. Superseded PR runs are canceled, and no `main` push trigger is
 added. The [browser guide](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30) owns the command
-and coverage tradeoff. P5 remains the next implementation task.
+and coverage tradeoff. P5 was the next implementation task then; it was held from 2026-11-01 and is again the next task (scheduled by the user 2026-11-07 (previously held 2026-11-01)).
 
 Verification, 2026-10-30, Apple Silicon/macOS: Debug configure/build passed using the pinned
 existing dependency sources (project sources warning-clean; bundled `stb_vorbis` warning).
@@ -1737,6 +1739,10 @@ qualification and were not rerun for this CI-only change. The PR run checks the 
 lane and skipped browser steps. No gameplay or audiovisual change.
 
 ### P5 — authority, prediction and recorded revisions
+
+**Owner: the [P5 implementation plan](PLUGIN_P5_PLAN.md)** (2026-11-07, revised 2026-11-08), with a
+shelter hunt in a free room as its first scenario (the co-op working harbour follows later); that
+plan holds the design, steps P5a–P5i, decisions and status. It numbers round-boundary revisions protocol v14 (v10 was used by the marina contract).
 
 **Deliverable:** one already proven authored scenario works in a room and can be recorded or
 reconstructed with its revision/state. Implement the explicit content, command/checkpoint,
@@ -2693,17 +2699,16 @@ The [free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-i
 cargo physics, lashing, assisted mooring, delivery detection and placement validation native,
 and moves work-site layout, loads, jobs and project outcomes into packages. That plan owns the
 gameplay steps and acceptance; this plan owns the contract each step adds. S1a–S1d are
-merged to main (2026-11-07); S1e's F1–F4 are implemented locally; SV1 is designed
-(2026-11-07), not implemented; S3+ is not implemented.
+merged to main (2026-11-07), as are S1e's F1–F4 and SV1 (#169); S3+ is not implemented.
 
 | Sandbox step | Contract addition | Rejected until qualified |
 | --- | --- | --- |
-| S1a (implemented locally 2026-11-07) | [`scene.work`](PLUGIN_API.md#work-sites-s1a) as an optional scene v3 subsystem (no v4 bump): 1–4 sites, each a registered `service_platform` preset and `crate` cargo placed at a berth position facing heading 0. Decoded to a pointer-free core definition; staging, the catalog generator and room packaging run the work-site survey. Bundled native-only `proteus.outer-work` (`free`, `outer`). The platform stays inside the preset: no module kind is a fixed in-water platform. | Rooms (rejected); browser catalog (omitted); voyage/race/match (rejected). Solo free scenes are not bound by `wake_velocity`, so the game ignores work sites |
-| S1b (implemented locally and accepted 2026-11-07) | Two schema additions before the site: a required site `heading` and the `receiving_platform` preset (same layout, starts empty, marked pad); a work list needs a `service_platform`. The bundled package gains a turned `landing` receiver at (−105, 0). The survey, overlap and spawn checks turn with the site | Same as S1a |
-| S1c (implemented locally and played 2026-11-07) | [Work-site job](PLUGIN_API.md#work-site-job-s1c): `objective.hud` after `scene.define` for a `free` package with work sites (init/update; no timers; `migrate` only for save load, SV1i); native `cargo.secured`, `cargo.delivered` (once per session), `cargo.lost` and `cargo.reset` events whose `id` is a work-site id (one crate, so no cargo id yet); sites may be `hidden`, and `work.enable {id}` builds one. The sandbox checks the named sites before committing the batch and keeps the previous checkpoint while the boat or crate occupies the envelope. The catalog bundles this one kind of objective package and probes its init | Same as S1a; `wake_velocity --plugin` refuses a free package with a job; the browser evaluator rejects `work.enable` |
-| S1d (implemented and approved 2026-11-07) | [Quay pickup](FREE_RIDE_SANDBOX_PLAN.md#s1d-result-2026-11-07): `cargo.supply {id}` uses up a delivered crate and places the next load on a built service pad (checked with the whole batch, as `work.enable`; waits while the crate is busy); cargo events gain `load` and delivery becomes once per load at each receiver; `work.guide {id}` sets the helm guidance target. Each at most once per batch. Still one crate body. The bundled package gains a hidden `jetty` receiver, its fourth site | Same as S1c; the browser evaluator also rejects the two new commands (no work grant) |
-| S1e (F1-F4 implemented locally 2026-11-07) | [Fixtures as package data](FREE_RIDE_SANDBOX_PLAN.md#s1e-remaining-fixtures-as-package-data): `scene.work` gains an optional workboat preset name (default `flat_deck`; unknown names rejected at staging); a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package; job notices as static `scene.work.notices` scene data (chosen over an objective command and recorded in PLUGIN_API at F3) | Same as S1c; the browser evaluator rejects or ignores the notice |
-| SV1 (designed 2026-11-07, revised the same day; not implemented) | [Local save and resume](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume): the work-site job's committed P3 objective checkpoint (state bytes, HUD rows, timers, grants, RNG, acknowledgment, tick, schema, generation, quarantine) is **saved automatically**, never by a player action. It is written to a native file at between-tick boundaries (committed batches, cargo milestones, a periodic dirty write, pause, leaving to the menu and quit), together with its unacknowledged events, sequence and the native cargo/site snapshot, all from one snapshot; resume installs it unchanged and re-derives nothing. A save's header names its **content identity**: package id, a work digest that excludes display text (`scene.work.notices`; HUD strings live in source, which is not compared), `state_version`, physics revision and tick rate. The game menu discovers saves by reading only that header. A changed work digest makes a save unavailable, and it is set aside rather than deleted; a source edit with the same `state_version` resumes with the new code. SV1i lets a free work-site job return `migrate`, run with the P3.3b contract at load when `state_version` changed. The job runs inside `wake_velocity` as a catalog Working Harbour content (still no `--plugin` live reload) | Browser storage, rooms and recorded/replayed saves; restarting a job beside built sites or a supplied load (its init would supply again); live reload or Undo of a work session |
+| S1a (merged 2026-11-07) | [`scene.work`](PLUGIN_API.md#work-sites-s1a) as an optional scene v3 subsystem (no v4 bump): 1–4 sites, each a registered `service_platform` preset and `crate` cargo placed at a berth position facing heading 0. Decoded to a pointer-free core definition; staging, the catalog generator and room packaging run the work-site survey. Bundled native-only `proteus.outer-work` (`free`, `outer`). The platform stays inside the preset: no module kind is a fixed in-water platform. | Rooms (rejected); browser catalog (omitted); voyage/race/match (rejected). Solo free scenes are not bound by `wake_velocity`, so the game ignores work sites |
+| S1b (merged, accepted 2026-11-07) | Two schema additions before the site: a required site `heading` and the `receiving_platform` preset (same layout, starts empty, marked pad); a work list needs a `service_platform`. The bundled package gains a turned `landing` receiver at (−105, 0). The survey, overlap and spawn checks turn with the site | Same as S1a |
+| S1c (merged, played 2026-11-07) | [Work-site job](PLUGIN_API.md#work-site-job-s1c): `objective.hud` after `scene.define` for a `free` package with work sites (init/update; no timers; `migrate` only for save load, SV1i); native `cargo.secured`, `cargo.delivered` (once per session), `cargo.lost` and `cargo.reset` events whose `id` is a work-site id (one crate, so no cargo id yet); sites may be `hidden`, and `work.enable {id}` builds one. The sandbox checks the named sites before committing the batch and keeps the previous checkpoint while the boat or crate occupies the envelope. The catalog bundles this one kind of objective package and probes its init | Same as S1a; `wake_velocity --plugin` refuses a free package with a job; the browser evaluator rejects `work.enable` |
+| S1d (merged, approved 2026-11-07) | [Quay pickup](FREE_RIDE_SANDBOX_PLAN.md#s1d-result-2026-11-07): `cargo.supply {id}` uses up a delivered crate and places the next load on a built service pad (checked with the whole batch, as `work.enable`; waits while the crate is busy); cargo events gain `load` and delivery becomes once per load at each receiver; `work.guide {id}` sets the helm guidance target. Each at most once per batch. Still one crate body. The bundled package gains a hidden `jetty` receiver, its fourth site | Same as S1c; the browser evaluator also rejects the two new commands (no work grant) |
+| S1e (F1-F4 merged in #169, 2026-11-07) | [Fixtures as package data](FREE_RIDE_SANDBOX_PLAN.md#s1e-remaining-fixtures-as-package-data): `scene.work` gains an optional workboat preset name (default `flat_deck`; unknown names rejected at staging); a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package; job notices as static `scene.work.notices` scene data (chosen over an objective command and recorded in PLUGIN_API at F3) | Same as S1c; the browser evaluator rejects or ignores the notice |
+| SV1 (SV1a–SV1i merged in #169, 2026-11-07) | [Local save and resume](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume): the work-site job's committed P3 objective checkpoint (state bytes, HUD rows, timers, grants, RNG, acknowledgment, tick, schema, generation, quarantine) is **saved automatically**, never by a player action. It is written to a native file at between-tick boundaries (committed batches, cargo milestones, a periodic dirty write, pause, leaving to the menu and quit), together with its unacknowledged events, sequence and the native cargo/site snapshot, all from one snapshot; resume installs it unchanged and re-derives nothing. A save's header names its **content identity**: package id, a work digest that excludes display text (`scene.work.notices`; HUD strings live in source, which is not compared), `state_version`, physics revision and tick rate. The game menu discovers saves by reading only that header. A changed work digest makes a save unavailable, and it is set aside rather than deleted; a source edit with the same `state_version` resumes with the new code. SV1i lets a free work-site job return `migrate`, run with the P3.3b contract at load when `state_version` changed. The job runs inside `wake_velocity` as a catalog Working Harbour content (still no `--plugin` live reload) | Browser storage, rooms and recorded/replayed saves; restarting a job beside built sites or a supplied load (its init would supply again); live reload or Undo of a work session |
 | S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction. Like SV1, all persisted objective and native state saves automatically; no package or player action is needed to save | Rooms until P5 authority |
 
 Finding from S1a: `boat_plugin_free_check_location` runs no map checks on a free package's

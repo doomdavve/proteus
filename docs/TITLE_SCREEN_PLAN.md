@@ -9,8 +9,8 @@ settings, plus a dedicated animated Credits screen. Volume settings, title music
 live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
 The compact two-tower bridge/river app icon is user-approved on 2026-10-28.
-Implemented locally 2026-11-07 (SV1h; no window was available, so no capture was inspected and
-the drawn rows, hint widths and input are unverified; the user's play check is owed):
+Implemented 2026-11-07 (SV1h, merged in #169; no window was available when it was written, so
+no capture was inspected then; the user played the menu flow on 2026-11-07, see the sandbox plan):
 Single Player's Gothenburg Harbour gains a WORKING HARBOUR content on native builds, with a
 SAVE row showing automatically discovered saves (Continue, New, Delete; New and Delete confirm)
 and the save's summary on the hint line. The WATER row is hidden for it. The
