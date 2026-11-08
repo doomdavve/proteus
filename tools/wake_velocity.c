@@ -868,7 +868,6 @@ static int study(int argc, char **argv)
         // The room's water: what follows joins it like --connect.
         host_options = (NetHostOptions) { .mode = host_mode,
             .location = location->name,
-            .package = !strcmp(host_mode, "hunt") ? "proteus.outer-hunt" : NULL,
             .waves = waves,
             .port = (uint16_t)(host_port ? host_port : BOAT_NET_PORT) };
         snprintf(host_endpoint, sizeof(host_endpoint), "127.0.0.1:%u", (unsigned)host_options.port);

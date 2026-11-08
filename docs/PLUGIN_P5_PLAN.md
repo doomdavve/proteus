@@ -252,7 +252,7 @@ findable, the HUD readable, and the score delay acceptable.
 **P5d result, 2026-11-08 (commit on `feat/plugin-p5`).** `--host hunt` and SHELTER HUNT (fourth
 MODE row entry) start the child room `--serve --mode free --location outer --package
 proteus.outer-hunt`; hunt, like race, fixes PLACE to the harbour and `--host hunt --location basin`
-is refused (`NetHostOptions.package` is new). Marks reach the renderers as `BoatViewState.marks`
+is refused. Marks reach the renderers as `BoatViewState.marks`
 and `boat_view.c` draws each as a ring of buoys (alternating orange and white, a mast and flag
 at the centre) through the same box visitor as the race gates, so the CPU and GPU renderers share
 it; the minimap draws `BoatMinimap.room_marks` as a magenta dashed circle with a centre dot, named on
@@ -267,6 +267,15 @@ menu validator in the repository, so the new row is only compiled and read; the 
 shares the code but its frame was not captured; labels on the chart overlap landmarks when marks
 are close; no windowed `--host hunt` run, no browser build run, and **user play check 1 is still owed**
 (findability of marks, HUD readability, score delay).
+
+**P5d fix, 2026-11-08.** The user's first `--host hunt` failed (`--port needs a UDP port 1-65535,
+not ''`): the POSIX spawn array had 14 slots and the hunt command line overflowed it into the port
+text; behind that, the child got `--mode hunt` and the default basin location. The command line is
+now built in one place, `net_host_arguments` (hunt maps to a free room on outer with its package),
+sized by `NET_HOST_ARGUMENTS`, and `validate_wake_velocity_host` (quick) checks each mode's exact
+line and that the longest one fits. Verified: a windowed `./build/wake_velocity --host hunt
+--frames 300` started the room on outer and printed `objective tick 12: HUNT=1 CREW 1=0`; full
+suite 446 of 446.
 
 ### P5e: authority-only reload
 

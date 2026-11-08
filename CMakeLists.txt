@@ -496,6 +496,14 @@ endif()
 
 enable_testing()
 include(cmake/CaseTests.cmake)
+if(NOT EMSCRIPTEN)
+  # The room command line wake_velocity --host passes to its --serve child.
+  add_executable(validate_wake_velocity_host tools/validate_wake_velocity_host.c
+    tools/wake_velocity_host.c)
+  target_include_directories(validate_wake_velocity_host PRIVATE tools)
+  target_compile_options(validate_wake_velocity_host PRIVATE ${PROTEUS_WARNINGS})
+  proteus_add_case_tests(wake_velocity_host validate_wake_velocity_host LABELS cpu quick)
+endif()
 add_executable(validate_boat_wake tools/validate_boat_wake.c)
 target_link_libraries(validate_boat_wake PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_wake PRIVATE
