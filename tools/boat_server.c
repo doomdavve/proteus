@@ -385,6 +385,9 @@ static void print_objective(BoatRoomObjective *o, uint64_t tick, bool *reported)
 // P5e: every 120 ticks (one second) re-read the package directory; a changed objective is staged
 // and applies at the next objective boundary. A candidate is judged once: SEEN is the last source
 // looked at, whether it was accepted or refused.
+// P5f: a candidate whose room definition differs from the one the room runs (or last staged) is a
+// definition revision, staged through the server; it commits at a boundary, in a free room when
+// it is empty, and the objective restarts on its source and marks then.
 #define RELOAD_POLL_TICKS 120
 typedef struct {
     const char *directory;
@@ -394,6 +397,8 @@ typedef struct {
     BoatRoomDefinition scratch;
     char last_error[160];
     uint64_t reported; // BoatRoomObjective.reloads already printed.
+    uint64_t definition; // Digest of the definition the room runs or last staged.
+    uint32_t revision; // The server revision already reported.
 } ObjectiveReload;
 
 static bool same_source(const BoatRoomObjectiveSource *a, const BoatRoomObjectiveSource *b)
@@ -403,7 +408,7 @@ static bool same_source(const BoatRoomObjectiveSource *a, const BoatRoomObjectiv
         && !memcmp(a->source, b->source, a->source_size);
 }
 
-static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o)
+static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o, BoatNetServer *server)
 {
     char error[160];
     if (!boat_room_package_load_objective(r->directory, false, false, r->location, r->world,
@@ -416,14 +421,41 @@ static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o)
         return;
     }
     r->last_error[0] = 0;
-    if (same_source(&r->candidate, &r->seen))
+    uint64_t definition = boat_room_definition_digest(&r->scratch);
+    if (definition == r->definition && same_source(&r->candidate, &r->seen))
         return;
     memcpy(&r->seen, &r->candidate, sizeof(r->seen));
     BoatPluginDiagnostic d;
-    if (!boat_room_objective_stage(o, &r->candidate, &d)) {
+    if (definition != r->definition) {
+        if (!boat_room_objective_stage_revision(o, server, &r->scratch, &r->candidate, &d)) {
+            printf("objective reload rejected: %s\n", d.message);
+            fflush(stdout);
+            return;
+        }
+        r->definition = definition;
+        uint32_t next = server->stats.revision + 1;
+        if (boat_net_server_players(server))
+            printf("objective reload: marks changed; revision %u waits for an empty room\n", next);
+        else
+            printf("objective reload: marks changed; revision %u commits at once (the room is "
+                   "empty)\n",
+                next);
+        fflush(stdout);
+    } else if (!boat_room_objective_stage(o, &r->candidate, &d)) {
         printf("objective reload rejected: %s\n", d.message);
         fflush(stdout);
     }
+}
+
+// Report each definition revision the server committed.
+static void print_revision(ObjectiveReload *r, const BoatNetServer *server)
+{
+    if (r->revision == server->stats.revision)
+        return;
+    r->revision = server->stats.revision;
+    printf("definition revision %u committed at tick %" PRIu64 " (%u marks)\n", r->revision,
+        server->fleet.state.tick, server->room->marks.count);
+    fflush(stdout);
 }
 
 static void print_reload(ObjectiveReload *r, const BoatRoomObjective *o)
@@ -508,6 +540,7 @@ static int room(const RoomOptions *options)
         reload.location = options->location;
         reload.world = options->world;
         reload.seen = *options->objective;
+        reload.definition = boat_room_definition_digest(&options->room);
     }
     if (objective_on) {
         boat_room_objective_init(&objective, options->objective);
@@ -523,6 +556,7 @@ static int room(const RoomOptions *options)
         boat_net_enet_cleanup();
         return 1;
     }
+    reload.revision = server.stats.revision;
     server.tick_limit = options->ticks; // --ticks/--seconds run exactly that many ticks.
     server.peer_timeout = (double)options->peer_timeout;
     BoatNetLan *lan = NULL;
@@ -613,7 +647,8 @@ static int room(const RoomOptions *options)
             print_objective(&objective, server.fleet.state.tick, &suspension_reported);
         if (reload.directory) {
             if (server.fleet.state.tick / RELOAD_POLL_TICKS != before / RELOAD_POLL_TICKS)
-                poll_reload(&reload, &objective);
+                poll_reload(&reload, &objective, &server);
+            print_revision(&reload, &server);
             print_reload(&reload, &objective);
         }
         if (options->report

@@ -407,6 +407,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put8(w, 0);
         put32(w, m->accept.wake_life_ticks);
         putf(w, m->accept.crest_height);
+        put32(w, m->accept.revision);
         break;
     case BOAT_NET_REJECT:
         put8(w, m->reject.reason);
@@ -436,8 +437,17 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put16(w, 0);
         put64(w, m->definition_begin.digest);
         break;
+    case BOAT_NET_REVISION_BEGIN:
+        put32(w, m->revision_begin.revision);
+        put32(w, m->revision_begin.bytes);
+        put16(w, m->revision_begin.pages);
+        put16(w, 0);
+        put64(w, m->revision_begin.digest);
+        put64(w, m->revision_begin.commit_tick);
+        break;
     case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_DEFINITION_PAGE:
+    case BOAT_NET_REVISION_PAGE:
     case BOAT_NET_WORLD_PAGE:
         put32(w, m->world_page.checkpoint);
         put16(w, m->world_page.index);
@@ -450,6 +460,8 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
     case BOAT_NET_DEFINITION_END:
+    case BOAT_NET_REVISION_END:
+    case BOAT_NET_REVISION_READY:
         put32(w, m->checkpoint);
         put32(w, 0);
         break;
@@ -702,6 +714,8 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         a->wake_life_ticks = get32(r);
         expect(r, a->wake_life_ticks >= 240 && a->wake_life_ticks <= BOAT_OBJECT_LIFE_TICKS);
         a->crest_height = getf(r, .1f, 3);
+        a->revision = get32(r);
+        expect(r, a->revision >= 1);
         break;
     }
     case BOAT_NET_REJECT:
@@ -742,8 +756,23 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
         break;
     }
+    case BOAT_NET_REVISION_BEGIN: {
+        BoatNetRevisionBegin *b = &m->revision_begin;
+        b->revision = get32(r);
+        b->bytes = get32(r);
+        b->pages = get16(r);
+        reserved(r, 2);
+        b->digest = get64(r);
+        b->commit_tick = get64(r);
+        expect(r, b->revision >= 1);
+        expect(r, b->bytes && b->bytes <= BOAT_NET_MAX_DEFINITION);
+        expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+        expect(r, b->commit_tick > tick);
+        break;
+    }
     case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_DEFINITION_PAGE:
+    case BOAT_NET_REVISION_PAGE:
     case BOAT_NET_WORLD_PAGE: {
         BoatNetWorldPage *p = &m->world_page;
         p->checkpoint = get32(r);
@@ -771,7 +800,11 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
     case BOAT_NET_DEFINITION_END:
+    case BOAT_NET_REVISION_END:
+    case BOAT_NET_REVISION_READY:
         m->checkpoint = get32(r);
+        if (m->header.type >= BOAT_NET_REVISION_END)
+            expect(r, m->checkpoint >= 1);
         reserved(r, 4);
         break;
     case BOAT_NET_INPUT_BATCH: {

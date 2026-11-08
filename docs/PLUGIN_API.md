@@ -325,9 +325,10 @@ root) whose package has a room objective.
   candidate is judged once. A package that no longer loads prints `objective reload rejected:
   MESSAGE` once per distinct message and changes nothing.
 - **Staging** (`boat_room_objective_stage`) copies the candidate and refuses it outright when it
-  has no objective or its marks differ from the running ones (`marks changed; restart the room`):
-  marks are part of the room definition sent at join, and definition revisions are P5f. A newer
-  stage replaces an older pending one.
+  has no objective or its marks differ from the running ones (`marks changed; that is a definition
+  revision`): marks are part of the room definition sent at join, so a marks change takes the
+  [revision path](#definition-revisions-from-reload-p5f) instead. A newer stage replaces an older
+  pending one.
 - **Boundary.** The candidate applies at the next 12-tick objective boundary, before that
   boundary's update, on copies of the committed objective. Events queued since the last boundary
   stay queued and reach the new code's update at that boundary.
@@ -350,6 +351,34 @@ root) whose package has a room objective.
   the revision starts at 1 and counts accepted reloads (`BoatRoomObjective.revision`, with the
   latest result in `reload`). An accepted reload makes the state callback report even when the
   HUD rows are identical, so clients' `ObjectiveState.revision` moves.
+
+#### Definition revisions from reload (P5f)
+
+A reload whose room definition differs from the one the room runs (or last staged), which today
+means changed marks, is a **definition revision**
+([protocol v14](MULTIPLAYER_PROTOCOL.md#definition-revisions-v14)) instead of a live swap:
+
+- The poll compares the candidate's definition digest with the running one first. A changed
+  definition is staged through `boat_room_objective_stage_revision` and
+  `boat_net_server_stage_revision`: the candidate source must start (a trial `init`) and the server
+  validates the definition like the room's own and keeps its mode and location. A refusal prints
+  `objective reload rejected: MESSAGE` and changes nothing.
+- A **free room commits a revision only while empty**. With players connected the server prints
+  `objective reload: marks changed; revision N waits for an empty room`; with none, `... revision N
+  commits at once (the room is empty)`. When it commits it prints `definition revision N committed
+  at tick T (M marks)`.
+- On commit the server tells the rules adapter (`BoatNetRules.definition`), and the objective
+  **restarts** on the staged source and marks: `init` at generation + 1 with no state, a replay of
+  `crew.joined` for each crew present, queued `mark.reached` events dropped (they name the old
+  marks), and `objective reload: revision N accepted (restart)`. The state callback reports, so
+  clients' `ObjectiveState.revision` moves. Players joining afterwards receive the new marks.
+- While a revision waits, a Lua-only edit with the same new marks replaces the revision's source
+  (the live path stays idle); an edit that changes the marks again stages a newer revision, which
+  replaces the waiting one. Lua-only edits with no revision waiting keep the P5e live path above.
+
+Race and deathmatch rooms revise at their round boundaries through the same server call
+(`boat_net_server_stage_revision`); no command-line trigger exists for them yet, so those paths are
+covered by the validator only.
 
 ## Match schema
 

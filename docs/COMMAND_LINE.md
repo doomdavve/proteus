@@ -357,9 +357,14 @@ refused with exit status 2. Every 120 server ticks (one second) the package is r
 12-tick objective boundary. With a `migrate` callback the state is kept; without one the
 objective restarts and re-announces present crews. The server prints
 `objective reload: revision N accepted (migrate|restart)` or
-`objective reload rejected: MESSAGE`; a failing candidate changes nothing. The marks cannot
-change, so restart the room for those. `wake_velocity --serve` shares the flag. See
-[room objective reload](PLUGIN_API.md#room-objective-reload-p5e).
+`objective reload rejected: MESSAGE`; a failing candidate changes nothing. A change to the marks
+(any change to the room definition) is a definition revision instead
+([protocol v14](MULTIPLAYER_PROTOCOL.md#definition-revisions-v14)): a free room commits it only
+while it has no players, printing `objective reload: marks changed; revision N waits for an empty
+room` and later `definition revision N committed at tick T`, and the objective restarts on the
+new marks; players who join afterwards receive them. `wake_velocity --serve` shares the flag. See
+[room objective reload](PLUGIN_API.md#room-objective-reload-p5e) and
+[its revisions](PLUGIN_API.md#definition-revisions-from-reload-p5f).
 
 The standalone authority defaults to loopback, basin and UDP port 24680. `--bind` selects
 an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--seconds` /

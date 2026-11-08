@@ -454,7 +454,7 @@ static int reload_broken(void)
     return 0;
 }
 
-// The room definition's marks cannot change in a reload.
+// A live reload cannot change the room definition's marks: that is a definition revision.
 static int reload_marks_changed(void)
 {
     static BoatRoomObjective o;
@@ -464,7 +464,7 @@ static int reload_marks_changed(void)
     edited.marks.items[0].x += 1;
     BoatPluginDiagnostic d = { 0 };
     CHECK(!boat_room_objective_stage(&o, &edited, &d));
-    CHECK(strstr(d.message, "marks changed") && strstr(d.message, "restart the room"));
+    CHECK(strstr(d.message, "marks changed") && strstr(d.message, "definition revision"));
     edited.marks = hunt.marks;
     edited.present = false;
     CHECK(!boat_room_objective_stage(&o, &edited, &d));
@@ -499,6 +499,114 @@ static int reload_reaches_clients(void)
     return 0;
 }
 
+// P5f: a marks change is a definition revision. It waits while the free room is occupied, commits
+// when it empties, and the objective restarts on the new source and marks.
+static void join(unsigned i, const char *name)
+{
+    unsigned link;
+    BoatNetTransport transport;
+    boat_net_memory_client(network, &link, &transport);
+    BoatNetClientConfig c
+        = { .name = name, .token = "", .build = "validate", .resources = test_worlds };
+    boat_net_client_init(&clients[i], transport, &c, now);
+}
+
+// The hunt's definition with mark 0 moved, and the matching candidate source.
+static void moved(BoatRoomDefinition *room, BoatRoomObjectiveSource *source, float dx)
+{
+    *room = hunt_room;
+    room->marks.items[0].x += dx;
+    *source = edited = hunt;
+    source->marks = room->marks;
+}
+
+static int revision_marks(void)
+{
+    static BoatRoomObjective o;
+    static BoatRoomDefinition room;
+    static BoatRoomObjectiveSource candidate;
+    CHECK(start_room(&o));
+    CHECK(edit("local MARKS = 5", "local MARKS = 5")); // Prepare EDITED's storage only.
+    moved(&room, &candidate, 100);
+    BoatPluginDiagnostic d = { 0 };
+    // Two crews are present: the revision is staged but waits, and the old marks keep scoring.
+    CHECK(boat_room_objective_stage_revision(&o, &server, &room, &candidate, &d));
+    CHECK(o.has_revision && boat_net_server_revision_pending(&server) && !o.has_pending);
+    step(2);
+    CHECK(server.stats.revision == 1 && server.stats.revisions_announced == 0);
+    CHECK(server.room->marks.items[0].x == hunt_room.marks.items[0].x && o.revision == 1);
+    visit(0, &hunt.marks.items[0]);
+    CHECK(value(&o, "c1") == 1);
+    // A Lua-only edit while it waits goes to the revision's source, not the running one.
+    CHECK(edit("\"CREW \"", "\"TEAM \""));
+    edited.marks = room.marks;
+    CHECK(boat_room_objective_stage(&o, &edited, &d) && !o.has_pending);
+    step(.5);
+    CHECK(o.revision == 1 && !strcmp(row(&o, "c1")->label, "CREW 1"));
+    // One crew leaves: still occupied. The last leaves: the revision commits.
+    boat_net_client_leave(&clients[1]);
+    step(.5);
+    CHECK(boat_net_server_players(&server) == 1 && server.stats.revision == 1);
+    boat_net_client_leave(&clients[0]);
+    step(.5);
+    CHECK(boat_net_server_players(&server) == 0 && server.stats.revision == 2);
+    CHECK(server.stats.revisions_committed == 1 && !boat_net_server_revision_pending(&server));
+    CHECK(server.room->marks.items[0].x == room.marks.items[0].x);
+    CHECK(!o.has_revision && o.revision == 2 && o.source == &o.owned);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_RESTARTED && o.objective.generation == 2);
+    CHECK(o.owned.marks.items[0].x == room.marks.items[0].x && value(&o, "hunt") == 1);
+    CHECK(!o.objective.quarantined);
+    // A new crew joins revision 2 and scores on the moved mark, not on the old spot.
+    join(0, "three");
+    step(1);
+    CHECK(clients[0].phase == BOAT_NET_CLIENT_PLAYING && clients[0].accept.revision == 2);
+    CHECK(boat_net_client_room(&clients[0])->marks.items[0].x == room.marks.items[0].x);
+    visit(0, &hunt.marks.items[0]); // The old position is no longer a mark.
+    CHECK(value(&o, "c1") == 0 && !strcmp(row(&o, "c1")->label, "TEAM 1"));
+    visit(0, &room.marks.items[0]);
+    CHECK(value(&o, "c1") == 1);
+    step(.2);
+    CHECK(clients[0].objective.revision == server.objective.revision
+        && boat_net_objective_state_equal(&clients[0].objective, &server.objective));
+    boat_net_memory_destroy(network);
+    return 0;
+}
+
+// A revision with no player commits at once; a refused one (another mode, a source that cannot
+// start) leaves the room, the objective and the server alone.
+static int revision_refused(void)
+{
+    static BoatRoomObjective o;
+    static BoatRoomDefinition room;
+    static BoatRoomObjectiveSource candidate;
+    CHECK(start_room(&o));
+    boat_net_client_leave(&clients[0]);
+    boat_net_client_leave(&clients[1]);
+    step(.5);
+    CHECK(boat_net_server_players(&server) == 0);
+    BoatPluginDiagnostic d = { 0 };
+    // Another mode is refused by the server.
+    moved(&room, &candidate, 100);
+    room.mode = BOAT_ROOM_MODE_DEATHMATCH;
+    CHECK(!boat_room_objective_stage_revision(&o, &server, &room, &candidate, &d));
+    CHECK(d.message[0] && !o.has_revision && !boat_net_server_revision_pending(&server));
+    // A source that fails to start never reaches the server.
+    moved(&room, &candidate, 100);
+    CHECK(edit("local MARKS = 5", "local MARKS = = 5"));
+    edited.marks = room.marks;
+    CHECK(!boat_room_objective_stage_revision(&o, &server, &room, &edited, &d));
+    CHECK(d.message[0] && !o.has_revision && !boat_net_server_revision_pending(&server));
+    CHECK(server.stats.revision == 1 && server.stats.revisions_staged == 0);
+    // A good one commits in the empty room without waiting.
+    moved(&room, &candidate, -100);
+    CHECK(boat_room_objective_stage_revision(&o, &server, &room, &candidate, &d));
+    step(.3);
+    CHECK(server.stats.revision == 2 && o.revision == 2 && !o.has_revision);
+    CHECK(o.source->marks.items[0].x == room.marks.items[0].x);
+    boat_net_memory_destroy(network);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(package),
     TEST_CASE(adapter),
@@ -510,6 +618,8 @@ static const TestCase cases[] = {
     TEST_CASE(reload_broken),
     TEST_CASE(reload_marks_changed),
     TEST_CASE(reload_reaches_clients),
+    TEST_CASE(revision_marks),
+    TEST_CASE(revision_refused),
 };
 
 int main(int argc, char **argv)

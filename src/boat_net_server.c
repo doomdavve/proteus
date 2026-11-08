@@ -15,6 +15,7 @@ static uint8_t text_copy(char *storage, const char *text, size_t limit)
 }
 
 static void objective_poll(BoatNetServer *s);
+static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h);
 
 bool boat_net_server_init(
     BoatNetServer *server, BoatNetTransport transport, const BoatNetServerConfig *config)
@@ -61,6 +62,7 @@ bool boat_net_server_init(
     boat_marks_tracker_reset(&server->marks);
     server->backlog_since = -1;
     server->next_checkpoint = 1;
+    server->stats.revision = 1;
     if (deathmatch)
         boat_combat_enable(&server->fleet, &room->combat_rules);
     server->match = match;
@@ -363,7 +365,8 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
                 : s->deathmatch  ? BOAT_NET_MODE_DEATHMATCH
                                  : BOAT_NET_MODE_FREE,
             .wake_life_ticks = s->fleet.state.wakes.life_ticks,
-            .crest_height = s->fleet.state.wakes.crest_height } };
+            .crest_height = s->fleet.state.wakes.crest_height,
+            .revision = s->stats.revision } };
     send_message(s, peer, &m);
     send_roster(s);
     if (s->deathmatch) {
@@ -468,7 +471,15 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
     p->heard_at = now;
     refill(p, now);
     if (p->phase == BOAT_NET_PEER_HANDSHAKE) {
-        if (m.header.type == BOAT_NET_HELLO && m.header.epoch == 0)
+        if (m.header.type == BOAT_NET_HELLO && m.header.epoch == 0 && s->announced.present) {
+            // A revision is announced: serve this Hello the new definition once it commits, so
+            // the room's population cannot change under the announcement.
+            if (!p->hello_held) {
+                p->hello_held = true;
+                p->held = m.hello;
+                ++s->stats.revision_held_hellos;
+            }
+        } else if (m.header.type == BOAT_NET_HELLO && m.header.epoch == 0)
             hello(s, peer, &m.hello);
         else
             reject(s, peer, BOAT_NET_REJECT_MALFORMED);
@@ -487,6 +498,12 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
                 boat_fleet_request_spawn(&s->fleet, p->slot);
             send_roster(s);
         }
+        break;
+    case BOAT_NET_REVISION_READY:
+        // Only the announced revision counts; a stale or early answer is ignored.
+        if (p->phase == BOAT_NET_PEER_READY && s->announced.present
+            && m.checkpoint == s->announced.revision)
+            p->revision_ready = m.checkpoint;
         break;
     case BOAT_NET_INPUT_BATCH:
         if (p->phase == BOAT_NET_PEER_READY)
@@ -682,6 +699,213 @@ static void send_snapshots(BoatNetServer *s)
     ++s->stats.snapshots;
 }
 
+// P5f: definition revisions. A candidate is staged, waits for a boundary, is announced to every
+// ready player and commits at a fixed tick. See boat_net_server_stage_revision.
+static bool revision_phase(const BoatNetServer *s)
+{
+    if (s->race_room)
+        return s->race.phase == BOAT_RACE_WAITING || s->race.phase == BOAT_RACE_RESULTS;
+    if (s->deathmatch)
+        return s->match.phase == BOAT_MATCH_WARMUP || s->match.phase == BOAT_MATCH_INTERMISSION;
+    return false;
+}
+
+// The tick after which the boundary phase is certain to still hold: its timed end, or never.
+static uint64_t revision_phase_end(const BoatNetServer *s)
+{
+    if (s->race_room && s->race.phase == BOAT_RACE_RESULTS)
+        return s->race.phase_end;
+    if (s->deathmatch && s->match.phase == BOAT_MATCH_INTERMISSION)
+        return s->match.phase_end;
+    return UINT64_MAX;
+}
+
+static bool revision_peers_settled(const BoatNetServer *s)
+{
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
+        if (s->peers[peer].phase == BOAT_NET_PEER_BOOTSTRAP)
+            return false; // Joining: it would change the room under the announcement.
+    return true;
+}
+
+static void revision_announce(BoatNetServer *s, uint64_t commit_tick)
+{
+    s->announced.present = true;
+    s->announced.revision = s->stats.revision + 1;
+    s->announced.commit_tick = commit_tick;
+    s->announced.bytes = s->waiting.bytes;
+    memcpy(s->announced.data, s->waiting.data, s->waiting.bytes);
+    s->announced.room = s->waiting.room;
+    s->waiting.present = false;
+    uint16_t pages
+        = (uint16_t)((s->announced.bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+    uint64_t now = s->fleet.state.tick;
+    BoatNetMessage begin = { .header = { .type = BOAT_NET_REVISION_BEGIN, .tick = now },
+        .revision_begin = { .revision = s->announced.revision,
+            .bytes = s->announced.bytes,
+            .pages = pages,
+            .digest = boat_net_bytes_digest(s->announced.data, s->announced.bytes),
+            .commit_tick = commit_tick } };
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
+        if (s->peers[peer].phase != BOAT_NET_PEER_READY)
+            continue;
+        send_message(s, peer, &begin);
+        for (uint16_t page = 0; page < pages; ++page) {
+            size_t offset = (size_t)page * BOAT_NET_PAGE_BYTES;
+            size_t length = s->announced.bytes - offset < BOAT_NET_PAGE_BYTES
+                ? s->announced.bytes - offset
+                : BOAT_NET_PAGE_BYTES;
+            BoatNetMessage m = { .header = { .type = BOAT_NET_REVISION_PAGE, .tick = now },
+                .world_page = { .checkpoint = s->announced.revision,
+                    .index = page,
+                    .count = pages,
+                    .size = (uint16_t)length } };
+            memcpy(m.world_page.data, s->announced.data + offset, length);
+            send_message(s, peer, &m);
+        }
+        BoatNetMessage end = { .header = { .type = BOAT_NET_REVISION_END, .tick = now },
+            .checkpoint = s->announced.revision };
+        send_message(s, peer, &end);
+        s->stats.revision_bytes += s->announced.bytes;
+    }
+    ++s->stats.revisions_announced;
+}
+
+// Install ROOM (encoded as BYTES) as the running definition after the tick just simulated.
+static void revision_install(
+    BoatNetServer *s, const BoatRoomDefinition *room, const uint8_t *bytes, uint32_t size)
+{
+    s->revised = *room;
+    s->room = &s->revised;
+    s->config.room = &s->revised;
+    memcpy(s->definition, bytes, size);
+    s->definition_bytes = size;
+    s->fleet.world.scene = s->revised.has_scene ? &s->revised.scene : NULL;
+    if (s->deathmatch) {
+        s->match.rules = s->revised.match_rules;
+        s->fleet.state.combat.rules = s->revised.combat_rules;
+        BoatNetMessage m = match_state(s);
+        if (!boat_net_match_state_equal(&m.match, &s->match_sent)) {
+            s->match_sent = m.match;
+            broadcast(s, &m);
+        }
+    }
+    if (s->race_room) {
+        s->race.rules = s->revised.race_rules;
+        s->race.course = s->revised.course;
+        boat_race_bind(&s->race, &s->fleet);
+        BoatNetMessage m = race_state(s);
+        if (!boat_net_race_state_equal(&m.race, &s->race_sent)) {
+            s->race_sent = m.race;
+            broadcast(s, &m);
+        }
+    }
+    boat_marks_tracker_reset(&s->marks);
+    ++s->stats.revisions_committed;
+    if (s->config.rules.definition)
+        s->config.rules.definition(s->config.rules.context, s->fleet.state.tick, s->room);
+}
+
+// At the commit tick: drop whoever is not ready, switch, then serve the Hellos held meanwhile.
+static void revision_commit(BoatNetServer *s)
+{
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
+        BoatNetServerPeer *p = &s->peers[peer];
+        if (p->phase >= BOAT_NET_PEER_BOOTSTRAP && p->revision_ready != s->announced.revision) {
+            ++s->stats.revision_leaves;
+            leave(s, peer, BOAT_NET_LEAVE_REVISION);
+        }
+    }
+    s->stats.revision = s->announced.revision;
+    s->announced.present = false;
+    revision_install(s, &s->announced.room, s->announced.data, s->announced.bytes);
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
+        BoatNetServerPeer *p = &s->peers[peer];
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE && p->hello_held) {
+            p->hello_held = false;
+            hello(s, peer, &p->held);
+        }
+    }
+}
+
+// After each tick's rules: commit the announced revision when its tick comes, else announce or
+// commit the waiting candidate at a boundary.
+static void revision_tick(BoatNetServer *s)
+{
+    uint64_t tick = s->fleet.state.tick;
+    if (s->announced.present) {
+        if (tick >= s->announced.commit_tick)
+            revision_commit(s);
+        return;
+    }
+    if (!s->waiting.present)
+        return;
+    bool players = boat_net_server_players(s) != 0;
+    bool rounds = s->race_room || s->deathmatch;
+    if (rounds ? !revision_phase(s) : players)
+        return; // A free room revises only while empty.
+    if (!players) {
+        // Nobody connected: nothing to announce.
+        ++s->stats.revision;
+        s->waiting.present = false;
+        revision_install(s, &s->waiting.room, s->waiting.data, s->waiting.bytes);
+        return;
+    }
+    uint64_t commit = (tick + BOAT_NET_REVISION_LEAD_TICKS + BOAT_NET_SNAPSHOT_TICKS - 1)
+        / BOAT_NET_SNAPSHOT_TICKS * BOAT_NET_SNAPSHOT_TICKS;
+    if (commit < revision_phase_end(s) && revision_peers_settled(s))
+        revision_announce(s, commit);
+}
+
+bool boat_net_server_stage_revision(
+    BoatNetServer *s, const uint8_t *bytes, size_t size, BoatRoomDiagnostic *diagnostic)
+{
+    static BoatRoomDefinition room;
+    BoatRoomDiagnostic local;
+    BoatRoomDiagnostic *d = diagnostic ? diagnostic : &local;
+    *d = (BoatRoomDiagnostic) { 0 };
+    const char *error = NULL;
+    if (!boat_room_definition_decode(bytes, size, &room, d)) {
+        if (!d->message[0])
+            text_copy(d->message, "is not a valid room definition", sizeof(d->message) - 1);
+        ++s->stats.revisions_refused;
+        return false;
+    }
+    BoatMatch match;
+    BoatRace race;
+    if (room.mode != s->room->mode || room.location != s->room->location)
+        error = "changes the room's mode or location";
+    else if (room.mode == BOAT_ROOM_MODE_DEATHMATCH && !boat_match_init(&match, &room.match_rules))
+        error = "has invalid match rules";
+    else if (room.mode == BOAT_ROOM_MODE_RACE
+        && !boat_race_init(&race, &room.race_rules, &room.course))
+        error = "has an invalid race course";
+    if (error) {
+        text_copy(d->message, error, sizeof(d->message) - 1);
+        ++s->stats.revisions_refused;
+        return false;
+    }
+    // The canonical encoding is what clients receive and digest.
+    static uint8_t encoded[BOAT_ROOM_BYTES_MAX];
+    size_t length = boat_room_definition_encode(&room, encoded, sizeof(encoded));
+    if (!length) {
+        text_copy(d->message, "does not encode", sizeof(d->message) - 1);
+        ++s->stats.revisions_refused;
+        return false;
+    }
+    s->waiting.present = true;
+    s->waiting.bytes = (uint32_t)length;
+    memcpy(s->waiting.data, encoded, length);
+    s->waiting.room = room;
+    ++s->stats.revisions_staged;
+    return true;
+}
+
+bool boat_net_server_revision_pending(const BoatNetServer *s)
+{
+    return s->waiting.present || s->announced.present;
+}
+
 static void tick(BoatNetServer *s)
 {
     uint64_t next = s->fleet.state.tick + 1;
@@ -709,6 +933,7 @@ static void tick(BoatNetServer *s)
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
     objective_poll(s);
+    revision_tick(s);
     ++s->stats.ticks;
     // Births first, so a lossless link delivers them before the snapshot that counts them.
     if (next % BOAT_NET_BIRTH_TICKS == 0)

@@ -1,10 +1,12 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a-P5e implemented on `feat/plugin-p5`: the hunt's objective runs on
+Status, 2026-11-08: **P5a-P5f implemented on `feat/plugin-p5`: the hunt's objective runs on
 `boat_server`'s authority, clients receive its marks and HUD over protocol v13, the game
-draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM), and
-`boat_server --package-reload` reloads the objective source on a running room. Play check 1 is
-accepted; next: the user's reload check (P5e gate), then P5f. The single P5 PR is not open
+draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM),
+`boat_server --package-reload` reloads the objective source on a running room, and protocol v14
+carries definition revisions (marks, scene, course, rules) in every room mode, committing at
+round boundaries or in an empty free room. Play check 1 is accepted; next: the user's reload
+check (P5e gate, now also covering a moved mark), then P5g. The single P5 PR is not open
 yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
@@ -14,7 +16,7 @@ reconnects see the same HUD, the authority can reload its source and commit defi
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
 Next task: the user's live-reload check of [P5e](#p5e-authority-only-reload), then
-[P5f](#p5f-definition-revisions-protocol-v14).
+[P5g](#p5g-recording-and-reconstruction).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -129,8 +131,9 @@ anyone: clients only ever see the resulting HUD.
   crosses a commit.
 
 Naming correction: older documents call round-boundary revisions "protocol v10". The protocol is
-already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v13)),
-so this plan uses v13 and v14 and the closing step retires the "v10" label.
+already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v14)),
+so this plan uses v13 and v14 and the closing step retires the "v10" label. Revisions landed in
+v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the protocol document).
 
 ### Recording and reconstruction
 
@@ -308,7 +311,7 @@ smoke (`boat_server --package-reload` on a copy of `plugins/outer-hunt`, one `bo
 server and `boat_bot objective: HUNT=1 TEAM 1=0` on the bot, no restart. Limits: a file that
 fails to load is reported once per distinct message, not per distinct content; the game's own
 clients were not run against a reload; marks and every other definition change still need a room
-restart until P5f. **Gate still owed (user check):** a live script edit on a hosted hunt reaches
+restart until P5f (which lifted it). **Gate still owed (user check):** a live script edit on a hosted hunt reaches
 both players without a restart. Host with `./build/boat_server --bind 0.0.0.0 --location outer
 --package plugins/outer-hunt --package-reload`, join two game clients over the LAN, then edit
 `plugins/outer-hunt/main.lua` (for example the `"CREW "` label) and save; both HUDs should change
@@ -324,6 +327,49 @@ Tests: success; a joiner mid-download; a missing readiness disconnects only that
 invalid candidate keeps the running revision; duplicate and stale announcements; a commit exactly
 on a round boundary; prediction history never crosses a commit.
 Gate: all revision cases pass in every mode; existing room tests unchanged.
+
+**P5f result, 2026-11-08 (commit on `feat/plugin-p5`).** Protocol v14 adds RevisionBegin, Page,
+End (types 26-28, server to client) and RevisionReady (29, client to server) on the control
+channel, leave reason 5, and the running revision in Accept (a joiner must know it to ignore
+stale announcements; the room's first definition is revision 1). `boat_net_server_stage_revision`
+validates a candidate like the room's own definition and requires the same mode and location. It
+commits at a boundary: race WAITING/RESULTS, deathmatch WARMUP/INTERMISSION, a free room only
+while empty (immediately, no announcement). With players it announces to every one and commits
+240 ticks (2 s) later, rounded up to a snapshot tick; clients not ready by then are dropped with
+reason 5. At the commit tick the server installs the definition (owned copy; `config.room` and the
+fleet's scene follow), replaces match/race rules, the course (rebinding its source), combat rules
+and marks, and tells `BoatNetRules.definition`. A client switches when its mirror reaches the
+commit tick and resets prediction there; a checkpoint at or after it is taken as new. Decisions
+and deviations from the sketch above: (1) the announcement waits until the boundary is certain to
+hold through the commit tick (a timed phase must outlast it) and no peer is still joining,
+because the protocol has no cancel message and a client switches unconditionally at the commit
+tick; (2) a Hello during an announcement is held in the handshake and served the new definition
+after the commit (the alternative, serving the old definition then the announcement, would let a
+join start a round under the announcement); (3) revision numbers are assigned at announcement or
+commit, a newer staged candidate replaces a waiting one but not an announced one (it waits for
+the next boundary); (4) `boat_server --package-reload` stages a marks change (any definition
+change) as a revision, and the objective restarts on the new source and marks at the commit
+(`boat_room_objective_stage_revision`; P5e's "marks changed; restart the room" refusal is gone).
+Verification (macOS, Debug, 2026-11-08): `cmake --build build -j8` warning-clean;
+`ctest --test-dir build --preset full -j8` 460 of 460 passed (453 before); new cases
+`boat_net.revision_free`, `revision_race`, `revision_joiners`, `revision_not_ready`,
+`revision_boundary` (free: waits while occupied, commits at once when empty, invalid and replaced
+candidates, a scene; race: commit in RESULTS with two predicting clients, prediction restart,
+duplicate/stale/invalid announcements; a joiner mid-download and a held Hello; a silent client
+dropped alone with reason 5; a deathmatch commit on an intermission's last tick and one that did
+not fit waiting for the next) and `boat_room_objective.revision_marks`, `revision_refused`
+(waits while occupied, commits when empty, objective restarts on the new marks, a new crew scores
+on the moved mark); the version re-pins are the golden header bytes, the snapshot digest and the
+LAN query. Real-process smoke: `boat_server --location outer --package <copy of outer-hunt>
+--package-reload`, one `boat_bot` joined (revision 1), a mark moved in the copy: the server
+printed `objective reload: marks changed; revision 2 waits for an empty room`, and after the bot
+left `definition revision 2 committed at tick 1925 (5 marks)` and `objective reload: revision 2
+accepted (restart)`; a second bot then joined with `revision=2`. Limits: race and deathmatch
+commits are covered by the validator only (no command-line trigger exists); the game's own
+clients were not run against a revision (the game reads marks from `boat_net_client_room` each
+frame, which changes in place at the commit); a timed phase shorter than the 2 s lead never
+fits, so such a room never commits; a revision keeps mode and location (no migration between
+modes); the browser build was not exercised. Next task: [P5g](#p5g-recording-and-reconstruction).
 
 ### P5g: recording and reconstruction
 
