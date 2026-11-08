@@ -562,6 +562,25 @@ static void marks(BoatMinimapLayer *layer)
     }
 }
 
+// A room's objective marks: a magenta circle at the mark's true radius with a centre dot. The
+// larger chart also names each one.
+static void room_marks(BoatMinimapLayer *layer, const BoatMarkSet *set, bool chart)
+{
+    for (unsigned i = 0; set && i < set->count; ++i) {
+        const BoatMark *mark = &set->items[i];
+        Vector2 centre = project_map(layer, to_map((Vector2) { mark->x, mark->z }));
+        int x = (int)floorf(centre.x), y = (int)floorf(centre.y);
+        if (!inside(layer, x, y))
+            continue;
+        // Keep a tiny circle visible on the corner chart.
+        float radius = fmaxf(2.5f, mark->radius * layer->scale);
+        dashed_circle(layer, centre, radius, magenta);
+        square(layer, x, y, 1, magenta);
+        if (chart)
+            text(layer, mark->name, x, y + (int)radius + 3, magenta);
+    }
+}
+
 static void scale_bar(BoatMinimapLayer *layer)
 {
     bool half = NAUTICAL_MILE * layer->scale > 80;
@@ -642,6 +661,7 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         bridge(layer, &bridges[i], false);
     ferry(layer, chart);
     marks(layer);
+    room_marks(layer, minimap->room_marks, chart);
     for (size_t i = 0; i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
         Vector2 p = project_map(layer, landmarks[i].map);
         int x = (int)floorf(p.x), y = (int)floorf(p.y);

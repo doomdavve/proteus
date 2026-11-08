@@ -50,6 +50,7 @@ typedef enum {
     BOAT_TITLE_HOST_FREE,
     BOAT_TITLE_HOST_DEATHMATCH,
     BOAT_TITLE_HOST_RACE,
+    BOAT_TITLE_HOST_HUNT,
     BOAT_TITLE_HOST_MODES
 } BoatTitleHostMode;
 typedef enum {
@@ -59,7 +60,7 @@ typedef enum {
     BOAT_TITLE_LIGHTING_COUNT
 } BoatTitleLighting;
 
-// The command-line spelling of a host mode: free, deathmatch or race.
+// The command-line spelling of a host mode: free, deathmatch, race or hunt.
 const char *boat_title_host_mode(unsigned mode);
 // The command-line spelling of a fixed lighting preset: day, sunset or dusk.
 const char *boat_title_lighting(unsigned lighting);

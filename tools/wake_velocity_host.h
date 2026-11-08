@@ -25,8 +25,9 @@ typedef struct {
 } NetHost;
 
 typedef struct {
-    const char *mode; // "free", "deathmatch" or "race".
-    const char *location; // A boat_location name; race rooms are always on the outer map.
+    const char *mode; // "free", "deathmatch", "race" or "hunt".
+    const char *location; // A boat_location name; race and hunt rooms are always on the outer map.
+    const char *package; // Room package id for --package, or NULL for the mode's default.
     bool waves;
     uint16_t port;
 } NetHostOptions;

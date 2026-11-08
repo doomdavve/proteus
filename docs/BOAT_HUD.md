@@ -328,6 +328,20 @@ the updated workflow has not yet run. Physical steering/capture, scroll, focus/E
 and display scaling on GNOME/KDE remain pending. See the [Linux owner](LINUX_BUILD.md) for
 current commands and verification limits; the preceding platform-check record is historical.
 
+## Room objective panel and minimap marks, 2026-11-08 (P5d)
+
+In a room whose package runs an objective (the shelter hunt, `plugins/outer-hunt`), the game
+draws the authority's HUD rows as a panel at the right edge under the player roster: labels at
+the left and values right-aligned (`HUNT 1`, `CREW 1 1`). A quarantined objective shows
+`OBJECTIVE SUSPENDED`; a room without an objective draws nothing. The minimap draws each mark
+as a magenta dashed circle with a centre dot (at least 2.5 pixels across); the larger chart names
+it. In the world a mark is a ring of alternating orange and white buoys around a white mast with an
+orange flag, in both CPU and GPU renderers (see [the shelter hunt](PLAYING.md#multiplayer)).
+
+`./build/boat_hunt_review --screenshot build/hunt.png` renders one CPU frame with two marks, the
+panel and both minimap sizes at 2x. Implemented and CPU-captured; not yet judged by a person in
+motion (see [P5d](PLUGIN_P5_PLAN.md#p5d-the-game-client-and-host-a-room-first-playable)).
+
 ## Review commands
 
 From the worktree root, build normally, then run the boating view:

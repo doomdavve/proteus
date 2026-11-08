@@ -1,8 +1,9 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a-P5c implemented on `feat/plugin-p5`: the hunt's objective runs on
-`boat_server`'s authority and clients receive its marks and HUD over protocol v13 (`boat_bot`
-prints them); the game draws them from P5d. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a-P5d implemented on `feat/plugin-p5`: the hunt's objective runs on
+`boat_server`'s authority, clients receive its marks and HUD over protocol v13, and the game
+draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM). Next: the user's
+play check 1, then P5e. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -10,7 +11,8 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: [P5d](#p5d-the-game-client-and-host-a-room-first-playable).
+Next task: **user play check 1** of [P5d](#p5d-the-game-client-and-host-a-room-first-playable),
+then [P5e](#p5e-authority-only-reload).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -244,8 +246,27 @@ the minimap, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`, `docs/BOAT_HUD.md`.
 Tests: `boat_net_process.py` hunt case (server + two bots, ENet, event-driven); title menu
 validator for the new row; a CPU capture of marks and HUD (validator frame dump, since
 `--connect` refuses `--screenshot`), inspected.
-Gate: **user play check 1** — two people on a LAN hunt the marks; judge whether the marks are
+Gate: **user play check 1 (owed)** — two people on a LAN hunt the marks; judge whether the marks are
 findable, the HUD readable, and the score delay acceptable.
+
+**P5d result, 2026-11-08 (commit on `feat/plugin-p5`).** `--host hunt` and SHELTER HUNT (fourth
+MODE row entry) start the child room `--serve --mode free --location outer --package
+proteus.outer-hunt`; hunt, like race, fixes PLACE to the harbour and `--host hunt --location basin`
+is refused (`NetHostOptions.package` is new). Marks reach the renderers as `BoatViewState.marks`
+and `boat_view.c` draws each as a ring of buoys (alternating orange and white, a mast and flag
+at the centre) through the same box visitor as the race gates, so the CPU and GPU renderers share
+it; the minimap draws `BoatMinimap.room_marks` as a magenta dashed circle with a centre dot, named on
+the chart; `net_study_draw_objective` draws the rows as a panel under the roster. Verification
+(macOS, Debug): `cmake --build build -j` warning-clean; `ctest --test-dir build --preset full -j8`
+444 of 444 passed (new: `wake_velocity_host_hunt_location_rejected`; `boat_net_process` gained a
+hunt case with a server and two ENet `boat_bot` joins that must print `CREW` rows, and the server
+`objective tick`). `./build/boat_hunt_review --screenshot build/hunt.png` (new CPU fixture, hidden
+window) was inspected: the ring, mast and flag are readable from about 40 m, the panel aligns
+labels and values, and the corner and chart minimaps show the marks. Limits: there is no title
+menu validator in the repository, so the new row is only compiled and read; the GPU renderer
+shares the code but its frame was not captured; labels on the chart overlap landmarks when marks
+are close; no windowed `--host hunt` run, no browser build run, and **user play check 1 is still owed**
+(findability of marks, HUD readability, score delay).
 
 ### P5e: authority-only reload
 

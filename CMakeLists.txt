@@ -428,6 +428,12 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
+  # P5d: a CPU capture of the hunt's marks, objective panel and minimap marks (build/hunt.png).
+  add_executable(boat_hunt_review tools/boat_hunt_review.c tools/wake_velocity_net.c)
+  target_link_libraries(boat_hunt_review PRIVATE proteus_boat_drive proteus_gpu
+    proteus_boat_net_enet proteus_boat_fixtures)
+  target_compile_options(boat_hunt_review PRIVATE ${PROTEUS_WARNINGS})
+  add_dependencies(boat_hunt_review proteus_assets)
   add_test(NAME boat_combat_lighting_hour_invalid
     COMMAND boat_combat_review --lighting-hour nope)
   add_test(NAME boat_combat_lighting_hour_missing
@@ -1159,6 +1165,8 @@ set_tests_properties(wake_velocity_serve_scripted PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_server scripted: boats=4 ticks=240")
 add_test(NAME wake_velocity_host_race_location_rejected
   COMMAND wake_velocity --host race --location basin)
+add_test(NAME wake_velocity_host_hunt_location_rejected
+  COMMAND wake_velocity --host hunt --location basin)
 add_test(NAME wake_velocity_host_connect_rejected
   COMMAND wake_velocity --host free --connect 127.0.0.1:24680)
 add_test(NAME wake_velocity_port_without_host_rejected COMMAND wake_velocity --port 24680)
@@ -1178,6 +1186,7 @@ set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_
   boat_bot_discover_join_rejected boat_bot_snapshots_with_seconds_rejected
   boat_server_scripted_until_empty_rejected boat_net_study_mode_rejected
   boat_net_study_name_rejected boat_net_study_skin_rejected wake_velocity_host_race_location_rejected
+  wake_velocity_host_hunt_location_rejected
   wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)

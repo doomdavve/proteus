@@ -317,10 +317,13 @@ Host and join from a native game process:
 ./build/wake_velocity --host free --location outer --name me
 ./build/wake_velocity --host deathmatch --location outer --name me
 ./build/wake_velocity --host race --name me
+./build/wake_velocity --host hunt --name me
 ```
 
-`--host free|deathmatch|race` starts a background authority open to the LAN and joins it;
-leaving closes the room. `--location`, `--waves` and `--port N` configure the room.
+`--host free|deathmatch|race|hunt` starts a background authority open to the LAN and joins it;
+leaving closes the room. `--location`, `--waves` and `--port N` configure the room. Like race,
+hunt always runs on `outer` (`--host hunt --location basin` is refused) and starts a room equal
+to `boat_server --mode free --location outer --package proteus.outer-hunt`.
 For a separate authority, use the packaged game's `--serve`, or the development server:
 
 ```sh
@@ -339,8 +342,9 @@ extra arguments. On macOS, a packaged headless room can run as:
 ```
 
 The room runs from a package. With no `--package`, `--mode free` uses the location's free
-package, `--mode deathmatch` uses `proteus.deathmatch` at any location, and `--mode race` uses
-`proteus.river-sprint` on `outer`, where every race room runs. `--package ID|DIR` selects another
+package, `--mode deathmatch` uses `proteus.deathmatch` at any location, `--mode race` uses
+`proteus.river-sprint` on `outer`, where every race room runs. The shelter hunt is a free room:
+`--mode free --location outer --package proteus.outer-hunt`. `--package ID|DIR` selects another
 bundled package by ID or evaluates a package directory once at start-up. The authority validates the package, sends the
 resulting definition to clients as data, and refuses to start with a diagnostic if it is
 invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.

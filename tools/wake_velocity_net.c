@@ -560,6 +560,51 @@ void net_study_race_view(const NetStudy *net, BoatViewState *view)
     view->race.next_gate = row->current ? row->gates : 0;
 }
 
+void net_study_marks_view(const NetStudy *net, BoatViewState *view)
+{
+    const BoatRoomDefinition *room = boat_net_client_room(&net->client);
+    view->marks = room && room->marks.count ? &room->marks : NULL;
+}
+
+int net_study_draw_objective(const NetStudy *net, int right, int top)
+{
+    const BoatNetClient *c = &net->client;
+    if (!c->objective_valid)
+        return top;
+    const BoatNetObjectiveState *o = &c->objective;
+    // Labels in a left column and values right-aligned, so "CREW 1" and 1 never read as "CREW 11".
+    char label[BOAT_NET_OBJECTIVE_ROWS + 1][BOAT_NET_OBJECTIVE_TEXT];
+    char value[BOAT_NET_OBJECTIVE_ROWS + 1][24];
+    unsigned count = 0;
+    if (o->suspended) {
+        snprintf(label[count], sizeof(label[count]), "OBJECTIVE SUSPENDED");
+        value[count++][0] = 0;
+    }
+    for (unsigned i = 0; i < o->row_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i, ++count) {
+        snprintf(label[count], sizeof(label[count]), "%s", o->rows[i].label);
+        snprintf(value[count], sizeof(value[count]), "%lld", (long long)o->rows[i].value);
+    }
+    if (!count)
+        return top;
+    int label_width = 0, value_width = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        int w = boat_ui_width(label[i], 12), v = boat_ui_width(value[i], 12);
+        label_width = w > label_width ? w : label_width;
+        value_width = v > value_width ? v : value_width;
+    }
+    int width = label_width + (value_width ? 14 + value_width : 0) + 14;
+    int height = (int)count * 16 + 8;
+    DrawRectangle(right - width, top, width, height, Fade(BLACK, .45f));
+    for (unsigned i = 0; i < count; ++i) {
+        Color color = o->suspended && i == 0 ? ORANGE : RAYWHITE;
+        boat_ui_text(label[i], right - width + 7, top + 5 + (int)i * 16, 12, color);
+        if (value[i][0])
+            boat_ui_text(value[i], right - 7 - boat_ui_width(value[i], 12), top + 5 + (int)i * 16,
+                12, color);
+    }
+    return top + height;
+}
+
 static const char *ordinal(unsigned place)
 {
     static const char *const names[] = { "-", "1ST", "2ND", "3RD", "4TH" };

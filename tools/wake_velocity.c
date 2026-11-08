@@ -203,7 +203,8 @@ static void usage(void)
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
-    cli_usage_line(stdout, "--host free|deathmatch|race", "Start a LAN room and join it");
+    cli_usage_line(
+        stdout, "--host MODE", "Start a LAN room (free, deathmatch, race, hunt) and join it");
     cli_usage_line(stdout, "--connect HOST:PORT", "Join a boat_server room");
     cli_usage_line(stdout, "--serve", "Run only a room; see --serve --help");
 
@@ -282,7 +283,8 @@ static void usage(void)
     cli_usage_line(stdout, "--name TEXT", "Player name");
     cli_usage_line(stdout, "--token TEXT", "Room token");
     cli_usage_line(stdout, "--port N", "Host UDP port (default 24680)");
-    cli_usage_line(stdout, "", "--location and --waves configure the hosted room");
+    cli_usage_line(
+        stdout, "", "--location and --waves configure the hosted room (race and hunt: outer)");
     cli_usage_line(stdout, "", "Leaving closes a room started with --host");
 
     cli_usage_section(stdout, "CONTROLS");
@@ -826,7 +828,7 @@ static int study(int argc, char **argv)
         } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
             host_mode = argv[++i];
             if (strcmp(host_mode, "free") != 0 && strcmp(host_mode, "deathmatch") != 0
-                && strcmp(host_mode, "race") != 0)
+                && strcmp(host_mode, "race") != 0 && strcmp(host_mode, "hunt") != 0)
                 goto invalid;
         } else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
             net_name = argv[++i];
@@ -858,13 +860,15 @@ static int study(int argc, char **argv)
             fprintf(stderr, "--host joins its own room; it cannot take --connect or --token.\n");
             goto invalid;
         }
-        if (!strcmp(host_mode, "race") && location_set && location->id != BOAT_LOCATION_OUTER) {
-            fprintf(stderr, "--host race runs on the outer location.\n");
+        bool fixed = !strcmp(host_mode, "race") || !strcmp(host_mode, "hunt");
+        if (fixed && location_set && location->id != BOAT_LOCATION_OUTER) {
+            fprintf(stderr, "--host %s runs on the outer location.\n", host_mode);
             goto invalid;
         }
         // The room's water: what follows joins it like --connect.
         host_options = (NetHostOptions) { .mode = host_mode,
             .location = location->name,
+            .package = !strcmp(host_mode, "hunt") ? "proteus.outer-hunt" : NULL,
             .waves = waves,
             .port = (uint16_t)(host_port ? host_port : BOAT_NET_PORT) };
         snprintf(host_endpoint, sizeof(host_endpoint), "127.0.0.1:%u", (unsigned)host_options.port);
@@ -2052,6 +2056,7 @@ static int study(int argc, char **argv)
         if (net) {
             live_view.skin = net_study_skin(net->client.slot); // Every client agrees.
             net_study_race_view(net, &live_view);
+            net_study_marks_view(net, &live_view);
         }
 #endif
         if (view == &playback)
@@ -2213,6 +2218,7 @@ static int study(int argc, char **argv)
                     .world = view_world,
                     .camera = camera_settings },
                 width, height);
+        minimap.room_marks = live_view.marks;
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
         Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
@@ -2302,6 +2308,9 @@ static int study(int argc, char **argv)
                 roster_top = (int)fmaxf((float)roster_top,
                     destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
             int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
+            int objective_bottom
+                = net_study_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
+            feed_top = objective_bottom > feed_top + 8 ? objective_bottom : feed_top;
             net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
             net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
@@ -2694,7 +2703,8 @@ static int title_join(BoatTitleSettings *settings, bool host)
     if (host) {
         arguments[count++] = "--host";
         arguments[count++] = (char *)boat_title_host_mode(settings->host_mode);
-        if (settings->host_mode != BOAT_TITLE_HOST_RACE) {
+        if (settings->host_mode != BOAT_TITLE_HOST_RACE
+            && settings->host_mode != BOAT_TITLE_HOST_HUNT) {
             arguments[count++] = "--location";
             arguments[count++] = (char *)boat_location(settings->host_location)->name;
         }

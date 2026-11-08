@@ -246,6 +246,41 @@ static void race_visit(
     }
 }
 
+// P5d: each room mark is a ring of buoys on its circle (alternating orange and white) around a
+// tall mast with a flag, so the circle reads from afar and its edge is visible when close.
+static void marks_visit(const BoatViewState *view, BoatCourseBoxDraw draw, void *context)
+{
+    const BoatMarkSet *set = view->marks;
+    for (unsigned i = 0; set && i < set->count; ++i) {
+        const BoatMark *mark = &set->items[i];
+        Vector2 centre = { mark->x, mark->z };
+        if (Vector2Distance(centre, view->boat.position) > 450 + mark->radius)
+            continue;
+        const Color flag = { 255, 128, 48, 255 };
+        draw(context,
+            (Transform3D) { .position = { -centre.x, 5, centre.y }, .scale = { .4f, 10, .4f } },
+            RAYWHITE);
+        draw(context,
+            (Transform3D) {
+                .position = { -centre.x - 1.4f, 9, centre.y }, .scale = { 2.8f, 1.8f, .2f } },
+            flag);
+        unsigned count = (unsigned)Clamp(mark->radius * 6.2831853f / 8, 12, 40);
+        for (unsigned k = 0; k < count; ++k) {
+            float angle = (float)k * 6.2831853f / (float)count;
+            Vector2 p
+                = { centre.x + cosf(angle) * mark->radius, centre.y + sinf(angle) * mark->radius };
+            draw(context,
+                (Transform3D) { .position = { -p.x, .5f, p.y }, .scale = { 1.6f, 1.4f, 1.6f } },
+                k % 2 ? RAYWHITE : flag);
+            if (k % 4)
+                continue;
+            draw(context,
+                (Transform3D) { .position = { -p.x, 2.6f, p.y }, .scale = { .3f, 3.6f, .3f } },
+                RAYWHITE);
+        }
+    }
+}
+
 static float storm_rain_hash(uint32_t seed)
 {
     seed ^= seed >> 16;
@@ -506,6 +541,7 @@ static void environment_visit(
 {
     if (view->race.enabled && world->definition->mapped)
         race_visit(view, &world->resources->map, draw, context);
+    marks_visit(view, draw, context);
     storm_visit(view, world, draw, context);
     combat_visit(view, world, draw, context);
     const Boat *boat = &view->boat;

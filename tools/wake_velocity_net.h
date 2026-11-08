@@ -71,6 +71,12 @@ bool net_study_deathmatch(const NetStudy *net);
 bool net_study_race(const NetStudy *net);
 // Fill VIEW's race markers: the course lines and the own next gate.
 void net_study_race_view(const NetStudy *net, BoatViewState *view);
+// Point VIEW at the room's objective marks (none when the room has none).
+void net_study_marks_view(const NetStudy *net, BoatViewState *view);
+// P5d: the room objective's rows as "LABEL value" lines in a panel whose right edge is RIGHT and
+// whose top is TOP, at window resolution. Draws nothing without an ObjectiveState; a suspended
+// objective shows OBJECTIVE SUSPENDED. Returns the y below the panel (TOP when nothing is drawn).
+int net_study_draw_objective(const NetStudy *net, int right, int top);
 void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera);
 // Deathmatch HUD at window resolution: round clock and own score at HEADER_TOP, a kill feed

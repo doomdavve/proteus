@@ -8,6 +8,9 @@ join with the room token and leave after a few snapshots; before them, a bot wit
 token must be refused. The room (--until-empty) closes once both have left. Checks exit codes, summaries
 and the message/datagram/MTU bounds.
 
+The shelter hunt (outer map, proteus.outer-hunt) runs the same way: two bots join and each must
+receive objective rows with a CREW entry, and the server must print the objective.
+
 Session rules over the real transport (deathmatch, race, churn and timeouts, the river map)
 run in-process on a virtual clock in validate_boat_net_enet; this test only proves that the
 programs connect, discover and exit. Timeouts below are failure deadlines, never waits.
@@ -34,6 +37,44 @@ def fields(text, prefix):
         if line.startswith(prefix):
             return dict(re.findall(r"(\w+)=([^\s]+)", line))
     raise AssertionError(f"missing '{prefix}' in output:\n{text}")
+
+
+def hunt(args):
+    """The shelter hunt over ENet: the authority runs the package's Lua objective and every
+    joined client receives its HUD rows. Returns a list of problems."""
+    port, lan_port = free_port(), free_port()
+    endpoint = f"127.0.0.1:{port}"
+    server = subprocess.Popen(
+        [args.server, "--mode", "free", "--location", "outer", "--package", "proteus.outer-hunt",
+         "--port", str(port), "--lan-port", str(lan_port), "--until-empty"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    problems = []
+    try:
+        line = server.stdout.readline()
+        if "listening on" not in line:
+            return [f"hunt server did not start: {line!r}"]
+        bots = [subprocess.Popen([args.bot, "--connect", endpoint, "--name", name,
+                    "--snapshots", str(SNAPSHOTS)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for name in ("hunt-a", "hunt-b")]
+        for bot in bots:
+            out, err = bot.communicate(timeout=DEADLINE)
+            print(out.strip())
+            rows = [l for l in out.splitlines() if l.startswith("boat_bot objective:")]
+            if bot.returncode != 0:
+                problems.append(f"hunt bot exit {bot.returncode}: {err}")
+            elif not any("CREW" in l for l in rows):
+                problems.append(f"hunt bot saw no CREW row: {rows}")
+        out, err = server.communicate(timeout=DEADLINE)
+        print(out.strip())
+        if server.returncode != 0 or "every player has left" not in out:
+            problems.append(f"hunt server exit {server.returncode}: {err}")
+        if "objective tick" not in out:
+            problems.append("hunt server printed no objective")
+    finally:
+        if server.poll() is None:
+            server.kill()
+    return problems
 
 
 def main():
@@ -114,6 +155,7 @@ def main():
     finally:
         if server.poll() is None:
             server.kill()
+    problems += hunt(args)
     for problem in problems:
         print(problem)
     print("boat_net_process=" + ("fail" if problems else "ok"))

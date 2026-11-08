@@ -62,7 +62,7 @@ static void exited(const NetHost *host, char *error, size_t size)
     snprintf(error, size, "The room stopped: %s", reason[0] ? reason : "no message.");
 }
 
-static void arguments(const NetHostOptions *o, char port[8], const char *out[13])
+static void arguments(const NetHostOptions *o, char port[8], const char *out[16])
 {
     snprintf(port, 8, "%u", (unsigned)o->port);
     unsigned n = 0;
@@ -76,6 +76,10 @@ static void arguments(const NetHostOptions *o, char port[8], const char *out[13]
     if (strcmp(o->mode, "race") != 0) {
         out[n++] = "--location";
         out[n++] = o->location;
+    }
+    if (o->package) {
+        out[n++] = "--package";
+        out[n++] = o->package;
     }
     if (o->waves)
         out[n++] = "--waves";
@@ -135,7 +139,7 @@ static void kill_child(NetHost *host) { TerminateProcess(host->process, 1); }
 static bool spawn(NetHost *host, const NetHostOptions *options, char *error, size_t size)
 {
     char path[1024], port[8], line[2048];
-    const char *argv[13];
+    const char *argv[16];
     DWORD length = GetModuleFileNameA(NULL, path, sizeof(path));
     if (!length || length >= sizeof(path)) {
         snprintf(error, size, "Cannot find this program's own path to start the room.");
