@@ -86,8 +86,14 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
     Color palette[256] = { 0 };
     palette[240] = color;
     Material3D material = { &texel, palette, 1, 1, 1, true };
+    // Navigation and street lamps are emitters: keep their authored colour even while the
+    // caller darkens the shared unlit tint for wakes and gulls. The GPU draws these cubes with
+    // a white emitter colour, so this also preserves the accepted night readability.
+    Vector3 tint = r->emissive_tint;
+    r->emissive_tint = (Vector3) { 1, 1, 1 };
     renderer3d_draw_textured_box(
         r, (Transform3D) { .position = position, .scale = scale }, &material);
+    r->emissive_tint = tint;
 }
 
 // Daytime glass, toward warm occupied rooms and darkened empty ones as the window light rises.
@@ -236,7 +242,12 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
     if (!omit_water) {
         Mesh3D water = *city;
         water.triangle_count = tiles->water_count;
+        // Apply the frame water light once with the normal CPU ambient/direct/tint shading.
+        // The same ordering is used by the basin's flat-water block.
+        Vector3 tint = r->tint;
+        r->tint = Vector3Multiply(tint, lighting->water);
         renderer3d_draw_mesh(r, &water, (Transform3D) { .scale = { 1, 1, 1 } });
+        r->tint = tint;
     }
     const Vector3 grow = { .1f, .1f, .1f };
     size_t count = boat_map_tiles_count(tiles);

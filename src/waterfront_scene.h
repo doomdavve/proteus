@@ -142,11 +142,26 @@ WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);
 
-// Borrowed static panorama under LIGHTING, shared by CPU sky rays and the GPU sky shader. Do
-// not unload. It is repainted when another light's sky differs, which invalidates earlier
-// borrowed pixels; a GPU owner uploads its copy and compares the light before reusing it.
+// Borrowed full-panorama reference under LIGHTING. Do not unload. It is repainted when another
+// light's sky differs, which invalidates earlier borrowed pixels; the CPU draw path uses its own
+// bounded visible-sample cache, and the GPU instead uploads the mask below once.
 // U is atan2(direction.x, direction.z) / (2*pi) + 0.5; V is (1-direction.y) / 2.
 Image waterfront_sky_image(const WaterfrontLighting *lighting);
+
+// Sky evaluation work for tests and diagnostics. Samples count actual recipe texel evaluations;
+// the draw cache evaluates each visible panorama texel on demand once per distinct sky.
+typedef struct {
+    unsigned long long reference_samples; // Full-reference texels painted.
+    unsigned long long draw_samples; // Visible texels evaluated by the draw cache.
+    unsigned long long draw_reused; // Visible texels served from the draw cache.
+    unsigned long long draw_calls; // Calls to waterfront_sky_draw[_squall].
+    unsigned long long draw_generations; // Distinct skies adopted by the draw cache.
+} WaterfrontSkyStats;
+
+WaterfrontSkyStats waterfront_sky_stats(void);
+// Borrowed light-independent cloud flags at the same panorama texel centres: R underside,
+// G lit rim, point-sampled by the GPU sky shader. Never repainted or unloaded.
+Image waterfront_sky_cloud_mask(void);
 void waterfront_sky_draw(
     Color *pixels, int width, int height, View3D camera, const WaterfrontLighting *lighting);
 // The sky with SQUALL over it, seen from the camera.

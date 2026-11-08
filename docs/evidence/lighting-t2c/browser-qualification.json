@@ -1,0 +1,414 @@
+{
+  "date": "2026-11-07",
+  "browser": "Chrome 156.0.8078.81 headless Metal on Apple M1 Max, macOS 26.6.2",
+  "build": "Emscripten 6.0.12 MinSizeRel",
+  "scope": "one fixed-hour actual-game run per case, waves on, demo, soundtrack off; exported CPU frame costs and browser intervals; no GPU query samples",
+  "percentile": "nearest rank after discarding first 24 GPU or 12 CPU frames",
+  "records": [
+    {
+      "case": {
+        "renderer": "gpu",
+        "place": "outer",
+        "hour": "0",
+        "resolution": "low",
+        "hdr": "off",
+        "frames": 240,
+        "backend": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+        },
+        "errors": 0
+      },
+      "reported_session": {
+        "map": "outer",
+        "preset": "default",
+        "vsync": true,
+        "aa": false,
+        "fullscreen": false,
+        "window": [
+          960,
+          600
+        ],
+        "framebuffer": [
+          960,
+          600
+        ],
+        "scene": [
+          320,
+          200
+        ],
+        "reflection": [
+          160,
+          120
+        ],
+        "effects": {
+          "waves": true,
+          "wake_objects": true,
+          "lighting": true,
+          "shadows": true,
+          "reflections": true
+        }
+      },
+      "discarded_warmup_frames": 24,
+      "measured_samples": 216,
+      "first_draw_ms": 529.200012,
+      "gpu_samples": 0,
+      "metrics": {
+        "frame_ms": {
+          "p50": 3.4000001,
+          "p95": 4.0999999,
+          "p99": 4.30000019,
+          "max": 4.69999981
+        },
+        "interval_ms": {
+          "p50": 16.7000008,
+          "p95": 17.5,
+          "p99": 17.8999996,
+          "max": 18.2000008
+        },
+        "simulation_ms": {
+          "p50": 0.299999952,
+          "p95": 0.400000095,
+          "p99": 0.400000095,
+          "max": 0.400000095
+        },
+        "render_submit_ms": {
+          "p50": 1.5,
+          "p95": 1.70000005,
+          "p99": 2.4000001,
+          "max": 2.5
+        },
+        "present_ms": {
+          "p50": 1.5,
+          "p95": 2.20000005,
+          "p99": 2.5999999,
+          "max": 2.80000019
+        }
+      }
+    },
+    {
+      "case": {
+        "renderer": "gpu",
+        "place": "outer",
+        "hour": "6.1",
+        "resolution": "low",
+        "hdr": "off",
+        "frames": 240,
+        "backend": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+        },
+        "errors": 0
+      },
+      "reported_session": {
+        "map": "outer",
+        "preset": "default",
+        "vsync": true,
+        "aa": false,
+        "fullscreen": false,
+        "window": [
+          960,
+          600
+        ],
+        "framebuffer": [
+          960,
+          600
+        ],
+        "scene": [
+          320,
+          200
+        ],
+        "reflection": [
+          160,
+          120
+        ],
+        "effects": {
+          "waves": true,
+          "wake_objects": true,
+          "lighting": true,
+          "shadows": true,
+          "reflections": true
+        }
+      },
+      "discarded_warmup_frames": 24,
+      "measured_samples": 216,
+      "first_draw_ms": 529.5,
+      "gpu_samples": 0,
+      "metrics": {
+        "frame_ms": {
+          "p50": 3.5999999,
+          "p95": 4.5,
+          "p99": 4.5999999,
+          "max": 4.80000019
+        },
+        "interval_ms": {
+          "p50": 16.7000008,
+          "p95": 17.5,
+          "p99": 17.7000008,
+          "max": 18.0
+        },
+        "simulation_ms": {
+          "p50": 0.299999952,
+          "p95": 0.400000095,
+          "p99": 0.400000095,
+          "max": 0.5
+        },
+        "render_submit_ms": {
+          "p50": 1.5,
+          "p95": 1.70000005,
+          "p99": 2.29999995,
+          "max": 2.39999986
+        },
+        "present_ms": {
+          "p50": 1.70000005,
+          "p95": 2.5999999,
+          "p99": 2.70000005,
+          "max": 2.79999995
+        }
+      }
+    },
+    {
+      "case": {
+        "renderer": "gpu",
+        "place": "outer",
+        "hour": "12",
+        "resolution": "high",
+        "hdr": "on",
+        "frames": 240,
+        "backend": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+        },
+        "errors": 0
+      },
+      "reported_session": {
+        "map": "outer",
+        "preset": "high",
+        "vsync": true,
+        "aa": false,
+        "fullscreen": false,
+        "window": [
+          1280,
+          800
+        ],
+        "framebuffer": [
+          1280,
+          800
+        ],
+        "scene": [
+          1280,
+          800
+        ],
+        "reflection": [
+          640,
+          480
+        ],
+        "effects": {
+          "waves": true,
+          "wake_objects": true,
+          "lighting": true,
+          "shadows": true,
+          "reflections": true
+        }
+      },
+      "discarded_warmup_frames": 24,
+      "measured_samples": 216,
+      "first_draw_ms": 530.400024,
+      "gpu_samples": 0,
+      "metrics": {
+        "frame_ms": {
+          "p50": 3.79999995,
+          "p95": 4.4000001,
+          "p99": 4.5999999,
+          "max": 4.5999999
+        },
+        "interval_ms": {
+          "p50": 16.7000008,
+          "p95": 17.6000004,
+          "p99": 17.7999992,
+          "max": 18.0
+        },
+        "simulation_ms": {
+          "p50": 0.299999952,
+          "p95": 0.400000095,
+          "p99": 0.400000095,
+          "max": 0.5
+        },
+        "render_submit_ms": {
+          "p50": 1.5,
+          "p95": 1.70000005,
+          "p99": 2.30000019,
+          "max": 2.5999999
+        },
+        "present_ms": {
+          "p50": 1.9000001,
+          "p95": 2.70000005,
+          "p99": 2.79999995,
+          "max": 2.9000001
+        }
+      }
+    },
+    {
+      "case": {
+        "renderer": "gpu",
+        "place": "outer",
+        "hour": "19.5",
+        "resolution": "high",
+        "hdr": "on",
+        "frames": 240,
+        "backend": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+        },
+        "errors": 0
+      },
+      "reported_session": {
+        "map": "outer",
+        "preset": "high",
+        "vsync": true,
+        "aa": false,
+        "fullscreen": false,
+        "window": [
+          1280,
+          800
+        ],
+        "framebuffer": [
+          1280,
+          800
+        ],
+        "scene": [
+          1280,
+          800
+        ],
+        "reflection": [
+          640,
+          480
+        ],
+        "effects": {
+          "waves": true,
+          "wake_objects": true,
+          "lighting": true,
+          "shadows": true,
+          "reflections": true
+        }
+      },
+      "discarded_warmup_frames": 24,
+      "measured_samples": 216,
+      "first_draw_ms": 533.5,
+      "gpu_samples": 0,
+      "metrics": {
+        "frame_ms": {
+          "p50": 3.5,
+          "p95": 4.5,
+          "p99": 4.5999999,
+          "max": 4.70000029
+        },
+        "interval_ms": {
+          "p50": 16.7000008,
+          "p95": 17.6000004,
+          "p99": 18.0,
+          "max": 18.2999992
+        },
+        "simulation_ms": {
+          "p50": 0.299999952,
+          "p95": 0.400000095,
+          "p99": 0.400000095,
+          "max": 0.5
+        },
+        "render_submit_ms": {
+          "p50": 1.5,
+          "p95": 1.70000005,
+          "p99": 2.4000001,
+          "max": 2.60000014
+        },
+        "present_ms": {
+          "p50": 1.70000005,
+          "p95": 2.5999999,
+          "p99": 2.60000014,
+          "max": 2.70000005
+        }
+      }
+    },
+    {
+      "case": {
+        "renderer": "cpu",
+        "place": "outer",
+        "hour": "21.5",
+        "resolution": "low",
+        "hdr": "off",
+        "frames": 48,
+        "backend": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+        },
+        "errors": 0
+      },
+      "reported_session": {
+        "map": "outer",
+        "preset": "default",
+        "vsync": true,
+        "aa": false,
+        "fullscreen": false,
+        "window": [
+          960,
+          600
+        ],
+        "framebuffer": [
+          960,
+          600
+        ],
+        "scene": [
+          320,
+          200
+        ],
+        "reflection": [
+          0,
+          0
+        ],
+        "effects": {
+          "waves": true,
+          "wake_objects": true,
+          "lighting": false,
+          "shadows": false,
+          "reflections": false
+        }
+      },
+      "discarded_warmup_frames": 12,
+      "measured_samples": 31,
+      "first_draw_ms": 1768.0,
+      "gpu_samples": 0,
+      "metrics": {
+        "frame_ms": {
+          "p50": 2074.30005,
+          "p95": 6230.8999,
+          "p99": 9028.2998,
+          "max": 9028.2998
+        },
+        "interval_ms": {
+          "p50": 2087.1001,
+          "p95": 4073.8999,
+          "p99": 6243.6001,
+          "max": 6243.6001
+        },
+        "simulation_ms": {
+          "p50": 1.4000001,
+          "p95": 1.79999995,
+          "p99": 1.9000001,
+          "max": 1.9000001
+        },
+        "render_submit_ms": {
+          "p50": 2072.6001,
+          "p95": 6228.0,
+          "p99": 9026.0,
+          "max": 9026.0
+        },
+        "present_ms": {
+          "p50": 0.200000048,
+          "p95": 1.0,
+          "p99": 1.0,
+          "max": 1.0
+        }
+      }
+    }
+  ]
+}

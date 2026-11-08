@@ -545,6 +545,132 @@ static int lifecycle(void)
     return 0;
 }
 
+// Full-reference sky mapping for the basin's CPU camera (independent traversal and storage).
+static Color basin_reference_sky(
+    Image reference, View3D camera, int width, int height, int x, int y)
+{
+    Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
+    Vector3 up = Vector3CrossProduct(forward, right);
+    float scale = 2 * tanf(camera.vertical_fov * .5f) / height;
+    Vector3 row = Vector3Add(forward, Vector3Scale(up, (height * .5f - y - .5f) * scale));
+    Vector3 ray
+        = Vector3Normalize(Vector3Add(row, Vector3Scale(right, (x + .5f - width * .5f) * scale)));
+    float u = atan2f(ray.x, ray.z) / (2 * PI) + .5f;
+    int sx = (int)(u * reference.width) % reference.width;
+    int sy = (int)Clamp((1 - ray.y) * .5f * reference.height, 0, reference.height - 1);
+    return ((const Color *)reference.data)[sy * reference.width + sx];
+}
+
+// The basin now shares the mapped scene's sky, sun direction, ambient/direct/tint and water
+// light. Compare against full-reference traversal and independently computed flat-water colour.
+static int cpu_basin_lighting(void)
+{
+    static BoatSession session;
+    static WaterfrontSceneFrame frame;
+    // Truly flat water (no player wake) keeps the basin's non-displaced path.
+    boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    for (int tick = 0; tick < 120; ++tick)
+        drive(&session, tick);
+    Renderer3D renderer = { 0 };
+    BoatCpuView cpu = { 0 };
+    Color pixels[320 * 200], again[320 * 200];
+    boat_scene_frame(
+        SESSION_VIEW(&session), &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
+
+    // Dawn: compare the top sky row with the full panorama traversed separately for this hour.
+    WaterfrontLighting dawn;
+    CHECK(waterfront_lighting_hour(6.5f, &dawn));
+    cpu.hour = 6.5f;
+    cpu.hour_set = true;
+    CHECK(boat_draw(&renderer, &cpu, pixels, 320, 200, SESSION_VIEW(&session),
+        &session.presentation, &session.world, BOAT_CAMERA_DEFAULT));
+    Image reference = waterfront_sky_image(&dawn);
+    for (int x = 0; x < 320; ++x)
+        CHECK(
+            ColorIsEqual(pixels[x], basin_reference_sky(reference, frame.camera, 320, 200, x, 0)));
+
+    // A wrapped hour is the same sky; a direct/backward seek is deterministic and not stale.
+    cpu.hour = 30.5f;
+    CHECK(boat_draw(&renderer, &cpu, again, 320, 200, SESSION_VIEW(&session), &session.presentation,
+        &session.world, BOAT_CAMERA_DEFAULT));
+    CHECK(memcmp(pixels, again, sizeof(pixels)) == 0);
+    cpu.hour = 21.5f;
+    CHECK(boat_draw(&renderer, &cpu, again, 320, 200, SESSION_VIEW(&session), &session.presentation,
+        &session.world, BOAT_CAMERA_DEFAULT));
+    CHECK(memcmp(pixels, again, sizeof(pixels)) != 0);
+    cpu.hour = 6.5f;
+    CHECK(boat_draw(&renderer, &cpu, again, 320, 200, SESSION_VIEW(&session), &session.presentation,
+        &session.world, BOAT_CAMERA_DEFAULT));
+    CHECK(memcmp(pixels, again, sizeof(pixels)) == 0);
+
+    // Late afternoon flat water applies the shared water multiplier once with the frame's flat
+    // light. The unchanged base {36,107,125} and top-face normal stay the water model.
+    WaterfrontLighting afternoon;
+    CHECK(waterfront_lighting_hour(18.5f, &afternoon));
+    cpu.hour = 18.5f;
+    CHECK(boat_draw(&renderer, &cpu, again, 320, 200, SESSION_VIEW(&session), &session.presentation,
+        &session.world, BOAT_CAMERA_DEFAULT));
+    Color base = { 36, 107, 125, 255 };
+    Vector3 tint = Vector3Multiply(afternoon.cpu_tint, afternoon.water);
+    float brightness
+        = afternoon.cpu_ambient + afternoon.cpu_direct * fmaxf(0, afternoon.sun_direction.y);
+    Color water = { (unsigned char)(base.r * fminf(1, brightness * tint.x)),
+        (unsigned char)(base.g * fminf(1, brightness * tint.y)),
+        (unsigned char)(base.b * fminf(1, brightness * tint.z)), 255 };
+    int matching = 0;
+    for (int i = 0; i < 320 * 200; ++i)
+        matching += ColorIsEqual(again[i], water);
+    CHECK(matching > 500);
+
+    // The mapped CPU flat-water path uses the same one-time tint ordering. Its unchanged water
+    // triangle colour is {45,79,104}; day keeps the default mapped water because the factor is 1.
+    static BoatSession mapped;
+    BoatCpuView mapped_cpu = { 0 };
+    mapped_cpu.hour = 12;
+    mapped_cpu.hour_set = true;
+    boat_session_init(&mapped, test_world(TEST_RIVER), (BoatWater) { 0 });
+    CHECK(boat_draw(&renderer, &mapped_cpu, again, 320, 200, SESSION_VIEW(&mapped),
+        &mapped.presentation, &mapped.world, BOAT_CAMERA_DEFAULT));
+    Color mapped_base = { 45, 79, 104, 255 };
+    WaterfrontLighting noon;
+    CHECK(waterfront_lighting_hour(12, &noon));
+    Vector3 day_tint = Vector3Multiply(noon.cpu_tint, noon.water);
+    float day_brightness = noon.cpu_ambient + noon.cpu_direct * fmaxf(0, noon.sun_direction.y);
+    Color mapped_day = { (unsigned char)(mapped_base.r * fminf(1, day_brightness * day_tint.x)),
+        (unsigned char)(mapped_base.g * fminf(1, day_brightness * day_tint.y)),
+        (unsigned char)(mapped_base.b * fminf(1, day_brightness * day_tint.z)), 255 };
+    int mapped_matching = 0;
+    for (int i = 0; i < 320 * 200; ++i)
+        mapped_matching += ColorIsEqual(again[i], mapped_day);
+    CHECK(noon.water.x == 1 && noon.water.y == 1 && noon.water.z == 1);
+    CHECK(mapped_matching > 500);
+
+    // A non-white hour proves the mapped path really applies the new water multiplier. The
+    // mapped base colour stays {45,79,104}; only the frame water/flat light changes.
+    mapped_cpu.hour = 18.5f;
+    CHECK(boat_draw(&renderer, &mapped_cpu, again, 320, 200, SESSION_VIEW(&mapped),
+        &mapped.presentation, &mapped.world, BOAT_CAMERA_DEFAULT));
+    Vector3 mapped_tint = Vector3Multiply(afternoon.cpu_tint, afternoon.water);
+    float mapped_brightness
+        = afternoon.cpu_ambient + afternoon.cpu_direct * fmaxf(0, afternoon.sun_direction.y);
+    Color mapped_afternoon
+        = { (unsigned char)(mapped_base.r * fminf(1, mapped_brightness * mapped_tint.x)),
+              (unsigned char)(mapped_base.g * fminf(1, mapped_brightness * mapped_tint.y)),
+              (unsigned char)(mapped_base.b * fminf(1, mapped_brightness * mapped_tint.z)), 255 };
+    int mapped_afternoon_matching = 0;
+    for (int i = 0; i < 320 * 200; ++i)
+        mapped_afternoon_matching += ColorIsEqual(again[i], mapped_afternoon);
+    CHECK(mapped_afternoon_matching > 500);
+    CHECK(renderer.tint.x == afternoon.cpu_tint.x && renderer.tint.y == afternoon.cpu_tint.y
+        && renderer.tint.z == afternoon.cpu_tint.z);
+    boat_cpu_view_destroy(&mapped_cpu);
+    boat_cpu_view_destroy(&cpu);
+    renderer3d_destroy(&renderer);
+    puts("cpu_basin_lighting=ok sky/hour-wrap/seek/basin-and-mapped-flat-water-tint");
+    return 0;
+}
+
 static int locations(void)
 {
     CHECK(boat_location(BOAT_LOCATION_COUNT) == NULL && !boat_location_find("harbour"));
@@ -562,6 +688,7 @@ static const TestCase cases[] = {
     SLOW_CASE(render_rates),
     TEST_CASE(core_order),
     TEST_CASE(view_binding),
+    SLOW_CASE(cpu_basin_lighting),
     SLOW_CASE(lifecycle),
 };
 

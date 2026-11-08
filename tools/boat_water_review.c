@@ -406,6 +406,16 @@ static int stress_lights;
 static bool no_ambient_occlusion, no_particles, no_shadows, no_reflections;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
+// --lighting-hour: developer full-day hour; overrides --daylight when set.
+static float review_hour;
+static bool review_hour_set;
+// --lighting-qualify: bounded developer fixed-vs-sampled-cycle full-frame audit.
+#define QUALIFY_MIN_SAMPLES 25
+#define QUALIFY_MAX_SAMPLES 3601
+#define QUALIFY_DEFAULT_SAMPLES 241
+#define QUALIFY_WARMUP 8
+#define QUALIFY_DEADLINE_MS (1000.0 / 60.0)
+static int qualify_samples = QUALIFY_DEFAULT_SAMPLES;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
 // a 1280x800 window (low: 320x200; high: a 1280x800 scene and 640x480 reflection). HDR follows
 // the resolution unless set.
@@ -791,6 +801,97 @@ static int check_presentation(void)
         &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
     EXPECT(gpu_frame(&gpu, &session, &frame) && same_image(high, frame));
     RELEASE(frame);
+    // Rear-view lighting: a light seek at unchanged wave time invalidates the 30 Hz sample and
+    // refreshes real mirror pixels. Returning to an earlier light restores the exact frame, and
+    // an unchanged light still reuses the sample.
+    {
+        BoatRearview cpu_mirror = { 0 };
+        Image gpu_day = { 0 }, gpu_dusk = { 0 }, gpu_night = { 0 }, gpu_night_again = { 0 };
+        Image gpu_again = { 0 }, cpu_day = { 0 }, cpu_dusk = { 0 }, cpu_night = { 0 };
+        Image cpu_again = { 0 };
+        gpu.daylight = WATERFRONT_DAYLIGHT_DAY;
+        gpu.hour_set = false;
+        boat_rearview_set_lighting(&mirror, WATERFRONT_DAYLIGHT_DAY, 0, false);
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu_day = LoadImageFromTexture(mirror.target.texture);
+        EXPECT(gpu_day.data);
+        gpu.daylight = WATERFRONT_DAYLIGHT_DUSK;
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu_dusk = LoadImageFromTexture(mirror.target.texture);
+        EXPECT(gpu_dusk.data && image_distance(gpu_day, gpu_dusk) > 0);
+        // A full-hour night direct seek, then away and back: history independent.
+        gpu.daylight = 0;
+        gpu.hour = 21;
+        gpu.hour_set = true;
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu_night = LoadImageFromTexture(mirror.target.texture);
+        EXPECT(gpu_night.data && image_distance(gpu_day, gpu_night) > 0);
+        gpu.hour = 6.5f;
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu.hour = 21;
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu_night_again = LoadImageFromTexture(mirror.target.texture);
+        EXPECT(gpu_night_again.data && image_distance(gpu_night, gpu_night_again) == 0);
+        gpu.daylight = WATERFRONT_DAYLIGHT_DAY;
+        gpu.hour_set = false;
+        EXPECT(boat_rearview_update(
+            &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+        gpu_again = LoadImageFromTexture(mirror.target.texture);
+        EXPECT(gpu_again.data && image_distance(gpu_day, gpu_again) == 0);
+
+        boat_rearview_set_lighting(&cpu_mirror, WATERFRONT_DAYLIGHT_DAY, 0, false);
+        EXPECT(boat_rearview_update(&cpu_mirror, NULL, SESSION_VIEW(&session),
+            &session.presentation, &session.world, NULL));
+        cpu_day = LoadImageFromTexture(cpu_mirror.texture);
+        EXPECT(cpu_day.data);
+        // Legacy dusk from the mirror must be the production rear-view frame at that light, not
+        // merely different from day. Render the same view independently at the same wave time.
+        boat_rearview_set_lighting(&cpu_mirror, WATERFRONT_DAYLIGHT_DUSK, 0, false);
+        EXPECT(boat_rearview_update(&cpu_mirror, NULL, SESSION_VIEW(&session),
+            &session.presentation, &session.world, NULL));
+        cpu_dusk = LoadImageFromTexture(cpu_mirror.texture);
+        EXPECT(cpu_dusk.data && image_distance(cpu_day, cpu_dusk) > 0);
+        {
+            BoatCpuView check_view = { 0 };
+            Renderer3D check_renderer = { 0 };
+            check_view.daylight = WATERFRONT_DAYLIGHT_DUSK;
+            const BoatCamera rear = { .rear_view = true };
+            Color expected[BOAT_REARVIEW_WIDTH * BOAT_REARVIEW_HEIGHT];
+            EXPECT(boat_draw_scene(&check_renderer, &check_view, expected, BOAT_REARVIEW_WIDTH,
+                BOAT_REARVIEW_HEIGHT, SESSION_VIEW(&session), &session.presentation, &session.world,
+                rear, NULL, NULL, NULL, 0));
+            EXPECT(memcmp(expected, cpu_mirror.pixels, sizeof(expected)) == 0);
+            boat_cpu_view_destroy(&check_view);
+            renderer3d_destroy(&check_renderer);
+        }
+        // Full-hour night and returning to day, then unchanged-light 30 Hz reuse.
+        boat_rearview_set_lighting(&cpu_mirror, 0, 21.0f, true);
+        EXPECT(boat_rearview_update(&cpu_mirror, NULL, SESSION_VIEW(&session),
+            &session.presentation, &session.world, NULL));
+        cpu_night = LoadImageFromTexture(cpu_mirror.texture);
+        EXPECT(cpu_night.data && image_distance(cpu_day, cpu_night) > 0);
+        boat_rearview_set_lighting(&cpu_mirror, WATERFRONT_DAYLIGHT_DAY, 0, false);
+        EXPECT(boat_rearview_update(&cpu_mirror, NULL, SESSION_VIEW(&session),
+            &session.presentation, &session.world, NULL));
+        cpu_again = LoadImageFromTexture(cpu_mirror.texture);
+        EXPECT(cpu_again.data && image_distance(cpu_day, cpu_again) == 0);
+        Color sentinel = { 1, 2, 3, 255 };
+        cpu_mirror.pixels[0] = sentinel;
+        EXPECT(boat_rearview_update(&cpu_mirror, NULL, SESSION_VIEW(&session),
+            &session.presentation, &session.world, NULL));
+        EXPECT(memcmp(&cpu_mirror.pixels[0], &sentinel, sizeof(sentinel)) == 0);
+        Image images[] = { gpu_day, gpu_dusk, gpu_night, gpu_night_again, gpu_again, cpu_day,
+            cpu_dusk, cpu_night, cpu_again };
+        for (size_t i = 0; i < sizeof(images) / sizeof(images[0]); ++i)
+            if (images[i].data)
+                UnloadImage(images[i]);
+        boat_rearview_destroy(&cpu_mirror);
+    }
     // A failed HDR allocation presents the 8-bit frame exactly, and a later request recovers.
     gpu.hdr_allocation_failures = 1;
     EXPECT(boat_gpu_resize(&gpu, 960, 600) && !boat_gpu_hdr_active(&gpu));
@@ -940,6 +1041,7 @@ static int check_light_clusters(void)
     // Dusk, then dusk with hundreds of review lights, at both presets: the slot lists draw
     // exactly the reference that shades every light everywhere.
     gpu.daylight = WATERFRONT_DAYLIGHT_DUSK;
+    gpu.hour_set = false; // This internal dusk parity check does not use the review hour.
     BoatScreenLayout layouts[] = { boat_screen_layout(BOAT_RESOLUTION_LOW, 320, 200, 960, 600),
         boat_screen_layout(BOAT_RESOLUTION_HIGH, 320, 200, 1280, 800) };
     for (int stress = 0; stress < 2; ++stress) {
@@ -1513,6 +1615,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         goto cleanup;
     }
     gpu.daylight = review_daylight;
+    gpu.hour = review_hour;
+    gpu.hour_set = review_hour_set;
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1707,8 +1811,11 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_string(json, renderer_name);
     fputs(",\"gl_version\":", json);
     json_string(json, gl_version);
-    fprintf(json, ",\n  \"daylight\":%.6g,\"stress_lights\":%d,\"light_build_us\":%.6g,\"lights\":",
-        (double)review_daylight, gpu.scene.stress_lights, light_build_us);
+    fprintf(json,
+        ",\n  \"lighting_mode\":\"%s\",\"daylight\":%.6g,\"lighting_hour\":%.6g,"
+        "\"stress_lights\":%d,\"light_build_us\":%.6g,\"lights\":",
+        review_hour_set ? "hour" : "daylight", (double)review_daylight, (double)review_hour,
+        gpu.scene.stress_lights, light_build_us);
     json_lights(json, &gpu.scene);
     fprintf(json,
         ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\","
@@ -1822,6 +1929,523 @@ cleanup:
     free(frames);
     free(scratch);
     return ok ? 0 : bench_fail(error ? error : "cannot write report");
+}
+
+// T2c developer qualification: the same finite physical trajectory and camera are drawn twice,
+// once at a fixed hour and once with an injected 900 s virtual cycle sampled N times. This is an
+// audit input, not a game clock; pose ticks advance independently of the light hour.
+typedef struct {
+    BoatSession session;
+    StressFixture stress;
+    size_t destination;
+    int tick;
+} QualRun;
+
+typedef struct {
+    float hour, elapsed_s;
+    float simulation_ms, submission_ms, present_ms, frame_ms, gpu_ms;
+    bool has_gpu;
+    WaterfrontGpuCount count;
+    unsigned long long sky_reference, sky_draw, sky_reused, sky_calls, sky_generations;
+} QualFrame;
+
+static void qualification_timer_poll(
+    GpuTimer *timer, QualFrame *fixed, QualFrame *cycle, int samples, bool wait)
+{
+    for (int i = 0; timer->supported && i < GPU_QUERIES; ++i) {
+        if (timer->frame[i] < 0)
+            continue;
+        GLint ready = wait;
+        if (!wait)
+            glGetQueryObjectiv(timer->ids[i], GL_QUERY_RESULT_AVAILABLE, &ready);
+        if (!ready)
+            continue;
+        GLuint64 elapsed = 0;
+        glGetQueryObjectui64v(timer->ids[i], GL_QUERY_RESULT, &elapsed);
+        int index = timer->frame[i];
+        int pass = index >= samples;
+        int sample = index - (pass ? samples : 0);
+        if (sample >= 0 && sample < samples) {
+            QualFrame *frame = &(pass ? cycle : fixed)[sample];
+            frame->gpu_ms = (float)((double)elapsed / 1e6);
+            frame->has_gpu = true;
+        }
+        timer->frame[i] = -1;
+    }
+}
+
+static float wrap_hour(double hour)
+{
+    double wrapped = fmod(hour, 24.0);
+    if (wrapped < 0)
+        wrapped += 24;
+    return (float)wrapped;
+}
+
+static bool qualification_init(QualRun *run, const Route *route, bool waves)
+{
+    *run = (QualRun) { 0 };
+    if (route) {
+        boat_session_init(&run->session, test_world(route->location),
+            waves ? boat_water_gentle() : (BoatWater) { 0 });
+        return true;
+    }
+    if (!stress_init(&run->stress, waves) || !stress_advance(&run->stress, STRESS_PREROLL_TICKS))
+        return false;
+    run->tick = (int)run->stress.fleet.state.tick;
+    return true;
+}
+
+static bool qualification_advance(QualRun *run, const Route *route)
+{
+    if (!route)
+        return stress_advance(&run->stress, STRESS_TICKS_PER_FRAME);
+    for (int i = 0; i < STRESS_TICKS_PER_FRAME; ++i) {
+        drive(&run->session, route, &run->destination);
+        ++run->tick;
+    }
+    return true;
+}
+
+static void qualification_state(char *out, size_t size, const QualRun *run, const Route *route)
+{
+    if (route)
+        format_final_state(out, size, &run->session.boat, run->tick);
+    else
+        format_stress_state(out, size, &run->stress);
+}
+
+static bool qualification_draw(QualRun *run, const Route *route, BoatGpu *gpu, Renderer3D *cpu,
+    BoatCpuView *cpu_view, Color *pixels, bool use_gpu, float hour, const BoatCamera *camera)
+{
+    const BoatCamera stress_camera = { .distance = 26, .height = 16 };
+    const BoatCamera settings = route ? *camera : stress_camera;
+    if (use_gpu) {
+        gpu->hour = hour;
+        gpu->hour_set = true;
+    } else {
+        cpu_view->hour = hour;
+        cpu_view->hour_set = true;
+    }
+    if (route) {
+        const BoatViewState *view = SESSION_VIEW(&run->session);
+        if (use_gpu)
+            boat_gpu_draw(gpu, view, &run->session.presentation, &run->session.world, settings);
+        else if (!boat_draw(cpu, cpu_view, pixels, 320, 200, view, &run->session.presentation,
+                     &run->session.world, settings))
+            return false;
+        return !use_gpu || !gpu->failed;
+    }
+    BoatWorld world = stress_world(&run->stress);
+    BoatViewState view = stress_view(&run->stress);
+    BoatRivals rivals = stress_rivals(&run->stress);
+    if (use_gpu)
+        boat_gpu_draw_scene(
+            gpu, &view, &run->stress.presentations[0], &world, settings, &rivals, NULL, NULL, 0);
+    else if (!boat_draw_scene(cpu, cpu_view, pixels, 320, 200, &view, &run->stress.presentations[0],
+                 &world, settings, &rivals, NULL, NULL, 0))
+        return false;
+    return !use_gpu || !gpu->failed;
+}
+
+typedef enum {
+    Q_SIMULATION,
+    Q_SUBMISSION,
+    Q_PRESENT,
+    Q_FRAME,
+    Q_GPU,
+    Q_SUBMISSIONS,
+    Q_TRIANGLES,
+    Q_SKY_DRAW
+} QualMetric;
+
+static void qual_json_stats(FILE *out, const char *name, const QualFrame *frames, int count,
+    float *scratch, QualMetric metric, bool comma)
+{
+    int n = 0;
+    for (int i = QUALIFY_WARMUP; i < count; ++i) {
+        float value;
+        switch (metric) {
+        case Q_SIMULATION:
+            value = frames[i].simulation_ms;
+            break;
+        case Q_SUBMISSION:
+            value = frames[i].submission_ms;
+            break;
+        case Q_PRESENT:
+            value = frames[i].present_ms;
+            break;
+        case Q_FRAME:
+            value = frames[i].frame_ms;
+            break;
+        case Q_GPU:
+            if (!frames[i].has_gpu)
+                continue;
+            value = frames[i].gpu_ms;
+            break;
+        case Q_SUBMISSIONS:
+            value = (float)frames[i].count.submissions;
+            break;
+        case Q_TRIANGLES:
+            value = (float)frames[i].count.triangles;
+            break;
+        default:
+            value = (float)frames[i].sky_draw;
+            break;
+        }
+        scratch[n++] = value;
+    }
+    fprintf(out, "  \"%s\":", name);
+    if (!n) {
+        fprintf(out, "null%s\n", comma ? "," : "");
+        return;
+    }
+    BoatMetricStats s = boat_metric_stats_sort(scratch, n);
+    fprintf(out,
+        "{\"samples\":%d,\"mean\":%.9g,\"p50\":%.9g,\"p95\":%.9g,\"p99\":%.9g,\"max\":%.9g}%s\n", n,
+        (double)s.mean, (double)s.p50, (double)s.p95, (double)s.p99, (double)s.maximum,
+        comma ? "," : "");
+}
+
+static void qualification_totals(const QualFrame *frames, int count, bool *bins, int *bin_count,
+    int *misses, int *gpu_samples, double *sky_reference, double *sky_draw, double *sky_reused,
+    double *sky_calls, double *sky_generations)
+{
+    for (int i = 0; i < 24; ++i)
+        bins[i] = false;
+    *bin_count = 0;
+    *misses = 0;
+    *gpu_samples = 0;
+    *sky_reference = *sky_draw = *sky_reused = *sky_calls = *sky_generations = 0;
+    for (int i = QUALIFY_WARMUP; i < count; ++i) {
+        const QualFrame *f = &frames[i];
+        int bin = (int)floorf(f->hour) % 24;
+        bin = bin < 0 ? bin + 24 : bin;
+        if (!bins[bin]) {
+            bins[bin] = true;
+            ++*bin_count;
+        }
+        *sky_reference += (double)f->sky_reference;
+        *sky_draw += (double)f->sky_draw;
+        *sky_reused += (double)f->sky_reused;
+        *sky_calls += (double)f->sky_calls;
+        *sky_generations += (double)f->sky_generations;
+        *misses += f->frame_ms > QUALIFY_DEADLINE_MS;
+        *gpu_samples += f->has_gpu;
+    }
+}
+
+static int lighting_qualify(
+    const char *prefix, bool use_gpu, bool waves, int samples, float tile_size, const Route *route)
+{
+    bool stress = !route;
+    char csv_path[4096], json_path[4096];
+    snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
+    snprintf(json_path, sizeof(json_path), "%s.json", prefix);
+    FILE *csv = fopen(csv_path, "w"), *json = csv ? fopen(json_path, "w") : NULL;
+    if (!csv || !json) {
+        if (csv) {
+            fclose(csv);
+            remove(csv_path);
+        }
+        return bench_fail("cannot create qualification report (the parent directory must exist)");
+    }
+    int total = samples + QUALIFY_WARMUP;
+    QualFrame *fixed = calloc((size_t)total, sizeof(*fixed));
+    QualFrame *cycle = calloc((size_t)total, sizeof(*cycle));
+    float *scratch = calloc((size_t)total, sizeof(*scratch));
+    BoatGpu gpu = { 0 };
+    Renderer3D cpu = { 0 };
+    BoatCpuView cpu_view = { 0 };
+    GpuTimer timer = { 0 };
+    QualRun fixed_run, cycle_run;
+    Color pixels[320 * 200];
+    const BoatCamera camera = route
+        ? (BoatCamera) { .distance = test_location(route->location)->camera_distance,
+              .height = test_location(route->location)->camera_height }
+        : (BoatCamera) { .distance = 26, .height = 16 };
+    char fixed_state[1024] = "", cycle_state[1024] = "";
+    char renderer_name[256] = "", gl_version[256] = "";
+    const char *error = NULL;
+    bool success = false, started = false, states_match = false;
+    bool fixed_ready = false, cycle_ready = false;
+    int gpu_index = 0, hour_bins = 0;
+    double start_hour = review_hour_set ? (double)review_hour : 12.0;
+    double stride = 900.0 / (double)(samples - 1);
+    double initialization_ms = 0;
+    if (!fixed || !cycle || !scratch) {
+        error = "allocation failed";
+        goto cleanup;
+    }
+    double initialization_start = boat_profile_time(false);
+    if (use_gpu) {
+        SetConfigFlags(FLAG_WINDOW_HIDDEN);
+        InitWindow(960, 600, "Proteus / lighting qualification");
+        started = true;
+        if (!IsWindowReady() || !boat_gpu_init(&gpu, false)
+            || (route && !prepare_location_tiles(&gpu.scenery, route->location, tile_size))
+            || !apply_scene_options(&gpu.scene) || !apply_review_preset(&gpu)) {
+            error = "graphics initialization failed";
+            goto cleanup;
+        }
+        snprintf(
+            renderer_name, sizeof(renderer_name), "%s", (const char *)glGetString(GL_RENDERER));
+        snprintf(gl_version, sizeof(gl_version), "%s", (const char *)glGetString(GL_VERSION));
+        gpu_timer_init(&timer);
+    } else if (route && !prepare_location_tiles(&cpu_view.scenery, route->location, tile_size)) {
+        error = "scenery initialization failed";
+        goto cleanup;
+    }
+    fixed_ready = qualification_init(&fixed_run, route, waves);
+    if (!fixed_ready) {
+        error = "qualification fixture failed";
+        goto cleanup;
+    }
+    cycle_ready = qualification_init(&cycle_run, route, waves);
+    if (!cycle_ready) {
+        error = "qualification fixture failed";
+        goto cleanup;
+    }
+    initialization_ms = (boat_profile_time(false) - initialization_start) * 1000;
+    for (int pass = 0; pass < 2; ++pass) {
+        QualRun *run = pass ? &cycle_run : &fixed_run;
+        QualFrame *frames = pass ? cycle : fixed;
+        for (int i = 0; i < total; ++i) {
+            double begin = boat_profile_time(false);
+            if (i > 0 && !qualification_advance(run, route)) {
+                error = "qualification fixture failed";
+                goto cleanup;
+            }
+            double simulated = boat_profile_time(false);
+            int measured = i - QUALIFY_WARMUP;
+            double elapsed = measured > 0 ? measured * stride : 0;
+            double hour
+                = pass ? wrap_hour(start_hour + elapsed * 24.0 / 900.0) : wrap_hour(start_hour);
+            QualFrame *frame = &frames[i];
+            frame->hour = (float)hour;
+            frame->elapsed_s = (float)elapsed;
+            bool timed = use_gpu && gpu_timer_begin(&timer, gpu_index);
+            WaterfrontSkyStats sky_before = waterfront_sky_stats();
+            if (!qualification_draw(
+                    run, route, &gpu, &cpu, &cpu_view, pixels, use_gpu, (float)hour, &camera)) {
+                error = "scene draw failed";
+                goto cleanup;
+            }
+            if (use_gpu)
+                rlDrawRenderBatchActive();
+            if (timed)
+                glEndQuery(GL_TIME_ELAPSED);
+            double submitted = boat_profile_time(false);
+            double presented = submitted;
+            if (use_gpu) {
+                // The benchmark's presentation path: the whole rendered frame reaches the window
+                // target, so CPU frame time and GPU execution are reported separately.
+                BeginDrawing();
+                ClearBackground(BLACK);
+                DrawTexturePro(gpu.target.texture,
+                    (Rectangle) {
+                        0, 0, -(float)gpu.target.texture.width, -(float)gpu.target.texture.height },
+                    (Rectangle) { 0, 0, 960, 600 }, (Vector2) { 0 }, 0, WHITE);
+                EndDrawing();
+                presented = boat_profile_time(false);
+            }
+            WaterfrontSkyStats sky_after = waterfront_sky_stats();
+            frame->simulation_ms = (float)((simulated - begin) * 1000);
+            frame->submission_ms = (float)((submitted - simulated) * 1000);
+            frame->present_ms = (float)((presented - submitted) * 1000);
+            frame->frame_ms = (float)((presented - begin) * 1000);
+            frame->sky_reference = sky_after.reference_samples - sky_before.reference_samples;
+            frame->sky_draw = sky_after.draw_samples - sky_before.draw_samples;
+            frame->sky_reused = sky_after.draw_reused - sky_before.draw_reused;
+            frame->sky_calls = sky_after.draw_calls - sky_before.draw_calls;
+            frame->sky_generations = sky_after.draw_generations - sky_before.draw_generations;
+            if (use_gpu) {
+                frame->count = waterfront_gpu_stats_total(&gpu.scene.stats);
+                qualification_timer_poll(&timer, fixed, cycle, total, false);
+            } else {
+                // Renderer3D exposes CPU mesh submissions and submitted triangles, not GPU
+                // DrawMesh calls; the report says so explicitly.
+                frame->count.submissions = (unsigned)cpu.stats.meshes;
+                frame->count.triangles = cpu.stats.triangles;
+            }
+            ++gpu_index;
+        }
+        qualification_state(pass ? cycle_state : fixed_state,
+            pass ? sizeof(cycle_state) : sizeof(fixed_state), run, route);
+    }
+    if (use_gpu) {
+        // Collect every outstanding query once the run has stopped submitting.
+        qualification_timer_poll(&timer, fixed, cycle, total, true);
+    }
+    states_match = strcmp(fixed_state, cycle_state) == 0;
+    bool wrapped = fabsf(cycle[QUALIFY_WARMUP + samples - 1].hour - wrap_hour(start_hour)) < 1e-5f;
+    int fixed_bins, cycle_bins, fixed_misses, cycle_misses, fixed_gpu, cycle_gpu;
+    double fr, fd, freuse, fcalls, fgen, cr, cd, creuse, ccalls, cgen;
+    bool fixed_seen[24], cycle_seen[24];
+    qualification_totals(fixed, total, fixed_seen, &fixed_bins, &fixed_misses, &fixed_gpu, &fr, &fd,
+        &freuse, &fcalls, &fgen);
+    qualification_totals(cycle, total, cycle_seen, &cycle_bins, &cycle_misses, &cycle_gpu, &cr, &cd,
+        &creuse, &ccalls, &cgen);
+    hour_bins = cycle_bins;
+    bool cycle_hours_complete = cycle_bins == 24;
+    if (!states_match) {
+        error = "fixed and cycle runs ended in different physical states";
+        goto cleanup;
+    }
+    if (!cycle_hours_complete || !wrapped) {
+        error = "sampled cycle did not visit every hour and wrap";
+        goto cleanup;
+    }
+    // Write rows sample-major so a pair shares one physical trajectory position.
+    fputs("run,sample,warmup,virtual_elapsed_s,hour,simulation_ms,submission_ms,present_ms,"
+          "frame_ms,gpu_ms,app_submissions,scene_triangles,sky_reference_samples,"
+          "sky_draw_samples,sky_draw_reused,sky_draw_calls,sky_draw_generations\n",
+        csv);
+    for (int i = 0; i < total; ++i) {
+        const QualFrame *pair[2] = { &fixed[i], &cycle[i] };
+        const char *names[2] = { "fixed", "cycle" };
+        for (int pass = 0; pass < 2; ++pass) {
+            const QualFrame *f = pair[pass];
+            char gpu_ms[32] = "";
+            if (f->has_gpu)
+                snprintf(gpu_ms, sizeof(gpu_ms), "%.9g", (double)f->gpu_ms);
+            fprintf(csv,
+                "%s,%d,%d,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%u,%zu,%llu,%llu,%llu,%llu,%llu\n",
+                names[pass], i, i < QUALIFY_WARMUP, (double)f->elapsed_s, (double)f->hour,
+                (double)f->simulation_ms, (double)f->submission_ms, (double)f->present_ms,
+                (double)f->frame_ms, gpu_ms, f->count.submissions, f->count.triangles,
+                f->sky_reference, f->sky_draw, f->sky_reused, f->sky_calls, f->sky_generations);
+        }
+    }
+    int width = use_gpu ? gpu.target.texture.width : 320;
+    int height = use_gpu ? gpu.target.texture.height : 200;
+    double effective_tile
+        = route ? (use_gpu ? gpu.scenery.tile_size : cpu_view.scenery.tile_size) : 0;
+    fprintf(json,
+        "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\","
+        "\"mode\":\"lighting_qualification\",\n  \"build\":\"%s\",\"platform\":\"%s\","
+        "\"renderer\":\"%s\",\"scenario\":\"%s\",\"waves\":%s,\n"
+        "  \"resolution\":[%d,%d],\"hdr\":%s,\"aa\":\"off\",\"window\":\"hidden\","
+        "\"tile_size\":%.9g,\n"
+        "  \"gpu_timer\":%s,\n  \"gl_renderer\":",
+        BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM, use_gpu ? "gpu" : "cpu",
+        stress ? "stress-basin" : route->name, waves ? "true" : "false", width, height,
+        use_gpu && boat_gpu_hdr_active(&gpu) ? "true" : "false", effective_tile,
+        timer.supported ? "\"GL_TIME_ELAPSED around the scene draw, asynchronous\"" : "null");
+    if (use_gpu) {
+        json_string(json, renderer_name);
+    } else {
+        fputs("null", json);
+    }
+    fputs(",\n  \"gl_version\":", json);
+    if (use_gpu) {
+        json_string(json, gl_version);
+    } else {
+        fputs("null", json);
+    }
+    fprintf(json,
+        ",\n  \"sample_count\":%d,\"warmup_samples\":%d,\"measured_samples\":%d,"
+        "\"frame_rows\":%d,\"virtual_cycle_seconds\":900,\"sample_stride_seconds\":%.9g,"
+        "\"initialization_ms\":%.9g,"
+        "\"cadence_note\":\"%d measured samples span virtual elapsed 0..900 s; warmup and first "
+        "draw are reported separately\",\n"
+        "  \"start_hour\":%.9g,\"fixed_hour\":%.9g,\"cycle_final_hour\":%.9g,"
+        "\"cycle_hours_complete\":%s,\"cycle_wraps\":%s,\"final_state_match\":%s,\n"
+        "  \"deadline_ms\":%.9g,\"deadline_rule\":\"value > deadline_ms\","
+        "\"clock\":\"injected virtual elapsed; no wall-clock waits\",\n"
+        "  \"note\":\"fixed and cycle runs share the same independent physical trajectory; CPU "
+        "has no GPU or presentation pass, so its frame_ms is simulation plus CPU render\",\n"
+        "  \"counter_semantics\":\"GPU app_submissions/scene_triangles count scene DrawMesh work; "
+        "CPU values count renderer3d mesh submissions and submitted triangles\",\n"
+        "  \"runs\":{\n",
+        samples, QUALIFY_WARMUP, samples, total, stride, initialization_ms, samples, start_hour,
+        wrap_hour(start_hour), (double)cycle[QUALIFY_WARMUP + samples - 1].hour,
+        cycle_hours_complete ? "true" : "false", wrapped ? "true" : "false",
+        states_match ? "true" : "false", QUALIFY_DEADLINE_MS);
+    fprintf(json, "  \"fixed\":{\"final_state\":");
+    json_string(json, fixed_state);
+    fprintf(json,
+        ",\"hour_bins_visited\":%d,\"deadline_misses\":%d,\"gpu_samples\":%d,"
+        "\"gpu_samples_skipped\":%d,\"first_draw_ms\":%.9g,\"first_measured_ms\":%.9g,"
+        "\"sky\":{\"reference_samples\":%.0f,\"draw_samples\":%.0f,\"draw_reused\":%.0f,"
+        "\"draw_calls\":%.0f,\"draw_generations\":%.0f},\n",
+        fixed_bins, fixed_misses, fixed_gpu, samples - fixed_gpu, (double)fixed[0].frame_ms,
+        (double)fixed[QUALIFY_WARMUP].frame_ms, fr, fd, freuse, fcalls, fgen);
+    qual_json_stats(json, "simulation_ms", fixed, total, scratch, Q_SIMULATION, true);
+    qual_json_stats(json, "submission_ms", fixed, total, scratch, Q_SUBMISSION, true);
+    qual_json_stats(json, "present_ms", fixed, total, scratch, Q_PRESENT, true);
+    qual_json_stats(json, "frame_ms", fixed, total, scratch, Q_FRAME, true);
+    qual_json_stats(json, "gpu_ms", fixed, total, scratch, Q_GPU, true);
+    qual_json_stats(json, "app_submissions", fixed, total, scratch, Q_SUBMISSIONS, true);
+    qual_json_stats(json, "scene_triangles", fixed, total, scratch, Q_TRIANGLES, true);
+    qual_json_stats(json, "sky_draw_samples", fixed, total, scratch, Q_SKY_DRAW, false);
+    fprintf(json, "  },\n  \"cycle\":{\"final_state\":");
+    json_string(json, cycle_state);
+    fprintf(json,
+        ",\"hour_bins_visited\":%d,\"deadline_misses\":%d,\"gpu_samples\":%d,"
+        "\"gpu_samples_skipped\":%d,\"first_draw_ms\":%.9g,\"first_measured_ms\":%.9g,"
+        "\"sky\":{\"reference_samples\":%.0f,\"draw_samples\":%.0f,\"draw_reused\":%.0f,"
+        "\"draw_calls\":%.0f,\"draw_generations\":%.0f},\n",
+        cycle_bins, cycle_misses, cycle_gpu, samples - cycle_gpu, (double)cycle[0].frame_ms,
+        (double)cycle[QUALIFY_WARMUP].frame_ms, cr, cd, creuse, ccalls, cgen);
+    qual_json_stats(json, "simulation_ms", cycle, total, scratch, Q_SIMULATION, true);
+    qual_json_stats(json, "submission_ms", cycle, total, scratch, Q_SUBMISSION, true);
+    qual_json_stats(json, "present_ms", cycle, total, scratch, Q_PRESENT, true);
+    qual_json_stats(json, "frame_ms", cycle, total, scratch, Q_FRAME, true);
+    qual_json_stats(json, "gpu_ms", cycle, total, scratch, Q_GPU, true);
+    qual_json_stats(json, "app_submissions", cycle, total, scratch, Q_SUBMISSIONS, true);
+    qual_json_stats(json, "scene_triangles", cycle, total, scratch, Q_TRIANGLES, true);
+    qual_json_stats(json, "sky_draw_samples", cycle, total, scratch, Q_SKY_DRAW, false);
+    fputs("  }\n  }\n}\n", json);
+    if (ferror(csv) || ferror(json)) {
+        error = "cannot write qualification report";
+        goto cleanup;
+    }
+    int csv_close = fclose(csv);
+    int json_close = fclose(json);
+    if (csv_close || json_close) {
+        csv = json = NULL;
+        error = "cannot write qualification report";
+        goto cleanup;
+    }
+    csv = json = NULL;
+    success = true;
+cleanup:
+    if (!success && error)
+        fprintf(stderr, "boat_water_review: %s\n", error);
+    if (use_gpu && started && IsWindowReady()) {
+        if (timer.supported)
+            glDeleteQueries(GPU_QUERIES, timer.ids);
+        boat_gpu_destroy(&gpu);
+        CloseWindow();
+    }
+    boat_cpu_view_destroy(&cpu_view);
+    renderer3d_destroy(&cpu);
+    if (fixed_ready && route)
+        boat_session_destroy(&fixed_run.session);
+    if (cycle_ready && route)
+        boat_session_destroy(&cycle_run.session);
+    if (csv)
+        fclose(csv);
+    if (json)
+        fclose(json);
+    if (!success) {
+        remove(csv_path);
+        remove(json_path);
+    }
+    free(fixed);
+    free(cycle);
+    free(scratch);
+    test_worlds_close();
+    if (success) {
+        printf("lighting_qualify scenario=%s renderer=%s samples=%d warmup=%d stride_s=%.9g "
+               "hours=%d final_state_match=%s\n",
+            stress ? "stress-basin" : route->name, use_gpu ? "gpu" : "cpu", samples, QUALIFY_WARMUP,
+            stride, hour_bins, states_match ? "yes" : "no");
+        printf("final_state %s\n", fixed_state);
+        return 0;
+    }
+    return bench_fail(error ? error : "qualification failed");
 }
 
 // G0 review poses: fixed map, boat pose and camera, with explicit ticks. Motion cases advance the
@@ -2805,6 +3429,8 @@ static int place_clip(const char *directory, int frames, bool squall)
     if (!boat_gpu_init(&gpu, clip_aa) || !boat_gpu_resize(&gpu, width, height))
         goto cleanup;
     gpu.daylight = review_daylight;
+    gpu.hour = review_hour;
+    gpu.hour_set = review_hour_set;
     for (int frame = 0; frame < frames; ++frame) {
         double time = frame / 60.0;
         BoatViewState view = { .boat = session.boat, .time = time };
@@ -3030,16 +3656,19 @@ static int review(const char *directory, bool use_gpu)
         goto cleanup;
     }
     gpu.daylight = cpu_view.daylight = review_daylight;
+    gpu.hour = cpu_view.hour = review_hour;
+    gpu.hour_set = cpu_view.hour_set = review_hour_set;
     fprintf(manifest,
         "{\n  \"schema_revision\":2,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
-        "  \"daylight\":%.6g,\n"
+        "  \"lighting_mode\":\"%s\",\"daylight\":%.6g,\"lighting_hour\":%.6g,\n"
         "  \"renderer\":\"%s\",\"resolution\":[%d,%d],\"gpu_aa\":%s,\"hdr\":%s,"
         "\"physics_revision\":%d,\n"
         "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
         "  \"check_command\":\"boat_water_review --check\",\n"
         "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
         "  \"poses\":[\n",
-        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? gpu.target.texture.width : 320,
+        review_hour_set ? "hour" : "daylight", (double)review_daylight, (double)review_hour,
+        use_gpu ? "gpu" : "cpu", use_gpu ? gpu.target.texture.width : 320,
         use_gpu ? gpu.target.texture.height : 200,
         use_gpu && gpu.supersampled.id ? "true" : "false",
         boat_gpu_hdr_active(&gpu) ? "true" : "false", BOAT_PHYSICS_REVISION,
@@ -3118,7 +3747,9 @@ int main(int argc, char **argv)
 {
     test_scenery_load();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
-    const char *scenario = NULL, *review_dir = NULL;
+    const char *scenario = NULL, *review_dir = NULL, *qualify = NULL;
+    bool lighting_samples_set = false;
+    bool review_daylight_set = false;
     float tile_size = 0;
     bool no_cull = false;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
@@ -3142,7 +3773,19 @@ int main(int argc, char **argv)
             stress_state_only = true;
         else if (strcmp(argv[i], "--review") == 0 && i + 1 < argc)
             review_dir = argv[++i];
-        else if (strcmp(argv[i], "--aa") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--lighting-qualify") == 0 && i + 1 < argc)
+            qualify = argv[++i];
+        else if (strcmp(argv[i], "--lighting-samples") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            long value = strtol(argv[++i], &end, 10);
+            if (!*argv[i] || *end || value < QUALIFY_MIN_SAMPLES || value > QUALIFY_MAX_SAMPLES) {
+                fprintf(stderr, "--lighting-samples takes %d..%d.\n", QUALIFY_MIN_SAMPLES,
+                    QUALIFY_MAX_SAMPLES);
+                return 2;
+            }
+            qualify_samples = (int)value;
+            lighting_samples_set = true;
+        } else if (strcmp(argv[i], "--aa") == 0 && i + 1 < argc)
             aa_name = argv[++i];
         else if (strcmp(argv[i], "--waves") == 0)
             waves = true;
@@ -3236,6 +3879,13 @@ int main(int argc, char **argv)
                 fprintf(stderr, "--daylight takes day, sunset, dusk or 0..1.\n");
                 return 2;
             }
+            review_daylight_set = true;
+        } else if (strcmp(argv[i], "--lighting-hour") == 0 && i + 1 < argc) {
+            if (!waterfront_hour_parse(argv[++i], &review_hour)) {
+                fprintf(stderr, "--lighting-hour takes a finite hour (wrapped into 0..24).\n");
+                return 2;
+            }
+            review_hour_set = true;
         } else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
@@ -3273,6 +3923,7 @@ int main(int argc, char **argv)
                  "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
                  "                    [--stress-lights N] [--no-ambient-occlusion]\n"
                  "                    [--no-particles] [--no-shadows] [--no-reflections]\n"
+                 "                    [--daylight ...] [--lighting-hour H]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3287,7 +3938,11 @@ int main(int argc, char **argv)
                  "                         [--scenario river|outer|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
-                 "--tile-size: render tile edge, 64..65536 m (default 2048).\n"
+                 "       boat_water_review --lighting-qualify PREFIX [--renderer cpu|gpu]\n"
+                 "                         [--lighting-samples 25..3601] [--lighting-hour H]\n"
+                 "                         [--scenario river|outer|stress] [--waves]\n"
+                 "                         [--resolution low|high] [--hdr on|off]\n");
+            puts("--tile-size: render tile edge, 64..65536 m (default 2048).\n"
                  "--analytic-wakes shades object wakes with the reference per-piece loop; by\n"
                  "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--no-water-history shades stamp-only water, without foam history and ripples.\n"
@@ -3306,6 +3961,8 @@ int main(int argc, char **argv)
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
                  "  G4 water left and G3b water right; squall brings a weather squall in.\n"
                  "  --clip-aa off draws it without supersampling; --daylight sets the light.\n"
+                 "--lighting-hour H selects a developer full-day hour and overrides --daylight\n"
+                 "  regardless of argument order; pose ticks and clip frames still drive waves.\n"
                  "--scenario river: the existing river route; outer: the same route on the outer\n"
                  "  map, continued across the estuary; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
@@ -3329,7 +3986,7 @@ int main(int argc, char **argv)
     // --check drives the river or outer route display-free; captures follow only the river.
     bool route_check = check && !bench && !aa_name && !pacing && scenario
         && (strcmp(scenario, "river") == 0 || strcmp(scenario, "outer") == 0);
-    if (bench || aa_name || pacing || (scenario && !route_check)) {
+    if (!qualify && (bench || aa_name || pacing || (scenario && !route_check))) {
         const char *problem = !bench
             ? "--aa, --pacing and --scenario require --benchmark (--check: river or outer)"
             : !aa_name                                         ? "--benchmark requires --aa off|4x4"
@@ -3354,13 +4011,40 @@ int main(int argc, char **argv)
             return 2;
         }
     }
+    if (qualify) {
+        const char *problem
+            = !*qualify || strlen(qualify) > 4000 || qualify[strlen(qualify) - 1] == '/'
+            ? "--lighting-qualify needs a file prefix of 1..4000 bytes"
+            : bench || check || output || review_dir || sequence || gpu_check || gpu_views
+                || gpu_lifecycle || culling || instancing || detail || geometry
+                || presentation_check || light_clusters_check || wake_stamp || water_history
+                || scene_depth || clip_dir || place_dir || aa_name || pacing || visible
+            ? "--lighting-qualify excludes benchmark, check, review, output and pacing modes"
+            : scenario && strcmp(scenario, "river") && strcmp(scenario, "outer")
+                && strcmp(scenario, "stress")
+            ? "--scenario must be river, outer or stress"
+            : !use_gpu && (review_resolution != BOAT_RESOLUTION_LOW || review_hdr > 0)
+            ? "--lighting-qualify CPU supports only --resolution low --hdr off"
+            : review_daylight_set
+            ? "--lighting-qualify selects its start with --lighting-hour, not --daylight"
+            : NULL;
+        if (problem) {
+            fprintf(stderr, "boat_water_review: %s\n", problem);
+            return 2;
+        }
+    } else if (lighting_samples_set) {
+        fprintf(stderr, "boat_water_review: --lighting-samples requires --lighting-qualify.\n");
+        return 2;
+    }
     if (review_dir
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
     if ((review_resolution != BOAT_RESOLUTION_LOW || review_hdr >= 0)
-        && (!use_gpu || !(review_dir || bench))) {
-        fprintf(stderr, "--resolution and --hdr apply to GPU --review and --benchmark runs.\n");
+        && !(qualify || (use_gpu && (review_dir || bench)))) {
+        fprintf(stderr,
+            "--resolution and --hdr apply to GPU review, benchmark and "
+            "lighting-qualification runs.\n");
         return 2;
     }
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
@@ -3386,7 +4070,7 @@ int main(int argc, char **argv)
             : gpu_views            ? check_gpu_views()
                                    : check_gpu_water();
     }
-    if (!check && !output && !bench && !review_dir)
+    if (!check && !output && !bench && !review_dir && !qualify)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     // These samples distinguish navigable space under the deck from solid legs.
@@ -3403,6 +4087,11 @@ int main(int argc, char **argv)
     if (bench)
         return benchmark(bench, waves, strcmp(aa_name, "4x4") == 0, visible,
             pacing ? pacing : "cap", tile_size,
+            !scenario || strcmp(scenario, "river") == 0 ? &river_route
+                : strcmp(scenario, "outer") == 0        ? &outer_route
+                                                        : NULL);
+    if (qualify)
+        return lighting_qualify(qualify, use_gpu, waves, qualify_samples, tile_size,
             !scenario || strcmp(scenario, "river") == 0 ? &river_route
                 : strcmp(scenario, "outer") == 0        ? &outer_route
                                                         : NULL);

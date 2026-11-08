@@ -138,6 +138,152 @@ static WaterfrontLighting dusk(void)
     };
 }
 
+// The full-day recipes reuse the approved palettes at day, sunset and dusk, with new sun
+// bearings supplied by the hour path. Night and dawn are their own recipes so night is not dusk
+// with the light removed.
+static WaterfrontLighting night(void)
+{
+    return (WaterfrontLighting) {
+        .phase = WATERFRONT_DAYLIGHT_DAY,
+        .sun_direction = { 0, 0, 1 },
+        .ambient = { .10f, .15f, .26f },
+        .direct = { .55f, .68f, .95f },
+        .direct_intensity = 0,
+        .cpu_ambient = .36f,
+        .cpu_direct = 0,
+        .cpu_tint = { .34f, .44f, .62f },
+        .sky_horizon = { 26, 36, 62 },
+        .sky_zenith = { 4, 9, 24 },
+        .sky_gradient = .90f,
+        .sun_halo = { 90, 110, 150 },
+        .sun_disc = { 120, 140, 180 },
+        .halo_strength = 0,
+        .halo_radius = .35f,
+        .disc_strength = 0,
+        .cloud_underside = { 20, 28, 46 },
+        .cloud_rim = { 28, 36, 56 },
+        .fog = { 18.0f / 255.0f, 26.0f / 255.0f, 44.0f / 255.0f },
+        .fog_start = 90,
+        .fog_end = 460,
+        .fog_opacity = .50f,
+        .water = { .36f, .50f, .72f },
+        .water_shadow = 1,
+        .glint = { 0 },
+        .highlight = { 0 },
+        .glint_speed = 0,
+        .window_light = 1,
+        .window_lit = { 1.0f, .82f, .52f },
+        .window_dark = { .26f, .34f, .50f },
+        .unlit = { .34f, .42f, .58f },
+    };
+}
+
+static WaterfrontLighting dawn(void)
+{
+    return (WaterfrontLighting) {
+        .phase = WATERFRONT_DAYLIGHT_DAY,
+        .sun_direction = { 0, 0, 1 },
+        .ambient = { .22f, .25f, .40f },
+        .direct = { .90f, .60f, .50f },
+        .direct_intensity = 0,
+        .cpu_ambient = .42f,
+        .cpu_direct = 0,
+        .cpu_tint = { .42f, .50f, .70f },
+        .sky_horizon = { 92, 88, 132 },
+        .sky_zenith = { 18, 28, 64 },
+        .sky_gradient = .70f,
+        .sun_halo = { 220, 130, 120 },
+        .sun_disc = { 255, 190, 150 },
+        .horizon_glow = { 200, 110, 90 },
+        .halo_strength = .25f,
+        .halo_radius = .50f,
+        .glow_strength = .35f,
+        .cloud_underside = { 55, 58, 90 },
+        .cloud_rim = { 48, 52, 84 },
+        .fog = { 70.0f / 255.0f, 78.0f / 255.0f, 112.0f / 255.0f },
+        .fog_start = 110,
+        .fog_end = 500,
+        .fog_opacity = .45f,
+        .water = { .45f, .58f, .82f },
+        .water_shadow = 1,
+        .glint = { 1.0f, .60f, .40f },
+        .highlight = { 1.0f, .60f, .45f },
+        .glint_sheen = SUNSET_SHEEN,
+        .glint_sparkle = SUNSET_SPARKLE,
+        .glint_speed = SUNSET_SPEED,
+        .window_light = .75f,
+        .window_lit = { 1.0f, .80f, .48f },
+        .window_dark = { .45f, .50f, .66f },
+        .unlit = { .55f, .60f, .76f },
+    };
+}
+
+static WaterfrontLighting sunrise(void)
+{
+    return (WaterfrontLighting) {
+        .phase = WATERFRONT_DAYLIGHT_DAY,
+        .sun_direction = { 0, 0, 1 },
+        .ambient = { .35f, .34f, .44f },
+        .direct = { 1.0f, .55f, .32f },
+        .direct_intensity = .90f,
+        .cpu_ambient = .34f,
+        .cpu_direct = .60f,
+        .cpu_tint = { 1.0f, .80f, .68f },
+        .sky_horizon = { 250, 170, 130 },
+        .sky_zenith = { 55, 90, 160 },
+        .sky_gradient = .48f,
+        .sun_halo = { 255, 180, 110 },
+        .sun_disc = { 255, 234, 172 },
+        .horizon_glow = { 255, 120, 80 },
+        .halo_strength = .50f,
+        .halo_radius = .35f,
+        .disc_strength = 1,
+        .glow_strength = .60f,
+        .cloud_underside = { 235, 150, 135 },
+        .cloud_rim = { 180, 110, 120 },
+        .fog = { 210.0f / 255.0f, 150.0f / 255.0f, 130.0f / 255.0f },
+        .fog_start = 125,
+        .fog_end = 600,
+        .fog_opacity = .40f,
+        .water = { .70f, .68f, .88f },
+        .water_shadow = .70f,
+        .glint = { 1.0f, .65f, .35f },
+        .highlight = { 1.0f, .60f, .32f },
+        .glint_sheen = SUNSET_SHEEN,
+        .glint_sparkle = SUNSET_SPARKLE,
+        .glint_speed = SUNSET_SPEED,
+        .window_light = .18f,
+        .window_lit = { 1.0f, .80f, .48f },
+        .window_dark = { .90f, .82f, .82f },
+        .unlit = { .90f, .76f, .70f },
+    };
+}
+
+static WaterfrontLighting morning(void)
+{
+    WaterfrontLighting l = day();
+    l.ambient = (Vector3) { .46f, .55f, .63f };
+    l.direct = (Vector3) { 1.0f, .91f, .75f };
+    l.sky_horizon = (Vector3) { 200, 230, 242 };
+    l.sky_zenith = (Vector3) { 64, 148, 216 };
+    l.fog = (Vector3) { 200.0f / 255.0f, 230.0f / 255.0f, 242.0f / 255.0f };
+    return l;
+}
+
+static WaterfrontLighting afternoon(void)
+{
+    WaterfrontLighting l = day();
+    l.ambient = (Vector3) { .50f, .53f, .58f };
+    l.direct = (Vector3) { 1.0f, .86f, .62f };
+    l.cpu_tint = (Vector3) { 1.0f, .97f, .92f };
+    l.sky_horizon = (Vector3) { 208, 224, 228 };
+    l.sky_zenith = (Vector3) { 70, 150, 210 };
+    l.fog = (Vector3) { 200.0f / 255.0f, 218.0f / 255.0f, 226.0f / 255.0f };
+    l.water = (Vector3) { 1.0f, .98f, .94f };
+    l.unlit = (Vector3) { .98f, .92f, .86f };
+    return l;
+}
+
 static Vector3 mix3(Vector3 a, Vector3 b, float t) { return Vector3Lerp(a, b, t); }
 
 static WaterfrontLighting mix(WaterfrontLighting a, WaterfrontLighting b, float t, float phase)
@@ -196,6 +342,101 @@ WaterfrontLighting waterfront_lighting(float phase)
         (phase - WATERFRONT_DAYLIGHT_SUNSET)
             / (WATERFRONT_DAYLIGHT_DUSK - WATERFRONT_DAYLIGHT_SUNSET),
         phase);
+}
+
+// Artistic hours, not solar claims. Azimuth advances through the day so sunrise and sunset are
+// opposite; each segment interpolates angle, never a direction vector through zero.
+typedef struct {
+    float hour, elevation, azimuth; // Degrees.
+    WaterfrontLighting (*recipe)(void);
+} HourAnchor;
+
+static const HourAnchor hour_anchors[] = {
+    { 0, -35, 0, night },
+    { 4.5f, -12, 30, dawn },
+    { 6, 0, 90, sunrise },
+    { 9, 38, 135, morning },
+    { 12, 58, 180, day },
+    { 15, 38, 225, afternoon },
+    { 18, 4, 270, sunset },
+    { 19.5f, -6, 290, dusk },
+    { 21.5f, -25, 320, night },
+    { 24, -35, 360, night },
+};
+
+static Vector3 sun_path(float elevation, float azimuth)
+{
+    float e = elevation * DEG2RAD, a = azimuth * DEG2RAD, horizontal = cosf(e);
+    return (Vector3) { horizontal * sinf(a), sinf(e), horizontal * cosf(a) };
+}
+
+static float smooth(float t) { return t * t * (3 - 2 * t); }
+
+// Direct light, disc, glitter, highlight and cast water shadow share one horizon gate. At and
+// below the horizon the first five are exactly zero and the water keeps its fully unshadowed
+// brightness.
+static void apply_horizon(WaterfrontLighting *lighting, float elevation_degrees)
+{
+    float visible = elevation_degrees <= 0
+        ? 0
+        : smooth(Clamp(elevation_degrees / 5.0f, 0, 1)); // Five-degree fade, in degrees.
+    lighting->direct_intensity *= visible;
+    lighting->cpu_direct *= visible;
+    lighting->disc_strength *= visible;
+    lighting->glint = Vector3Scale(lighting->glint, visible);
+    lighting->highlight = Vector3Scale(lighting->highlight, visible);
+    lighting->glint_sheen *= visible;
+    lighting->glint_sparkle *= visible;
+    lighting->water_shadow = Lerp(1, lighting->water_shadow, visible);
+}
+
+bool waterfront_hour_normalize(float hour, float *wrapped)
+{
+    if (!isfinite(hour))
+        return false;
+    double value = fmod((double)hour, 24.0);
+    if (value < 0)
+        value += 24.0;
+    float result = (float)value;
+    if (result >= 24.0f || result == 0)
+        result = 0; // Also canonicalizes -0.
+    *wrapped = result;
+    return true;
+}
+
+bool waterfront_hour_parse(const char *text, float *hour)
+{
+    char *end;
+    float value = strtof(text, &end);
+    if (end == text || *end)
+        return false;
+    return waterfront_hour_normalize(value, hour);
+}
+
+bool waterfront_lighting_hour(float hour, WaterfrontLighting *lighting)
+{
+    float h;
+    if (!waterfront_hour_normalize(hour, &h))
+        return false;
+    size_t i = 0;
+    while (i + 2 < sizeof(hour_anchors) / sizeof(*hour_anchors) && h >= hour_anchors[i + 1].hour)
+        ++i;
+    const HourAnchor *a = &hour_anchors[i], *b = &hour_anchors[i + 1];
+    float elevation = a->elevation, azimuth = a->azimuth;
+    WaterfrontLighting result;
+    if (h == a->hour) {
+        result = a->recipe();
+    } else {
+        float t = smooth((h - a->hour) / (b->hour - a->hour));
+        result = mix(a->recipe(), b->recipe(), t, WATERFRONT_DAYLIGHT_DAY);
+        elevation = Lerp(a->elevation, b->elevation, t);
+        azimuth = Lerp(a->azimuth, b->azimuth, t);
+    }
+    result.phase = WATERFRONT_DAYLIGHT_DAY;
+    result.sun_direction = sun_path(elevation, azimuth);
+    apply_horizon(&result, elevation);
+    *lighting = result;
+    return true;
 }
 
 // Exact: raymath's Vector3Equals tolerates differences that would change the panorama.
