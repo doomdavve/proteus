@@ -1799,8 +1799,7 @@ static int study(int argc, char **argv)
         mobile_target = boat_web_mobile_target();
         mobile_button_height = boat_web_mobile_size(width);
 #endif
-        bool keyboard_steering
-            = IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A);
+        bool keyboard_steering = app_input.helm_right || app_input.helm_left;
         bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
         bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
 #if defined(__EMSCRIPTEN__)
@@ -1833,7 +1832,7 @@ static int study(int argc, char **argv)
                 EnableCursor();
             mouse_captured = capture_mouse;
         }
-        float mouse_delta = GetMouseDelta().x;
+        float mouse_delta = app_input.pointer_delta.x;
 #endif
         // Capture warps the native cursor; discard that frame's delta. Stop moving to
         // hold this target, rather than deriving steering from a screen position.
@@ -1845,8 +1844,7 @@ static int study(int argc, char **argv)
             : !keyboard_steering              ? mobile_target
                                               : NAN;
         float steering_rate = keyboard_steering
-            ? (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                  - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)))
+            ? (float)((int)app_input.helm_right - (int)app_input.helm_left)
             : (float)(((mobile_buttons & 8) != 0) - ((mobile_buttons & 4) != 0));
         // The open console takes typed input, but the world keeps running with a neutral helm.
         bool console_simulating = false;
@@ -1891,11 +1889,10 @@ static int study(int argc, char **argv)
             if (IsKeyPressed(KEY_C))
                 camera_settings = camera_default;
         }
-        bool precision = active && !demo && !session.runs.playing
-            && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+        bool precision = active && !demo && !session.runs.playing && app_input.precision;
         thrust_target = active && !demo && !session.runs.playing
-            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) || (mobile_buttons & 1),
-                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S) || (mobile_buttons & 2), precision)
+            ? boat_pedal_target(app_input.throttle_up || (mobile_buttons & 1),
+                  app_input.throttle_down || (mobile_buttons & 2), precision)
             : 0;
         bool replay_adjusted = false;
         if (!active)
@@ -1943,14 +1940,16 @@ static int study(int argc, char **argv)
                 }
                 Rectangle bar = replay_timeline(GetScreenWidth());
                 Rectangle hit = { bar.x - 4, bar.y - 6, bar.width + 8, bar.height + 12 };
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-                    && CheckCollisionPointRec(GetMousePosition(), hit))
+                // On the web a consumed touch tap may have overwritten the app's pointer values,
+                // but only while the menu is open, when this replay block is inactive.
+                if (app_input.pointer_pressed && CheckCollisionPointRec(app_input.pointer, hit))
                     replay_dragging = true;
                 if (replay_dragging) {
-                    boat_replay_seek(&session.runs, (GetMouseX() - bar.x) / bar.width * duration);
+                    boat_replay_seek(
+                        &session.runs, (app_input.pointer.x - bar.x) / bar.width * duration);
                     session.runs.paused = true;
                     replay_adjusted = true;
-                    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+                    if (!app_input.pointer_down)
                         replay_dragging = false;
                 }
             }
