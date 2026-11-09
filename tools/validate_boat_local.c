@@ -495,8 +495,10 @@ static int bench(void)
         total / frames, worst, frames);
     printf("outer 8x 0.1 s frames (G = 96): mean %.3f ms, worst %.3f ms over %u frames\n",
         total_96 / frames, worst_96, frames);
-    // The direct path for the same 16-tick frames.
+    // The direct path for the same 16-tick frames, without presentation (the local frames above
+    // stepped none).
     direct_open();
+    direct.session.presentation_enabled = false;
     direct.accumulator = 0;
     clock_t start = clock();
     for (unsigned n = 0; n < frames; ++n) {
