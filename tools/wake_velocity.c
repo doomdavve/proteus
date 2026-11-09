@@ -8,6 +8,7 @@
 #include "boat_course_view.h"
 #include "boat_gpu.h"
 #include "boat_gpu_timer.h"
+#include "boat_helm.h"
 #include "boat_hud.h"
 #include "boat_minimap.h"
 #include "boat_music.h"
@@ -2154,13 +2155,10 @@ static int study(int argc, char **argv)
                         &work, &session, work_drive.slew, work_drive.reach, work_drive.hoist, helm);
                 } else if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
-                else {
-                    if (isfinite(steering_target))
-                        input.steering_rate
-                            = boat_steering_rate(session.boat.wheel, steering_target);
-                    input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
-                    timed_boat_step(&session, input, &metrics, wake, objects);
-                }
+                else
+                    timed_boat_step(&session,
+                        boat_helm_input(&session.boat, input, thrust_target, steering_target),
+                        &metrics, wake, objects);
                 if (plugin_active)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;

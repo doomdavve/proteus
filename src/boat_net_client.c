@@ -1,4 +1,5 @@
 #include "boat_net_client.h"
+#include "boat_helm.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
 
@@ -929,11 +930,8 @@ bool boat_net_client_command(
         || c->prediction.fleet.state.tick + 1 != tick || c->command_count == BOAT_NET_MAX_COMMANDS)
         return false;
     // Solo's per-tick expressions, from the predicted boat the authority will step.
-    const Boat *boat = &c->prediction.fleet.state.slots[c->slot].boat;
-    if (isfinite(steering_target))
-        input.steering_rate = boat_steering_rate(boat->wheel, steering_target);
-    if (isfinite(thrust_target))
-        input.throttle_rate = boat_throttle_rate(boat->throttle, thrust_target);
+    input = boat_helm_input(
+        &c->prediction.fleet.state.slots[c->slot].boat, input, thrust_target, steering_target);
     BoatNetCommand next = boat_net_precise_command(input, 0);
     if (own->life != c->command_life)
         c->command_count = 0; // A batch steers one life.
