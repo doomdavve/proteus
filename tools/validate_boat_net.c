@@ -2117,6 +2117,42 @@ static int resync(void)
     return 0;
 }
 
+// A checkpoint at the mirror's own tick is installed, unlike a snapshot at that tick: it carries
+// the full wake records that a snapshot only digests, so it repairs a damaged mirror in place.
+static int resync_same_tick(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 6, (BoatNetServerConfig) { 0 }));
+    unsigned i = room_join(&room, "same", NULL, 0);
+    room_run(&room, 8);
+    BoatNetClient *c = &room.clients[i];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->fleet.state.wakes.live > 3);
+    // Hold the authority at the next snapshot tick: the mirror reaches it, then no newer state
+    // exists, so the stall resync can only return a checkpoint at the mirror's tick.
+    uint64_t hold
+        = (room.server.fleet.state.tick / BOAT_NET_SNAPSHOT_TICKS + 1) * BOAT_NET_SNAPSHOT_TICKS;
+    room.server.tick_limit = hold;
+    room_run(&room, .25);
+    CHECK(room.server.fleet.state.tick == hold && c->fleet.state.tick == hold);
+    CHECK(c->stats.bootstraps == 1 && c->stats.resyncs == 0);
+    uint64_t authority = boat_fleet_hash(&room.server.fleet.state);
+    CHECK(boat_fleet_hash(&c->fleet.state) == authority);
+    BoatWakeObject *o = &c->fleet.state.wakes.objects[127];
+    o->born = c->fleet.state.tick;
+    o->amplitude = .5f;
+    CHECK(boat_fleet_hash(&c->fleet.state) != authority);
+    room_run(&room, 1.5);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->timed_out == 0);
+    CHECK(c->stats.snapshot_resyncs >= 1 && room.server.stats.resyncs >= 1);
+    CHECK(c->stats.bootstraps >= 2 && c->fleet.state.tick == hold);
+    CHECK(boat_fleet_hash(&c->fleet.state) == authority);
+    printf("resync_same_tick: a checkpoint at the mirror tick %" PRIu64 " replaced the damaged "
+           "mirror (%" PRIu64 " bootstraps)\n",
+        hold, c->stats.bootstraps);
+    room_close(&room);
+    return 0;
+}
+
 // Checkpoint/input replay: the authority's remote slots hold one bot command per 32-tick block
 // and its own slot changes command every tick, so a prediction holding the remote rates and
 // replaying the recorded own commands must reproduce every authoritative tick bit for bit,
@@ -2768,6 +2804,7 @@ static const TestCase cases[] = {
     TEST_CASE(rejections),
     SLOW_CASE(deathmatch),
     TEST_CASE(resync),
+    TEST_CASE(resync_same_tick),
     SLOW_CASE(race_room),
     SLOW_CASE(mapped_rooms),
 };
@@ -3585,6 +3622,7 @@ static const TestCase cases[] = {
     SLOW_CASE(mapped_rooms),
     SLOW_CASE(four_player_lifecycle),
     TEST_CASE(resync),
+    TEST_CASE(resync_same_tick),
     SLOW_CASE(prediction_replay),
     TEST_CASE(prediction_wakes),
     TEST_CASE(remote_view),

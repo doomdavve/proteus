@@ -320,7 +320,9 @@ count, then the page bytes. WorldEnd and Ready: `u32` checkpoint ID, `u32` reser
 
 The client installs a checkpoint only when every page arrived, the byte digest matches, it
 decodes and its fleet hash equals the sender's. It then answers Ready. A failed install asks for
-a resync.
+a resync. While playing, a checkpoint older than the mirror is discarded; one at the mirror's own
+tick is installed, because it carries the complete wake pool that a Snapshot only digests (a
+Snapshot at the mirror tick is stale).
 
 ### Slot block (174 bytes)
 

@@ -730,7 +730,7 @@ a few seconds. It covers:
   round trips that resume bit-identically;
 - seeded in-memory rooms: handshake rejections, the input-loss policy, command idempotence,
   sequence wrap, a flood against the bounded queue, profile F one way for 60 s, blackouts and
-  timeouts, and wake resync;
+  timeouts, and wake resync (including a checkpoint at the mirror's own tick repairing it);
 - client mirrors that reproduce the authority's `boat_fleet_hash`;
 - client prediction: replays from mid-flight, landing and capsized checkpoints that match the
   authority bit for bit, and predicting rooms (steady 30 ms, profile F both ways with smooth
@@ -765,9 +765,9 @@ only a failure deadline. Cases:
 - `enet_lifecycle` (slow): three predicting bots stay while a fourth leaves and a fifth is
   refused as full. Another bot falls silent, times out on the room clock after
   `BOAT_NET_TIMEOUT`, and a replacement takes its slot.
-- Unchanged room cases over UDP: `rejections`, `resync`, and `deathmatch`, `race_room` and
-  `mapped_rooms` (all three slow). `mapped_rooms` checks that clients take the server's
-  location.
+- Unchanged room cases over UDP: `rejections`, `resync`, `resync_same_tick`, and `deathmatch`,
+  `race_room` and `mapped_rooms` (all three slow). `mapped_rooms` checks that clients take the
+  server's location.
 
 **Processes.** `boat_net_process` runs `tools/boat_net_process.py` (about 0.25 s). It ends on
 events, not elapsed time:

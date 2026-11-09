@@ -182,7 +182,9 @@ static void install(BoatNetClient *c, double now)
         send_message(c, &m);
         return;
     }
-    // A resync replaces the mirror only when the checkpoint is newer than it.
+    // A resync replaces the mirror unless the checkpoint is older. One at the mirror's own tick
+    // carries the full wake records that a snapshot only digests, so it repairs the mirror in
+    // place (a snapshot at that tick is stale).
     if (c->phase == BOAT_NET_CLIENT_PLAYING && state.tick < mirror_tick(c))
         return;
     memset(c->combat_sets, 0, sizeof(c->combat_sets));
