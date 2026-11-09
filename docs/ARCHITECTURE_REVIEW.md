@@ -8,9 +8,9 @@
 > [foundations plan](BOATING_FOUNDATIONS_PLAN.md). A future `ARCHITECTURE.md` spec is meant to
 > supersede this review (see the [spec lifecycle](README.md#specs)).
 
-> **Successor, 2026-11-08.** The [architecture restructuring plan](ARCHITECTURE_PLAN.md)
-> subsumes this review and reconciles its remaining recommendations. Its A0 assessment was
-> completed after PR #175 merged (2026-11-09); feature work continues against implemented
+> **Successor, 2026-11-09.** The [architecture restructuring plan](ARCHITECTURE_PLAN.md)
+> subsumes this review and reconciles its remaining recommendations. Its AR0 assessment was
+> completed after PR #175 merged; feature work continues against implemented
 > contracts. The plan's closing `ARCHITECTURE.md` will replace both documents. Existing
 > foundations/feature owners retain their unfinished tasks until explicitly reconciled.
 

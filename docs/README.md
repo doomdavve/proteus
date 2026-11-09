@@ -46,8 +46,8 @@ without dated results (see [Documentation maintenance](../AGENTS.md#documentatio
 - Candidates, to be written at the closing step of the milestone that settles them (not yet
   written): `ARCHITECTURE.md` (modules, libraries, boundaries, clock, world ownership; the
   [restructuring plan](ARCHITECTURE_PLAN.md) will become this spec and subsume the
-  [architecture review](ARCHITECTURE_REVIEW.md)), `MULTIPLAYER.md` (authority,
-  prediction, rooms, hosting) and `WORKING_HARBOUR.md` (cargo rules, save format, autosave
+  [architecture review](ARCHITECTURE_REVIEW.md); it also owns authority/client composition),
+  `MULTIPLAYER.md` (rooms, hosting, remote prediction tuning) and `WORKING_HARBOUR.md` (cargo rules, save format, autosave
   policy).
 
 ## River location retired — 2026-11-04
@@ -155,11 +155,11 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 - [Boating performance](BOATING_PERFORMANCE.md): headless arcade benchmark contract, P2a verification, P3a baseline and C1 clock comparison.
 - [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v14 byte layout, channels, validation
   envelope, authority rules carried on the wire, version policy and fixtures.
-- [Architecture restructuring plan](ARCHITECTURE_PLAN.md): A0 merged baseline/contracts and CPU
-  verification complete (2026-11-09); next A0b authority/client design, including offline single
-  player. Owns migration, platform/module restructuring and review reconciliation, then becomes
-  `ARCHITECTURE.md`. Other feature work continues against implemented contracts; production
-  refactoring has not started.
+- [Architecture restructuring plan](ARCHITECTURE_PLAN.md): AR0 merged baseline/contracts and CPU
+  verification complete (2026-11-09); next AR1 authority/client design, including offline single
+  player. Its [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
+  Owns migration, platform/module restructuring and review reconciliation, then becomes
+  `ARCHITECTURE.md`. Production refactoring has not started.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.
