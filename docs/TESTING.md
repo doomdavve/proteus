@@ -723,6 +723,29 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
+`boat_local` (AR6 ledger row L0, labels `core;cpu;quick`, each case under 100 ms) runs
+`tools/validate_boat_local.c`, which links `proteus_boat_net` and `proteus_boat_drive`. Every
+scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
+with the arcade wake pool) beside a private local session (`src/boat_local.c`: one authority and
+one predicting client over the memory transport, driven by host grants) fed the same scripted
+frames, and requires bit-identical boats and wake pools at every predicted tick and at each
+frame's authority tick. Cases: `basin_1x`, `basin_quarter`, `basin_8x`, `outer_1x` and `outer_8x`
+(outer with waves, current and crossing water); `grant_96` (0.1 s frames and 0.25 s stalls
+clamped to 0.1 s at 8x, after a short first frame, so a grant of 96 starts mid-cadence and takes
+9 chunks); `odd_chunk_sizes` (uneven frame times: partial first chunks and odd remainders);
+`explorer_handling`; `pause_and_focus` (30 s of paused frames: no timeout, resync or close);
+`restart_generation` (a restart recreates both endpoints with the next generation; an
+old-generation command batch and READY are counted stale and change nothing); `repeated_sessions`
+(100 restarts); `startup_failure` (invalid configuration and a refused water recipe release
+everything); `queue_saturation` (an unreliable or reliable queue overflow stops the session
+instead of dropping a command batch silently); and `private_range` (the private codec round-trips
+full precision; a hosted room counts the private type as malformed and rejects the sender). Each
+drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
+integrating a received command, no resync and zero prediction correction error. Frame time is a
+scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports processor time
+per frame at 8x on `outer` for 16-tick frames and 96-tick grants, and the direct path for
+comparison.
+
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
 a few seconds. It covers:
 
