@@ -41,6 +41,7 @@
 #include "boat_server.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_host.h"
+#include "wake_velocity_local.h"
 #endif
 #include "wake_velocity_net.h"
 #endif
@@ -636,6 +637,9 @@ static int study(int argc, char **argv)
     BoatCamera camera_settings = BOAT_CAMERA_DEFAULT;
     bool camera_distance_set = false, camera_height_set = false;
     bool time_set = false, demo = false, mouse_steering = false;
+    // D8: a developer-only switch back to the direct free-boating path (Debug builds only, so
+    // never in a release); AR7 removes it with that path.
+    bool direct_session = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
@@ -820,6 +824,10 @@ static int study(int argc, char **argv)
             work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
+#ifndef NDEBUG
+        } else if (strcmp(argv[i], "--direct-session") == 0) {
+            direct_session = true;
+#endif
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
             screenshot = argv[++i];
         } else if (strcmp(argv[i], "--time") == 0 && i + 1 < argc) {
@@ -1625,6 +1633,24 @@ static int study(int argc, char **argv)
     result = 0;
     if (work_mode)
         wake_work_autosave(&work, true);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    // AR6 (L0): plain free boating runs as a local authority and client. Voyages, objectives,
+    // courses, the working harbour, rooms, demos and the developer studies keep the direct path
+    // until their ledger rows migrate them.
+    static WakeLocal local;
+#define LOCAL_ELIGIBLE()                                                                           \
+    (!direct_session && !networked && !work_mode && !course && !demo && objects                    \
+        && !objects->crossing && !wake && !session.voyage_route && !session.runs.playing           \
+        && plugin_active && !plugin.authoring && plugin.host.kind == BOAT_PLUGIN_KIND_FREE         \
+        && !plugin.objective.initialized)
+    if (LOCAL_ELIGIBLE() && !wake_local_open(&local, &session, objects, worlds, GetTime())) {
+        snprintf(study_failure, sizeof(study_failure), "Single player could not start: %s.",
+            local.local.failure);
+        fprintf(stderr, "%s\n", study_failure);
+        result = 1;
+        goto cleanup;
+    }
+#endif
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
 #if defined(__EMSCRIPTEN__)
         // The browser supplies a bounded low-resolution viewport after resizing settles.
@@ -2060,6 +2086,19 @@ static int study(int argc, char **argv)
             accumulator = 0;
             if (plugin_active)
                 wake_plugin_reset_objective(&plugin, &session);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            // A restart recreates both endpoints with a new generation; a revision that is no
+            // longer plain free boating continues on the direct path from the reset session.
+            if (local.active && !LOCAL_ELIGIBLE())
+                wake_local_close(&local);
+            else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
+                snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                    local.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
+#endif
             demo_tick = 0;
             replay_dragging = false;
         } else if (session.runs.playing) {
@@ -2080,6 +2119,20 @@ static int study(int argc, char **argv)
             accumulator += work_mode
                 ? boat_time_work_frame_seconds(raw_active_delta, time_speed_index, work_was_active)
                 : boat_time_frame_seconds(raw_active_delta, time_speed_index);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            // The grant is the same accumulator arithmetic; the client derives each tick's rates
+            // from its predicted boat as the loop below does from the session's.
+            if (local.active
+                && !wake_local_frame(&local, &session, objects, &accumulator, input, thrust_target,
+                    steering_target, GetTime(), &metrics)) {
+                // D10: no save applies to free boating; back to the title with the reason.
+                snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                    local.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
+#endif
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
@@ -2616,6 +2669,17 @@ static int study(int argc, char **argv)
         }
     }
 cleanup:
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    if (local.local.stats.frames)
+        fprintf(stdout,
+            "Local session: generation %u, %llu ticks in %llu chunks (at most %u per frame), "
+            "%llu restarts\n",
+            (unsigned)local.local.generation, (unsigned long long)local.local.stats.ticks,
+            (unsigned long long)local.local.stats.chunks, local.local.stats.max_chunks,
+            (unsigned long long)local.local.stats.restarts);
+    wake_local_close(&local);
+    local.local.stats = (BoatLocalStats) { 0 };
+#endif
     if (lighting_review.state) {
         if (performance_timer.supported)
             boat_gpu_timer_poll(
