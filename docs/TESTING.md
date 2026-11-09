@@ -742,9 +742,9 @@ instead of dropping a command batch silently); and `private_range` (the private 
 full precision; a hosted room counts the private type as malformed and rejects the sender). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
-scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports processor time
-per frame at 8x on `outer` for 16-tick frames and 96-tick grants, and the direct path for
-comparison.
+scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
+processor time per frame at 8x on `outer` for 16-tick frames and 96-tick grants, and the direct
+path for comparison.
 
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
 a few seconds. It covers:

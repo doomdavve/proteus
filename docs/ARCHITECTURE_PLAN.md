@@ -1,16 +1,15 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) reviewed;
-the user accepted [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) as recommended.
-The AR1 PR (`arch/ar1-design`) awaits approval. No production refactor started; nothing played
-or browser-tested.
-**Open:** AR1 PR approval; platform, browser and real-time qualification.
+**Status, 2026-11-09:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
+(not merged): AR2a input value and the [AR6 pilot](#ar6-status),
+native basin free boating as a local authority and client with its L0 gates passing in CTest.
+Nothing played or browser-tested.
+**Open:** manual input/pilot checks below; AR2b; impaired-delivery and browser qualification.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
 (AR10).
-**Next:** AR2–AR6 in AR1's order. AR2a (input value) is implemented on `arch/ar2-pilot`
-(2026-11-09, awaiting the manual input check below); its commands half belongs to AR6's client.
-Then AR6, AR3, AR5, with AR4 independent.
+**Next:** the user's manual pilot check, then AR3, AR5 (AR4 independent) and AR7's ledger order.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -434,6 +433,81 @@ support comparison; AR7 removes parallel production paths. Done when the pilot p
 reviewed temporal and behavior contracts. It does not qualify voyages, cargo, persistence or
 browser authority.
 
+#### AR6 status
+
+2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played.
+
+Implemented (ledger row L0):
+
+- `src/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
+  predicting `BoatNetClient` and an unimpaired memory transport in the game's thread. Start runs
+  the handshake in bounded service rounds (3 in practice, at most 8) at tick 0; a frame's grant
+  runs in chunks of at most 12 ticks ending on multiples of 12 (at most 9 per frame): the client
+  commands each tick, one batch is flushed, the authority runs the chunk, the client handles the
+  results. Restart recreates both endpoints with the next generation (the authority's epoch).
+- Private schedule: `boat_net_server_grant` runs exactly the granted ticks with no peer timeout,
+  catch-up or overload and refills the input and spawn buckets per granted tick;
+  `boat_net_client_command`/`flush`/`local_service` address commands to explicit ticks, derive
+  target rates from the predicted boat as solo does, and count stall resync (120 granted ticks
+  without a snapshot), wake-mismatch resync (120) and the prediction hold (12) in granted ticks,
+  with no peer timeout, snapshot-silence close or ping. Hosted service is unchanged.
+- Full-precision commands (D4): in-memory float rates on `BoatNetCommand`, carried by the
+  private range's PrivateInputBatch (`src/boat_net_private.[ch]`, type 0xC0, rejected by hosted
+  rooms). The v14 codec and golden bytes are unchanged.
+- Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
+- Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
+  or authoring (in practice basin free boating) start a local session; the solo accumulator's
+  ticks become the grant; the client's prediction fills the game's `BoatSession` boat, clock,
+  presentation (stepped per predicted tick) and arcade pool. A restart recreates both endpoints;
+  an endpoint failure returns to the title with its reason (D10; free boating has no save).
+  Debug builds accept `--direct-session` (D8); release builds (`NDEBUG`) do not.
+
+Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
+
+- Handling class, current/crossing water, the wake pool recipe and the spawned boat reach both
+  endpoints as host-supplied creation config (`BoatNetPrivateSession`), not private-range
+  messages; a restart is endpoint recreation, so no message is needed for them. Only the
+  full-precision command uses the private range.
+- The player's boat is placed when the authority accepts the client, before the bootstrap
+  checkpoint, instead of by a spawn request after READY, so the first granted tick is commanded.
+- The client's resync rate limit also counts granted ticks (one resync per 120), not elapsed
+  time, and the private client sends no ping.
+- A command batch dropped by a full unreliable queue is an endpoint failure (the host compares
+  the transport's dropped count around each flush), not a repeated command.
+- Outer: every shipped outer solo session is a voyage package, so L0 reaches the game on the
+  basin only; outer with current and crossing water is qualified in CTest, and outer play
+  migrates with L1.
+- Not done: impaired memory delivery for private sessions (T1 selects none; hosted impairment
+  stays in `boat_net`), browser private sessions (L4), the objective-gated stop (no objective in
+  L0), real offline startup and the native windowed manual check.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no wall clock):
+
+- `boat_local` (14 quick cases, each under 100 ms) compares every predicted tick and every frame's
+  authority tick bit for bit with the game's direct path (`timed_boat_step`): basin at ¼×, 1× and
+  8×; outer with waves, current and crossing at 1× and 8×; `G = 96` with 0.25 s stalls clamped at
+  8× (9 chunks, a partial first chunk); uneven frames (odd remainders, partial first chunks);
+  explorer handling; 30 s of pause; restart with stale old-generation traffic; 100 repeated
+  sessions; startup failure and release; queue saturation; the private range in a hosted room.
+  Each drive has zero rate-limited, late, future or duplicate commands and every tick integrates
+  a received command. Negative checks during development: quantizing the commands at the
+  authority fails `basin_1x` and `outer_8x`.
+- Debug build warning-clean; `ctest --preset full`: see [current evidence](#current-evidence-and-limitations).
+- CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
+  byte-identical to an `e1b1175` build (main's tree): captures drive the direct scripted path
+  before the frame loop (L6 migrates them).
+- Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
+  outer with waves, current and crossing, no presentation): 16-tick frames at 8× mean 0.53 ms
+  (worst 0.62–0.74 ms) against 0.26 ms for the direct path; `G = 96` frames mean 3.09 ms (worst
+  3.72–3.78 ms). Presentation, stepped per tick on both paths, is not included.
+- Hidden-window smoke run (`--renderer cpu --frames 240 --performance-report`): the local
+  session advanced 737 ticks in 280 chunks with no failure. Not a manual check.
+
+Owed to the user (native windowed): steering/throttle feel with keyboard, mouse and Shift; menu,
+help and focus-loss pause; time scale `[`/`]`/`\` up to 8×; Backspace reset and menu restart
+(repeatedly); skins (explorer, cabin, Grodan); quit to title. The browser keeps the direct path
+(L4), so a browser smoke check only confirms nothing changed there.
+
 ### AR7 — Migrate modes and retire separate production sessions
 
 Execute AR1's ledger in reviewable groups after the pilot: voyages/tour/objectives; time
@@ -786,3 +860,7 @@ and the accepted decisions; this plan keeps only the step status (header and
   browser, Windows/Linux, GPU or manual checks; documentation-only beyond the resync commit.
 - 2026-11-09: the user accepted AR1 product decisions D1–D10 as recommended. Product direction
   only: no implementation exists, and nothing was played or browser-tested.
+- AR6 verification, 2026-11-09, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
+  build warning-clean; `ctest --preset full` passed all 489 enabled tests (13 disabled), including
+  the 14 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
+  windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).

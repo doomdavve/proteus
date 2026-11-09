@@ -1,9 +1,10 @@
 # AR1 authority/client design — 2026-11-09
 
 **Status:** reviewed (independent reviews, 2026-11-09); the user accepted
-[product decisions](#product-decisions) D1–D10 as recommended on 2026-11-09. No production code,
-scheduler, worker, protocol extension or mode is implemented, and nothing here has been played
-or browser-tested. The [architecture plan's AR1 step](ARCHITECTURE_PLAN.md#ar1--authorityclient-architecture-and-migration-design)
+[product decisions](#product-decisions) D1–D10 as recommended on 2026-11-09. Ledger row L0 is
+implemented on `arch/ar2-pilot` (AR6, not merged) with the deviations its
+[status](ARCHITECTURE_PLAN.md#ar6-status) lists; no other row, worker or mode is, and nothing
+here has been played or browser-tested. The [architecture plan's AR1 step](ARCHITECTURE_PLAN.md#ar1--authorityclient-architecture-and-migration-design)
 owns the step status. Observed behaviour is cited at `ab01d92`; it extends the
 [AR0 baseline](ARCHITECTURE_PLAN.md#ar0-merged-baseline-and-contracts--2026-11-09) and
 does not restate it.
