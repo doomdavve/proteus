@@ -1598,7 +1598,11 @@ static int study(int argc, char **argv)
     double next_snapshot_time = 0;
     // G0w: live capture is independent of the F3 overlay. Its ring, GPU queries and the export
     // path belong to the application, not the simulation or network.
-    BoatCapture capture = { 0 };
+    // Static, like the other large application state: its ~370 KB ring would otherwise sit in
+    // this frame, which must fit Windows' 1 MB main-thread stack in MSVC Debug builds. study()
+    // runs again from the title, so clear it here.
+    static BoatCapture capture;
+    memset(&capture, 0, sizeof(capture));
     BoatGpuTimer performance_timer = { 0 };
     unsigned long long performance_serial = 0;
     double previous_performance_start = -1;
