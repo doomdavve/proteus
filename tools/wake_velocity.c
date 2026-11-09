@@ -28,6 +28,7 @@
 #include "wake_command.h"
 #include "wake_console.h"
 #include "wake_velocity_drive.h"
+#include "wake_velocity_input.h"
 #include "wake_velocity_lighting_review.h"
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
@@ -1731,6 +1732,8 @@ static int study(int argc, char **argv)
             else
                 boat_menu_open(&menu);
         }
+        bool menu_touch_wanted = menu.open && menu_was_open && !help_visible && IsWindowFocused();
+        BoatAppInput app_input = boat_app_input_sample(menu_touch_wanted);
         BoatScreenLayout layout
             = boat_screen_layout(resolution, width, height, GetScreenWidth(), GetScreenHeight());
         int scale = layout.scale;
@@ -1743,7 +1746,8 @@ static int study(int argc, char **argv)
                                      destination.y + (height - 200) * scale / 2 },
             .zoom = scale };
         if (menu.open && menu_was_open && !help_visible && IsWindowFocused()) {
-            BoatMenuChoice choice = boat_menu_update(&menu, menu_camera, GetFrameTime());
+            BoatMenuChoice choice
+                = boat_menu_update(&menu, &app_input, menu_camera, GetFrameTime());
             if (choice == BOAT_MENU_RESUME)
                 menu.open = false;
             else if (choice == BOAT_MENU_CONTROLS)

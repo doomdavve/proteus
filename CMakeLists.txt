@@ -299,7 +299,8 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
+  tools/wake_velocity_menu.c
   tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
   tools/wake_velocity_work.h tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
