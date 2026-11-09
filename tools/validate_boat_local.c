@@ -4,15 +4,15 @@
  * pool) beside a local session fed the same frames, and requires bit-identical boats and wake
  * pools at every predicted tick and at every frame's authority tick. Frame time is a scripted
  * value, never wall time. `--bench` reports per-frame cost (not a test). */
+#include "boat_helm.h"
 #include "boat_local.h"
-#include "boat_steering.h"
 #include "boat_test_cases.h"
 #include "boat_test_world.h"
-#include "boat_throttle.h"
 #include "boat_time_control.h"
-#include "wake_velocity_drive.h"
+#include "wake_velocity_local.h"
 
 #include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,22 +42,26 @@ typedef struct {
     const BoatHandling *handling;
 } World;
 
-// The direct path, as the game's free-boating branch runs it.
+// A free-boating session as the game holds it: the direct path steps it with timed_boat_step;
+// the local path is the game's own glue (tools/wake_velocity_local.c) filling it from the client.
 typedef struct {
     BoatSession session;
     ObjectStudy objects;
     double accumulator;
-} Direct;
+} Play;
 
-static BoatLocal local;
-static Direct direct;
+static Play direct, play;
+static WakeLocal game;
+static BoatLocal *const lp = &game.local;
 static World world;
 
-// Per-tick boats and pool digests of the direct path, compared with the client's predictions.
-enum { TRACE = 4096 };
+// Per-tick boats, presentations and pool digests of the direct path, compared with the local
+// path's session (filled from the client's prediction) at every predicted tick.
+enum { TRACE = 128 };
 typedef struct {
     uint64_t tick;
     Boat boat;
+    BoatPresentation presentation;
     uint64_t wakes;
 } Expected;
 static Expected expected[TRACE];
@@ -77,108 +81,126 @@ static BoatWater world_water(void)
     return boat_world_test_water(r->definition, world.waves, world.current, world.crossing);
 }
 
-static void direct_open(void)
+static void play_open(Play *p)
 {
-    boat_session_init(&direct.session, test_world(world.location), world_water());
+    boat_session_init(&p->session, test_world(world.location), world_water());
     if (world.handling)
-        direct.session.handling = world.handling;
-    object_study_reset(&direct.objects, &direct.session, false, BOAT_OBJECT_LIFE_TICKS,
-        BOAT_OBJECT_DEFAULT_HEIGHT);
-    direct.accumulator = 0;
+        p->session.handling = world.handling;
+    object_study_reset(
+        &p->objects, &p->session, false, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT);
+    p->accumulator = 0;
 }
 
-static void direct_restart(void)
+// The game's reset branch: restart the session and its pool.
+static void play_restart(Play *p)
 {
-    boat_session_restart(&direct.session, world_water());
-    object_study_reset(&direct.objects, &direct.session, false, BOAT_OBJECT_LIFE_TICKS,
-        BOAT_OBJECT_DEFAULT_HEIGHT);
-    direct.accumulator = 0;
+    boat_session_restart(&p->session, world_water());
+    object_study_reset(
+        &p->objects, &p->session, false, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT);
+    p->accumulator = 0;
 }
 
-static BoatLocalConfig local_config(void)
+static float particle_values(const BoatWaterParticle *q, unsigned i)
 {
-    BoatWater water = direct.session.world.water;
-    water.objects = NULL;
-    return (BoatLocalConfig) { .resources = worlds(),
-        .location = world.location,
-        .world = { .water = water,
-            .handling = world.handling,
-            .wake_life_ticks = BOAT_OBJECT_LIFE_TICKS,
-            .crest_height = BOAT_OBJECT_DEFAULT_HEIGHT,
-            .spawn = direct.session.boat } };
+    const float v[] = { q->position.x, q->position.y, q->velocity.x, q->velocity.y, q->height,
+        q->lift, q->age, q->lifetime, q->size, q->variation, (float)q->spray, (float)q->wash };
+    return v[i];
 }
 
-// The game's grant: the same accumulator arithmetic as its tick loop.
-static unsigned grant(double *accumulator, Frame f)
+// Field by field: the particle structs have padding.
+static bool same_presentation(const BoatPresentation *a, const BoatPresentation *b)
 {
-    if (f.paused) {
-        *accumulator = 0;
-        return 0;
-    }
-    *accumulator += boat_time_frame_seconds(f.seconds, f.speed);
-    unsigned ticks = 0;
-    while (*accumulator >= BOAT_TICK_SECONDS) {
-        *accumulator -= BOAT_TICK_SECONDS;
-        ++ticks;
-    }
-    return ticks;
+    if (memcmp(&a->flag.surface, &b->flag.surface, sizeof(a->flag.surface))
+        || memcmp(a->flag.previous, b->flag.previous, sizeof(a->flag.previous))
+        || a->flag.flutter_phase != b->flag.flutter_phase
+        || a->flag.initialized != b->flag.initialized || a->camera_heading != b->camera_heading
+        || a->next_particle != b->next_particle || a->emission != b->emission
+        || a->wake_emission != b->wake_emission || a->wake_distance != b->wake_distance
+        || a->spray_time != b->spray_time || a->propeller_time != b->propeller_time
+        || a->landing_strength != b->landing_strength || a->landing_age != b->landing_age
+        || a->landing_serial != b->landing_serial || a->seen_landings != b->seen_landings
+        || a->fall_speed != b->fall_speed)
+        return false;
+    for (unsigned i = 0; i < BOAT_WATER_PARTICLES; ++i)
+        for (unsigned k = 0; k < 12; ++k)
+            if (particle_values(&a->water[i], k) != particle_values(&b->water[i], k))
+                return false;
+    return true;
 }
 
+// The game's direct free-boating branch for one frame.
 static void direct_frame(Frame f)
 {
-    unsigned ticks = grant(&direct.accumulator, f);
+    if (f.paused) {
+        direct.accumulator = 0;
+        return;
+    }
+    direct.accumulator += boat_time_frame_seconds(f.seconds, f.speed);
+    unsigned ticks = boat_time_grant(&direct.accumulator, UINT_MAX);
     for (unsigned i = 0; i < ticks; ++i) {
         BoatSession *s = &direct.session;
-        BoatInput input = { .steering_rate = f.steering_rate };
-        if (isfinite(f.steering_target))
-            input.steering_rate = boat_steering_rate(s->boat.wheel, f.steering_target);
-        input.throttle_rate = boat_throttle_rate(s->boat.throttle, f.thrust_target);
-        timed_boat_step(s, input, NULL, NULL, &direct.objects);
+        timed_boat_step(s,
+            boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
+                f.thrust_target, f.steering_target),
+            NULL, NULL, &direct.objects);
         if (expected_count < TRACE)
-            expected[expected_count++] = (Expected) { s->tick, s->boat,
+            expected[expected_count++] = (Expected) { s->tick, s->boat, s->presentation,
                 boat_net_wake_digest(object_study_wakes(&direct.objects)) };
     }
 }
 
-static void observe(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
-    const BoatWakeObjects *water)
+static void traced(void *context, const BoatSession *session, const BoatFleet *view)
 {
-    (void)context, (void)water;
+    (void)context;
     for (unsigned i = 0; i < expected_count; ++i)
-        if (expected[i].tick == tick) {
+        if (expected[i].tick == session->tick) {
             ++observed;
-            mismatches
-                += memcmp(&expected[i].boat, &view->state.slots[slot].boat, sizeof(Boat)) != 0
+            mismatches += memcmp(&expected[i].boat, &session->boat, sizeof(Boat)) != 0
+                || !same_presentation(&expected[i].presentation, &session->presentation)
                 || expected[i].wakes != boat_net_wake_digest(&view->state.wakes);
             return;
         }
     ++mismatches;
 }
 
-static double local_accumulator, now;
+static double now;
 
 static bool same_authority(void)
 {
-    const BoatFleet *fleet = &local.server.fleet;
+    const BoatFleet *fleet = &lp->server.fleet;
     const BoatWakeObjects *wakes = object_study_wakes(&direct.objects);
-    return fleet->state.tick == direct.session.tick && local.tick == direct.session.tick
+    return fleet->state.tick == direct.session.tick && lp->tick == direct.session.tick
+        && play.session.tick == direct.session.tick
         && memcmp(&fleet->state.slots[0].boat, &direct.session.boat, sizeof(Boat)) == 0
+        && memcmp(&play.session.boat, &direct.session.boat, sizeof(Boat)) == 0
+        && same_presentation(&play.session.presentation, &direct.session.presentation)
         && boat_net_wake_digest(&fleet->state.wakes) == boat_net_wake_digest(wakes)
+        && boat_net_wake_digest(&play.objects.wakes) == boat_net_wake_digest(wakes)
         && fleet->state.wakes.emitted == wakes->emitted && fleet->state.wakes.live == wakes->live;
 }
 
-// Run FRAMES of SCRIPT through both paths; compare after every frame.
+// One frame of the local path through the game's glue; false on an endpoint failure.
+static bool local_frame(Frame f, double at)
+{
+    if (f.paused)
+        play.accumulator = 0;
+    else
+        play.accumulator += boat_time_frame_seconds(f.seconds, f.speed);
+    return wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
+        (BoatInput) { .steering_rate = f.steering_rate }, f.thrust_target, f.steering_target, at,
+        NULL);
+}
+
+// Run FRAMES of SCRIPT through both paths; compare at every tick and after every frame.
 static int drive(Script script, unsigned frames)
 {
-    BoatLocalObserver observer = { NULL, observe };
     for (unsigned n = 0; n < frames; ++n) {
         Frame f = script(n);
         expected_count = 0;
         direct_frame(f);
         unsigned before = observed;
-        uint64_t tick = local.tick;
-        unsigned ticks = grant(&local_accumulator, f);
-        CHECK(ticks == expected_count);
+        uint64_t tick = lp->tick;
+        unsigned ticks = expected_count;
         for (unsigned left = ticks, at = (unsigned)(tick % 12); left;) {
             unsigned k = boat_local_chunk(tick, left);
             chunk_sizes[k] += 1;
@@ -188,11 +210,11 @@ static int drive(Script script, unsigned frames)
             left -= k;
             at = 0;
         }
-        uint64_t chunks = local.stats.chunks;
+        uint64_t chunks = lp->stats.chunks;
         now += f.seconds;
-        CHECK(boat_local_frame(&local, now, ticks, (BoatInput) { .steering_rate = f.steering_rate },
-            f.thrust_target, f.steering_target, &observer));
-        CHECK(local.stats.chunks - chunks <= 9);
+        CHECK(local_frame(f, now));
+        CHECK(lp->tick == tick);
+        CHECK(lp->stats.chunks - chunks <= 9);
         CHECK(observed - before == ticks);
         CHECK(mismatches == 0);
         CHECK(same_authority());
@@ -203,15 +225,25 @@ static int drive(Script script, unsigned frames)
 static int open_world(World w)
 {
     world = w;
-    direct_open();
-    local_accumulator = 0;
+    play_open(&direct);
+    play_open(&play);
     now = 100;
     observed = mismatches = 0;
     memset(chunk_sizes, 0, sizeof(chunk_sizes));
     chunk_starts_mid = odd_chunks = 0;
-    BoatLocalConfig config = local_config();
-    CHECK(boat_local_start(&local, &config, 1, now));
-    CHECK(local.stats.startup_rounds <= BOAT_LOCAL_STARTUP_ROUNDS);
+    game.traced = traced;
+    CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
+    CHECK(lp->stats.startup_rounds <= BOAT_LOCAL_STARTUP_ROUNDS);
+    CHECK(same_authority());
+    return 0;
+}
+
+// Both paths take the game's reset branch.
+static int restart_both(void)
+{
+    play_restart(&direct);
+    play_restart(&play);
+    CHECK(wake_local_restart(&game, &play.session, &play.objects, now));
     CHECK(same_authority());
     return 0;
 }
@@ -219,7 +251,7 @@ static int open_world(World w)
 // The L0 command gates: every granted tick integrated the client's own command.
 static int clean_commands(void)
 {
-    const BoatNetServerStats *s = &local.server.stats;
+    const BoatNetServerStats *s = &lp->server.stats;
     CHECK(s->rate_limited == 0);
     CHECK(s->late_commands == 0);
     CHECK(s->future_commands == 0);
@@ -228,10 +260,10 @@ static int clean_commands(void)
     CHECK(s->malformed == 0 && s->forbidden == 0);
     CHECK(s->input_states[BOAT_NET_INPUT_RECEIVED] == s->ticks);
     CHECK(s->timeouts == 0);
-    CHECK(local.client.stats.resyncs == 0);
-    CHECK(local.client.stats.decode_errors == 0);
-    CHECK(local.client.prediction.stats.snaps == 0);
-    CHECK(local.client.prediction.stats.max_error == 0);
+    CHECK(lp->client.stats.resyncs == 0);
+    CHECK(lp->client.stats.decode_errors == 0);
+    CHECK(lp->client.prediction.stats.snaps == 0);
+    CHECK(lp->client.prediction.stats.max_error == 0);
     return 0;
 }
 
@@ -313,7 +345,23 @@ static int grant_96(void)
     if (run(BASIN, stalls, 8))
         return 1;
     CHECK(chunk_starts_mid > 0);
-    CHECK(local.stats.max_chunks == 9);
+    CHECK(lp->stats.max_chunks == 9);
+    return 0;
+}
+
+// A frame never grants more than 96 ticks: boat_local_frame refuses 97, and the game's glue
+// grants 96 and carries the rest in its accumulator (the frame clamp keeps real play at 96).
+static int grant_cap(void)
+{
+    if (open_world(BASIN))
+        return 1;
+    CHECK(!boat_local_frame(lp, now, BOAT_LOCAL_MAX_GRANT + 1, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(lp->running && lp->tick == 0);
+    play.accumulator = 100.5 * BOAT_TICK_SECONDS;
+    CHECK(wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
+        (BoatInput) { 0 }, 0, NAN, now, NULL));
+    CHECK(lp->tick == BOAT_LOCAL_MAX_GRANT && play.session.tick == BOAT_LOCAL_MAX_GRANT);
+    CHECK(fabs(play.accumulator - 4.5 * BOAT_TICK_SECONDS) < 1e-9);
     return 0;
 }
 
@@ -341,8 +389,8 @@ static int pause_and_focus(void)
     if (run(BASIN, pausing, 2000))
         return 1;
     // Thirty paused seconds: no timeout, no stall or wake resync, no snapshot-silence close.
-    CHECK(local.client.phase == BOAT_NET_CLIENT_PLAYING);
-    CHECK(local.client.stats.snapshot_resyncs == 0);
+    CHECK(lp->client.phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(lp->client.stats.snapshot_resyncs == 0);
     return 0;
 }
 
@@ -350,14 +398,11 @@ static int restart_generation(void)
 {
     if (open_world(BASIN) || drive(one, 120))
         return 1;
-    uint32_t old_epoch = local.generation;
-    uint32_t old_sequence = local.client.sequence[BOAT_NET_STATE];
-    direct_restart();
-    local_accumulator = 0;
-    BoatLocalConfig config = local_config();
-    CHECK(boat_local_restart(&local, &config, now));
-    CHECK(local.generation == old_epoch + 1 && local.tick == 0);
-    CHECK(same_authority());
+    uint32_t old_epoch = lp->generation;
+    uint32_t old_sequence = lp->client.sequence[BOAT_NET_STATE];
+    if (restart_both())
+        return 1;
+    CHECK(lp->generation == old_epoch + 1 && lp->tick == 0);
     // Late traffic of the earlier generation: a command batch and a READY acknowledgement.
     BoatNetHeader header = { .epoch = old_epoch, .sequence = old_sequence + 100, .tick = 2 };
     BoatNetInputBatch batch = { .life = 1, .count = 2 };
@@ -366,15 +411,15 @@ static int restart_generation(void)
     uint8_t bytes[BOAT_NET_MAX_MESSAGE];
     size_t size = boat_net_private_encode_input(&header, &batch, bytes);
     CHECK(size);
-    CHECK(boat_net_send(&local.client.transport, 0, BOAT_NET_STATE, bytes, size));
+    CHECK(boat_net_send(&lp->client.transport, 0, BOAT_NET_STATE, bytes, size));
     BoatNetMessage ready
         = { .header = { .type = BOAT_NET_READY, .epoch = old_epoch, .tick = 0 }, .checkpoint = 2 };
     size = boat_net_encode(&ready, bytes);
     CHECK(size);
-    CHECK(boat_net_send(&local.client.transport, 0, BOAT_NET_CONTROL, bytes, size));
+    CHECK(boat_net_send(&lp->client.transport, 0, BOAT_NET_CONTROL, bytes, size));
     if (drive(one, 120))
         return 1;
-    CHECK(local.server.stats.stale_packets == 2);
+    CHECK(lp->server.stats.stale_packets == 2);
     return clean_commands();
 }
 
@@ -385,13 +430,10 @@ static int repeated_sessions(void)
     for (unsigned session = 0; session < 100; ++session) {
         if (drive(one, 6))
             return 1;
-        direct_restart();
-        local_accumulator = 0;
-        BoatLocalConfig config = local_config();
-        CHECK(boat_local_restart(&local, &config, now));
-        CHECK(same_authority());
+        if (restart_both())
+            return 1;
     }
-    CHECK(local.generation == 101);
+    CHECK(lp->generation == 101);
     if (drive(one, 30))
         return 1;
     return clean_commands();
@@ -401,16 +443,16 @@ static int startup_failure(void)
 {
     world = BASIN;
     BoatLocalConfig config = { .resources = worlds(), .location = BOAT_LOCATION_COUNT };
-    CHECK(!boat_local_start(&local, &config, 1, 0));
-    CHECK(!local.network && !local.running && local.failure[0]);
+    CHECK(!boat_local_start(lp, &config, 1, 0));
+    CHECK(!lp->network && !lp->running && lp->failure[0]);
     // Released after a partial start: the authority refuses a water recipe it cannot checkpoint.
     config.location = BOAT_LOCATION_BASIN;
     config.world.water = boat_water_test(false, false, false);
     config.world.water.player_wake_enabled = true;
-    CHECK(!boat_local_start(&local, &config, 1, 0));
-    CHECK(!local.network && !local.running);
+    CHECK(!boat_local_start(lp, &config, 1, 0));
+    CHECK(!lp->network && !lp->running);
     // A stopped session refuses frames.
-    CHECK(!boat_local_frame(&local, 1, 1, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(!boat_local_frame(lp, 1, 1, (BoatInput) { 0 }, 0, NAN, NULL));
     return 0;
 }
 
@@ -421,19 +463,63 @@ static int queue_saturation(void)
     for (unsigned reliable = 0; reliable < 2; ++reliable) {
         if (open_world(BASIN) || drive(one, 30))
             return 1;
-        BoatNetMessage ping = { .header = { .type = BOAT_NET_PING, .epoch = local.generation } };
+        BoatNetMessage ping = { .header = { .type = BOAT_NET_PING, .epoch = lp->generation } };
         uint8_t bytes[BOAT_NET_MAX_MESSAGE];
         size_t size = boat_net_encode(&ping, bytes);
         CHECK(size);
         for (unsigned i = 0; i < BOAT_NET_MEMORY_QUEUE; ++i)
-            boat_net_send(&local.client.transport, 0, reliable ? BOAT_NET_CONTROL : BOAT_NET_STATE,
+            boat_net_send(&lp->client.transport, 0, reliable ? BOAT_NET_CONTROL : BOAT_NET_STATE,
                 bytes, size);
         now += 1.0 / 60;
-        CHECK(!boat_local_frame(&local, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
-        CHECK(!local.running && local.failure[0]);
-        CHECK(!boat_local_frame(&local, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
-        boat_local_stop(&local);
+        CHECK(!boat_local_frame(lp, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
+        CHECK(!lp->running && lp->failure[0]);
+        CHECK(!boat_local_frame(lp, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
+        boat_local_stop(lp);
     }
+    return 0;
+}
+
+// A live record the authority never emitted, far from the boat, in the client's mirror pool: the
+// wake digest no longer matches the snapshots.
+static void inject_mismatch(void)
+{
+    BoatWakeObjects *w = &lp->client.fleet.state.wakes;
+    w->objects[3 * BOAT_OBJECT_PER_BOAT + 5] = (BoatWakeObject) { .position = { 5000, 5000 },
+        .direction = { 1, 0 },
+        .length = 2,
+        .amplitude = 1,
+        .inverse_speed = .01f,
+        .born = w->tick };
+}
+
+// Section 5: a mismatch that one checkpoint repairs recovers in place; a stall that outlasts
+// BOAT_NET_LOCAL_RESYNCS resyncs is endpoint failure (D10). The frozen host clock makes the
+// authority rate-limit every resync after the first, so the second mismatch is never repaired.
+static int resync_escalation(void)
+{
+    if (open_world(BASIN) || drive(one, 30))
+        return 1;
+    inject_mismatch();
+    for (unsigned n = 0; n < 200; ++n)
+        CHECK(local_frame(helm(n), now));
+    const BoatNetClient *c = &lp->client;
+    CHECK(c->stats.resyncs == 1 && lp->server.stats.resyncs == 1);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->wake_consistent && c->local_resyncs == 0);
+    const BoatFleet *view = boat_local_view(lp);
+    CHECK(view->state.tick == lp->server.fleet.state.tick);
+    CHECK(memcmp(&view->state.slots[0].boat, &lp->server.fleet.state.slots[0].boat, sizeof(Boat))
+        == 0);
+    CHECK(boat_net_wake_digest(&view->state.wakes)
+        == boat_net_wake_digest(&lp->server.fleet.state.wakes));
+
+    inject_mismatch();
+    unsigned n = 0;
+    while (n < 1000 && local_frame(helm(n), now))
+        ++n;
+    CHECK(n < 1000 && !lp->running && strstr(lp->failure, "repeated resyncs"));
+    CHECK(c->stats.resyncs == 1 + BOAT_NET_LOCAL_RESYNCS);
+    CHECK(lp->server.stats.resyncs == 1 && lp->server.stats.rate_limited == BOAT_NET_LOCAL_RESYNCS);
+    CHECK(!local_frame(helm(n), now));
     return 0;
 }
 
@@ -494,18 +580,15 @@ static int bench(void)
 {
     if (open_world(OUTER))
         return 1;
-    BoatLocalObserver observer = { NULL, NULL };
     const unsigned frames = 1200;
     double worst = 0, total = 0, worst_96 = 0, total_96 = 0;
     for (unsigned n = 0; n < 2 * frames; ++n) {
         Frame f = eight(n);
         if (n >= frames)
             f.seconds = .1; // G = 96
-        unsigned ticks = grant(&local_accumulator, f);
         now += f.seconds;
         clock_t start = clock();
-        CHECK(boat_local_frame(&local, now, ticks, (BoatInput) { .steering_rate = f.steering_rate },
-            f.thrust_target, f.steering_target, &observer));
+        CHECK(local_frame(f, now));
         double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;
         if (n < frames) {
             total += ms;
@@ -515,16 +598,13 @@ static int bench(void)
             worst_96 = fmax(worst_96, ms);
         }
     }
-    printf("startup: %u service rounds\n", local.stats.startup_rounds);
+    printf("startup: %u service rounds\n", lp->stats.startup_rounds);
     printf("outer 8x 60 Hz (16 ticks/frame): mean %.3f ms, worst %.3f ms over %u frames\n",
         total / frames, worst, frames);
     printf("outer 8x 0.1 s frames (G = 96): mean %.3f ms, worst %.3f ms over %u frames\n",
         total_96 / frames, worst_96, frames);
-    // The direct path for the same 16-tick frames, without presentation (the local frames above
-    // stepped none).
-    direct_open();
-    direct.session.presentation_enabled = false;
-    direct.accumulator = 0;
+    // The direct path for the same 16-tick frames, with presentation, as the local frames above.
+    play_open(&direct);
     clock_t start = clock();
     for (unsigned n = 0; n < frames; ++n) {
         expected_count = 0;
@@ -539,7 +619,7 @@ int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--bench")) {
         int result = bench();
-        boat_local_stop(&local);
+        boat_local_stop(lp);
         test_worlds_close();
         return result;
     }
@@ -550,6 +630,7 @@ int main(int argc, char **argv)
         TEST_CASE(outer_1x),
         TEST_CASE(outer_8x),
         TEST_CASE(grant_96),
+        TEST_CASE(grant_cap),
         TEST_CASE(odd_chunk_sizes),
         TEST_CASE(explorer_handling),
         TEST_CASE(pause_and_focus),
@@ -557,10 +638,11 @@ int main(int argc, char **argv)
         TEST_CASE(repeated_sessions),
         TEST_CASE(startup_failure),
         TEST_CASE(queue_saturation),
+        TEST_CASE(resync_escalation),
         TEST_CASE(private_range),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
-    boat_local_stop(&local);
+    boat_local_stop(lp);
     test_worlds_close();
     return result;
 }
