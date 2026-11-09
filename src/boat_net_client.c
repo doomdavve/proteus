@@ -19,6 +19,7 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
     const BoatNetClientConfig *config, double now)
 {
     *client = (BoatNetClient) { .transport = transport,
+        .local = config->local,
         .first_sequence = config->first_sequence,
         .resources = config->resources,
         .predict = config->predict,
@@ -171,9 +172,14 @@ static void install(BoatNetClient *c, double now)
         && resources->definition->id == c->accept.location;
     if (complete)
         complete = boat_fleet_init_scene(&fleet, resources,
-            boat_world_test_water(resources->definition, c->accept.waves, false, false),
+            c->local.enabled
+                ? c->local.water
+                : boat_world_test_water(resources->definition, c->accept.waves, false, false),
             c->accept.wake_life_ticks, c->accept.crest_height,
             c->room.has_scene ? &c->room.scene : NULL);
+    if (complete && c->local.enabled)
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+            fleet.handling[i] = c->local.handling;
     if (!complete) {
         ++c->stats.bootstrap_failures;
         c->resync_at = now;
@@ -789,14 +795,9 @@ static void command(
     ++c->stats.input_packets;
 }
 
-static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive,
-    float thrust_target, float steering_target)
+// Handle at most BOAT_NET_MESSAGES_PER_SERVICE events. False once rejected or closed.
+static bool handle_events(BoatNetClient *c, double now)
 {
-    if (now - c->serviced_at > .25)
-        c->pong_after = now; // Loading a mapped view is not network round-trip time.
-    c->serviced_at = now;
-    uint32_t life_before
-        = c->phase == BOAT_NET_CLIENT_PLAYING ? c->fleet.state.slots[c->slot].life : 0;
     BoatNetEvent event;
     for (unsigned handled = 0;
         handled < BOAT_NET_MESSAGES_PER_SERVICE && boat_net_poll(&c->transport, &event);
@@ -819,7 +820,18 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
         if (c->phase >= BOAT_NET_CLIENT_REJECTED)
             return false;
     }
-    if (c->phase >= BOAT_NET_CLIENT_REJECTED)
+    return c->phase < BOAT_NET_CLIENT_REJECTED;
+}
+
+static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive,
+    float thrust_target, float steering_target)
+{
+    if (now - c->serviced_at > .25)
+        c->pong_after = now; // Loading a mapped view is not network round-trip time.
+    c->serviced_at = now;
+    uint32_t life_before
+        = c->phase == BOAT_NET_CLIENT_PLAYING ? c->fleet.state.slots[c->slot].life : 0;
+    if (!handle_events(c, now))
         return false;
     bool joining = c->phase < BOAT_NET_CLIENT_PLAYING;
     bool unresponsive = !joining && now - c->heard_at > BOAT_NET_TIMEOUT;
@@ -902,6 +914,96 @@ bool boat_net_client_service_targets(BoatNetClient *c, double now, BoatInput inp
     float thrust_target, float steering_target)
 {
     return service(c, now, input, inactive, thrust_target, steering_target);
+}
+
+// AR6: the granted-tick clock of a private session, in seconds so the hosted thresholds keep their
+// meaning (BOAT_NET_RESYNC_AFTER is 120 ticks, BOAT_NET_HOLD_INCOMPLETE 12).
+static double local_clock(const BoatNetClient *c) { return (double)c->command_tick / BOAT_TICK_HZ; }
+
+bool boat_net_client_command(
+    BoatNetClient *c, uint64_t tick, BoatInput input, float thrust_target, float steering_target)
+{
+    const BoatFleetSlot *own = boat_net_client_own(c);
+    if (!c->local.enabled || !c->predict || !own || tick <= mirror_tick(c)
+        || (c->command_tick && tick != c->command_tick + 1)
+        || c->prediction.fleet.state.tick + 1 != tick || c->command_count == BOAT_NET_MAX_COMMANDS)
+        return false;
+    // Solo's per-tick expressions, from the predicted boat the authority will step.
+    const Boat *boat = &c->prediction.fleet.state.slots[c->slot].boat;
+    if (isfinite(steering_target))
+        input.steering_rate = boat_steering_rate(boat->wheel, steering_target);
+    if (isfinite(thrust_target))
+        input.throttle_rate = boat_throttle_rate(boat->throttle, thrust_target);
+    BoatNetCommand next = boat_net_precise_command(input, 0);
+    if (own->life != c->command_life)
+        c->command_count = 0; // A batch steers one life.
+    c->history[c->command_count++] = next;
+    c->command_tick = tick;
+    c->command_life = own->life;
+    ++c->stats.commands;
+    boat_prediction_record(&c->prediction, tick, own->life, next);
+    boat_prediction_advance(&c->prediction, tick);
+    return c->prediction.fleet.state.tick == tick;
+}
+
+bool boat_net_client_flush(BoatNetClient *c)
+{
+    if (!c->local.enabled || c->command_count > BOAT_NET_MAX_COMMANDS)
+        return false;
+    if (!c->command_count)
+        return true;
+    BoatNetHeader header = { .type = BOAT_NET_PRIVATE_INPUT_BATCH,
+        .epoch = c->epoch,
+        .sequence = c->sequence[BOAT_NET_STATE]++,
+        .tick = c->command_tick };
+    BoatNetInputBatch batch = {
+        .life = c->command_life, .count = (uint8_t)c->command_count, .snapshot_tick = mirror_tick(c)
+    };
+    memcpy(batch.commands, c->history, sizeof(*c->history) * c->command_count);
+    c->command_count = 0;
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    size_t size = boat_net_private_encode_input(&header, &batch, bytes);
+    if (!size || !boat_net_send(&c->transport, 0, BOAT_NET_STATE, bytes, size))
+        return false;
+    ++c->stats.input_packets;
+    return true;
+}
+
+bool boat_net_client_local_service(BoatNetClient *c, double now)
+{
+    if (!c->local.enabled)
+        return false;
+    double clock = local_clock(c);
+    if (!handle_events(c, clock))
+        return false;
+    if (c->phase < BOAT_NET_CLIENT_PLAYING) {
+        // Startup is the one elapsed deadline; the host bounds it in service rounds too.
+        if (now - c->started_at > BOAT_NET_HANDSHAKE_TIMEOUT) {
+            c->timed_out = 1;
+            c->phase = BOAT_NET_CLIENT_CLOSED;
+            c->transport.disconnect(c->transport.context, 0);
+            return false;
+        }
+        return true;
+    }
+    bool wake_stalled = !c->wake_consistent && c->mismatch_since >= 0
+        && clock - c->mismatch_since > BOAT_NET_RESYNC_AFTER;
+    bool snapshot_stalled = clock - c->snapshot_at > BOAT_NET_RESYNC_AFTER;
+    if ((wake_stalled || snapshot_stalled) && clock - c->resync_at > BOAT_NET_RESYNC_AFTER) {
+        c->resync_at = clock;
+        ++c->stats.resyncs;
+        if (snapshot_stalled && !wake_stalled)
+            ++c->stats.snapshot_resyncs;
+        BoatNetMessage m = { .header = { .type = BOAT_NET_RESYNC_REQUEST, .tick = mirror_tick(c) },
+            .resync = { .reason = wake_stalled ? 1 : 2, .snapshot_tick = mirror_tick(c) } };
+        send_message(c, &m);
+    }
+    if (c->predict_dirty) {
+        bool hold = c->mismatch_since >= 0 && clock - c->mismatch_since < BOAT_NET_HOLD_INCOMPLETE;
+        BoatPredictionWakes wakes = { c->wake_digest, c->pending, c->pending_count, hold };
+        c->predict_dirty = !boat_prediction_correct(&c->prediction, &c->fleet, c->inputs, &wakes);
+    }
+    return true;
 }
 
 void boat_net_client_request_reset(BoatNetClient *c)
