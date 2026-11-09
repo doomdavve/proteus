@@ -8,8 +8,9 @@ or browser-tested.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
 (AR10).
-**Next:** AR2–AR6 in AR1's order, starting with AR2a (input value → commands), the only
-prerequisite of the AR6 pilot (L0); then AR6, AR3, AR5, with AR4 independent.
+**Next:** AR2–AR6 in AR1's order. AR2a (input value) is implemented on `arch/ar2-pilot`
+(2026-11-09, awaiting the manual input check below); its commands half belongs to AR6's client.
+Then AR6, AR3, AR5, with AR4 independent.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -313,6 +314,30 @@ pointer/touch code. Preserve event consumption, precedence, focus behavior and s
 window, canvas and low-resolution coordinate conversion explicit. Produce UI actions and
 gameplay commands for the AR1 client boundary; shared UI gains no new direct mutation of
 authoritative state. Keep predicted controls distinct from commits.
+
+**AR2a status (2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played).**
+Implemented: `BoatAppInput` and `boat_app_input_sample(poll_touch)` in
+`tools/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
+per frame in `study()` (after the menu-toggle block) and once per frame in `boat_title_run`. It
+carries pressed navigation (up/down/left/right, confirm, activate, back, pause), the pointer in
+window pixels (position, delta, pressed, held; the web touch tap replaces position and press when
+polled) and held helm keys (steer left/right, throttle up/down, precision). Consumers migrated:
+the pause menu (`boat_menu_update` takes the value and reads no raylib input), the title's
+navigation/pointer/turn reads, the game loop's keyboard steering, throttle, precision, native
+mouse-steering delta and the replay timeline pointer. Scene-coordinate conversion stays in each
+consumer. Deliberately unchanged: precedence and event consumption (the menu still runs only
+when open and focused; `GetCharPressed`/`GetKeyPressed` text queues, the console, F-keys, camera
+and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon keys and the
+browser mobile/mouse bridges still read their sources directly). The web touch tap is consumed
+only on frames where the menu update ran before (`poll_touch`), because the bridge's `click()`
+drains it; browser behaviour is not verified. Not done: turning the value into per-tick commands
+(AR6's client), the remaining consumers above, and AR2b.
+Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
+`ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
+`boat_menu_update` with synthetic values, and `boat_title_settings`); CPU captures
+`--renderer cpu --screenshot ... --time 3` for basin and `--location outer` are byte-identical to
+a build of the AR1 parent. Owed: manual native windowed menu, title, steering and replay
+timeline check; browser keyboard/mouse/touch check.
 
 **AR2b: capabilities and operations.** Express actual capabilities such as
 application-controlled fullscreen and pointer capture, distinguishing support from mutable state
