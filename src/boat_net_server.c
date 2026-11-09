@@ -53,10 +53,19 @@ bool boat_net_server_init(
     server->config.token = server->token;
     server->content_digest = boat_net_content_digest();
     const BoatWorldDefinition *definition = config->resources->definition;
+    const BoatNetPrivateSession *local = &config->local;
     if (!boat_fleet_init_scene(&server->fleet, config->resources,
-            boat_world_test_water(definition, config->waves, false, false), BOAT_OBJECT_LIFE_TICKS,
-            BOAT_OBJECT_DEFAULT_HEIGHT, room->has_scene ? &room->scene : NULL))
+            local->enabled ? local->water
+                           : boat_world_test_water(definition, config->waves, false, false),
+            local->enabled && local->wake_life_ticks ? local->wake_life_ticks
+                                                     : BOAT_OBJECT_LIFE_TICKS,
+            local->enabled && local->crest_height ? local->crest_height
+                                                  : BOAT_OBJECT_DEFAULT_HEIGHT,
+            room->has_scene ? &room->scene : NULL))
         return false;
+    if (local->enabled)
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+            server->fleet.handling[i] = local->handling;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         server->slot_peer[i] = -1;
     boat_marks_tracker_reset(&server->marks);
@@ -351,6 +360,10 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
     s->inputs[slot] = (BoatNetSlotInput) { 0 };
     ++s->stats.accepted;
     rule_event(s, BOAT_NET_RULE_CREW_JOINED, slot, 0);
+    // A private session's boat is in the world before the checkpoint that bootstraps its
+    // client, so the client commands it from the first granted tick.
+    if (s->config.local.enabled)
+        boat_fleet_place(&s->fleet, slot, s->config.local.spawn);
     BoatNetMessage m = { .header = { .type = BOAT_NET_ACCEPT, .tick = s->fleet.state.tick },
         .accept = { .slot = (uint8_t)slot,
             .waves = s->config.waves,
@@ -447,10 +460,43 @@ static void refill(BoatNetServerPeer *p, double now)
     p->spawn_tokens = fmin(2, p->spawn_tokens + elapsed * 2);
 }
 
+// AR6: the private range, accepted only by a private session (a hosted room's decoder counts it
+// as malformed like any unknown type).
+static void private_message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    BoatNetInputBatch batch;
+    if (boat_net_private_decode_input(event->data, event->size, &header, &batch) != BOAT_NET_OK
+        || event->channel != BOAT_NET_STATE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        return;
+    }
+    if (header.epoch != s->config.epoch) {
+        ++s->stats.stale_packets; // An earlier generation's traffic never reaches this one.
+        return;
+    }
+    if (p->phase == BOAT_NET_PEER_READY)
+        commands(s, p, &header, &batch);
+}
+
 static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
     BoatNetServerPeer *p = &s->peers[peer];
     static BoatNetMessage m;
+    if (s->config.local.enabled && boat_net_private_message(event->data, event->size)) {
+        private_message(s, peer, event, now);
+        return;
+    }
     BoatNetError error = boat_net_decode(event->data, event->size, &m);
     if (error == BOAT_NET_BAD_VERSION && p->phase == BOAT_NET_PEER_HANDSHAKE) {
         BoatNetHeader header;
@@ -469,7 +515,8 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
         return;
     }
     p->heard_at = now;
-    refill(p, now);
+    if (!s->config.local.enabled)
+        refill(p, now); // A private session refills per granted tick instead.
     if (p->phase == BOAT_NET_PEER_HANDSHAKE) {
         if (m.header.type == BOAT_NET_HELLO && m.header.epoch == 0 && s->announced.present) {
             // A revision is announced: serve this Hello the new definition once it commits, so
@@ -494,7 +541,9 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
         if (p->phase == BOAT_NET_PEER_BOOTSTRAP) {
             p->phase = BOAT_NET_PEER_READY;
             // A race places joiners itself: free boating while waiting, else the next grid.
-            if (!s->race_room || !boat_race_join(&s->race, &s->fleet, p->slot))
+            if (s->config.local.enabled)
+                ; // Placed on accept.
+            else if (!s->race_room || !boat_race_join(&s->race, &s->fleet, p->slot))
                 boat_fleet_request_spawn(&s->fleet, p->slot);
             send_roster(s);
         }
@@ -980,6 +1029,26 @@ bool boat_net_server_service(BoatNetServer *s, double now)
         s->backlog_since = -1;
     }
     return !s->overloaded;
+}
+
+bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
+{
+    if (!s->config.local.enabled)
+        return false;
+    handle_events(s, now);
+    for (unsigned n = 0; n < ticks; ++n) {
+        // The hosted buckets refill 120 input and 2 spawn tokens per elapsed second: per granted
+        // tick here, so 8x is not rate limited and a pause refills nothing.
+        for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
+            BoatNetServerPeer *p = &s->peers[peer];
+            if (p->phase == BOAT_NET_PEER_FREE)
+                continue;
+            p->input_tokens = fmin(30, p->input_tokens + 1);
+            p->spawn_tokens = fmin(2, p->spawn_tokens + 2.0 / BOAT_TICK_HZ);
+        }
+        tick(s);
+    }
+    return true;
 }
 
 double boat_net_server_next_tick(const BoatNetServer *s)
