@@ -5,9 +5,8 @@ Status, 2026-11-08: **P5a-P5f implemented on `feat/plugin-p5`: the hunt's object
 draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM),
 `boat_server --package-reload` reloads the objective source on a running room, and protocol v14
 carries definition revisions (marks, scene, course, rules) in every room mode, committing at
-round boundaries or in an empty free room. Play check 1 is accepted; next: the user's reload
-check (P5e gate, now also covering a moved mark), then P5g. The single P5 PR is not open
-yet.** Scheduled by the user "as soon as possible"
+round boundaries or in an empty free room. Play check 1 and the P5e reload check are accepted;
+the user's moved-mark check (P5f) is owed; next: P5g. P5a–P5f are in PR #175.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -311,8 +310,10 @@ smoke (`boat_server --package-reload` on a copy of `plugins/outer-hunt`, one `bo
 server and `boat_bot objective: HUNT=1 TEAM 1=0` on the bot, no restart. Limits: a file that
 fails to load is reported once per distinct message, not per distinct content; the game's own
 clients were not run against a reload; marks and every other definition change still need a room
-restart until P5f (which lifted it). **Gate still owed (user check):** a live script edit on a hosted hunt reaches
-both players without a restart. Host with `./build/boat_server --bind 0.0.0.0 --location outer
+restart until P5f (which lifted it). **Gate accepted 2026-11-09:** the user hosted with `boat_server --package-reload`,
+joined two game clients over the LAN on one Mac, edited the label and reported "Tested it and
+it works well!". The check: a live script edit on a hosted hunt reaches both players without a
+restart. Host with `./build/boat_server --bind 0.0.0.0 --location outer
 --package plugins/outer-hunt --package-reload`, join two game clients over the LAN, then edit
 `plugins/outer-hunt/main.lua` (for example the `"CREW "` label) and save; both HUDs should change
 within about a second and keep their counts.
