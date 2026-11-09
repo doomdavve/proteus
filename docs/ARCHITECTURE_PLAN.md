@@ -1,15 +1,14 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-09:** AR0 (merged baseline and contracts) complete at `1fb9950`; no
-production refactor started. The user selected authority/client composition for every playable
-mode, including offline single player, on 2026-11-09.
-**Open:** local-authority scheduling versus solo time scaling and stall discard (see
-[timing](#timing-critical-paths-and-inherited-gaps)); browser local authority with Lua;
-execution topology; platform, browser and real-time qualification.
+**Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) drafted
+on `arch/ar1-design` (in-process queued topology, host-granted ticks for private authorities,
+migration ledger); awaiting review and the user's
+[decisions D1–D9](ARCHITECTURE_AR1.md#open-product-decisions). No production refactor started.
+**Open:** AR1 review and decisions; platform, browser and real-time qualification.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
 (AR10).
-**Next:** AR1, authority/client design and migration ledger.
+**Next:** AR1 review; then AR2a and the AR6 pilot (ledger row L0).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -244,7 +243,9 @@ or blocking model into one API.
 
 ### AR1 — Authority/client architecture and migration design
 
-Produce the design before AR2 implementation; update AR0's intended contracts without rewriting
+Drafted 2026-11-09 in [the AR1 design](ARCHITECTURE_AR1.md); summary in
+[AR1 authority/client design](#ar1-authorityclient-design--2026-11-09). Produce the design before
+AR2 implementation; update AR0's intended contracts without rewriting
 its observed baseline. Decide responsibilities before APIs/layout and preserve core/net purity.
 
 1. Map authority, client, storage and platform adapter ownership for every live mode. Build a
@@ -578,15 +579,18 @@ contracts; audit their transitive includes when touching them. New filenames are
 | Responsibility / entry contracts | Permitted dependencies and ownership | Forbidden dependencies / enforcement |
 | --- | --- | --- |
 | Core: `boat.h`, `boat_world.h`, `boat_fleet.h`, definition/input/clock values | Math/types, compiled geometry, core modules. World resources/maps are non-copyable owners; copyable worlds borrow them. | No device/input/files/sockets/Lua/plugins. Source and archive-symbol tests, including marks; no callback execution hidden in core. |
-| Net: protocol/client/server/prediction and `boat_net_transport.h` | Core; byte/event transport and application-supplied rules callbacks with caller-owned contexts. | No transport OS APIs or plugin execution. Existing core/net gates; AR5/AR9 add indirect enforcement as targets split. |
+| Net: protocol/client/server/prediction and `boat_net_transport.h` | Core; byte/event transport and application-supplied rules callbacks with caller-owned contexts. AR1: a private schedule mode (host-granted ticks) and a private extension message range with its own codec, never sent remotely. | No transport OS APIs or plugin execution. Existing core/net gates; AR5/AR9 add indirect enforcement as targets split. |
 | Presentation: `boat_view.h`, scene/presentation values | Core/scenery; CPU and GPU own their caches/resources. Cosmetic updates cannot feed simulation. | No reverse core dependency. Simulation parity with cosmetics disabled; AR8/AR9 enforce header ownership. |
 | Plugin data/codecs: extracted value/state/descriptor interfaces | Core values, bounded buffer helpers and JSON where required; caller-owned bytes/results. | No Lua evaluation, filesystem, processes, browser bridges, rendering or input. AR5 adds source/symbol restrictions and a standalone consumer. |
 | Plugin evaluation/host: `boat_plugin.h`, `boat_plugin_state.h`, `boat_plugin_host.h` | Data/codecs/core; evaluation uses private Lua. Host owns stable revisions; borrowers rebind at commit. | No platform execution dependency in the data layer. AR5 splits combined headers; AR4 isolates worker mechanics. |
 | Package I/O and workers: `boat_plugin_io.h`, `boat_plugin_stage.h` | Evaluation/data and an explicitly selected OS/browser backend; each operation owns handles and copied requests. | No OS/browser handles in common request policy. AR4 backend selection, lifecycle tests and include checks. |
-| Save/file: sandbox byte codec versus `boat_file.h`/work/replay persistence | Codec consumes data values only; authority coordinates checkpoint capture; storage adapters own paths/handles and atomic replacement. | Codec acquires no files and executes no plugins. AR5 standalone consumer; AR1/AR7 map replay, saves and ghosts without a competing P5g format. |
-| Authority/session/work/room adapters | Committed simulation, rules/progression, objective/revision transactions and persistence coordination behind explicit commands/results. `BoatRoomObjective` is an existing authority adapter. | No renderer/input/device access in authority rules; no mutable state shared with the client. AR1 defines, AR6 pilots, AR7 migrates. |
-| Client composition | Controls, prediction, camera, UI/render/audio; consumes authoritative state and immutable resources with explicit lifetimes. | No authoritative progression or save effects from prediction; no direct authority mutation, reentrant endpoint delivery or parallel solo gameplay. AR2 supplies commands; AR6/AR7 prove behavior. |
+| Save/file: sandbox byte codec versus `boat_file.h`/work/replay persistence | Codec consumes data values only; authority coordinates checkpoint capture; storage adapters own paths/handles and atomic replacement. AR1: the authority queues copied bytes with an identity; the adapter answers with an identified ack, consumed at the authority's next service. | Codec acquires no files and executes no plugins. AR5 standalone consumer; AR1/AR7 map replay, saves and ghosts without a competing P5g format. |
+| Authority/session/work/room adapters | Committed simulation, rules/progression, objective/revision transactions and persistence coordination behind explicit commands/results. `BoatRoomObjective` is an existing authority adapter. AR1: mode adapters may differ (fleet room with course/voyage/objective adapters; a work-session endpoint); host management is local calls between service calls. | No renderer/input/device access in authority rules; no mutable state shared with the client. AR1 defines, AR6 pilots, AR7 migrates. |
+| Client composition | Controls, prediction, camera, UI/render/audio; consumes authoritative state and immutable resources with explicit lifetimes. AR1: computes the private tick grant; replay and ghost viewing are client-only. | No authoritative progression or save effects from prediction; no direct authority mutation, reentrant endpoint delivery or parallel solo gameplay. AR2 supplies commands; AR6/AR7 prove behavior. |
 | App input/services | Normalized values, small capability/operation contracts, selected native/web backend. UI consumes one input snapshot per frame. | No common UI-to-JavaScript/OS dependency for migrated functions. AR2/AR3 enforce bridge placement and event consumption. |
+
+AR1 (2026-11-09) amended the net, save/file, authority and client rows; the rest of this
+section is the AR0 record.
 
 A smaller include directory alone cannot enforce private headers. AR2–AR4 use backend-private
 headers without exporting their directories, plus include checks for migrated consumers; AR5
@@ -691,6 +695,31 @@ were inspected (boat and wake visible, outer scenery present). Compare same-conf
 when touched and do not normalize format fields. Build-revision strings in application output
 need separate treatment, not relaxed physics/codec comparisons.
 
+## AR1 authority/client design — 2026-11-09
+
+Draft for review; the full design, mode matrix, ledger and decisions are in
+[ARCHITECTURE_AR1.md](ARCHITECTURE_AR1.md). Selections:
+
+- **Topology:** in-process, single-thread, queued (T1) for private sessions over the unimpaired
+  memory transport; hosted rooms keep `boat_server`. Threads, workers and processes are not
+  selected for private play.
+- **Scheduling:** private authorities run exactly a host-granted tick count per frame, computed
+  by today's solo/work frame functions, so pause, ¼×–8×, the 0.1 s clamp and stall discard are
+  unchanged; elapsed time keeps operational deadlines; liveness timeouts are disabled for
+  in-process peers. Hosted rooms keep the elapsed model and keep running when a client pauses.
+- **Contract:** v14 where it fits; a private extension range for private-only state and
+  commands; host management as local calls.
+- **Persistence:** authority captures between ticks and queues copied bytes; storage adapters
+  return identified acks; save formats and paths unchanged.
+- **Browser:** authority in the main Wasm without Lua, the existing objective evaluator as its
+  service, the T/T+1 gate moved to the authority's grant.
+- **Precision:** full-precision commands in private sessions during migration; hosted rooms
+  keep v14 (decision D4).
+- **Order of seams:** AR2a precedes AR6 (L0); AR3 persistence placement and objective-bridge
+  extraction precede L2 and L4; AR5 precedes L1 and L3; AR4 is independent. AR7 group order:
+  L0, L6, L2, L1, L3, L4. No layout change beyond the AR8 proposal: the private codec belongs to
+  net, authority adapters to `session`, storage adapters stay with the application until AR8b.
+
 ## Current evidence and limitations
 
 - 2026-11-08: read-only source review by Codex and Astra, agreed direction, and this plan.
@@ -723,3 +752,18 @@ need separate treatment, not relaxed physics/codec comparisons.
   snapshot acceptance, and staged revisions from announced commit obligations. Must-complete
   now requires contract-defined outcomes rather than guaranteed success or unlimited retries;
   persistence failure/retry behavior remains unchanged. Documentation-only clarification.
+- 2026-11-09: AR1 design drafted on `arch/ar1-design` ([design](ARCHITECTURE_AR1.md)): mode
+  matrix, frame order, contract layers, topology, scheduling resolution, persistence, browser
+  composition, precision and ledger; nine product decisions listed for the user. Not reviewed.
+- AR1 measurement, 2026-11-09, scratch harness (not committed), Release `proteus_boat_net`, Apple
+  M1 Max, macOS 26.6.2, Apple clang 21.0.0: one predicting client in-process costs about 2–3×
+  direct one-boat stepping (outer 0.032 versus 0.014 ms/tick), worst frame 0.58 ms at an
+  emulated 8×, zero own prediction error. Feasibility on one machine, not qualification.
+- AR1 resync nit (PR #176): a checkpoint at the client's mirror tick is installed while a
+  snapshot at that tick is ignored. Investigated and kept as the wake-repair path; comment and
+  [protocol](MULTIPLAYER_PROTOCOL.md) and [testing](TESTING.md) updated, and
+  `boat_net.resync_same_tick` / `boat_net_enet.resync_same_tick` added (they fail under `<=`).
+- AR1 verification, 2026-11-09, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug build with
+  `PROTEUS_GPU_TESTS=OFF` (fetched sources reused from the main checkout) passed; `ctest --preset
+  full` with socket/process access passed all 474 enabled tests in 38.84 s (13 disabled). No
+  browser, Windows/Linux, GPU or manual checks; documentation-only beyond the resync commit.

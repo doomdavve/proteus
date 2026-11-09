@@ -156,8 +156,9 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 - [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v14 byte layout, channels, validation
   envelope, authority rules carried on the wire, version policy and fixtures.
 - [Architecture restructuring plan](ARCHITECTURE_PLAN.md): AR0 merged baseline/contracts and CPU
-  verification complete (2026-11-09); next AR1 authority/client design, including offline single
-  player. Its [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
+  verification complete (2026-11-09); the [AR1 authority/client design](ARCHITECTURE_AR1.md),
+  including offline single player, is drafted and awaits review and user decisions. Its
+  [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
   Owns migration, platform/module restructuring and review reconciliation, then becomes
   `ARCHITECTURE.md`. Production refactoring has not started.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
