@@ -602,6 +602,13 @@ target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_
 target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
 set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
+# The pause menu's input handling, driven by synthetic BoatAppInput values (no window or raylib
+# input reads).
+add_executable(validate_app_input tools/validate_app_input.c tools/wake_velocity_menu.c)
+target_link_libraries(validate_app_input PRIVATE proteus_render)
+target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME app_input COMMAND validate_app_input)
+set_tests_properties(app_input PROPERTIES LABELS "cpu;quick")
 # The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
 add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
 target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
