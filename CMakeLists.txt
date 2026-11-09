@@ -72,7 +72,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_scene_definition.c src/boat_scene_definition.h
   src/boat_marks.c src/boat_marks.h
   src/waterfront_flock.c src/waterfront_flock.h
-  src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
+  src/boat_input.h src/boat_helm.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
   src/boat_voyage.c src/boat_voyage.h src/boat_water.h src/boat_world.c src/boat_world.h
   src/geometry3d.h
