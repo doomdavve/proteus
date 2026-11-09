@@ -57,6 +57,9 @@ typedef struct {
     uint64_t
         resets_dropped; // Requests the authority never queued (rate limit), given up after 1 s.
     double max_reset; // Longest time from a reset request to its new life, seconds.
+    // Definition revisions (v14): committed here; announcements refused as invalid (the client
+    // does not answer READY and will be dropped); ignored as duplicate or stale.
+    uint64_t revisions, revisions_invalid, revisions_ignored;
 } BoatNetClientStats;
 
 // A deathmatch event as received, with the roster names of that moment (leavers keep theirs).
@@ -122,6 +125,16 @@ typedef struct {
     BoatRoomDefinition room;
     uint64_t room_digest; // FNV-1a 64 of the encoded definition.
     uint8_t definition_error; // 1 malformed/oversized, 2 checkpoint rules differ.
+    // Definition revisions (v14). REVISION is the running one (from Accept, then each commit).
+    // An announcement is assembled, validated and staged; the client answers REVISION_READY and
+    // switches when the mirror reaches its commit tick, resetting prediction.
+    uint32_t revision, revision_seen; // Running; newest announced (older ones are ignored).
+    BoatNetRevisionBegin revision_begin;
+    bool revising, revision_staged;
+    unsigned revision_pages_received;
+    uint8_t revision_assembly[BOAT_NET_MAX_DEFINITION];
+    BoatRoomDefinition revision_room; // The staged definition, valid while revision_staged.
+    uint64_t revision_digest; // Of the staged definition's bytes.
     // Deathmatch rooms: the authority's scoreboard and events, never predicted.
     bool match_valid;
     BoatNetMatchState match;
@@ -132,6 +145,8 @@ typedef struct {
     bool race_valid;
     BoatNetRaceState race;
     BoatNetRaceState race_result; // The latest round's rows as its results phase began.
+    bool objective_valid; // An ObjectiveState arrived (free rooms with an objective).
+    BoatNetObjectiveState objective; // The newest by revision.
     BoatNetRaceFeedEntry race_feed[BOAT_NET_MATCH_FEED];
     uint64_t race_feed_count;
     uint64_t race_go; // Of the newest snapshot: binds the course source and the hold release.
@@ -207,8 +222,11 @@ const BoatFleetSlot *boat_net_client_own(const BoatNetClient *client);
 double boat_net_client_server_tick(const BoatNetClient *client, double now);
 // The fleet to draw: the speculative one when predicting, else the mirror.
 const BoatFleet *boat_net_client_view(const BoatNetClient *client);
-// The installed room definition, or NULL before it validates. Read-only for the connection.
+// The installed room definition, or NULL before it validates. Read-only for the caller; it
+// changes in place when a definition revision commits, so read it each frame.
 const BoatRoomDefinition *boat_net_client_room(const BoatNetClient *client);
+// The installed definition's revision (the room's first is 1); zero before the Accept.
+uint32_t boat_net_client_revision(const BoatNetClient *client);
 // Text for a rejection or close, for the console.
 const char *boat_net_client_failure(const BoatNetClient *client);
 

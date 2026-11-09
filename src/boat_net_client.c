@@ -117,6 +117,8 @@ static void check_wakes(BoatNetClient *c, double now)
 }
 
 static void definition_fail(BoatNetClient *c, uint8_t reason);
+static void revision_apply_room(BoatNetClient *c);
+static void revision_commit(BoatNetClient *c);
 
 // Race rooms: the course source runs on the latest round's clock, in the mirror and in the
 // prediction, which also releases grid holds at GO.
@@ -142,6 +144,10 @@ static void install(BoatNetClient *c, double now)
     c->assembling = false;
     bool decoded = boat_net_checkpoint_decode(c->assembly, b->bytes, &state, inputs, &race_go)
         == BOAT_NET_OK;
+    // A checkpoint at or past a staged commit tick was taken under the new definition.
+    bool revised = decoded && c->revision_staged && state.tick >= c->revision_begin.commit_tick;
+    if (revised)
+        revision_apply_room(c);
     if (decoded && c->room_valid && c->room.mode == BOAT_ROOM_MODE_DEATHMATCH
         && state.combat.enabled
         && !boat_combat_rules_equal(&state.combat.rules, &c->room.combat_rules)) {
@@ -192,7 +198,7 @@ static void install(BoatNetClient *c, double now)
     ++c->stats.bootstraps;
     release_births(c);
     check_wakes(c, now);
-    if (c->predict && c->phase != BOAT_NET_CLIENT_PLAYING)
+    if (c->predict && (c->phase != BOAT_NET_CLIENT_PLAYING || revised))
         boat_prediction_reset(&c->prediction, &c->fleet, c->inputs, c->slot);
     bind_race(c, race_go);
     if (c->phase != BOAT_NET_CLIENT_PLAYING)
@@ -274,6 +280,8 @@ static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
     }
     boat_remote_history_push(&c->remotes, tick, state->slots);
     ++c->stats.snapshots;
+    if (c->revision_staged && tick >= c->revision_begin.commit_tick)
+        revision_commit(c);
     // The authority sends snapshot n right after tick n: allow half the round trip.
     double sample = (double)tick + c->rtt * .5 * BOAT_TICK_HZ - now * BOAT_TICK_HZ;
     if (!c->offset_valid || fabs(sample - c->offset) > 12) {
@@ -398,6 +406,92 @@ static void definition_end(BoatNetClient *c, uint32_t id)
     c->stats.definition_bytes += b->bytes;
 }
 
+// Definition revisions (v14). An announcement is assembled like a definition but never fails the
+// connection: one the client cannot accept simply goes unanswered, and the authority drops the
+// client at the commit tick.
+static void revision_begin(BoatNetClient *c, const BoatNetMessage *m)
+{
+    const BoatNetRevisionBegin *b = &m->revision_begin;
+    if (b->revision <= c->revision || b->revision <= c->revision_seen) {
+        ++c->stats.revisions_ignored; // Duplicate or stale.
+        return;
+    }
+    c->revision_seen = b->revision;
+    c->revision_begin = *b;
+    c->revising = true;
+    c->revision_staged = false; // A newer announcement supersedes a staged one.
+    c->revision_pages_received = 0;
+}
+
+static void revision_page(BoatNetClient *c, const BoatNetWorldPage *p)
+{
+    const BoatNetRevisionBegin *b = &c->revision_begin;
+    if (!c->revising || p->checkpoint != b->revision)
+        return; // Not the revision being assembled.
+    size_t offset = (size_t)p->index * BOAT_NET_PAGE_BYTES;
+    size_t expected
+        = b->bytes - offset < BOAT_NET_PAGE_BYTES ? b->bytes - offset : BOAT_NET_PAGE_BYTES;
+    if (p->count != b->pages || p->index != c->revision_pages_received || p->size != expected) {
+        c->revising = false;
+        ++c->stats.revisions_invalid;
+        return;
+    }
+    memcpy(c->revision_assembly + offset, p->data, p->size);
+    ++c->revision_pages_received;
+}
+
+static void revision_end(BoatNetClient *c, uint32_t revision)
+{
+    const BoatNetRevisionBegin *b = &c->revision_begin;
+    if (!c->revising || revision != b->revision)
+        return;
+    c->revising = false;
+    static BoatRoomDefinition room;
+    BoatRoomDiagnostic diagnostic;
+    bool valid = c->revision_pages_received == b->pages
+        && boat_net_bytes_digest(c->revision_assembly, b->bytes) == b->digest
+        && boat_room_definition_decode(c->revision_assembly, b->bytes, &room, &diagnostic)
+        && room.mode == c->accept.mode && room.location == c->accept.location
+        && (c->phase != BOAT_NET_CLIENT_PLAYING || mirror_tick(c) < b->commit_tick);
+    if (!valid) {
+        ++c->stats.revisions_invalid;
+        return;
+    }
+    c->revision_room = room;
+    c->revision_digest = b->digest;
+    c->revision_staged = true;
+    BoatNetMessage ready = { .header = { .type = BOAT_NET_REVISION_READY, .tick = mirror_tick(c) },
+        .checkpoint = b->revision };
+    send_message(c, &ready);
+}
+
+// The staged definition becomes the room's. The fleets are not touched here.
+static void revision_apply_room(BoatNetClient *c)
+{
+    c->room = c->revision_room;
+    c->room_digest = c->revision_digest;
+    c->revision = c->revision_begin.revision;
+    c->revision_staged = false;
+    ++c->stats.revisions;
+}
+
+// The mirror reached the commit tick: switch the room and rebuild what borrows or derives from
+// it. Prediction history never crosses a commit: it restarts from the mirror, like a resync.
+static void revision_commit(BoatNetClient *c)
+{
+    revision_apply_room(c);
+    c->fleet.world.scene = c->room.has_scene ? &c->room.scene : NULL;
+    if (c->room.mode == BOAT_ROOM_MODE_DEATHMATCH)
+        c->fleet.state.combat.rules = c->room.combat_rules;
+    memset(c->combat_sets, 0, sizeof(c->combat_sets));
+    if (c->predict) {
+        boat_prediction_reset(&c->prediction, &c->fleet, c->inputs, c->slot);
+        boat_combat_bind(&c->prediction.fleet);
+    }
+    bind_race(c, c->race_go);
+    c->predict_dirty = true;
+}
+
 static void page(BoatNetClient *c, const BoatNetWorldPage *p)
 {
     const BoatNetWorldBegin *b = &c->begin;
@@ -482,6 +576,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         c->epoch = m.header.epoch;
         c->heard_at = now;
         c->slot = m.accept.slot;
+        c->revision = m.accept.revision;
         c->phase = BOAT_NET_CLIENT_BOOTSTRAP;
         unsigned count = c->early_bootstrap_count;
         c->early_bootstrap_count = 0;
@@ -512,6 +607,15 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         break;
     case BOAT_NET_DEFINITION_END:
         definition_end(c, m.checkpoint);
+        break;
+    case BOAT_NET_REVISION_BEGIN:
+        revision_begin(c, &m);
+        break;
+    case BOAT_NET_REVISION_PAGE:
+        revision_page(c, &m.world_page);
+        break;
+    case BOAT_NET_REVISION_END:
+        revision_end(c, m.checkpoint);
         break;
     case BOAT_NET_WORLD_BEGIN:
         c->begin = m.world_begin;
@@ -575,6 +679,13 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     case BOAT_NET_RACE_EVENT:
         race_event(c, &m, now);
         break;
+    case BOAT_NET_OBJECTIVE_STATE:
+        if (!c->objective_valid
+            || boat_net_sequence_newer(m.objective.revision, c->objective.revision)) {
+            c->objective = m.objective;
+            c->objective_valid = true;
+        }
+        break;
     case BOAT_NET_DISCONNECT:
         c->leave = m.leave;
         c->phase = BOAT_NET_CLIENT_CLOSED;
@@ -605,6 +716,8 @@ const BoatRoomDefinition *boat_net_client_room(const BoatNetClient *c)
 {
     return c->room_valid ? &c->room : NULL;
 }
+
+uint32_t boat_net_client_revision(const BoatNetClient *c) { return c->revision; }
 
 // One command per local tick, aimed at the estimated server tick plus the lead.
 static void command(
@@ -841,6 +954,8 @@ const char *boat_net_client_failure(const BoatNetClient *c)
         return "the server closed the room";
     case BOAT_NET_LEAVE_MISBEHAVING:
         return "the server dropped this client for invalid messages";
+    case BOAT_NET_LEAVE_REVISION:
+        return "the room changed its definition and this client was not ready in time";
     case BOAT_NET_LEAVE_QUIT:
         return "left the room";
     default:

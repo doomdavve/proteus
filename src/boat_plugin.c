@@ -177,8 +177,8 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
     // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
     // A package cannot reorder or repeat them, and timers require HUD. Other kinds may add only
-    // scene.define, immediately after their kind grant; a free package may follow it with
-    // objective.hud (S1c, for its work sites' job).
+    // scene.define, immediately after their kind grant; a free package may then add
+    // objective.hud (S1c, for its work sites' job; P5a, for its marks' room objective).
     int order = 0;
     bool extra_scene = false;
     for (int i = 1; i < capabilities->size; ++i) {
@@ -187,16 +187,16 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         if (!boat_json_text(json, &tokens[at[6] + i + 1], capability, sizeof(capability)))
             return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path, "is not a string");
         if (kind != BOAT_PLUGIN_KIND_VOYAGE) {
-            if (!strcmp(capability, "scene.define") && !extra_scene) {
+            if (!strcmp(capability, "scene.define") && !extra_scene && !m.objective) {
                 m.scene = true;
                 extra_scene = true;
             } else if (kind == BOAT_PLUGIN_KIND_FREE && !strcmp(capability, "objective.hud")
-                && extra_scene && !m.objective)
+                && !m.objective)
                 m.objective = true;
             else
                 return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
                     kind == BOAT_PLUGIN_KIND_FREE
-                        ? "must be scene.define, optionally followed by objective.hud"
+                        ? "must be an optional scene.define, then an optional objective.hud"
                         : "must be scene.define and may appear once");
             continue;
         }
@@ -1056,12 +1056,38 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
             &candidate.scene, &candidate.scene_digest, d)
         != BOAT_PLUGIN_OK)
         return BOAT_PLUGIN_SCHEMA;
-    // S1c: a free objective is the job of its package's work sites; only the cargo sandbox
-    // hosts it.
-    if (manifest->objective && !candidate.scene.work_present)
+    // P5a: marks belong to a room objective; they need the callbacks and exclude work sites.
+    if (data->mark_count) {
+        if (!manifest->objective)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.marks",
+                "requires the objective.hud capability and init/update");
+        if (candidate.scene.work_present)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.marks",
+                "cannot be combined with scene.work sites");
+        candidate.marks.count = data->mark_count;
+        for (unsigned i = 0; i < data->mark_count && i < BOAT_MARKS_MAX; ++i) {
+            BoatMark *m = &candidate.marks.items[i];
+            memcpy(m->id, data->marks[i].id, sizeof(m->id));
+            memcpy(m->name, data->marks[i].name, sizeof(m->name));
+            m->x = (float)data->marks[i].x;
+            m->z = (float)data->marks[i].z;
+            m->radius = (float)data->marks[i].radius;
+        }
+        BoatMarkDiagnostic check;
+        if (!boat_marks_validate(&candidate.marks, &check)) {
+            char field[80];
+            snprintf(field, sizeof(field), "free.%s", check.field);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, field, "%s", check.message);
+        }
+    }
+    // S1c: a free objective is the job of its package's work sites, which the cargo sandbox
+    // hosts, or (P5a) the room objective over its marks.
+    if (manifest->objective && !candidate.scene.work_present && !candidate.marks.count)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
-            "free objectives require scene.work sites");
+            "free objectives require scene.work sites or free.marks");
     candidate.digest = candidate.scene_digest;
+    if (candidate.marks.count)
+        candidate.digest ^= boat_marks_digest(&candidate.marks);
     *out = candidate;
     BoatPluginCost cost = d->cost;
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
@@ -1219,6 +1245,19 @@ BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
     if (free->has_scene && free->scene.work_present
         && check_work_sites(free, location, map, d) != BOAT_PLUGIN_OK)
         return d->status;
+    if (free->marks.count) {
+        if (location->mapped && !map)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+                "free.marks requires the location's map");
+        BoatMarkDiagnostic check;
+        if (!boat_marks_check_map(
+                &free->marks, location->mapped ? map : NULL, location->half_extent, &check)) {
+            char field[80];
+            snprintf(field, sizeof(field), "free.%s", check.field);
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, free->manifest.entry, field, "%s", check.message);
+        }
+    }
     d->status = BOAT_PLUGIN_OK;
     return BOAT_PLUGIN_OK;
 }

@@ -420,6 +420,8 @@ static int transition(lua_State *L)
         integer_field(L, "sequence", event->sequence);
         if (event->load)
             integer_field(L, "load", event->load);
+        if (event->crew)
+            integer_field(L, "crew", event->crew);
         string_field(L, "kind", event->kind);
         string_field(L, "id", event->id);
         lua_rawseti(L, -2, i + 1);

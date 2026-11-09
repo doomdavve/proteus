@@ -123,7 +123,8 @@ typedef enum {
     PANEL_CREDITS
 } Panel;
 
-static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
+static const char *const host_modes[BOAT_TITLE_HOST_MODES]
+    = { "free", "deathmatch", "race", "hunt" };
 static const char *const lighting_names[BOAT_TITLE_LIGHTING_HOURS] = { "day", "sunset", "dusk" };
 static const char *const lighting_hours[]
     = { "hour-v1:00", "hour-v1:01", "hour-v1:02", "hour-v1:03", "hour-v1:04", "hour-v1:05",
@@ -199,10 +200,15 @@ const char *boat_title_host_mode(unsigned mode)
     return host_modes[mode < BOAT_TITLE_HOST_MODES ? mode : 0];
 }
 
-// Race rooms are always on the outer map.
+// Race and shelter hunt rooms are always on the outer map.
+static bool fixed_place(const BoatTitleSettings *s)
+{
+    return s->host_mode == BOAT_TITLE_HOST_RACE || s->host_mode == BOAT_TITLE_HOST_HUNT;
+}
+
 static unsigned host_location(const BoatTitleSettings *s)
 {
-    return s->host_mode == BOAT_TITLE_HOST_RACE ? BOAT_LOCATION_OUTER : s->host_location;
+    return fixed_place(s) ? BOAT_LOCATION_OUTER : s->host_location;
 }
 
 typedef struct {
@@ -485,13 +491,13 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     if (t->panel == PANEL_HOST) {
         static const char *labels[HOST_ROWS] = { "MODE", "PLACE", "WATER", "START ROOM", "BACK" };
         static const char *modes[BOAT_TITLE_HOST_MODES]
-            = { "FREE BOATING", "DEATHMATCH", "RIVER RACE" };
+            = { "FREE BOATING", "DEATHMATCH", "RIVER RACE", "SHELTER HUNT" };
         *label = labels[row];
         const char *place = boat_location(host_location(s))->title;
         if (row == ROW_MODE)
             snprintf(value, size, "< %s >", modes[s->host_mode]);
         else if (row == ROW_PLACE)
-            snprintf(value, size, s->host_mode == BOAT_TITLE_HOST_RACE ? "%s" : "< %s >", place);
+            snprintf(value, size, fixed_place(s) ? "%s" : "< %s >", place);
         else if (row == ROW_WATER)
             snprintf(value, size, "< %s >", s->host_waves ? "WAVES" : "CALM");
         return;
@@ -690,12 +696,13 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_HOST_ROOM)
         hint = "RUN A ROOM ON THIS COMPUTER AND JOIN IT";
     if (!hint && t->panel == PANEL_HOST) {
-        static const char *modes[BOAT_TITLE_HOST_MODES] = { "SHARED FREE BOATING, NO SCORES",
-            "TIMED ROUNDS: CAPSIZE THE OTHERS", "SPRINT DOWN THE RIVER FROM A GRID" };
+        static const char *modes[BOAT_TITLE_HOST_MODES]
+            = { "SHARED FREE BOATING, NO SCORES", "TIMED ROUNDS: CAPSIZE THE OTHERS",
+                  "SPRINT DOWN THE RIVER FROM A GRID", "FIND THE SHELTER MARKS TOGETHER" };
         if (t->selected == ROW_MODE)
             hint = modes[s->host_mode];
-        else if (t->selected == ROW_PLACE && s->host_mode == BOAT_TITLE_HOST_RACE)
-            hint = "RIVER RACES ALWAYS RUN IN THE HARBOUR";
+        else if (t->selected == ROW_PLACE && fixed_place(s))
+            hint = "RACES AND HUNTS ALWAYS RUN IN THE HARBOUR";
         else if (t->selected == ROW_START) {
             snprintf(
                 lan, sizeof(lan), "OPEN TO YOUR LAN ON UDP %d; LEAVING CLOSES IT", BOAT_NET_PORT);
@@ -1102,7 +1109,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             if (t.selected == ROW_MODE)
                 s->host_mode
                     = (s->host_mode + BOAT_TITLE_HOST_MODES + turn) % BOAT_TITLE_HOST_MODES;
-            else if (t.selected == ROW_PLACE && s->host_mode != BOAT_TITLE_HOST_RACE)
+            else if (t.selected == ROW_PLACE && !fixed_place(s))
                 s->host_location
                     = (s->host_location + BOAT_LOCATION_COUNT + turn) % BOAT_LOCATION_COUNT;
             else if (t.selected == ROW_WATER && turn)

@@ -9,13 +9,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Multiplayer protocol v11 (per-berth appearance). docs/MULTIPLAYER_PROTOCOL.md
-// owns the byte tables.
+// Multiplayer protocol v14 (definition revisions). docs/MULTIPLAYER_PROTOCOL.md owns the byte
+// tables.
 // Every multi-byte field is big-endian; floats travel as IEEE-754 binary32 bit patterns. Encoders
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 12
+#define BOAT_NET_VERSION 14
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -75,6 +75,11 @@ typedef enum {
     BOAT_NET_DEFINITION_BEGIN = 22, // S→C: the room definition, before the world checkpoint.
     BOAT_NET_DEFINITION_PAGE = 23, // S→C: one bounded piece of the definition bytes.
     BOAT_NET_DEFINITION_END = 24, // S→C: the definition is complete on this reliable channel.
+    BOAT_NET_OBJECTIVE_STATE = 25, // S→C: a free room objective's HUD rows and suspension.
+    BOAT_NET_REVISION_BEGIN = 26, // S→C: a definition revision and the tick it commits at.
+    BOAT_NET_REVISION_PAGE = 27, // S→C: one bounded piece of the revision's bytes.
+    BOAT_NET_REVISION_END = 28, // S→C: the revision is complete on this reliable channel.
+    BOAT_NET_REVISION_READY = 29, // C→S: the client validated and staged this revision.
     BOAT_NET_TYPE_LIMIT
 } BoatNetType;
 
@@ -106,6 +111,7 @@ typedef enum {
     BOAT_NET_LEAVE_TIMEOUT = 2,
     BOAT_NET_LEAVE_SHUTDOWN = 3,
     BOAT_NET_LEAVE_MISBEHAVING = 4,
+    BOAT_NET_LEAVE_REVISION = 5, // Not ready for a definition revision by its commit tick.
     BOAT_NET_LEAVE_LIMIT
 } BoatNetLeaveReason;
 
@@ -167,6 +173,7 @@ typedef struct {
     uint16_t tick_hz;
     uint32_t wake_life_ticks;
     float crest_height;
+    uint32_t revision; // The room's running definition revision (v14); the first is 1.
 } BoatNetAccept;
 
 typedef struct {
@@ -202,8 +209,18 @@ typedef struct {
     uint64_t digest; // FNV-1a 64 of the definition bytes; corruption detection only.
 } BoatNetDefinitionBegin;
 
+// A definition revision (v14): the same fields as a definition's begin, a server-assigned revision
+// number (the room's first definition is revision 1) and the authoritative tick the new
+// definition applies from: the tick after commit_tick is the first one simulated under it.
 typedef struct {
-    uint32_t checkpoint;
+    uint32_t revision, bytes;
+    uint16_t pages;
+    uint64_t digest; // FNV-1a 64 of the definition bytes.
+    uint64_t commit_tick;
+} BoatNetRevisionBegin;
+
+typedef struct {
+    uint32_t checkpoint; // Also the revision of a REVISION_PAGE.
     uint16_t index, count, size;
     uint8_t data[BOAT_NET_PAGE_BYTES];
 } BoatNetWorldPage;
@@ -284,6 +301,22 @@ typedef struct {
     uint64_t time; // Finish subticks after GO; zero for other kinds.
 } BoatNetRaceEvent;
 
+#define BOAT_NET_OBJECTIVE_ROWS 8
+#define BOAT_NET_OBJECTIVE_TEXT 24 // Row id and label capacity, including the terminator.
+
+// A free room objective's HUD as data (P5c): a revision the server counts, whether the objective
+// is suspended, and up to BOAT_NET_OBJECTIVE_ROWS label/value rows. Lua state is never sent.
+typedef struct {
+    uint32_t revision; // Server-assigned, from 1; bumped on each change.
+    bool suspended;
+    uint8_t row_count;
+    struct {
+        char id[BOAT_NET_OBJECTIVE_TEXT];
+        char label[BOAT_NET_OBJECTIVE_TEXT];
+        int64_t value;
+    } rows[BOAT_NET_OBJECTIVE_ROWS];
+} BoatNetObjectiveState;
+
 typedef struct {
     uint8_t slot; // Pool slot; slot / BOAT_OBJECT_PER_BOAT is the emitter.
     BoatWakeObject record;
@@ -303,8 +336,9 @@ typedef struct {
         BoatNetRoster roster;
         BoatNetWorldBegin world_begin;
         BoatNetDefinitionBegin definition_begin;
-        BoatNetWorldPage world_page; // Also DEFINITION_PAGE: the same bounded page layout.
-        uint32_t checkpoint; // WORLD_END, READY, DEFINITION_END.
+        BoatNetRevisionBegin revision_begin;
+        BoatNetWorldPage world_page; // Also DEFINITION_PAGE, REVISION_PAGE: the same page layout.
+        uint32_t checkpoint; // WORLD_END, READY, DEFINITION_END; REVISION_END/READY: the revision.
         BoatNetInputBatch input;
         BoatNetSnapshot snapshot;
         BoatNetWakeBirths births;
@@ -321,6 +355,7 @@ typedef struct {
         BoatNetMatchEvent match_event;
         BoatNetRaceState race;
         BoatNetRaceEvent race_event;
+        BoatNetObjectiveState objective;
     };
 } BoatNetMessage;
 
@@ -332,6 +367,8 @@ bool boat_net_match_state_equal(const BoatNetMatchState *a, const BoatNetMatchSt
 void boat_net_race_state_of(const BoatRace *race, BoatNetRaceState *state);
 BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEvent *event);
 bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b);
+// Everything but the revision, which only the server assigns.
+bool boat_net_objective_state_equal(const BoatNetObjectiveState *a, const BoatNetObjectiveState *b);
 // The GO tick a snapshot or checkpoint carries for RACE: zero before its first round.
 uint64_t boat_net_race_go(const BoatRace *race);
 // Bind a race room's package course source to FLEET's water for GO (zero removes it), as the

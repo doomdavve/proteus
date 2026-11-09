@@ -47,7 +47,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"`, `"free"`, `"course"`, `"race"` or `"match"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
-| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c). A course package uses exactly `["course.define"]`. |
+| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c), and one with [marks](#marks-p5a) requests `["free.define", "objective.hud"]` (optionally with `"scene.define"` between them). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -97,7 +97,8 @@ return { free = { version = 1 } }
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
 location must be `basin` or `outer`. A free package has no objective or callback grant unless
-it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`;
+it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`, or
+[marks](#marks-p5a) for a room objective;
 a scene is the same envelope described under [the scene contract](#location-life-scene-contract-l11l43).
 A free package with a scene fixes the room's location; without one it still names its location.
 
@@ -262,6 +263,122 @@ guide to the same site. The sandbox checks the whole batch before applying any o
 - `work.guide {id}` points the helm guidance at a site that is built or built in the same
   batch (otherwise the job is suspended). Departure guides there instead of to the next site in
   list order, unless the boat is leaving that site; N still cycles by hand. A reset clears it.
+
+## Marks (P5a)
+
+Status, 2026-11-08: **P5a-P5c: the objective runs on `boat_server`'s authority; clients receive
+its marks (room definition v4) and HUD (ObjectiveState) over protocol v13 and `boat_bot` prints
+them; the game draws them from P5d.** A free package may author up to 16 named circles on
+the water for an objective that runs on a multiplayer room's authority
+([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it. The marks
+stay fixed for the room's life; the script can be [reloaded](#room-objective-reload-p5e).
+
+`boat_server` (and the game's HOST A ROOM child) loads the objective with
+`boat_room_package_load_objective` and runs it in `tools/boat_room_objective.c` behind
+`BoatNetServerConfig.rules`, so `proteus_boat_net` never links Lua. The objective starts at tick
+zero with generation 1 and updates at every 12-tick boundary with the queued events, under the
+[P3 transaction](#objective-transactions-p31--p32) and default budgets. A failing callback, or more
+than 64 events between boundaries, suspends the objective (`objective suspended: ...` on the
+server's output); the room keeps running. The server prints each committed HUD change as
+`objective tick N: LABEL=value ...`. Lua state, timers and events never leave the authority.
+
+```lua
+return {
+  init = function(c) return {}, {} end,
+  update = function(c, s) return s, {} end,
+  free = {
+    version = 1,
+    marks = {
+      { id = "north_reach", name = "NORTH REACH", x = -500, z = 300, radius = 25 },
+    }
+  }
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| `marks` | 1–16 entries, a list numbered from 1; requires `objective.hud` with `init` and `update`; not combined with `scene.work` |
+| `id` | 1–23 characters of `a-z`, `0-9` and `_`, unique in the package; the events' `id` |
+| `name` | 1–23 printable ASCII characters without edge spaces; the display name |
+| `x`, `z` | Simulation metres (x = -east, z = north), within ±20 000 |
+| `radius` | 10–200 m; circles may touch but not overlap. The centre must be open water with 4 m clearance on a mapped location, and the circle inside the walls in the basin |
+
+The native side reports, on the authority, one `mark.reached { id, crew }` event when a room boat
+moves from outside to inside a mark; staying inside reports nothing, and leaving and returning,
+or a respawn (a new life) inside the circle, reports again. `crew` is the boat's fleet slot plus
+one (1–4). The authority also reports `crew.joined { crew }` and `crew.left { crew }`. Solo
+events never carry `crew`. Scoring is the script's: the native side keeps no counts. The
+package's digest is its scene digest combined with the marks' (`boat_marks_digest`).
+`plugins/outer-hunt` is the reference: five marks along the river, a row per crew, the first crew
+to find them all, and a new hunt once every crew present has them.
+
+### Room objective reload (P5e)
+
+`boat_server --package-reload` (also `wake_velocity --serve`) lets an authored room's objective
+change on a running room, with no client change and no new protocol field. It needs `--package`
+naming a directory (or a bundled ID that has a `plugins/` directory, run from the repository
+root) whose package has a room objective.
+
+- **Trigger.** Every 120 server ticks (one second) the server re-reads the package with the same
+  loader as start-up. When the source bytes, `state_version` or the presence of `migrate` differ
+  from the last candidate seen, whether accepted or refused, it stages the candidate; each distinct
+  candidate is judged once. A package that no longer loads prints `objective reload rejected:
+  MESSAGE` once per distinct message and changes nothing.
+- **Staging** (`boat_room_objective_stage`) copies the candidate and refuses it outright when it
+  has no objective or its marks differ from the running ones (`marks changed; that is a definition
+  revision`): marks are part of the room definition sent at join, so a marks change takes the
+  [revision path](#definition-revisions-from-reload-p5f) instead. A newer stage replaces an older
+  pending one.
+- **Boundary.** The candidate applies at the next 12-tick objective boundary, before that
+  boundary's update, on copies of the committed objective. Events queued since the last boundary
+  stay queued and reach the new code's update at that boundary.
+- **Migrate.** A candidate with a `migrate(context, state)` function (the same rule as solo reload:
+  the package's `migrate` is a function) runs the [P3.3b migration](#live-migration-and-review-p33b)
+  with the candidate's `state_version` and generation + 1, stamped with the last committed tick so
+  the update at this boundary is still strictly later. Equal versions still run `migrate`. Success
+  swaps source, state and generation together and clears quarantine.
+- **Restart.** A candidate without `migrate` runs `init` at generation + 1 with the new source and
+  no state. The host then replays `crew.joined` for every crew present (tracked from the joined and
+  left events), before the queued `mark.reached` events, with fresh increasing sequence numbers;
+  queued joins and leaves are already part of that presence. Restart also clears quarantine. If the
+  queue plus the replay would exceed 64 events, the oldest queued marks are dropped.
+- **Failure.** A syntax error, an `init` or `migrate` error or invalid commands reject the
+  candidate: the running source, state, generation, quarantine and queued events are exactly as
+  before, the candidate is dropped, and the server prints `objective reload rejected: MESSAGE`. An
+  `update` that fails in the new code after a successful swap is an ordinary failure and suspends
+  the objective until the next reload.
+- **Result.** Accepted reloads print `objective reload: revision N accepted (migrate|restart)`;
+  the revision starts at 1 and counts accepted reloads (`BoatRoomObjective.revision`, with the
+  latest result in `reload`). An accepted reload makes the state callback report even when the
+  HUD rows are identical, so clients' `ObjectiveState.revision` moves.
+
+#### Definition revisions from reload (P5f)
+
+A reload whose room definition differs from the one the room runs (or last staged), which today
+means changed marks, is a **definition revision**
+([protocol v14](MULTIPLAYER_PROTOCOL.md#definition-revisions-v14)) instead of a live swap:
+
+- The poll compares the candidate's definition digest with the running one first. A changed
+  definition is staged through `boat_room_objective_stage_revision` and
+  `boat_net_server_stage_revision`: the candidate source must start (a trial `init`) and the server
+  validates the definition like the room's own and keeps its mode and location. A refusal prints
+  `objective reload rejected: MESSAGE` and changes nothing.
+- A **free room commits a revision only while empty**. With players connected the server prints
+  `objective reload: marks changed; revision N waits for an empty room`; with none, `... revision N
+  commits at once (the room is empty)`. When it commits it prints `definition revision N committed
+  at tick T (M marks)`.
+- On commit the server tells the rules adapter (`BoatNetRules.definition`), and the objective
+  **restarts** on the staged source and marks: `init` at generation + 1 with no state, a replay of
+  `crew.joined` for each crew present, queued `mark.reached` events dropped (they name the old
+  marks), and `objective reload: revision N accepted (restart)`. The state callback reports, so
+  clients' `ObjectiveState.revision` moves. Players joining afterwards receive the new marks.
+- While a revision waits, a Lua-only edit with the same new marks replaces the revision's source
+  (the live path stays idle); an edit that changes the marks again stages a newer revision, which
+  replaces the waiting one. Lua-only edits with no revision waiting keep the P5e live path above.
+
+Race and deathmatch rooms revise at their round boundaries through the same server call
+(`boat_net_server_stage_revision`); no command-line trigger exists for them yet, so those paths are
+covered by the validator only.
 
 ## Match schema
 

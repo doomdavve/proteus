@@ -233,6 +233,13 @@ protocol and physics versions; use matching releases when playing together.
 - **Free boating:** share the water, collide and jump each other's wakes.
 - **River race:** with two or more players, line up for a countdown, pass six gates in
   order, cross ferry wakes and a moving storm, then finish for a confirmed place.
+- **Shelter hunt** (host it from the title or with `--host hunt`): a free room on the outer map
+  with five marks (NORTH REACH, UPPER BEND, MIDSTREAM, WIDE WATER, SOUTH CHANNEL). Each mark is a
+  ring of alternating orange and white buoys around a white mast with an orange flag; the minimap
+  shows it as a magenta dashed circle, named on the larger chart. Crews score by driving into a
+  mark's 25 m circle, and the objective panel under the player roster lists `HUNT` plus each
+  crew's score; it shows what the host's authority has confirmed, so it lags your boat a moment.
+  There are no rounds or winner yet.
 - **Deathmatch:** capsize or sink opponents to score. Rounds start with two players;
   defeated boats respawn and the scoreboard shows the standings.
 
@@ -255,12 +262,14 @@ See [browser multiplayer](WEB_BUILD.md#webrtc-rooms) for setup and limits.
 
 ### Hosting from the game
 
-On native builds, choose MULTIPLAYER → HOST A ROOM, select MODE, PLACE and WATER, then
-START ROOM. The game starts an authority in the background and joins it. Allow Wake
+On native builds, choose MULTIPLAYER → HOST A ROOM, select MODE (FREE BOATING, DEATHMATCH,
+RIVER RACE or SHELTER HUNT), PLACE and WATER, then START ROOM; the last two modes fix PLACE to
+the harbour. From the terminal, `--host hunt` starts the same room as
+`boat_server --mode free --location outer --package proteus.outer-hunt`. The game starts
+an authority in the background and joins it. Allow Wake
 Velocity through the firewall. The room closes when you leave, quit or crash; CLOSE ROOM
-ends it for everyone. Friends on the same network choose its LAN entry or enter the
-host's LAN address with UDP port 24680. Guest-network isolation, firewalls and VPNs can
-prevent discovery.
+ends it for everyone. Friends on the same network choose its LAN entry or join with
+`--connect HOST:24680`. Guest-network isolation, firewalls and VPNs can prevent discovery.
 
 Internet hosting needs UDP port forwarding or a VPN for native clients. Browser access
 needs the optional WebRTC endpoint. Native transport has no automatic NAT traversal,

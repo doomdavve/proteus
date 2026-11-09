@@ -70,6 +70,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
   src/boat_room_definition.c src/boat_room_definition.h
   src/boat_scene_definition.c src/boat_scene_definition.h
+  src/boat_marks.c src/boat_marks.h
   src/waterfront_flock.c src/waterfront_flock.h
   src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
@@ -164,7 +165,7 @@ set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
   plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work
-  plugins/basin-work)
+  plugins/basin-work plugins/outer-hunt)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag
@@ -419,7 +420,8 @@ if(NOT EMSCRIPTEN)
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
   target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
     tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h
-    tools/boat_room_package.c tools/boat_room_package.h)
+    tools/boat_room_package.c tools/boat_room_package.h
+    tools/boat_room_objective.c tools/boat_room_objective.h)
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -427,6 +429,12 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
+  # P5d: a CPU capture of the hunt's marks, objective panel and minimap marks (build/hunt.png).
+  add_executable(boat_hunt_review tools/boat_hunt_review.c tools/wake_velocity_net.c)
+  target_link_libraries(boat_hunt_review PRIVATE proteus_boat_drive proteus_gpu
+    proteus_boat_net_enet proteus_boat_fixtures)
+  target_compile_options(boat_hunt_review PRIVATE ${PROTEUS_WARNINGS})
+  add_dependencies(boat_hunt_review proteus_assets)
   add_test(NAME boat_combat_lighting_hour_invalid
     COMMAND boat_combat_review --lighting-hour nope)
   add_test(NAME boat_combat_lighting_hour_missing
@@ -501,6 +509,14 @@ endif()
 
 enable_testing()
 include(cmake/CaseTests.cmake)
+if(NOT EMSCRIPTEN)
+  # The room command line wake_velocity --host passes to its --serve child.
+  add_executable(validate_wake_velocity_host tools/validate_wake_velocity_host.c
+    tools/wake_velocity_host.c)
+  target_include_directories(validate_wake_velocity_host PRIVATE tools)
+  target_compile_options(validate_wake_velocity_host PRIVATE ${PROTEUS_WARNINGS})
+  proteus_add_case_tests(wake_velocity_host validate_wake_velocity_host LABELS cpu quick)
+endif()
 add_executable(validate_boat_wake tools/validate_boat_wake.c)
 target_link_libraries(validate_boat_wake PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_wake PRIVATE
@@ -886,6 +902,11 @@ add_test(NAME boat_voyage COMMAND validate_boat_voyage)
 set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
 # Lua plugins P0: manifest, restricted evaluation, voyage decoding and parity with the compiled
 # route; its file cases work in a scratch directory under the build tree.
+# Plugin P5a: mark validation and the fleet entry detector, core only.
+add_executable(validate_boat_marks tools/validate_boat_marks.c)
+target_link_libraries(validate_boat_marks PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_marks PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_marks validate_boat_marks LABELS core cpu)
 add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
 target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins)
 target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})
@@ -1085,7 +1106,7 @@ target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
 add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c
-  tools/boat_room_package.c)
+  tools/boat_room_package.c tools/boat_room_objective.c)
 add_executable(boat_bot tools/boat_bot.c tools/cli_usage.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
@@ -1127,6 +1148,7 @@ set_tests_properties(boat_server_scripted PROPERTIES
 add_test(NAME boat_server_scripted_room_option_rejected
   COMMAND boat_server --scripted --port 24680)
 add_test(NAME boat_server_port_rejected COMMAND boat_server --port 0)
+add_test(NAME boat_server_package_reload_rejected COMMAND boat_server --package-reload --ticks 1)
 add_test(NAME boat_server_bind_rejected COMMAND boat_server --bind not-an-address --ticks 1)
 add_test(NAME boat_bot_endpoint_rejected COMMAND boat_bot --connect 127.0.0.1)
 add_test(NAME boat_bot_discover_join_rejected
@@ -1171,6 +1193,8 @@ set_tests_properties(wake_velocity_serve_scripted PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_server scripted: boats=4 ticks=240")
 add_test(NAME wake_velocity_host_race_location_rejected
   COMMAND wake_velocity --host race --location basin)
+add_test(NAME wake_velocity_host_hunt_location_rejected
+  COMMAND wake_velocity --host hunt --location basin)
 add_test(NAME wake_velocity_host_connect_rejected
   COMMAND wake_velocity --host free --connect 127.0.0.1:24680)
 add_test(NAME wake_velocity_port_without_host_rejected COMMAND wake_velocity --port 24680)
@@ -1186,10 +1210,12 @@ if(PROTEUS_GPU_TESTS)
     PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
 endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
+  boat_server_package_reload_rejected
   boat_server_bind_rejected boat_server_round_without_deathmatch_rejected boat_bot_endpoint_rejected
   boat_bot_discover_join_rejected boat_bot_snapshots_with_seconds_rejected
   boat_server_scripted_until_empty_rejected boat_net_study_mode_rejected
   boat_net_study_name_rejected boat_net_study_skin_rejected wake_velocity_host_race_location_rejected
+  wake_velocity_host_hunt_location_rejected
   wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)
@@ -1200,6 +1226,14 @@ target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus
   proteus_boat_net)
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# P5b: a free package's room objective runs only behind the authority's rules adapter.
+add_executable(validate_boat_room_objective tools/validate_boat_room_objective.c
+  tools/boat_room_package.c tools/boat_room_objective.c)
+target_link_libraries(validate_boat_room_objective PRIVATE proteus_plugins proteus_plugin_catalog
+  proteus_boat_net)
+target_compile_options(validate_boat_room_objective PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_room_objective validate_boat_room_objective LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Validators and review tools compare packages against the shipped fixture values.
 foreach(target validate_boat validate_boat_banking validate_boat_clock validate_boat_world

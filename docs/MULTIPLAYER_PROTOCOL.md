@@ -1,4 +1,4 @@
-# Multiplayer protocol v12
+# Multiplayer protocol v14
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -56,6 +56,23 @@ request, slot blocks gain that request, checkpoints optionally append the comple
 combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
+v14 (2026-11-08, plugin P5f) adds definition revisions. A room can switch to a new validated
+definition (marks, scene, course, rules) without a restart: the authority announces it with
+RevisionBegin, RevisionPage and RevisionEnd (types 26–28, server to client), each connected client
+answers RevisionReady (type 29) once it has validated and staged it, and every client switches at
+the announced commit tick. Accept gains the room's running revision (`u32`, from 1). A client not
+ready by the commit tick is disconnected with leave reason 5 (revision). Everything else
+(commands, snapshots, checkpoints, the definition's own messages) is unchanged. v13 peers are
+rejected at Hello. Rebuild all peers: v1–v13 are incompatible. See
+[Definition revisions](#definition-revisions-v14).
+
+v13 (2026-11-08) carries a free room's marks and its objective HUD. Room definition v4 adds
+flags bit 2 and a marks block after the scene, and ObjectiveState (type 25, server to client,
+reliable control channel) sends the HUD rows and suspension as data on every change and to each
+joiner after Roster. Lua state never leaves the authority. v12 peers are rejected at Hello; no
+other layout changes (commands, snapshots and checkpoints are unchanged). Rebuild all peers:
+v1–v12 are incompatible.
 
 v12 (2026-11-04) retires the river location into the outer map, which holds the same water in
 the same frame. Accept's and the room definition's location byte is now 0 basin or 1 outer
@@ -146,7 +163,7 @@ traffic from an earlier session never reaches a room.
 
 | Channel | ENet delivery | Carries |
 | ---: | --- | --- |
-| 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent, RaceState, RaceEvent |
+| 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent, RaceState, RaceEvent, ObjectiveState, RevisionBegin, RevisionPage, RevisionEnd, RevisionReady |
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
 | 3 registry | unreliable, unsequenced | CombatPage, tied to a fleet snapshot tick |
@@ -168,7 +185,7 @@ buffering does not change the wire layout or channels.
 | Type | Name | Dir | Header tick | Payload bytes |
 | ---: | --- | --- | --- | ---: |
 | 1 | Hello | C→S | 0 | 15 + three string lengths |
-| 2 | Accept | S→C | room tick | 20 |
+| 2 | Accept | S→C | room tick | 24 |
 | 3 | Reject | S→C | room tick | 16 |
 | 4 | Roster | S→C | room tick | 72 |
 | 5 | WorldBegin | S→C | checkpoint tick | 28 |
@@ -191,6 +208,11 @@ buffering does not change the wire layout or channels.
 | 22 | DefinitionBegin | S→C | room tick | 20 |
 | 23 | DefinitionPage | S→C | room tick | 8 + 1..1024 |
 | 24 | DefinitionEnd | S→C | room tick | 8 |
+| 25 | ObjectiveState | S→C | room tick | 8 + rows (at most 456) |
+| 26 | RevisionBegin | S→C | announcement tick | 28 |
+| 27 | RevisionPage | S→C | announcement tick | 8 + 1..1024 |
+| 28 | RevisionEnd | S→C | announcement tick | 8 |
+| 29 | RevisionReady | C→S | client's mirror tick | 8 |
 
 ### Hello, Accept, Reject
 
@@ -222,7 +244,8 @@ Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` bi
 (0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be outer),
 `u16` tick rate (must be 120), `u8` location (0 basin, 1 outer; v12), `u8` reserved,
 `u32` wake lifetime ticks (240–1920),
-`f32` crest height (0.1–3). The header epoch is the room's epoch.
+`f32` crest height (0.1–3), `u32` revision of the room's running definition (≥ 1; v14). The
+header epoch is the room's epoch.
 
 Reject: `u8` reason, `u8` reserved, `u16` server protocol version, `u32` server handling
 revision, `u64` server content digest. Reasons: 1 version, 2 handling revision, 3 content,
@@ -250,14 +273,18 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 
 | Field | Type |
 | --- | --- |
-| version (3) | u8 |
+| version (4) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
 | location (0 basin, 1 outer; v12) | u8 |
-| flags: bit 0 has rules, bit 1 has a scene | u8 |
+| flags: bit 0 has rules, bit 1 has a scene, bit 2 has marks | u8 |
 | package ID and display name | u8 length + printable ASCII |
 | race: start, 1–8 gates, grid, ferry, storm, rules | five `f32` per line; `f64` start times; `f32` weather; `u32` ticks |
 | deathmatch: match rules and combat rules | `u32`/`f32` fields as in the checkpoint's rules |
 | scene, when present | the L1–L4 fieldwise scene (marina, traffic, gulls) |
+| marks, when flagged | `u8` count 1–16; per mark `u8` length + id, `u8` length + name, `f32` x, z, radius |
+
+Marks are valid only in free rooms; clients check them structurally (count, id and name text,
+finite bounded coordinates, radius, no overlap) like the rest of the definition.
 
 Map-dependent checks (open water, gate and recovery clearance, authored-contact clearance) run
 on the authority before the room starts. Clients validate only structure and bounds: version,
@@ -431,7 +458,61 @@ immutable, so repeated copies in later batches cannot change them.
   that life (or not yet placed), so a repeated request cannot reset twice.
 - Ping/Pong: `u64` client clock in microseconds, echoed unchanged.
 - ResyncRequest: `u8` reason (1 wake digest mismatch, 2 other), three reserved, `u64` mirror tick.
-- Disconnect: `u8` reason (1 quit, 2 timeout, 3 shutdown, 4 misbehaving), three reserved.
+- Disconnect: `u8` reason (1 quit, 2 timeout, 3 shutdown, 4 misbehaving, 5 revision: not ready
+  for a definition revision by its commit tick), three reserved.
+
+### Definition revisions (v14)
+
+A room's definition is immutable for a connection **except** through a revision. The room's first
+definition is revision 1 (Accept carries the running revision, so a joiner knows it). A revision
+carries the complete definition of the same mode and location; the authority validates it exactly
+as the room's own definition (decode, structure, scene, rules) before staging, and refuses an
+invalid one, leaving the running revision.
+
+| Message | Payload |
+| --- | --- |
+| RevisionBegin | `u32` revision (> running), `u32` byte count (1–16384), `u16` page count (= `ceil(bytes / 1024)`), `u16` reserved, `u64` FNV-1a 64 of the bytes, `u64` commit tick (> the header tick) |
+| RevisionPage | `u32` revision, `u16` index, `u16` count, then 1–1024 bytes (the DefinitionPage layout) |
+| RevisionEnd | `u32` revision, `u32` reserved |
+| RevisionReady (C→S) | `u32` revision, `u32` reserved |
+
+All four use the reliable ordered control channel, so a client sees a complete announcement in
+order and a commit never races a snapshot. The header tick of the three server messages is the
+announcement tick. The bytes are the canonical definition encoding, as in DefinitionPage.
+
+**When it commits.** Only at a boundary, so no round is disturbed:
+
+- race: phase WAITING or RESULTS; deathmatch: WARMUP or INTERMISSION;
+- free room: only while no player is connected, at once and with no announcement (a room with
+  players keeps the staged candidate until it empties).
+
+With players connected the authority announces the revision to every one of them and sets the
+commit tick to the announcement tick plus 240 (2 s, `BOAT_NET_REVISION_LEAD_TICKS`) rounded up
+to a snapshot tick (a multiple of 4). It announces only when the boundary phase is certain to
+still hold at that tick: a timed phase (RESULTS, INTERMISSION) must end after the commit tick,
+and no peer may still be joining (a peer that has been accepted but is not READY yet delays the
+announcement). While an announcement is out, a Hello waits in the handshake and is answered after
+the commit with the new definition (the handshake timeout, 10 s, is far longer than the lead). A
+candidate staged meanwhile waits for the next boundary; a newer candidate replaces a waiting one.
+Revision numbers are assigned when a candidate is announced or committed.
+
+**Client.** A client ignores a RevisionBegin whose revision is not newer than the running or the
+newest announced one (duplicates and stale announcements), assembles pages like a definition,
+and on RevisionEnd checks the page count and digest, decodes and validates the definition, checks
+that mode and location are unchanged and that its mirror has not reached the commit tick. Only
+then does it answer RevisionReady. An announcement it cannot accept goes unanswered and the
+authority disconnects the client at the commit tick. A client switches when its mirror reaches the
+commit tick (the snapshot at the commit tick, or the first one after it): it installs the new
+definition, rebinds what borrows from it (scene, deathmatch combat rules, race course source) and
+resets prediction from the mirror, like a resync, so no prediction history crosses the commit. A
+checkpoint taken at or after the commit tick was made under the new definition.
+
+**Authority.** At the commit tick (after that tick's simulation) it drops every peer that has not
+answered RevisionReady for this revision with leave reason 5, then switches: it installs the
+definition, replaces the match or race rules and the course (rebinding the race course source),
+the combat rules, the scene and the marks (and resets the mark tracker), sends the changed
+MatchState or RaceState, and serves the Hellos it held. The new definition applies from the next
+tick. Late joiners receive the new definition and revision in the ordinary bootstrap.
 
 ### MatchState and MatchEvent (deathmatch rooms)
 
@@ -505,6 +586,24 @@ RaceEvent: `u8` kind (0 phase, 1 gate, 2 finish, 3 did not finish, 4 recovery, 5
 ≤ 4, the gate index < 8, or the place 1–4; otherwise 0), `u8` reserved, `u32` round (> 0),
 `u64` finish time in 1/1024-tick units (finish events only; 0 otherwise). Within a tick, events
 precede the RaceState that counts them.
+
+### ObjectiveState (free rooms with an objective)
+
+A free room whose package has an objective sends the HUD as data. The authority sends it to every
+connected peer whenever the rows or the suspension change (and once at start), and to each joiner
+right after Roster (and any MatchState or RaceState) and before the definition and checkpoint.
+Clients never send it. Lua state, timers and events are never sent. The newest revision wins;
+the reliable ordered control channel keeps it intact under datagram loss and reordering. Payload:
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | u32 | revision, from 1; the server adds one per change |
+| 4 | u8 | flags: bit 0 suspended (the objective is quarantined on the authority); other bits 0 |
+| 5 | u8 | row count, 0–8 |
+| 6 | u16 | reserved, 0 |
+| 8 | rows | per row: `u8` id length 1–23 + id, `u8` label length 1–23 + label (printable ASCII 0x20–0x7e), `i64` value |
+
+The largest payload is 8 + 8 × 56 = 456 bytes.
 
 ## LAN discovery
 
@@ -588,7 +687,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v11 rejects every other version, v1–v10 included; there is no negotiation or
+  protocol version. v14 rejects every other version, v1–v13 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
@@ -602,12 +701,25 @@ must not exceed their capacities, and expired ≤ emitted.
 
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
   a RaceEvent payload, and of the room definition's begin/page/end messages;
+- ObjectiveState: golden bytes of a suspended two-row HUD with a negative value, every
+  truncation, and rejection of row count 9, an empty id, a non-printable label, a nonzero
+  reserved field, flags 2 and revision 0; a free definition with 16 maximum-length marks that
+  round trips in 979 bytes (budget 1200) and is refused in a deathmatch definition; and the
+  `objective_state` memory-transport case, where two clients and a late joiner mirror the
+  server's HUD, including under loss profile F;
 - the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`7bb4635201d38223`; v8 was `413083c341105850`, v5 was
+  digest of a hand-built snapshot's bytes (`4fc3a7e799ace302` at v14 and `84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
   `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's `690c711d99578e10`);
-- round trips of all 24 types, rejection of every truncation, and a declared extra byte;
+- round trips of all 29 types (Accept now carries the revision), rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from
   the river and the MatchState, MatchEvent, RaceState and RaceEvent consistency rules;
+- definition revisions (`revision_*` cases, in-memory transport, virtual ticks): a free room that
+  waits while occupied and commits at once when empty, refuses invalid candidates and replaces a
+  waiting one, and carries a scene; a race room committing in RESULTS with both predicting clients
+  switching at the commit tick and restarting prediction, and duplicate, stale and invalid
+  announcements ignored; a joiner mid-download delaying the announcement and a Hello held through
+  the lead; a silent client dropped with leave reason 5 while the other stays; and a deathmatch
+  commit on the last tick of an intermission with one that does not fit waiting for the next;
 - a deathmatch room on the in-memory transport whose clients, including a mid-round joiner,
   hold the authority's MatchState through capsizes, a round end and a leaver;
 - a race room on the in-memory transport: predicting entrants held through the countdown and

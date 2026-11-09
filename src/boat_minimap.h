@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_MINIMAP_H
 
 #include "boat_location.h"
+#include "boat_marks.h"
 #include "boat_voyage.h"
 
 // North-up nautical chart of a mapped location: the whole map baked once in paper-chart colours
@@ -29,6 +30,9 @@ typedef struct {
 // Caller-owned; zero-initialized is an empty minimap that composes nothing.
 typedef struct {
     const BoatWorldDefinition *location;
+    // A room's objective marks (P5d), drawn by every compose; NULL or empty draws none. The caller
+    // owns the set and may change it between compositions.
+    const BoatMarkSet *room_marks;
     BoatMinimapLayer layers[BOAT_MINIMAP_MODES]; // Index BOAT_MINIMAP_HIDDEN is unused.
 } BoatMinimap;
 

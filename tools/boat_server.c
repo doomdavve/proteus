@@ -16,6 +16,7 @@
 #include "boat_net_rtc.h"
 #endif
 #include "boat_net_server.h"
+#include "boat_room_objective.h"
 #include "boat_room_package.h"
 #include "cli_usage.h"
 
@@ -63,6 +64,8 @@ static void usage(FILE *out)
     cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
     cli_usage_line(out, "--location NAME", "basin|outer (default basin; race uses outer)");
     cli_usage_line(out, "--package ID|DIR", "Room package (default: the mode's bundled package)");
+    cli_usage_line(out, "--package-reload", "Reload the package's room objective when its files");
+    cli_usage_line(out, "", "change (needs --package DIR or a bundled ID with a room objective)");
     cli_usage_line(out, "--waves", "Gentle crossing waves");
     cli_usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
     cli_usage_line(out, "", "only this machine, otherwise the local network");
@@ -353,11 +356,120 @@ typedef struct {
     unsigned long players, ticks, report;
     unsigned long peer_timeout; // Seconds; 0 keeps BOAT_NET_TIMEOUT.
     const char *package; // --package ID or directory; NULL uses the mode's default.
+    const char *reload_directory; // --package-reload: the directory to watch; NULL when off.
     bool race, exit_with_stdin, until_empty;
     BoatLocationId location;
     const BoatWorldResources *world; // The location's resources, owned by main.
     BoatRoomDefinition room; // The loaded package definition.
+    BoatRoomObjectiveSource *objective; // P5b: the package's room objective, owned by main.
 } RoomOptions;
+
+// P5b: the room objective's HUD after each committed change, and its quarantine once.
+static void print_objective(BoatRoomObjective *o, uint64_t tick, bool *reported)
+{
+    if (o->hud_changed) {
+        o->hud_changed = false;
+        printf("objective tick %" PRIu64 ":", tick);
+        for (unsigned i = 0; i < o->objective.hud_count; ++i)
+            printf(" %s=%" PRId64, o->objective.hud[i].label, o->objective.hud[i].value);
+        printf("\n");
+        fflush(stdout);
+    }
+    if (o->objective.quarantined && !*reported) {
+        *reported = true;
+        printf("objective suspended: %s\n", o->diagnostic.message);
+        fflush(stdout);
+    }
+}
+
+// P5e: every 120 ticks (one second) re-read the package directory; a changed objective is staged
+// and applies at the next objective boundary. A candidate is judged once: SEEN is the last source
+// looked at, whether it was accepted or refused.
+// P5f: a candidate whose room definition differs from the one the room runs (or last staged) is a
+// definition revision, staged through the server; it commits at a boundary, in a free room when
+// it is empty, and the objective restarts on its source and marks then.
+#define RELOAD_POLL_TICKS 120
+typedef struct {
+    const char *directory;
+    BoatLocationId location;
+    const BoatWorldResources *world;
+    BoatRoomObjectiveSource seen, candidate;
+    BoatRoomDefinition scratch;
+    char last_error[160];
+    uint64_t reported; // BoatRoomObjective.reloads already printed.
+    uint64_t definition; // Digest of the definition the room runs or last staged.
+    uint32_t revision; // The server revision already reported.
+} ObjectiveReload;
+
+static bool same_source(const BoatRoomObjectiveSource *a, const BoatRoomObjectiveSource *b)
+{
+    return a->present == b->present && a->state_version == b->state_version
+        && a->migrates == b->migrates && a->source_size == b->source_size
+        && !memcmp(a->source, b->source, a->source_size);
+}
+
+static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o, BoatNetServer *server)
+{
+    char error[160];
+    if (!boat_room_package_load_objective(r->directory, false, false, r->location, r->world,
+            &r->scratch, &r->candidate, error, sizeof(error))) {
+        if (strcmp(error, r->last_error)) {
+            snprintf(r->last_error, sizeof(r->last_error), "%s", error);
+            printf("objective reload rejected: %s\n", error);
+            fflush(stdout);
+        }
+        return;
+    }
+    r->last_error[0] = 0;
+    uint64_t definition = boat_room_definition_digest(&r->scratch);
+    if (definition == r->definition && same_source(&r->candidate, &r->seen))
+        return;
+    memcpy(&r->seen, &r->candidate, sizeof(r->seen));
+    BoatPluginDiagnostic d;
+    if (definition != r->definition) {
+        if (!boat_room_objective_stage_revision(o, server, &r->scratch, &r->candidate, &d)) {
+            printf("objective reload rejected: %s\n", d.message);
+            fflush(stdout);
+            return;
+        }
+        r->definition = definition;
+        uint32_t next = server->stats.revision + 1;
+        if (boat_net_server_players(server))
+            printf("objective reload: marks changed; revision %u waits for an empty room\n", next);
+        else
+            printf("objective reload: marks changed; revision %u commits at once (the room is "
+                   "empty)\n",
+                next);
+        fflush(stdout);
+    } else if (!boat_room_objective_stage(o, &r->candidate, &d)) {
+        printf("objective reload rejected: %s\n", d.message);
+        fflush(stdout);
+    }
+}
+
+// Report each definition revision the server committed.
+static void print_revision(ObjectiveReload *r, const BoatNetServer *server)
+{
+    if (r->revision == server->stats.revision)
+        return;
+    r->revision = server->stats.revision;
+    printf("definition revision %u committed at tick %" PRIu64 " (%u marks)\n", r->revision,
+        server->fleet.state.tick, server->room->marks.count);
+    fflush(stdout);
+}
+
+static void print_reload(ObjectiveReload *r, const BoatRoomObjective *o)
+{
+    if (r->reported == o->reloads)
+        return;
+    r->reported = o->reloads;
+    if (o->reload.kind == BOAT_ROOM_RELOAD_REJECTED)
+        printf("objective reload rejected: %s\n", o->reload.diagnostic.message);
+    else
+        printf("objective reload: revision %u accepted (%s)\n", o->revision,
+            o->reload.kind == BOAT_ROOM_RELOAD_MIGRATED ? "migrate" : "restart");
+    fflush(stdout);
+}
 
 static void print_roster(const BoatNetServer *server)
 {
@@ -419,6 +531,21 @@ static int room(const RoomOptions *options)
         .max_players = (unsigned)options->players,
         .resources = options->world,
         .room = &options->room };
+    static BoatRoomObjective objective;
+    bool objective_on = options->objective && options->objective->present;
+    bool suspension_reported = false;
+    static ObjectiveReload reload;
+    if (options->reload_directory && objective_on) {
+        reload.directory = options->reload_directory;
+        reload.location = options->location;
+        reload.world = options->world;
+        reload.seen = *options->objective;
+        reload.definition = boat_room_definition_digest(&options->room);
+    }
+    if (objective_on) {
+        boat_room_objective_init(&objective, options->objective);
+        config.rules = boat_room_objective_rules(&objective);
+    }
     static BoatNetServer server;
     if (!boat_net_server_init(&server, transport, &config)) {
         fprintf(stderr, "boat_server: invalid room configuration.\n");
@@ -429,6 +556,7 @@ static int room(const RoomOptions *options)
         boat_net_enet_cleanup();
         return 1;
     }
+    reload.revision = server.stats.revision;
     server.tick_limit = options->ticks; // --ticks/--seconds run exactly that many ticks.
     server.peer_timeout = (double)options->peer_timeout;
     BoatNetLan *lan = NULL;
@@ -460,6 +588,11 @@ static int room(const RoomOptions *options)
         options->waves ? "wave" : "calm", boat_room_mode_name(options->room.mode), BOAT_NET_VERSION,
         BOAT_PHYSICS_REVISION, config.epoch, options->players, lan_note);
     printf("room package: %s (%s)\n", options->room.id, options->room.name);
+    if (objective_on) {
+        printf("room objective: %u marks, Lua on this authority only\n",
+            options->objective->marks.count);
+        print_objective(&objective, 0, &suspension_reported);
+    }
     fflush(stdout);
     fflush(stdout);
     unsigned players = 0;
@@ -509,6 +642,14 @@ static int room(const RoomOptions *options)
         if (boat_net_server_players(&server) != players) {
             players = boat_net_server_players(&server);
             print_roster(&server);
+        }
+        if (objective_on)
+            print_objective(&objective, server.fleet.state.tick, &suspension_reported);
+        if (reload.directory) {
+            if (server.fleet.state.tick / RELOAD_POLL_TICKS != before / RELOAD_POLL_TICKS)
+                poll_reload(&reload, &objective, &server);
+            print_revision(&reload, &server);
+            print_reload(&reload, &objective);
         }
         if (options->report
             && server.fleet.state.tick / options->report != before / options->report)
@@ -567,7 +708,7 @@ int boat_server_main(int argc, char **argv)
 {
     unsigned long ticks = 0, boats = BOAT_FLEET_SLOTS, report = 0, seconds = 0, round = 0;
     bool deathmatch = false, race = false, location_given = false;
-    bool scripted_mode = false, room_option = false;
+    bool scripted_mode = false, room_option = false, package_reload = false;
     static BoatWorldResources world;
     RoomOptions room_options = { .bind = "127.0.0.1",
         .token = "",
@@ -665,6 +806,9 @@ int boat_server_main(int argc, char **argv)
             room_options.package = value;
             room_option = true;
             ++i;
+        } else if (strcmp(argv[i], "--package-reload") == 0) {
+            package_reload = true;
+            room_option = true;
         } else if (strcmp(argv[i], "--round-seconds") == 0 && value
             && parse_count(value, 2, 60ul * 60, &round)) {
             ++i;
@@ -750,6 +894,33 @@ int boat_server_main(int argc, char **argv)
         fprintf(stderr, "boat_server: give --ticks or --seconds, not both.\n");
         return 2;
     }
+    static char reload_path[256];
+    if (package_reload) {
+        // A directory is watched as given; a bundled ID watches its plugins/ directory.
+        const char *spec = room_options.package;
+        const char *name = spec && !strncmp(spec, "proteus.", 8) ? spec + 8 : spec;
+        char manifest[300];
+        if (!spec) {
+            fprintf(stderr, "boat_server: --package-reload needs --package DIR or a bundled ID.\n");
+            return 2;
+        }
+        if (strchr(spec, '/') || strchr(spec, '\\') || spec[0] == '.') {
+            snprintf(reload_path, sizeof(reload_path), "%s", spec);
+        } else {
+            snprintf(reload_path, sizeof(reload_path), "plugins/%s", name);
+            snprintf(manifest, sizeof(manifest), "%s/plugin.json", reload_path);
+            FILE *file = fopen(manifest, "rb");
+            if (!file) {
+                fprintf(stderr,
+                    "boat_server: --package-reload: %s has no directory %s (run from the "
+                    "repository root, or name a directory).\n",
+                    spec, reload_path);
+                return 2;
+            }
+            fclose(file);
+        }
+        room_options.reload_directory = reload_path;
+    }
     room_options.ticks = seconds ? seconds * BOAT_TICK_HZ : ticks;
     room_options.report = report;
     room_options.race = race;
@@ -757,11 +928,18 @@ int boat_server_main(int argc, char **argv)
         return 1;
     room_options.world = &world;
     char error[220];
-    if (!boat_room_package_load(room_options.package, deathmatch, race, room_options.location,
-            &world, &room_options.room, error, sizeof(error))) {
+    static BoatRoomObjectiveSource objective;
+    room_options.objective = &objective;
+    if (!boat_room_package_load_objective(room_options.package, deathmatch, race,
+            room_options.location, &world, &room_options.room, &objective, error, sizeof(error))) {
         fprintf(stderr, "boat_server: cannot load the room package: %s\n", error);
         boat_world_resources_destroy(&world);
         return 1;
+    }
+    if (package_reload && !objective.present) {
+        fprintf(stderr, "boat_server: --package-reload needs a package with a room objective.\n");
+        boat_world_resources_destroy(&world);
+        return 2;
     }
     // Rule overrides apply after loading, so clients receive the effective values.
     if (round)

@@ -93,7 +93,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e54000c0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e54000e0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -103,7 +103,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000c09000000000900000000000000000000"
+        "50424e54000e09000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -174,6 +174,55 @@ static int golden(void)
     CHECK(same_bytes(bytes + 32, 16,
         "02000100000000020000000000"
         "5a0000"));
+    // ObjectiveState (v13): a suspended HUD with a negative value, then its invalid forms.
+    BoatNetMessage hud = { .header = { .type = BOAT_NET_OBJECTIVE_STATE, .tick = 960 },
+        .objective = { .revision = 7, .suspended = true, .row_count = 2 } };
+    strcpy(hud.objective.rows[0].id, "hunt");
+    strcpy(hud.objective.rows[0].label, "HUNT");
+    hud.objective.rows[0].value = 3;
+    strcpy(hud.objective.rows[1].id, "c1");
+    strcpy(hud.objective.rows[1].label, "CREW 1");
+    hud.objective.rows[1].value = -2;
+    size = encode(hud, bytes);
+    CHECK(size == 32 + 44);
+    CHECK(same_bytes(bytes + 32, 44,
+        "00000007" // Revision.
+        "0102"
+        "0000" // Suspended, two rows, reserved.
+        "0468756e74"
+        "0448554e54"
+        "0000000000000003" // hunt: HUNT = 3.
+        "026331"
+        "06435245572031"
+        "fffffffffffffffe")); // c1: CREW 1 = -2.
+    BoatNetMessage hud_back;
+    CHECK(boat_net_decode(bytes, size, &hud_back) == BOAT_NET_OK);
+    CHECK(hud_back.objective.revision == 7 && hud_back.objective.suspended
+        && hud_back.objective.rows[1].value == -2
+        && boat_net_objective_state_equal(&hud_back.objective, &hud.objective));
+    CHECK(boat_net_channel(BOAT_NET_OBJECTIVE_STATE) == BOAT_NET_CONTROL);
+    for (size_t length = 0; length < size; ++length)
+        CHECK(boat_net_decode(bytes, length, &hud_back) != BOAT_NET_OK);
+    BoatNetMessage invalid[6];
+    for (unsigned i = 0; i < 6; ++i)
+        invalid[i] = hud;
+    invalid[0].objective.row_count = BOAT_NET_OBJECTIVE_ROWS + 1;
+    invalid[1].objective.rows[1].id[0] = 0; // Empty id.
+    invalid[2].objective.rows[0].label[1] = '\t'; // Not printable.
+    invalid[3].objective.revision = 0;
+    invalid[4].objective.rows[0].id[0] = 'x'; // Valid control: only the id differs.
+    memset(invalid[5].objective.rows[1].label, 'L', 24); // Unterminated, too long.
+    for (unsigned i = 0; i < 6; ++i) {
+        size = encode(invalid[i], bytes);
+        bool accepted = size && boat_net_decode(bytes, size, &hud_back) == BOAT_NET_OK;
+        CHECK(accepted == (i == 4));
+    }
+    size = encode(hud, bytes);
+    bytes[32 + 4] = 2; // Flags with an undefined bit.
+    CHECK(boat_net_decode(bytes, size, &hud_back) != BOAT_NET_OK);
+    bytes[32 + 4] = 1;
+    bytes[32 + 7] = 1; // Reserved.
+    CHECK(boat_net_decode(bytes, size, &hud_back) != BOAT_NET_OK);
     // Snapshot layout: sizes and a pinned digest of a hand-built state's bytes.
     BoatFleetState state = { .tick = 1000, .next_request = 5 };
     BoatNetSlotInput records[BOAT_FLEET_SLOTS]
@@ -207,7 +256,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x9e194ddbabc7ff9c)); // v12 header; snapshot payload unchanged.
+    CHECK(digest == UINT64_C(0x4fc3a7e799ace302)); // v14 header; snapshot payload unchanged.
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -241,7 +290,7 @@ static unsigned samples(Sample *out)
         .hello = { BOAT_PHYSICS_REVISION, 42, "name", "token", "build" } };
     m[1] = (BoatNetMessage) { .header = { .type = BOAT_NET_ACCEPT, .epoch = 3 },
         .accept = { 2, true, BOAT_NET_MODE_DEATHMATCH, BOAT_LOCATION_OUTER, 4, 12, 2, 12, 24, 120,
-            1920, 1.8f } };
+            1920, 1.8f, 3 } };
     m[2] = (BoatNetMessage) { .header = { .type = BOAT_NET_REJECT },
         .reject = { BOAT_NET_REJECT_TOKEN, 1, 6, 42 } };
     m[3] = (BoatNetMessage) { .header = { .type = BOAT_NET_ROSTER, .epoch = 3 } };
@@ -310,6 +359,26 @@ static unsigned samples(Sample *out)
         .world_page = { .checkpoint = 2, .index = 5, .count = 6, .size = 212 } };
     m[23] = (BoatNetMessage) { .header = { .type = BOAT_NET_DEFINITION_END, .epoch = 3 },
         .checkpoint = 2 };
+    m[24] = (BoatNetMessage) { .header
+        = { .type = BOAT_NET_OBJECTIVE_STATE, .epoch = 3, .tick = 960 },
+        .objective = { .revision = 4, .suspended = true, .row_count = 2 } };
+    strcpy(m[24].objective.rows[0].id, "hunt");
+    strcpy(m[24].objective.rows[0].label, "HUNT");
+    m[24].objective.rows[0].value = 3;
+    strcpy(m[24].objective.rows[1].id, "c1");
+    strcpy(m[24].objective.rows[1].label, "CREW 1");
+    m[24].objective.rows[1].value = -2;
+    m[25]
+        = (BoatNetMessage) { .header = { .type = BOAT_NET_REVISION_BEGIN, .epoch = 3, .tick = 960 },
+              .revision_begin = { 4, 5332, 6, 99, 1200 } };
+    m[26]
+        = (BoatNetMessage) { .header = { .type = BOAT_NET_REVISION_PAGE, .epoch = 3, .tick = 960 },
+              .world_page = { .checkpoint = 4, .index = 5, .count = 6, .size = 212 } };
+    m[27] = (BoatNetMessage) { .header = { .type = BOAT_NET_REVISION_END, .epoch = 3, .tick = 960 },
+        .checkpoint = 4 };
+    m[28]
+        = (BoatNetMessage) { .header = { .type = BOAT_NET_REVISION_READY, .epoch = 3, .tick = 970 },
+              .checkpoint = 4 };
     for (unsigned i = 0; i < BOAT_NET_TYPE_LIMIT - 1; ++i) {
         out[n].size = boat_net_encode(&m[i], out[n].bytes);
         if (!out[n].size) {
@@ -343,7 +412,7 @@ static int codec(void)
         // A payload byte added and declared: still rejected by the type's exact layout,
         // except pages, whose data length is variable.
         if (s->bytes[6] != BOAT_NET_WORLD_PAGE && s->bytes[6] != BOAT_NET_DEFINITION_PAGE
-            && s->size < BOAT_NET_MAX_MESSAGE) {
+            && s->bytes[6] != BOAT_NET_REVISION_PAGE && s->size < BOAT_NET_MAX_MESSAGE) {
             longer[25] = (uint8_t)(longer[25] + 1);
             if (longer[25] == 0)
                 ++longer[24];
@@ -471,7 +540,7 @@ static int codec(void)
     CHECK(boat_net_encode(&bad, b) == 0);
     bad = (BoatNetMessage) { .header = { .type = BOAT_NET_ACCEPT },
         .accept = { 0, false, BOAT_NET_MODE_RACE, BOAT_LOCATION_BASIN, 4, 12, 2, 12, 24, 120, 1920,
-            1.8f } }; // The river sprint needs the river.
+            1.8f, 1 } }; // The river sprint needs the river.
     CHECK(boat_net_encode(&bad, b) == 0);
     bad.accept.location = BOAT_LOCATION_OUTER;
     CHECK(boat_net_encode(&bad, b) > 0);
@@ -643,8 +712,8 @@ static BoatRoomDefinition room_definition(
     return d;
 }
 
-static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config, BoatRoomMode mode,
-    const BoatMatchRules *rules)
+static bool room_open_marked(Room *room, uint64_t seed, BoatNetServerConfig config,
+    BoatRoomMode mode, const BoatMatchRules *rules, const BoatMarkSet *marks)
 {
     // Clear in place: a Room is over 1 MB, more than Windows' default stack, so a compound
     // literal temporary would overflow it.
@@ -659,10 +728,18 @@ static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config
     if (!config.resources)
         config.resources = basin();
     room->definition = room_definition(config.resources->definition->id, mode, rules);
+    if (marks)
+        room->definition.marks = *marks;
     config.room = &room->definition;
     BoatNetTransport transport;
     return room_listen(room, seed, &transport)
         && boat_net_server_init(&room->server, transport, &config);
+}
+
+static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config, BoatRoomMode mode,
+    const BoatMatchRules *rules)
+{
+    return room_open_marked(room, seed, config, mode, rules, NULL);
 }
 
 static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
@@ -1133,7 +1210,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c510001000c"));
+    CHECK(same_bytes(query, 8, "50424c510001000e"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -2765,6 +2842,55 @@ static int room_definition_codec(void)
     size_t scene_size = boat_room_definition_encode(&scene, bytes, sizeof(bytes));
     scene.scene.berths[0].recipe = BOAT_SCENE_BERTH_RECIPES;
     CHECK(!boat_room_definition_validate(&scene, &rd));
+    // Marks (v4): sixteen full-length marks round trip within the size budget; other modes and
+    // invalid marks are refused.
+    BoatRoomDefinition marked = d;
+    marked.marks.count = BOAT_MARKS_MAX;
+    for (unsigned i = 0; i < BOAT_MARKS_MAX; ++i) {
+        BoatMark *m = &marked.marks.items[i];
+        snprintf(m->id, sizeof(m->id), "mark_%017u", i);
+        snprintf(m->name, sizeof(m->name), "MARK %018u", i);
+        m->x = 500.0f * (float)i - 3000;
+        m->z = -250.5f;
+        m->radius = 25;
+    }
+    CHECK(boat_room_definition_validate(&marked, &rd));
+    size = boat_room_definition_encode(&marked, bytes, sizeof(bytes));
+    static uint8_t plain[BOAT_ROOM_BYTES_MAX];
+    size_t plain_size = boat_room_definition_encode(&d, plain, sizeof(plain));
+    CHECK(size > plain_size && size <= 1200);
+    CHECK(boat_room_definition_decode(bytes, size, &back, &rd));
+    CHECK(back.marks.count == BOAT_MARKS_MAX
+        && !memcmp(&back.marks, &marked.marks, sizeof(marked.marks))
+        && boat_room_definition_digest(&back) == boat_room_definition_digest(&marked));
+    for (size_t length = 0; length < size; ++length)
+        CHECK(!boat_room_definition_decode(bytes, length, &back, &rd));
+    printf("room_definition: 16 marks %zu bytes (%zu without)\n", size, plain_size);
+    bad = marked;
+    bad.mode = BOAT_ROOM_MODE_DEATHMATCH;
+    bad.match_rules = boat_fixture_match_default_rules;
+    bad.combat_rules = boat_fixture_combat_default_rules;
+    CHECK(!boat_room_definition_validate(&bad, &rd) && !strcmp(rd.field, "marks"));
+    bad = marked;
+    bad.marks.items[1].x = bad.marks.items[0].x; // Overlap.
+    bad.marks.items[1].z = bad.marks.items[0].z;
+    CHECK(!boat_room_definition_validate(&bad, &rd) && !strncmp(rd.field, "marks", 5));
+    bad = marked;
+    bad.marks.items[2].id[0] = 'X';
+    CHECK(!boat_room_definition_validate(&bad, &rd));
+    // Decoding refuses an unknown flag bit and an empty or oversized mark list.
+    size = boat_room_definition_encode(&marked, bytes, sizeof(bytes));
+    bytes[3] |= 8; // Flags: an undefined bit.
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[3] = 0; // Marks flag cleared: the mark bytes trail the definition.
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[3] = 4;
+    size_t at = 1 + 1 + 1 + 1 + 1 + 14 + 1 + 14; // Count byte after the id and name text.
+    CHECK(bytes[at] == BOAT_MARKS_MAX);
+    bytes[at] = 0;
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[at] = BOAT_MARKS_MAX + 1;
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
     // Definition paging, as the bootstrap channel carries it.
     static uint8_t definition[BOAT_ROOM_BYTES_MAX];
     size = boat_room_definition_encode(&race, definition, sizeof(definition));
@@ -2797,6 +2923,636 @@ static int room_definition_codec(void)
     return 0;
 }
 
+// P5b: a free room's marks and rules adapter. The server reports joins and leaves between ticks
+// and mark entries after the tick; it runs no scripts itself. Other modes refuse marks.
+typedef struct {
+    unsigned count;
+    BoatNetRuleEvent events[64];
+    uint64_t ticks[64];
+    uint64_t after_ticks, last_after;
+    bool ordered;
+} RuleLog;
+
+static void log_rule(void *context, uint64_t tick, const BoatNetRuleEvent *event)
+{
+    RuleLog *log = context;
+    if (log->count < 64) {
+        log->events[log->count] = *event;
+        log->ticks[log->count++] = tick;
+    }
+}
+
+static void log_after(void *context, uint64_t tick)
+{
+    RuleLog *log = context;
+    log->ordered &= tick == log->last_after + 1;
+    log->last_after = tick;
+    ++log->after_ticks;
+}
+
+static int rule_events(void)
+{
+    static Room room;
+    static RuleLog log;
+    memset(&log, 0, sizeof(log));
+    log.ordered = true;
+    BoatMarkSet marks = { .count = 2,
+        .items = { { .id = "near", .name = "NEAR", .x = 60, .z = 60, .radius = 20 },
+            { .id = "far", .name = "FAR", .x = -60, .z = -60, .radius = 20 } } };
+    BoatNetServerConfig config
+        = { .rules = { .context = &log, .event = log_rule, .after_tick = log_after } };
+    CHECK(room_open_marked(&room, 71, config, BOAT_ROOM_MODE_FREE, NULL, &marks));
+    BoatNetServer *s = &room.server;
+    unsigned a = room_join(&room, "a", NULL, 0), b = room_join(&room, "b", NULL, 0);
+    room_run(&room, .5);
+    CHECK(active_boats(s) == 2 && log.ordered && log.after_ticks == s->fleet.state.tick);
+    CHECK(log.count == 2);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(log.events[i].kind == BOAT_NET_RULE_CREW_JOINED && log.events[i].slot == i);
+    // Slot 1 is moved into the far mark between ticks; the entry is reported once, after the
+    // tick that observed it.
+    unsigned slot = room.clients[b].slot;
+    s->fleet.state.slots[slot].boat.position = (Vector2) { -60, -55 };
+    s->fleet.state.slots[slot].boat.velocity = (Vector2) { 0 };
+    uint64_t moved = s->fleet.state.tick;
+    room_run(&room, .25);
+    CHECK(log.count == 3 && log.events[2].kind == BOAT_NET_RULE_MARK_REACHED);
+    CHECK(log.events[2].slot == slot && log.events[2].mark == 1 && log.ticks[2] == moved + 1);
+    // Both boats in the near mark on one tick: two entries in slot order.
+    for (unsigned i = 0; i < 2; ++i) {
+        s->fleet.state.slots[i].boat.position = (Vector2) { 60, 50 + 15 * (float)i };
+        s->fleet.state.slots[i].boat.velocity = (Vector2) { 0 };
+    }
+    room_run(&room, .25);
+    CHECK(log.count == 5);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(log.events[3 + i].kind == BOAT_NET_RULE_MARK_REACHED && log.events[3 + i].slot == i
+            && log.events[3 + i].mark == 0 && log.ticks[3 + i] == log.ticks[3]);
+    // A leave is reported between ticks with the leaver's slot.
+    boat_net_client_leave(&room.clients[a]);
+    room.live[a] = false;
+    room_run(&room, .1);
+    CHECK(log.count == 6 && log.events[5].kind == BOAT_NET_RULE_CREW_LEFT);
+    CHECK(log.events[5].slot == room.clients[a].slot && log.ordered);
+    CHECK(log.after_ticks == s->fleet.state.tick);
+    room_close(&room);
+
+    // Marks belong to free rooms, and must be valid.
+    BoatMatchRules rules = boat_fixture_match_default_rules;
+    CHECK(!room_open_marked(&room, 72, config, BOAT_ROOM_MODE_DEATHMATCH, &rules, &marks));
+    room_close(&room);
+    marks.items[1].x = marks.items[1].z = 70; // Overlaps the near mark.
+    CHECK(!room_open_marked(&room, 73, config, BOAT_ROOM_MODE_FREE, NULL, &marks));
+    room_close(&room);
+    return 0;
+}
+
+// P5c: the objective HUD reaches every client through the control channel. A fake, Lua-free
+// adapter changes its rows on given ticks; the server numbers each change, tells every peer and
+// every joiner (before its checkpoint), and a lossy, reordering link still ends in agreement.
+#define FAKE_CHANGES 5
+typedef struct {
+    unsigned version, next;
+    bool pending;
+} FakeObjective;
+
+static const uint64_t fake_change_ticks[FAKE_CHANGES] = { 60, 240, 420, 600, 780 };
+
+static void fake_after(void *context, uint64_t tick)
+{
+    FakeObjective *f = context;
+    if (f->next < FAKE_CHANGES && tick == fake_change_ticks[f->next]) {
+        ++f->version;
+        ++f->next;
+        f->pending = true;
+    }
+}
+
+static bool fake_state(void *context, BoatNetObjectiveState *out)
+{
+    FakeObjective *f = context;
+    if (!f->pending)
+        return false;
+    f->pending = false;
+    out->suspended = f->version == 3;
+    out->row_count = 2;
+    strcpy(out->rows[0].id, "score");
+    strcpy(out->rows[0].label, "SCORE");
+    out->rows[0].value = 10 * (int64_t)f->version;
+    strcpy(out->rows[1].id, "delta");
+    strcpy(out->rows[1].label, "DELTA");
+    out->rows[1].value = -(int64_t)f->version;
+    return true;
+}
+
+static bool hud_mirrored(const Room *room, unsigned i)
+{
+    const BoatNetClient *c = &room->clients[i];
+    const BoatNetServer *s = &room->server;
+    return c->objective_valid && c->objective.revision == s->objective.revision
+        && boat_net_objective_state_equal(&c->objective, &s->objective);
+}
+
+static int objective_state(void)
+{
+    static Room room;
+    static FakeObjective fake;
+    memset(&fake, 0, sizeof(fake));
+    fake.pending = true; // The initial HUD, reported at init.
+    BoatNetServerConfig config
+        = { .rules = { .context = &fake, .after_tick = fake_after, .state = fake_state } };
+    CHECK(room_open(&room, 81, config));
+    BoatNetServer *s = &room.server;
+    CHECK(s->has_objective && s->objective.revision == 1 && s->objective.row_count == 2);
+    unsigned a = room_join(&room, "a", NULL, 0), b = room_join(&room, "b", NULL, 0);
+    room_run(&room, .4); // Before the first change (tick 60).
+    CHECK(s->objective.revision == 1 && hud_mirrored(&room, a) && hud_mirrored(&room, b));
+    CHECK(room.clients[a].objective.rows[0].value == 0);
+    room_run(&room, .6);
+    CHECK(s->objective.revision == 2 && s->objective.rows[0].value == 10);
+    CHECK(hud_mirrored(&room, a) && hud_mirrored(&room, b));
+    room_run(&room, 1.6); // Past the second change (tick 240).
+    CHECK(
+        s->objective.revision == 3 && s->objective.rows[1].value == -2 && !s->objective.suspended);
+    CHECK(hud_mirrored(&room, a) && hud_mirrored(&room, b));
+
+    // A later joiner has the current HUD before its checkpoint, so before any snapshot.
+    unsigned c = room_join(&room, "c", NULL, 0);
+    for (unsigned n = 0; n < 1200 && !room.clients[c].objective_valid; ++n)
+        room_step(&room, 1.0 / 240);
+    CHECK(room.clients[c].objective_valid && hud_mirrored(&room, c));
+    CHECK(room.clients[c].stats.snapshots == 0);
+    room_run(&room, 1);
+    CHECK(room.clients[c].phase == BOAT_NET_CLIENT_PLAYING && hud_mirrored(&room, c));
+
+    // The rest of the changes cross a lossy, reordering link; the clients still agree.
+    BoatNetImpairment f = { .04, .01, .01, .002, .01, .02 };
+    for (unsigned i = 0; i < 3; ++i)
+        boat_net_memory_impair(room.network, room.link[i], f, f);
+    room_run(&room, 7);
+    CHECK(fake.next == FAKE_CHANGES && s->objective.revision == 1 + FAKE_CHANGES);
+    CHECK(s->objective.suspended == (fake.version == 3) && s->objective.rows[0].value == 50);
+    for (unsigned i = 0; i < 3; ++i)
+        CHECK(hud_mirrored(&room, i) && room.clients[i].stats.decode_errors == 0);
+    CHECK(s->stats.objective_states >= 3 + 2 * 2 + 3 * 3 && s->stats.malformed == 0);
+    printf("objective_state: revision %u, %" PRIu64 " messages, three clients identical\n",
+        s->objective.revision, s->stats.objective_states);
+    room_close(&room);
+    return 0;
+}
+
+// P5f: definition revisions. A candidate is staged on the authority and commits only at a
+// boundary; every client switches at the same tick, or is dropped for not being ready.
+
+// BASE with variant N of what its mode revises: a mark, the respawn and combat rules, or the
+// recovery time.
+static BoatRoomDefinition revised_room(const BoatRoomDefinition *base, unsigned n)
+{
+    BoatRoomDefinition d = *base;
+    if (d.mode == BOAT_ROOM_MODE_FREE) {
+        d.marks.count = 1;
+        BoatMark *m = &d.marks.items[0];
+        snprintf(m->id, sizeof(m->id), "rev_%u", n);
+        snprintf(m->name, sizeof(m->name), "REVISION %u", n);
+        m->x = 40.0f * (float)n;
+        m->z = 0;
+        m->radius = 20;
+    } else if (d.mode == BOAT_ROOM_MODE_DEATHMATCH) {
+        d.match_rules.respawn_ticks += 60 * n;
+        d.combat_rules.health += (float)n;
+    } else {
+        d.race_rules.recovery_ticks += 60 * n;
+    }
+    return d;
+}
+
+static size_t encode_room(const BoatRoomDefinition *d, uint8_t *out)
+{
+    return boat_room_definition_encode(d, out, BOAT_ROOM_BYTES_MAX);
+}
+
+static bool stage_room(Room *room, const BoatRoomDefinition *d, BoatRoomDiagnostic *diagnostic)
+{
+    static uint8_t bytes[BOAT_ROOM_BYTES_MAX];
+    size_t size = encode_room(d, bytes);
+    return size && boat_net_server_stage_revision(&room->server, bytes, size, diagnostic);
+}
+
+// True when client I runs exactly definition D, as revision REVISION.
+static bool client_runs(
+    const Room *room, unsigned i, const BoatRoomDefinition *d, uint32_t revision)
+{
+    const BoatNetClient *c = &room->clients[i];
+    const BoatRoomDefinition *r = boat_net_client_room(c);
+    return r && boat_room_definition_digest(r) == boat_room_definition_digest(d)
+        && boat_net_client_revision(c) == revision;
+}
+
+typedef struct {
+    unsigned count;
+    uint64_t tick, digest;
+} DefinitionLog;
+
+static void log_definition(void *context, uint64_t tick, const BoatRoomDefinition *room)
+{
+    DefinitionLog *log = context;
+    ++log->count;
+    log->tick = tick;
+    log->digest = boat_room_definition_digest(room);
+}
+
+// Step the room one tick at a time until PREDICATE holds, for at most LIMIT steps.
+#define ROOM_UNTIL(room, limit, predicate)                                                         \
+    for (unsigned guard_ = 0; guard_ < (limit) && !(predicate); ++guard_)                          \
+    room_step((room), 1.0 / 240)
+
+// A free room revises only while empty, with no announcement; later joiners see the new marks.
+// Invalid candidates and replaced ones leave the running revision alone.
+static int revision_free(void)
+{
+    static Room room;
+    static DefinitionLog log;
+    memset(&log, 0, sizeof(log));
+    CHECK(room_open(&room, 21,
+        (BoatNetServerConfig) { .rules = { .context = &log, .definition = log_definition } }));
+    BoatNetServer *s = &room.server;
+    const BoatRoomDefinition v1 = room.definition, a = revised_room(&v1, 1),
+                             b = revised_room(&v1, 2), c = revised_room(&v1, 3);
+    unsigned first = room_join(&room, "alpha", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[first].accept.revision == 1 && client_runs(&room, first, &v1, 1));
+    CHECK(s->stats.revision == 1 && !boat_net_server_revision_pending(s));
+
+    // Refused candidates: garbage, another mode, an invalid mark set.
+    BoatRoomDiagnostic diagnostic;
+    CHECK(!boat_net_server_stage_revision(s, (const uint8_t *)"nope", 4, &diagnostic));
+    CHECK(diagnostic.message[0]);
+    BoatRoomDefinition other
+        = room_definition(BOAT_LOCATION_BASIN, BOAT_ROOM_MODE_DEATHMATCH, NULL);
+    CHECK(!stage_room(&room, &other, &diagnostic) && strstr(diagnostic.message, "mode"));
+    BoatRoomDefinition twin = revised_room(&v1, 1);
+    twin.marks.count = 2;
+    twin.marks.items[1] = twin.marks.items[0];
+    CHECK(!stage_room(&room, &twin, &diagnostic));
+    CHECK(s->stats.revisions_refused == 2 || s->stats.revisions_refused == 3);
+    CHECK(!boat_net_server_revision_pending(s) && s->stats.revision == 1
+        && s->room == &room.definition);
+
+    // Staged with a player present: it waits, silently, for as long as the room is occupied.
+    CHECK(stage_room(&room, &a, NULL) && boat_net_server_revision_pending(s));
+    room_run(&room, 3);
+    CHECK(s->stats.revision == 1 && s->stats.revisions_announced == 0 && log.count == 0);
+    CHECK(client_runs(&room, first, &v1, 1) && s->room->marks.count == 0);
+    boat_net_client_leave(&room.clients[first]);
+    room.live[first] = false;
+    room_run(&room, .5);
+    CHECK(s->stats.revision == 2 && s->stats.revisions_committed == 1);
+    CHECK(s->stats.revisions_announced == 0 && !boat_net_server_revision_pending(s));
+    CHECK(log.count == 1 && log.digest == boat_room_definition_digest(&a));
+    CHECK(s->room == &s->revised && s->config.room == s->room && s->room->marks.count == 1);
+    CHECK(s->fleet.world.scene == NULL);
+    unsigned second = room_join(&room, "beta", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[second].accept.revision == 2 && client_runs(&room, second, &a, 2));
+
+    // A newer candidate replaces a waiting one: one commit, one revision step, the newest content.
+    CHECK(stage_room(&room, &b, NULL) && stage_room(&room, &c, NULL));
+    room_run(&room, 2);
+    CHECK(s->stats.revision == 2 && client_runs(&room, second, &a, 2));
+    boat_net_client_leave(&room.clients[second]);
+    room.live[second] = false;
+    room_run(&room, .5);
+    CHECK(s->stats.revision == 3 && s->stats.revisions_committed == 2 && log.count == 2);
+    CHECK(log.digest == boat_room_definition_digest(&c) && s->stats.revisions_staged == 3);
+    // A scene commits too: the fleet's borrowed scene follows, on the authority and a client.
+    BoatRoomDefinition scene = revised_room(&v1, 4);
+    scene.has_scene = true;
+    scene.scene.version = BOAT_SCENE_VERSION;
+    scene.scene.berths_present = true;
+    scene.scene.berth_count = 1;
+    snprintf(scene.scene.berths[0].id, sizeof(scene.scene.berths[0].id), "%s", "skiff");
+    scene.scene.berths[0].recipe = BOAT_SCENE_BERTH_SKIFF;
+    scene.scene.berths[0].x = 10;
+    scene.scene.berths[0].z = 20;
+    scene.scene.entrance_present = true;
+    scene.scene.entrance_x = 1;
+    scene.scene.entrance_z = 2;
+    scene.scene.entrance_width = 8;
+    CHECK(stage_room(&room, &scene, &diagnostic));
+    room_run(&room, .5);
+    CHECK(s->stats.revision == 4 && s->fleet.world.scene == &s->revised.scene);
+    unsigned third = room_join(&room, "gamma", NULL, 0);
+    room_run(&room, 1);
+    const BoatNetClient *g = &room.clients[third];
+    CHECK(g->phase == BOAT_NET_CLIENT_PLAYING && client_runs(&room, third, &scene, 4));
+    CHECK(g->fleet.world.scene == &g->room.scene && g->stats.decode_errors == 0);
+    CHECK(s->stats.output_faults == 0 && room.mismatches == 0);
+    printf("revision_free: refused %" PRIu64
+           " candidates; waited while occupied, committed at once "
+           "when empty (revisions 2-4), joiners got each\n",
+        s->stats.revisions_refused);
+    room_close(&room);
+    return 0;
+}
+
+// Send MESSAGE to client I as if the authority had, bypassing the revision machinery.
+static void inject_to_client(Room *room, unsigned i, BoatNetMessage m)
+{
+    static uint32_t sequence = 0x7000;
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    m.header.epoch = room->server.config.epoch;
+    m.header.sequence = sequence++;
+    size_t size = boat_net_encode(&m, bytes);
+    if (size)
+        boat_net_send(&room->server.transport,
+            (unsigned)room->server.slot_peer[room->clients[i].slot],
+            boat_net_channel(m.header.type), bytes, size);
+}
+
+// A whole announcement of D as REVISION, committing at COMMIT, optionally with a bad digest.
+static void inject_revision(Room *room, unsigned i, const BoatRoomDefinition *d, uint32_t revision,
+    uint64_t commit, bool corrupt)
+{
+    static uint8_t bytes[BOAT_ROOM_BYTES_MAX];
+    size_t size = encode_room(d, bytes);
+    uint64_t tick = room->server.fleet.state.tick;
+    inject_to_client(room, i,
+        (BoatNetMessage) { .header = { .type = BOAT_NET_REVISION_BEGIN, .tick = tick },
+            .revision_begin = { .revision = revision,
+                .bytes = (uint32_t)size,
+                .pages = (uint16_t)((size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES),
+                .digest = boat_net_bytes_digest(bytes, size) ^ (corrupt ? 1 : 0),
+                .commit_tick = commit } });
+    for (size_t page = 0; page * BOAT_NET_PAGE_BYTES < size; ++page) {
+        size_t offset = page * BOAT_NET_PAGE_BYTES;
+        size_t length = size - offset < BOAT_NET_PAGE_BYTES ? size - offset : BOAT_NET_PAGE_BYTES;
+        BoatNetMessage m = { .header = { .type = BOAT_NET_REVISION_PAGE, .tick = tick },
+            .world_page = { .checkpoint = revision,
+                .index = (uint16_t)page,
+                .count = (uint16_t)((size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES),
+                .size = (uint16_t)length } };
+        memcpy(m.world_page.data, bytes + offset, length);
+        inject_to_client(room, i, m);
+    }
+    inject_to_client(room, i,
+        (BoatNetMessage) {
+            .header = { .type = BOAT_NET_REVISION_END, .tick = tick }, .checkpoint = revision });
+}
+
+// A race room revises in RESULTS: both predicting clients switch on the commit tick, prediction
+// restarts there, and duplicate, stale and invalid announcements change nothing.
+static int revision_race(void)
+{
+    static Room room;
+    CHECK(room_open_mode(&room, 71,
+        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_OUTER) }, BOAT_ROOM_MODE_RACE,
+        NULL));
+    BoatNetServer *s = &room.server;
+    room.predict = room.race = true;
+    const BoatRoomDefinition v1 = room.definition, v2 = revised_room(&v1, 1),
+                             v3 = revised_room(&v1, 2);
+    unsigned a = room_join(&room, "alpha", NULL, 0), b = room_join(&room, "beta", NULL, 0);
+    room_run(&room, 1);
+    ROOM_UNTIL(&room, 3000, s->race.phase == BOAT_RACE_RACING);
+    CHECK(s->race.phase == BOAT_RACE_RACING);
+    room_run(&room, 2);
+    // Staged mid-race, it waits for RESULTS; end the race at once.
+    CHECK(stage_room(&room, &v2, NULL));
+    room_run(&room, .5);
+    CHECK(s->stats.revisions_announced == 0 && s->stats.revision == 1);
+    s->race.deadline = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 100, s->race.phase == BOAT_RACE_RESULTS);
+    CHECK(s->race.phase == BOAT_RACE_RESULTS);
+    ROOM_UNTIL(&room, 100, s->announced.present);
+    CHECK(s->announced.present && s->announced.revision == 2 && s->stats.revisions_announced == 1);
+    uint64_t commit = s->announced.commit_tick, announced = s->fleet.state.tick;
+    CHECK(commit % BOAT_NET_SNAPSHOT_TICKS == 0
+        && commit >= announced + BOAT_NET_REVISION_LEAD_TICKS);
+    CHECK(commit < s->race.phase_end);
+    // Until the commit nobody runs the new definition; the clients stage it and answer READY.
+    room_run(&room, .2);
+    for (unsigned i = 0; i < 2; ++i) {
+        const BoatNetClient *c = &room.clients[i];
+        CHECK(c->stats.revisions == 0 && c->revision_staged && c->revision == 1);
+        CHECK(s->peers[s->slot_peer[c->slot]].revision_ready == 2);
+    }
+    // The server commits on the tick; each client switches when its mirror reaches it, and its
+    // prediction restarts there instead of replaying across the switch.
+    bool committed = false, switched[2] = { false, false };
+    for (unsigned n = 0; n < 2000 && !(committed && switched[0] && switched[1]); ++n) {
+        uint64_t before[2] = { room.clients[0].prediction.stats.corrections,
+            room.clients[1].prediction.stats.corrections };
+        room_step(&room, 1.0 / 240);
+        if (!committed && s->stats.revision == 2) {
+            committed = true;
+            CHECK(s->fleet.state.tick == commit && s->race.phase == BOAT_RACE_RESULTS);
+            CHECK(s->race.rules.recovery_ticks == v2.race_rules.recovery_ticks);
+            CHECK(s->stats.revision_leaves == 0 && !s->announced.present);
+        }
+        for (unsigned i = 0; i < 2; ++i) {
+            const BoatNetClient *c = &room.clients[i];
+            if (switched[i] || c->stats.revisions == 0)
+                continue;
+            switched[i] = true;
+            CHECK(c->stats.revisions == 1 && c->revision == 2 && s->stats.revision == 2);
+            CHECK(before[i] > 5 && c->prediction.stats.corrections <= 1);
+            CHECK(c->prediction.authority_tick >= commit && c->fleet.state.tick >= commit);
+            CHECK(c->prediction.fleet.state.tick >= c->prediction.authority_tick);
+        }
+    }
+    CHECK(committed && switched[0] && switched[1]);
+    room_run(&room, 1);
+    for (unsigned i = 0; i < 2; ++i) {
+        const BoatNetClient *c = &room.clients[i];
+        CHECK(client_runs(&room, i, &v2, 2) && same_race(c, s)
+            && c->phase == BOAT_NET_CLIENT_PLAYING);
+        CHECK(
+            c->race.recovery_ticks == v2.race_rules.recovery_ticks && c->stats.decode_errors == 0);
+        CHECK(
+            c->prediction.fleet.world.water.vessel.started == s->fleet.world.water.vessel.started);
+    }
+    CHECK(room.mismatches == 0 && s->stats.output_faults == 0);
+    // Duplicate (the committed revision), stale (an older one), then a newer one that is valid
+    // and one that is not: only the valid newer one is staged, and the server ignores the answers
+    // to what it never announced.
+    BoatNetClient *c = &room.clients[a];
+    uint64_t far = s->fleet.state.tick + 100000;
+    inject_revision(&room, a, &v2, 2, far, false);
+    inject_revision(&room, a, &v1, 1, far, false);
+    room_run(&room, .2);
+    CHECK(c->stats.revisions_ignored == 2 && !c->revision_staged && c->revision == 2);
+    inject_revision(&room, a, &v3, 3, far, false);
+    room_run(&room, .2);
+    CHECK(c->revision_staged && c->revision_begin.revision == 3 && c->stats.revisions_invalid == 0);
+    inject_revision(&room, a, &v3, 3, far, false); // The same announcement again.
+    room_run(&room, .2);
+    CHECK(c->stats.revisions_ignored == 3 && c->revision_staged && c->revision == 2);
+    inject_revision(&room, a, &v3, 4, far, true); // Newer, but its digest is wrong.
+    room_run(&room, .2);
+    CHECK(c->stats.revisions_invalid == 1 && !c->revision_staged && c->revision == 2);
+    CHECK(s->peers[s->slot_peer[c->slot]].revision_ready == 2 && s->stats.revision == 2);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && room.clients[b].revision == 2);
+    printf("revision_race: both clients switched at tick %" PRIu64 " (announced at %" PRIu64
+           "), prediction restarted, duplicates ignored\n",
+        commit, announced);
+    room_close(&room);
+    return 0;
+}
+
+// A joiner that is still downloading delays the announcement; a Hello during the lead is held
+// and served the new definition after the commit.
+static int revision_joiners(void)
+{
+    static Room room;
+    CHECK(room_open_mode(&room, 72,
+        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_OUTER) }, BOAT_ROOM_MODE_RACE,
+        NULL));
+    BoatNetServer *s = &room.server;
+    room.race = true;
+    const BoatRoomDefinition v1 = room.definition, v2 = revised_room(&v1, 1);
+    unsigned a = room_join(&room, "alpha", NULL, 0), b = room_join(&room, "beta", NULL, 0);
+    room_run(&room, 1);
+    ROOM_UNTIL(&room, 3000, s->race.phase == BOAT_RACE_RACING);
+    unsigned late = room_join_ex(&room, "late", NULL, 0, true); // Holds READY.
+    room_run(&room, .5);
+    BoatNetClient *g = &room.clients[late];
+    CHECK(g->phase == BOAT_NET_CLIENT_PLAYING && g->ready_pending);
+    CHECK(s->peers[s->slot_peer[g->slot]].phase == BOAT_NET_PEER_BOOTSTRAP);
+    s->race.deadline = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 100, s->race.phase == BOAT_RACE_RESULTS);
+    CHECK(stage_room(&room, &v2, NULL));
+    room_run(&room, 1);
+    CHECK(s->stats.revisions_announced == 0 && s->stats.revision == 1); // Still joining.
+    CHECK(boat_net_client_ready(g));
+    ROOM_UNTIL(&room, 1200, s->announced.present);
+    CHECK(s->announced.present && s->stats.revisions_announced == 1);
+    // A Hello now waits for the commit.
+    unsigned d = room_join(&room, "delta", NULL, 0);
+    room_run(&room, .3);
+    CHECK(s->stats.revision_held_hellos == 1 && room.clients[d].phase == BOAT_NET_CLIENT_HANDSHAKE);
+    CHECK(boat_net_server_players(s) == 3);
+    ROOM_UNTIL(&room, 2000, s->stats.revision == 2);
+    CHECK(s->stats.revision == 2 && s->stats.revision_leaves == 0);
+    room_run(&room, 2);
+    CHECK(room.clients[d].phase == BOAT_NET_CLIENT_PLAYING && room.clients[d].accept.revision == 2);
+    for (unsigned i = 0; i < 4; ++i)
+        CHECK(client_runs(&room, i, &v2, 2) && room.clients[i].phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(boat_net_server_players(s) == 4 && room.clients[a].stats.decode_errors == 0);
+    CHECK(room.clients[b].stats.revisions == 1 && room.clients[d].stats.revisions == 0);
+    printf("revision_joiners: a joiner mid-download delayed the announcement; a Hello during the "
+           "lead was held and served revision 2\n");
+    room_close(&room);
+    return 0;
+}
+
+// A client that never answers READY is dropped with REVISION at the commit tick; the rest stay.
+static int revision_not_ready(void)
+{
+    static Room room;
+    BoatMatchRules rules = boat_fixture_match_default_rules;
+    rules.round_ticks = 8 * BOAT_TICK_HZ;
+    rules.intermission_ticks = 5 * BOAT_TICK_HZ;
+    CHECK(
+        room_open_mode(&room, 73, (BoatNetServerConfig) { 0 }, BOAT_ROOM_MODE_DEATHMATCH, &rules));
+    BoatNetServer *s = &room.server;
+    const BoatRoomDefinition v1 = room.definition, v2 = revised_room(&v1, 1);
+    unsigned a = room_join(&room, "alpha", NULL, 0), b = room_join(&room, "beta", NULL, 0);
+    room_run(&room, 4);
+    CHECK(s->match.phase == BOAT_MATCH_PLAYING);
+    s->match.phase_end = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 100, s->match.phase == BOAT_MATCH_INTERMISSION);
+    room.live[b] = false; // Beta stops answering before it can say READY.
+    CHECK(stage_room(&room, &v2, NULL));
+    ROOM_UNTIL(&room, 100, s->announced.present);
+    CHECK(s->announced.present);
+    unsigned slot_b = room.clients[b].slot;
+    ROOM_UNTIL(&room, 2000, s->stats.revision == 2);
+    CHECK(s->stats.revision == 2 && s->stats.revision_leaves == 1);
+    CHECK(s->slot_peer[slot_b] < 0 && boat_net_server_players(s) == 1);
+    CHECK(s->slot_peer[room.clients[a].slot] >= 0);
+    room_run(&room, 1);
+    BoatNetClient *ca = &room.clients[a];
+    CHECK(ca->phase == BOAT_NET_CLIENT_PLAYING && client_runs(&room, a, &v2, 2));
+    CHECK(ca->fleet.state.combat.rules.health == v2.combat_rules.health && same_match(ca, s));
+    CHECK(s->match.rules.respawn_ticks == v2.match_rules.respawn_ticks);
+    // The dropped client hears why when it is serviced again.
+    room.live[b] = true;
+    room_run(&room, .5);
+    BoatNetClient *cb = &room.clients[b];
+    CHECK(cb->phase == BOAT_NET_CLIENT_CLOSED && cb->leave == BOAT_NET_LEAVE_REVISION);
+    CHECK(strstr(boat_net_client_failure(cb), "definition") != NULL);
+    // A new player joins revision 2 and installs its checkpoint (the combat rules agree).
+    unsigned g = room_join(&room, "gamma", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[g].phase == BOAT_NET_CLIENT_PLAYING && client_runs(&room, g, &v2, 2));
+    CHECK(room.clients[g].stats.bootstrap_failures == 0 && s->stats.output_faults == 0);
+    printf("revision_not_ready: only the silent client was dropped (REVISION); a joiner installed "
+           "revision 2\n");
+    room_close(&room);
+    return 0;
+}
+
+// A deathmatch commit lands on the last tick of the intermission, the next round runs the new
+// rules; a commit that would not fit before the round starts waits for the next intermission.
+static int revision_boundary(void)
+{
+    static Room room;
+    BoatMatchRules rules = boat_fixture_match_default_rules;
+    rules.round_ticks = 8 * BOAT_TICK_HZ;
+    rules.intermission_ticks = 5 * BOAT_TICK_HZ;
+    CHECK(
+        room_open_mode(&room, 74, (BoatNetServerConfig) { 0 }, BOAT_ROOM_MODE_DEATHMATCH, &rules));
+    BoatNetServer *s = &room.server;
+    const BoatRoomDefinition v1 = room.definition, v2 = revised_room(&v1, 1),
+                             v3 = revised_room(&v1, 2);
+    unsigned a = room_join(&room, "alpha", NULL, 0), b = room_join(&room, "beta", NULL, 0);
+    room_run(&room, 4);
+    CHECK(s->match.phase == BOAT_MATCH_PLAYING);
+    // Into the intermission, then fix its end one tick past the commit tick.
+    s->match.phase_end = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 100, s->match.phase == BOAT_MATCH_INTERMISSION);
+    CHECK(stage_room(&room, &v2, NULL));
+    uint64_t next = s->fleet.state.tick + 1;
+    uint64_t commit = (next + BOAT_NET_REVISION_LEAD_TICKS + 3) / 4 * 4;
+    uint32_t round = s->match.round;
+    uint64_t exact = commit;
+    s->match.phase_end = commit + 1;
+    ROOM_UNTIL(&room, 2000, s->stats.revision == 2);
+    CHECK(s->stats.revision == 2 && s->fleet.state.tick == commit
+        && s->stats.revisions_announced == 1);
+    CHECK(s->match.phase == BOAT_MATCH_INTERMISSION && s->match.round == round);
+    CHECK(s->match.rules.respawn_ticks == v2.match_rules.respawn_ticks);
+    ROOM_UNTIL(&room, 10, s->match.round == round + 1);
+    CHECK(s->match.phase == BOAT_MATCH_PLAYING && s->fleet.state.tick == commit + 1);
+    CHECK(s->match.rules.respawn_ticks == v2.match_rules.respawn_ticks);
+    room_run(&room, 1);
+    CHECK(client_runs(&room, a, &v2, 2) && client_runs(&room, b, &v2, 2)
+        && same_match(&room.clients[a], s));
+    // The next candidate: the intermission ends exactly at the would-be commit tick, so it does
+    // not fit; the room waits for the following intermission.
+    s->match.phase_end = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 100, s->match.phase == BOAT_MATCH_INTERMISSION);
+    CHECK(stage_room(&room, &v3, NULL));
+    commit = (s->fleet.state.tick + 1 + BOAT_NET_REVISION_LEAD_TICKS + 3) / 4 * 4;
+    s->match.phase_end = commit;
+    ROOM_UNTIL(&room, 2000, s->match.phase == BOAT_MATCH_PLAYING);
+    CHECK(s->match.phase == BOAT_MATCH_PLAYING && s->stats.revisions_announced == 1);
+    CHECK(s->stats.revision == 2 && boat_net_server_revision_pending(s));
+    room_run(&room, 1);
+    s->match.phase_end = s->fleet.state.tick + 1;
+    ROOM_UNTIL(&room, 2000, s->stats.revision == 3);
+    CHECK(s->stats.revision == 3 && s->match.phase == BOAT_MATCH_INTERMISSION);
+    CHECK(s->stats.revisions_announced == 2 && s->stats.revision_leaves == 0);
+    room_run(&room, 1);
+    CHECK(client_runs(&room, a, &v3, 3) && client_runs(&room, b, &v3, 3));
+    CHECK(room.clients[a].phase == BOAT_NET_CLIENT_PLAYING && room.mismatches == 0);
+    printf("revision_boundary: committed on the intermission's last tick %" PRIu64
+           "; one that did not fit waited for the next\n",
+        exact);
+    room_close(&room);
+    return 0;
+}
+
 static const TestCase cases[] = {
     SLOW_CASE(throttle_detents),
     TEST_CASE(golden),
@@ -2808,6 +3564,13 @@ static const TestCase cases[] = {
     TEST_CASE(snapshot_resync),
     TEST_CASE(combat_compact),
     TEST_CASE(lossless),
+    TEST_CASE(rule_events),
+    TEST_CASE(objective_state),
+    SLOW_CASE(revision_free),
+    SLOW_CASE(revision_race),
+    SLOW_CASE(revision_joiners),
+    SLOW_CASE(revision_not_ready),
+    SLOW_CASE(revision_boundary),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),
     TEST_CASE(prediction_release),

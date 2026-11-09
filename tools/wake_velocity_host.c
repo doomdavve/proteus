@@ -62,8 +62,10 @@ static void exited(const NetHost *host, char *error, size_t size)
     snprintf(error, size, "The room stopped: %s", reason[0] ? reason : "no message.");
 }
 
-static void arguments(const NetHostOptions *o, char port[8], const char *out[13])
+unsigned net_host_arguments(
+    const NetHostOptions *o, char port[8], const char *out[NET_HOST_ARGUMENTS])
 {
+    bool race = !strcmp(o->mode, "race"), hunt = !strcmp(o->mode, "hunt");
     snprintf(port, 8, "%u", (unsigned)o->port);
     unsigned n = 0;
     out[n++] = "--serve";
@@ -72,15 +74,20 @@ static void arguments(const NetHostOptions *o, char port[8], const char *out[13]
     out[n++] = "--port";
     out[n++] = port;
     out[n++] = "--mode";
-    out[n++] = o->mode;
-    if (strcmp(o->mode, "race") != 0) {
+    out[n++] = hunt ? "free" : o->mode;
+    if (!race) {
         out[n++] = "--location";
-        out[n++] = o->location;
+        out[n++] = hunt ? "outer" : o->location;
+    }
+    if (hunt) {
+        out[n++] = "--package";
+        out[n++] = "proteus.outer-hunt";
     }
     if (o->waves)
         out[n++] = "--waves";
     out[n++] = "--exit-with-stdin";
     out[n] = NULL;
+    return n;
 }
 
 #ifdef _WIN32
@@ -135,13 +142,13 @@ static void kill_child(NetHost *host) { TerminateProcess(host->process, 1); }
 static bool spawn(NetHost *host, const NetHostOptions *options, char *error, size_t size)
 {
     char path[1024], port[8], line[2048];
-    const char *argv[13];
+    const char *argv[NET_HOST_ARGUMENTS];
     DWORD length = GetModuleFileNameA(NULL, path, sizeof(path));
     if (!length || length >= sizeof(path)) {
         snprintf(error, size, "Cannot find this program's own path to start the room.");
         return false;
     }
-    arguments(options, port, argv);
+    net_host_arguments(options, port, argv);
     int used = snprintf(line, sizeof(line), "\"%s\"", path);
     for (unsigned i = 0; argv[i] && used > 0 && (size_t)used < sizeof(line); ++i)
         used += snprintf(line + used, sizeof(line) - (size_t)used, " %s", argv[i]);
@@ -247,14 +254,14 @@ static bool own_path(char *path, size_t size)
 static bool spawn(NetHost *host, const NetHostOptions *options, char *error, size_t size)
 {
     char path[1024], port[8];
-    const char *argv[14];
+    const char *argv[1 + NET_HOST_ARGUMENTS]; // The program path, then the arguments.
     host->input = host->output = -1;
     if (!own_path(path, sizeof(path))) {
         snprintf(error, size, "Cannot find this program's own path to start the room.");
         return false;
     }
     argv[0] = path;
-    arguments(options, port, argv + 1);
+    net_host_arguments(options, port, argv + 1);
     int in[2], out[2];
     if (pipe(in) != 0) {
         snprintf(error, size, "Cannot create the room's pipes.");

@@ -407,6 +407,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put8(w, 0);
         put32(w, m->accept.wake_life_ticks);
         putf(w, m->accept.crest_height);
+        put32(w, m->accept.revision);
         break;
     case BOAT_NET_REJECT:
         put8(w, m->reject.reason);
@@ -436,8 +437,17 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put16(w, 0);
         put64(w, m->definition_begin.digest);
         break;
+    case BOAT_NET_REVISION_BEGIN:
+        put32(w, m->revision_begin.revision);
+        put32(w, m->revision_begin.bytes);
+        put16(w, m->revision_begin.pages);
+        put16(w, 0);
+        put64(w, m->revision_begin.digest);
+        put64(w, m->revision_begin.commit_tick);
+        break;
     case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_DEFINITION_PAGE:
+    case BOAT_NET_REVISION_PAGE:
     case BOAT_NET_WORLD_PAGE:
         put32(w, m->world_page.checkpoint);
         put16(w, m->world_page.index);
@@ -450,6 +460,8 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
     case BOAT_NET_DEFINITION_END:
+    case BOAT_NET_REVISION_END:
+    case BOAT_NET_REVISION_READY:
         put32(w, m->checkpoint);
         put32(w, 0);
         break;
@@ -580,6 +592,19 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put64(w, e->time);
         break;
     }
+    case BOAT_NET_OBJECTIVE_STATE: {
+        const BoatNetObjectiveState *os = &m->objective;
+        put32(w, os->revision);
+        put8(w, os->suspended ? 1 : 0);
+        put8(w, os->row_count);
+        put16(w, 0);
+        for (unsigned i = 0; i < os->row_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i) {
+            put_string(w, os->rows[i].id, BOAT_NET_OBJECTIVE_TEXT - 1);
+            put_string(w, os->rows[i].label, BOAT_NET_OBJECTIVE_TEXT - 1);
+            put64(w, (uint64_t)os->rows[i].value);
+        }
+        break;
+    }
     default:
         w->overflow = true;
     }
@@ -689,6 +714,8 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         a->wake_life_ticks = get32(r);
         expect(r, a->wake_life_ticks >= 240 && a->wake_life_ticks <= BOAT_OBJECT_LIFE_TICKS);
         a->crest_height = getf(r, .1f, 3);
+        a->revision = get32(r);
+        expect(r, a->revision >= 1);
         break;
     }
     case BOAT_NET_REJECT:
@@ -729,8 +756,23 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
         break;
     }
+    case BOAT_NET_REVISION_BEGIN: {
+        BoatNetRevisionBegin *b = &m->revision_begin;
+        b->revision = get32(r);
+        b->bytes = get32(r);
+        b->pages = get16(r);
+        reserved(r, 2);
+        b->digest = get64(r);
+        b->commit_tick = get64(r);
+        expect(r, b->revision >= 1);
+        expect(r, b->bytes && b->bytes <= BOAT_NET_MAX_DEFINITION);
+        expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+        expect(r, b->commit_tick > tick);
+        break;
+    }
     case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_DEFINITION_PAGE:
+    case BOAT_NET_REVISION_PAGE:
     case BOAT_NET_WORLD_PAGE: {
         BoatNetWorldPage *p = &m->world_page;
         p->checkpoint = get32(r);
@@ -758,7 +800,11 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
     case BOAT_NET_DEFINITION_END:
+    case BOAT_NET_REVISION_END:
+    case BOAT_NET_REVISION_READY:
         m->checkpoint = get32(r);
+        if (m->header.type >= BOAT_NET_REVISION_END)
+            expect(r, m->checkpoint >= 1);
         reserved(r, 4);
         break;
     case BOAT_NET_INPUT_BATCH: {
@@ -938,6 +984,24 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
                         && !rs->slots[i].recoveries));
         }
         expect(r, finished == rs->placed);
+        break;
+    }
+    case BOAT_NET_OBJECTIVE_STATE: {
+        BoatNetObjectiveState *os = &m->objective;
+        os->revision = get32(r);
+        expect(r, os->revision >= 1);
+        uint8_t flags = get8(r);
+        expect(r, flags <= 1);
+        os->suspended = flags & 1;
+        os->row_count = get8(r);
+        expect(r, os->row_count <= BOAT_NET_OBJECTIVE_ROWS);
+        reserved(r, 2);
+        for (unsigned i = 0; i < os->row_count && !r->error; ++i) {
+            get_string(r, os->rows[i].id, BOAT_NET_OBJECTIVE_TEXT - 1);
+            get_string(r, os->rows[i].label, BOAT_NET_OBJECTIVE_TEXT - 1);
+            expect(r, os->rows[i].id[0] && os->rows[i].label[0]);
+            os->rows[i].value = (int64_t)get64(r);
+        }
         break;
     }
     case BOAT_NET_RACE_EVENT: {
@@ -1537,5 +1601,16 @@ bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState
             || x->gates != y->gates || x->recoveries != y->recoveries || x->finish != y->finish)
             return false;
     }
+    return true;
+}
+
+bool boat_net_objective_state_equal(const BoatNetObjectiveState *a, const BoatNetObjectiveState *b)
+{
+    if (a->suspended != b->suspended || a->row_count != b->row_count)
+        return false;
+    for (unsigned i = 0; i < a->row_count && i < BOAT_NET_OBJECTIVE_ROWS; ++i)
+        if (strcmp(a->rows[i].id, b->rows[i].id) || strcmp(a->rows[i].label, b->rows[i].label)
+            || a->rows[i].value != b->rows[i].value)
+            return false;
     return true;
 }

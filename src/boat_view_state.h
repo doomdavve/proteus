@@ -3,6 +3,7 @@
 
 #include "boat.h"
 #include "boat_course.h"
+#include "boat_marks.h"
 #include "boat_scene_definition.h"
 #include "geometry3d.h"
 
@@ -31,6 +32,8 @@ typedef struct {
     // L1.3: frame-borrowed accepted scene; NULL draws and collides with the compiled marina.
     const BoatSceneDefinition *scene;
     const BoatViewProps *props; // NULL: nothing extra.
+    // A room objective's marks (P5d), drawn as rings of buoys; frame-borrowed, NULL draws none.
+    const BoatMarkSet *marks;
     // Race rooms: draw the river sprint's start, gates and finish; NEXT_GATE is the viewer's
     // next uncleared gate (the gate count once finished).
     struct {

@@ -21,6 +21,7 @@ typedef struct {
     int64_t tick, sequence;
     char kind[48], id[BOAT_PLUGIN_TEXT];
     int64_t load; // S1d cargo events: the crate's load number, from 1; zero omits the field.
+    int64_t crew; // P5 room events: the player's crew (fleet slot + 1); zero omits the field.
 } BoatPluginEvent;
 
 typedef struct {

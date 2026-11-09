@@ -1,0 +1,10 @@
+{
+  "id": "proteus.outer-hunt",
+  "name": "Shelter hunt",
+  "api": 1,
+  "kind": "free",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["free.define", "objective.hud"],
+  "state_version": 1
+}

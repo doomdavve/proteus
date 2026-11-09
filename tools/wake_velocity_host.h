@@ -25,12 +25,18 @@ typedef struct {
 } NetHost;
 
 typedef struct {
-    const char *mode; // "free", "deathmatch" or "race".
-    const char *location; // A boat_location name; race rooms are always on the outer map.
+    const char *mode; // "free", "deathmatch", "race" or "hunt".
+    const char *location; // A boat_location name; race and hunt rooms are always on the outer map.
     bool waves;
     uint16_t port;
 } NetHostOptions;
 
+// The child's arguments after the program path, NULL-terminated: at most 13 plus the NULL.
+#define NET_HOST_ARGUMENTS 16
+// Fill OUT (PORT holds the port's text) and return the argument count. Race rooms take the
+// outer map from their mode; hunt rooms are free rooms on outer with the shelter hunt package.
+unsigned net_host_arguments(
+    const NetHostOptions *options, char port[8], const char *out[NET_HOST_ARGUMENTS]);
 // Start the room listening on every IPv4 interface and wait (at most five seconds) until it says
 // so. False with ERROR set when it cannot start or exits first.
 bool net_host_start(NetHost *host, const NetHostOptions *options, char *error, size_t size);

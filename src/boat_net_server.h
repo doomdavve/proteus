@@ -1,6 +1,7 @@
 #ifndef PROTEUS_BOAT_NET_SERVER_H
 #define PROTEUS_BOAT_NET_SERVER_H
 
+#include "boat_marks.h"
 #include "boat_match.h"
 #include "boat_net_transport.h"
 #include "boat_race.h"
@@ -11,6 +12,38 @@
 #define BOAT_NET_MATCH_EVENTS 16 // Recent deathmatch or race events kept for the caller's log.
 #define BOAT_NET_CATCH_UP_TICKS 8 // Ticks per service call at most; never a larger step.
 #define BOAT_NET_MISBEHAVIOUR_LIMIT 16 // Malformed or forbidden messages before disconnecting.
+// A definition revision with clients connected commits this many ticks after its announcement
+// (2 s), rounded up to the next snapshot tick so the commit tick is a snapshot tick.
+#define BOAT_NET_REVISION_LEAD_TICKS 240
+
+// P5b: what the authority tells a room objective. Crews are fleet slots; the adapter numbers them
+// from 1. Joins and leaves arrive between ticks, at the current tick; mark entries arrive after
+// the tick that made them, before that tick's after_tick.
+typedef enum {
+    BOAT_NET_RULE_CREW_JOINED, // A peer was accepted into SLOT.
+    BOAT_NET_RULE_CREW_LEFT, // SLOT's peer left, timed out or was dropped.
+    BOAT_NET_RULE_MARK_REACHED, // SLOT's boat entered MARK (boat_marks_observe).
+} BoatNetRuleKind;
+
+typedef struct {
+    uint8_t kind; // BoatNetRuleKind
+    uint8_t slot;
+    uint8_t mark; // Index into the room definition's marks; MARK_REACHED only.
+} BoatNetRuleEvent;
+
+// An optional rules adapter, the same pattern as BoatNetTransport. The server never calls Lua;
+// the adapter (boat_server's room objective) may. Callbacks must not touch the server.
+typedef struct {
+    void *context;
+    void (*event)(void *context, uint64_t tick, const BoatNetRuleEvent *event);
+    void (*after_tick)(void *context, uint64_t tick); // After every tick and its events.
+    // True when the objective's HUD or suspension changed since the last call; fills OUT (the
+    // revision is the server's). Called once at init and after every after_tick.
+    bool (*state)(void *context, BoatNetObjectiveState *out);
+    // P5f: a definition revision committed after TICK; ROOM is the new running definition. Called
+    // between ticks, before any event for the new definition's marks. Optional.
+    void (*definition)(void *context, uint64_t tick, const BoatRoomDefinition *room);
+} BoatNetRules;
 
 typedef struct {
     const char *token; // Room token every Hello must match exactly; "" for none.
@@ -23,6 +56,7 @@ typedef struct {
     const BoatRoomDefinition *room;
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
+    BoatNetRules rules; // Zero for none.
 } BoatNetServerConfig;
 
 typedef enum {
@@ -48,6 +82,9 @@ typedef struct {
     uint32_t input_sequence; // Newest command packet sequence received.
     bool input_seen;
     unsigned misbehaviour;
+    uint32_t revision_ready; // The newest revision this peer answered REVISION_READY for.
+    bool hello_held; // A Hello waits for the announced revision to commit (see HELLO below).
+    BoatNetHello held;
 } BoatNetServerPeer;
 
 // Per-slot control record: the authority's only use of client messages.
@@ -66,6 +103,12 @@ typedef struct {
     uint64_t commands, duplicate_commands, late_commands, future_commands, stale_life_commands;
     uint64_t stale_packets, rate_limited, malformed, forbidden, misbehaving;
     uint64_t input_states[BOAT_NET_INPUT_STATES]; // Ticks integrated with each input source.
+    uint64_t objective_states; // ObjectiveState messages queued, broadcasts and joins alike.
+    // Definition revisions (v14): candidates staged, announced, refused at staging, committed;
+    // peers dropped for not being ready; Hellos held while an announcement was out.
+    uint64_t revisions_staged, revisions_announced, revisions_refused, revisions_committed;
+    uint64_t revision_leaves, revision_held_hellos, revision_bytes;
+    uint32_t revision; // The running definition's revision (1 at start).
     uint64_t spawn_requests, resyncs, output_faults, emission_failures, births_truncated;
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
@@ -79,6 +122,17 @@ typedef struct {
     bool deathmatch, race_room; // Derived from ROOM's mode.
     uint8_t definition[BOAT_ROOM_BYTES_MAX]; // The encoded room definition.
     uint32_t definition_bytes;
+    // P5f: the room a committed revision installed. CONFIG.room and ROOM point here from the
+    // first commit on, so the fleet's scene pointer stays valid; before it they are borrowed.
+    BoatRoomDefinition revised;
+    // A candidate waiting for a boundary, and the announced one that commits at a fixed tick.
+    struct {
+        bool present;
+        uint32_t revision, bytes;
+        uint64_t commit_tick;
+        uint8_t data[BOAT_ROOM_BYTES_MAX];
+        BoatRoomDefinition room;
+    } waiting, announced;
     BoatFleet fleet;
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS];
     BoatNetSlotControl control[BOAT_FLEET_SLOTS];
@@ -98,6 +152,9 @@ typedef struct {
     BoatNetRaceState race_sent; // The race state clients last received.
     BoatRaceEvent race_events[BOAT_NET_MATCH_EVENTS]; // Recent race events, a ring.
     uint64_t race_event_count;
+    BoatMarkTracker marks; // Which mark each slot is inside; used when ROOM has marks.
+    BoatNetObjectiveState objective; // The HUD clients last received (revision 0: none yet).
+    bool has_objective;
     BoatNetServerStats stats;
 } BoatNetServer;
 
@@ -109,6 +166,18 @@ bool boat_net_server_init(
 // their cadence, stopping at tick_limit when set. False once the room is overloaded (500 ms
 // behind for a second).
 bool boat_net_server_service(BoatNetServer *server, double now);
+// P5f: stage CANDIDATE (encoded bytes) as the room's next definition. It is validated as the
+// room's own definition is (decode, structure, scene) and must keep the running mode and
+// location; false with DIAGNOSTIC leaves the running revision and any waiting candidate alone. A
+// valid candidate replaces the waiting one. It commits only at a boundary: race RESULTS or
+// WAITING, deathmatch INTERMISSION or WARMUP, a free room with no player. With players connected
+// it is announced to every one of them and commits BOAT_NET_REVISION_LEAD_TICKS later; a player
+// not ready by then is dropped with BOAT_NET_LEAVE_REVISION. An empty free room commits at once.
+// Revision numbers are assigned when a candidate is announced or committed.
+bool boat_net_server_stage_revision(
+    BoatNetServer *server, const uint8_t *bytes, size_t size, BoatRoomDiagnostic *diagnostic);
+// True while a staged candidate has not committed (waiting for a boundary or announced).
+bool boat_net_server_revision_pending(const BoatNetServer *server);
 // Monotonic time of the next tick, for the caller's wait.
 double boat_net_server_next_tick(const BoatNetServer *server);
 unsigned boat_net_server_players(const BoatNetServer *server);

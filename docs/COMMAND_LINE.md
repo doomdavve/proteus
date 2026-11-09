@@ -342,10 +342,13 @@ Host and join from a native game process:
 ./build/wake_velocity --host free --location outer --name me
 ./build/wake_velocity --host deathmatch --location outer --name me
 ./build/wake_velocity --host race --name me
+./build/wake_velocity --host hunt --name me
 ```
 
-`--host free|deathmatch|race` starts a background authority open to the LAN and joins it;
-leaving closes the room. `--location`, `--waves` and `--port N` configure the room.
+`--host free|deathmatch|race|hunt` starts a background authority open to the LAN and joins it;
+leaving closes the room. `--location`, `--waves` and `--port N` configure the room. Like race,
+hunt always runs on `outer` (`--host hunt --location basin` is refused) and starts a room equal
+to `boat_server --mode free --location outer --package proteus.outer-hunt`.
 For a separate authority, use the packaged game's `--serve`, or the development server:
 
 ```sh
@@ -364,11 +367,29 @@ extra arguments. On macOS, a packaged headless room can run as:
 ```
 
 The room runs from a package. With no `--package`, `--mode free` uses the location's free
-package, `--mode deathmatch` uses `proteus.deathmatch` at any location, and `--mode race` uses
-`proteus.river-sprint` on `outer`, where every race room runs. `--package ID|DIR` selects another
+package, `--mode deathmatch` uses `proteus.deathmatch` at any location, `--mode race` uses
+`proteus.river-sprint` on `outer`, where every race room runs. The shelter hunt is a free room:
+`--mode free --location outer --package proteus.outer-hunt`. `--package ID|DIR` selects another
 bundled package by ID or evaluates a package directory once at start-up. The authority validates the package, sends the
 resulting definition to clients as data, and refuses to start with a diagnostic if it is
 invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.
+
+`--package-reload` re-reads that package while the room runs. It needs `--package` naming a
+directory, or a bundled ID such as `proteus.outer-hunt` (which resolves to `plugins/outer-hunt`
+when run from the repository root), whose package has a room objective; otherwise the server is
+refused with exit status 2. Every 120 server ticks (one second) the package is read again; when
+`main.lua` or the state version changed, the new objective is staged and applies at the next
+12-tick objective boundary. With a `migrate` callback the state is kept; without one the
+objective restarts and re-announces present crews. The server prints
+`objective reload: revision N accepted (migrate|restart)` or
+`objective reload rejected: MESSAGE`; a failing candidate changes nothing. A change to the marks
+(any change to the room definition) is a definition revision instead
+([protocol v14](MULTIPLAYER_PROTOCOL.md#definition-revisions-v14)): a free room commits it only
+while it has no players, printing `objective reload: marks changed; revision N waits for an empty
+room` and later `definition revision N committed at tick T`, and the objective restarts on the
+new marks; players who join afterwards receive them. `wake_velocity --serve` shares the flag. See
+[room objective reload](PLUGIN_API.md#room-objective-reload-p5e) and
+[its revisions](PLUGIN_API.md#definition-revisions-from-reload-p5f).
 
 The standalone authority defaults to loopback, basin and UDP port 24680. `--bind` selects
 an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--seconds` /
