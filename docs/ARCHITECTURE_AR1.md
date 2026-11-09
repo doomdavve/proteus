@@ -71,7 +71,13 @@ stage calls the opposite endpoint, so delivery is never reentrant.
       send. A chunk therefore stays within the 12 commands one batch repeats
       (`src/boat_net_protocol.h:29`), the authority's 24-tick future window
       (`src/boat_net_protocol.h:30`, `src/boat_net_server.c:418`) and prediction's 32-tick lead
-      (`src/boat_prediction.h:11`).
+      (`src/boat_prediction.h:11`). The client normally sends a batch only every
+      `input_ticks` commands (2, `src/boat_net_protocol.h:28`, `src/boat_net_client.c:780`), so
+      an odd chunk would hold back its last command and the authority would repeat the previous
+      one. **Private mode flushes one batch at every chunk end**, carrying the chunk's
+      commands (≤ 12, one packet). Chosen over `input_ticks = 1` because it sends one message
+      per chunk instead of up to 12, leaves the Accept value and hosted behaviour untouched,
+      and flushes exactly where the authority needs the commands.
    2. **Authority service:** handle at most 128 inbound messages, then run the chunk's ticks.
       Each tick keeps today's order: commands, fleet/session step, rules events, `after_tick`,
       objective cadence, emission (AR0 tick order). The authoritative tick is must-complete.
@@ -145,6 +151,19 @@ with solo, and no net invariant changes. Teardown and recreation are the repeate
 the L0 gates already require. The host runs the in-process handshake in bounded service rounds
 within the restart frame, so the player sees what solo shows today (decision D5 keeps the full
 restart). If the gates show it needs more than one frame, how that frame looks joins D10.
+
+What crosses a restart follows today's `boat_session_restart` (`src/boat_session.c:60-75`), the
+caller's reset branch (`tools/wake_velocity.c:2036-2058`) and `boat_session_init`
+(`src/boat_session.c:30-37`):
+
+| Carried into the new endpoints | Reset |
+| --- | --- |
+| Location, waves and water options; handling class; voyage route and course definition; the active plugin revision; time-scale index and pause state (host-owned); best, last and reference runs; personal save paths. | Tick (to 0), world water and wakes, boat and presentation, voyage progress, course progress, objective (new generation), in-progress recording, practice latch; the ghost opponent is copied again from the reference or best run (`src/boat_replay.c:404-418`). |
+
+Before teardown the host captures the old authority's pending storage requests (a finished
+run's best/last save, a dirty work checkpoint) and lets the storage adapter complete them, as
+today's restart flushes first. Every request and ack carries the session generation; an ack
+for an earlier generation is reported to the client but never applied to the new authority.
 
 **Local host management (outside any protocol).** Start/stop and teardown, pause and grant,
 time-scale index, restart, resume from a save at start, staging a plugin revision, storage
@@ -234,8 +253,8 @@ limits, and produced late commands), and raising the catch-up cap (same clock co
 
 | Item | Capture (authority, between ticks) | Request queue | Storage adapter | Outcomes |
 | --- | --- | --- | --- | --- |
-| Course run and best | Finish commits the result at its tick (must-complete); the recorder keeps the per-tick replay samples. Practice runs never request a save. | One pending best/last request; a newer finish supersedes an unstarted one. | Atomic replace in the data directory; digest-named best (`src/boat_replay.h:55-80`); IndexedDB in the browser. | Ack `saved`/`failed(reason)` with run identity; failure keeps the run as "last" and reports it, as today. |
-| Work autosave | `boat_work_frame_due` after the frame's ticks (`src/boat_work_session.h:139-141`); `boat_work_session_save` copies a checkpoint with generation, tick and work digest. | One request; an unstarted older checkpoint is superseded (coalescing like today's dirty state). | `cargo-<package>.sav`, `.bak`, `.rejected` unchanged. | Ack with checkpoint identity; clean only if it matches the latest capture; failure keeps dirty for the next policy-driven attempt. No crash durability or infinite retry. |
+| Course run and best | Finish commits the result at its tick (must-complete); the recorder keeps the per-tick replay samples. Practice runs never request a save. | One pending best/last request; a newer finish supersedes an unstarted one. | Atomic replace in the data directory; digest-named best (`src/boat_replay.h:55-80`); IndexedDB in the browser. | Ack `saved`/`failed(reason)` with run identity and session generation; failure keeps the run as "last" and reports it, as today. |
+| Work autosave | `boat_work_frame_due` after the frame's ticks (`src/boat_work_session.h:139-141`); `boat_work_session_save` copies a checkpoint with generation, tick and work digest. | One request; an unstarted older checkpoint is superseded (coalescing like today's dirty state). | `cargo-<package>.sav`, `.bak`, `.rejected` unchanged. | Ack with checkpoint identity (session generation, tick, digest); clean only if it matches the latest capture; failure keeps dirty for the next policy-driven attempt. No crash durability or infinite retry. |
 | Work resume | Before the first tick. | — | Startup read (allowed blocking), backup fallback, set-aside. | Resumed / fresh / set aside, as `boat_work_save_load` (`src/boat_work_save.h:33-36`). |
 | Leave-time save | On quit/title return, after the last tick. | Synchronous at shutdown (not a frame path). | As autosave. | Reported success/failure, as `boat_work_save_leave` (`:41-44`). |
 | Objective state | Authority adapter owns checkpoint, events, HUD and quarantine (room pattern: `tools/boat_room_objective.c:225-250`). | — | Not persisted (unchanged). | Commit, or the existing failure/quarantine policy. |
@@ -286,7 +305,7 @@ the modes it ships. L5 and L7 change no ownership.
 
 | Row | Mode | Missing commands/state | Topology | Compatibility changes | Prerequisite slices | Fixtures | Acceptance gates | Removal point |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| L0 (AR6) | Private native free boating | Private schedule mode with chunked grants; handling class; current/crossing water; restart by recreation; full-precision commands (ring, missing-input policy, prediction history); solo wake-object parameters | T1 | None on the wire; private range added; fleet/core handling and water changes also run in hosted rooms | AR2a input value → commands | AR0 basin/outer captures and wake traces; new solo-versus-local per-tick hash trace; net golden | Trace equality at ¼×, 1×, 8× and a 0.1 s clamped frame at 8× (`G = 96`); pause, focus loss, suspension; restart and 100 repeated sessions; offline start; zero late/future/rate-limited commands; queue-saturation and partial-startup release on virtual time; net golden bytes unchanged and the net regression suite passing; native windowed manual check | Free-boating branch of the frame loop after L6 passes |
+| L0 (AR6) | Private native free boating | Private schedule mode with chunked grants; handling class; current/crossing water; restart by recreation; full-precision commands (ring, missing-input policy, prediction history); solo wake-object parameters | T1 | None on the wire; private range added; fleet/core handling and water changes also run in hosted rooms | AR2a input value → commands | AR0 basin/outer captures and wake traces; new solo-versus-local per-tick hash trace; net golden | Trace equality at ¼×, 1×, 8×, a 0.1 s clamped frame at 8× (`G = 96`) and odd-sized chunks (a partial first chunk, an odd remainder, an objective-gated stop); pause, focus loss, suspension; restart and 100 repeated sessions; offline start; zero late/future/rate-limited commands; queue-saturation and partial-startup release on virtual time; net golden bytes unchanged and the net regression suite passing; native windowed manual check | Free-boating branch of the frame loop after L6 passes |
 | L6 | Scripted demos and captures | Scripted command source | T1 | None | L0 | Capture hashes, `--demo` traces, `--title-start` checks | Byte-equal captures | `demo_step` direct path |
 | L2 | Time trial, runs, bests, ghosts | Course state and results; practice notice; course restart; recorder camera-follow; storage requests/acks | T1 | None on disk (replay and best names) | AR3 persistence placement | `replay-fixture.run` hash, course/replay validators | Equal results/splits from the same commands; best selection; practice; save failure | Course recording/flush in `BoatSession` |
 | L1 | Voyages, tours, objectives | Voyage state/events, recover, objective adapter on the authority, solo revision staging | T1 | None | AR5 (data codecs) for the adapter's dependencies | Plugin objective traces and voyage validators | Equal objective traces and revisions from the same command stream; quarantine; weather | `wake_plugin_before/after_tick` ownership |
