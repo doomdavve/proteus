@@ -11,6 +11,8 @@
 
 #define BOAT_LOCAL_CHUNK_TICKS 12 // Ticks per chunk at most; chunks end on multiples of 12.
 #define BOAT_LOCAL_STARTUP_ROUNDS 8 // Service rounds a start may take before it fails.
+// The largest grant: 0.1 s clamped frames at 8x (docs/ARCHITECTURE_AR1.md section 2).
+#define BOAT_LOCAL_MAX_GRANT 96
 
 typedef struct {
     // Location owners indexed by BoatLocationId (the client's table); RESOURCES[LOCATION] must be
@@ -22,10 +24,13 @@ typedef struct {
 } BoatLocalConfig;
 
 // Called after each predicted tick of a chunk's intake: VIEW is the client's prediction at TICK
-// (the boat the authority will commit). Presentation steps here, never the authority.
+// (the boat the authority will commit) and WATER the wake pool that boat read during the tick,
+// before the tick's emission, as boat_session_step's presentation reads it. Presentation steps
+// here, never from the authority.
 typedef struct {
     void *context;
-    void (*tick)(void *context, const BoatFleet *view, unsigned slot, uint64_t tick);
+    void (*tick)(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
+        const BoatWakeObjects *water);
 } BoatLocalObserver;
 
 typedef struct {
@@ -43,6 +48,7 @@ typedef struct {
     uint32_t generation; // The session generation: the authority's epoch; restarts increment it.
     uint64_t tick; // Ticks granted so far: the authority's tick.
     bool running;
+    BoatWakeObjects water; // The observer's pre-emission pool for the current tick.
     char failure[128]; // Why the latest start, frame or restart failed.
     BoatLocalStats stats;
 } BoatLocal;
@@ -60,10 +66,11 @@ bool boat_local_restart(BoatLocal *local, const BoatLocalConfig *config, double 
 // The size of the chunk that starts after TICK with REMAINING granted ticks: up to the next
 // multiple of BOAT_LOCAL_CHUNK_TICKS, at most REMAINING.
 unsigned boat_local_chunk(uint64_t tick, unsigned remaining);
-// Run one host frame's GRANT ticks (zero while paused) in chunks. Per chunk: the client commands
-// each tick from INPUT and the frame's targets (solo's expressions) and OBSERVER sees each
-// predicted tick; one batch is flushed; the authority handles its messages and runs the chunk;
-// the client handles the results. False on an endpoint failure (D10), with failure text.
+// Run one host frame's GRANT ticks (zero while paused, at most BOAT_LOCAL_MAX_GRANT) in chunks. Per
+// chunk: the client commands each tick from INPUT and the frame's targets (solo's expressions) and
+// OBSERVER sees each predicted tick; one batch is flushed; the authority handles its messages and
+// runs the chunk; the client handles the results. False on an endpoint failure (D10), with failure
+// text.
 bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
     float thrust_target, float steering_target, const BoatLocalObserver *observer);
 // The client's view: the predicted fleet, at the authority's tick after a frame.

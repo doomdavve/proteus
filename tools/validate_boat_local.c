@@ -140,9 +140,10 @@ static void direct_frame(Frame f)
     }
 }
 
-static void observe(void *context, const BoatFleet *view, unsigned slot, uint64_t tick)
+static void observe(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
+    const BoatWakeObjects *water)
 {
-    (void)context;
+    (void)context, (void)water;
     for (unsigned i = 0; i < expected_count; ++i)
         if (expected[i].tick == tick) {
             ++observed;

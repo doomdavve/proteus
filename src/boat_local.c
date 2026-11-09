@@ -122,6 +122,10 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
         fail(local, "the local session is not running");
         return false;
     }
+    if (grant > BOAT_LOCAL_MAX_GRANT) {
+        fail(local, "a frame granted more than 96 ticks");
+        return false;
+    }
     ++local->stats.frames;
     boat_net_memory_set_time(local->network, now);
     unsigned chunks = 0;
@@ -130,13 +134,19 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
         BoatNetClient *client = &local->client;
         for (unsigned i = 1; i <= count; ++i) {
             uint64_t tick = local->tick + i;
+            if (observer && observer->tick) {
+                // The pool at TICK - 1, advanced as the fleet does before stepping the boats.
+                local->water = client->prediction.fleet.state.wakes;
+                boat_wake_objects_advance(&local->water);
+            }
             if (!boat_net_client_command(client, tick, input, thrust_target, steering_target)) {
                 fail(local, "the local client could not command its boat");
                 local->running = false;
                 return false;
             }
             if (observer && observer->tick)
-                observer->tick(observer->context, &client->prediction.fleet, client->slot, tick);
+                observer->tick(observer->context, &client->prediction.fleet, client->slot, tick,
+                    &local->water);
         }
         BoatNetTransport *transport = &client->transport;
         uint64_t dropped = transport->stats(transport->context).dropped;

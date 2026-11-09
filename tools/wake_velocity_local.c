@@ -1,4 +1,5 @@
 #include "wake_velocity_local.h"
+#include "boat_time_control.h"
 #include "raylib.h"
 
 #include <math.h>
@@ -34,31 +35,38 @@ bool wake_local_restart(
     return local->active;
 }
 
+typedef struct {
+    WakeLocal *local;
+    BoatSession *session;
+} Present;
+
 // The client's predicted boat at TICK becomes the session's, and its presentation follows as
-// boat_session_step steps it.
-static void present(void *context, const BoatFleet *view, unsigned slot, uint64_t tick)
+// boat_session_step steps it: against WATER, the pool before the tick's emission.
+static void present(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
+    const BoatWakeObjects *water)
 {
-    BoatSession *session = context;
+    Present *p = context;
+    BoatSession *session = p->session;
     session->boat = view->state.slots[slot].boat;
     boat_session_set_tick(session, tick);
-    if (!session->presentation_enabled)
-        return;
-    BoatWorld world = session->world;
-    world.water.objects = &view->state.wakes;
-    boat_presentation_step(&session->presentation, &session->boat, &world, boat_tick_seconds(tick));
+    if (session->presentation_enabled) {
+        BoatWorld world = session->world;
+        world.water.objects = water;
+        boat_presentation_step(
+            &session->presentation, &session->boat, &world, boat_tick_seconds(tick));
+    }
+    if (p->local->traced)
+        p->local->traced(p->local->traced_context, session, view);
 }
 
 bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
     BoatFrameMetrics *metrics)
 {
-    unsigned grant = 0;
-    while (*accumulator >= BOAT_TICK_SECONDS) {
-        *accumulator -= BOAT_TICK_SECONDS;
-        ++grant;
-    }
+    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
     double started = boat_profile_time(IsWindowReady());
-    BoatLocalObserver observer = { session, present };
+    Present context = { local, session };
+    BoatLocalObserver observer = { &context, present };
     bool ok = boat_local_frame(
         &local->local, now, grant, input, thrust_target, steering_target, &observer);
     if (ok && grant)

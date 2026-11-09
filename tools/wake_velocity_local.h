@@ -12,6 +12,9 @@
 typedef struct {
     BoatLocal local;
     bool active;
+    // Test seam: called after each predicted tick has filled the session (NULL in the game).
+    void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
+    void *traced_context;
 } WakeLocal;
 
 // Start a session from SESSION's location, water, scene, handling and boat and OBJECTS' pool
@@ -21,9 +24,9 @@ bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectS
 // After the game restarted SESSION and OBJECTS: a new generation from their reset state.
 bool wake_local_restart(
     WakeLocal *local, const BoatSession *session, const ObjectStudy *objects, double now);
-// Grant the ticks ACCUMULATOR holds (the solo tick loop's arithmetic) and run them; then copy the
-// predicted pool into OBJECTS. Presentation steps per predicted tick. False on an endpoint
-// failure (D10).
+// Grant the ticks ACCUMULATOR holds (boat_time_grant, at most BOAT_LOCAL_MAX_GRANT; any excess
+// stays for the next frame) and run them; then copy the predicted pool into OBJECTS. Presentation
+// steps per predicted tick against the pool the boat read. False on an endpoint failure (D10).
 bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
     BoatFrameMetrics *metrics);
