@@ -880,5 +880,5 @@ and the accepted decisions; this plan keeps only the step status (header and
   only: no implementation exists, and nothing was played or browser-tested.
 - AR6 verification, 2026-11-09, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
   build warning-clean; `ctest --preset full` passed all 491 enabled tests (13 disabled), including
-  the 14 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
+  the 16 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
   windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).
