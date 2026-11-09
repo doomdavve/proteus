@@ -413,6 +413,29 @@ static int startup_failure(void)
     return 0;
 }
 
+// A saturated queue is an endpoint failure, never a silently dropped command batch: unreliable
+// overflow drops the batch, reliable overflow closes the link. Both stop the session.
+static int queue_saturation(void)
+{
+    for (unsigned reliable = 0; reliable < 2; ++reliable) {
+        if (open_world(BASIN) || drive(one, 30))
+            return 1;
+        BoatNetMessage ping = { .header = { .type = BOAT_NET_PING, .epoch = local.generation } };
+        uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+        size_t size = boat_net_encode(&ping, bytes);
+        CHECK(size);
+        for (unsigned i = 0; i < BOAT_NET_MEMORY_QUEUE; ++i)
+            boat_net_send(&local.client.transport, 0, reliable ? BOAT_NET_CONTROL : BOAT_NET_STATE,
+                bytes, size);
+        now += 1.0 / 60;
+        CHECK(!boat_local_frame(&local, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
+        CHECK(!local.running && local.failure[0]);
+        CHECK(!boat_local_frame(&local, now, 2, (BoatInput) { 0 }, 0, NAN, NULL));
+        boat_local_stop(&local);
+    }
+    return 0;
+}
+
 // The private codec round-trips full precision; a hosted room never accepts the private range: it
 // is malformed there, as any unknown type, and rejects the sender.
 static int private_range(void)
@@ -491,6 +514,7 @@ static int bench(void)
             worst_96 = fmax(worst_96, ms);
         }
     }
+    printf("startup: %u service rounds\n", local.stats.startup_rounds);
     printf("outer 8x 60 Hz (16 ticks/frame): mean %.3f ms, worst %.3f ms over %u frames\n",
         total / frames, worst, frames);
     printf("outer 8x 0.1 s frames (G = 96): mean %.3f ms, worst %.3f ms over %u frames\n",
@@ -531,6 +555,7 @@ int main(int argc, char **argv)
         TEST_CASE(restart_generation),
         TEST_CASE(repeated_sessions),
         TEST_CASE(startup_failure),
+        TEST_CASE(queue_saturation),
         TEST_CASE(private_range),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
