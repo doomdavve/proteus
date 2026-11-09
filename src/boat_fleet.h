@@ -49,6 +49,9 @@ typedef struct {
 
 typedef struct BoatFleet {
     BoatWorld world; // Immutable definition and water settings; objects borrow state.wakes.
+    // Engine class per slot, NULL for the speedboat (every room). Immutable, borrowed and kept
+    // by copies and checkpoint restores; never part of the checkpointed state.
+    const BoatHandling *handling[BOAT_FLEET_SLOTS];
     BoatFleetState state;
     BoatFleetStats stats;
 } BoatFleet;
