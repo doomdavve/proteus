@@ -607,7 +607,7 @@ class Worker(unittest.TestCase):
             for _ in range(2):
                 job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=360)
                 try:
-                    job.process.wait(timeout=10)  # Failure deadline, no simulation clock.
+                    job.process.wait(timeout=60)  # Failure deadline only: Debug CI under -j 4 is slow.
                     self.assertEqual(job.poll(1)["status"], "ok", job.result)
                     self.assertEqual(job.result["operation"], "preview")
                     self.assertEqual(len(job.result["artifact_id"]), 64)
