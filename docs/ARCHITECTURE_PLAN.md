@@ -1,13 +1,15 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) drafted
-on `arch/ar1-design`; awaiting review and the user's
-[decisions D1–D10](ARCHITECTURE_AR1.md#open-product-decisions). No production refactor started.
-**Open:** AR1 review and decisions; platform, browser and real-time qualification.
+**Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) reviewed;
+the user accepted [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) as recommended.
+The AR1 PR (`arch/ar1-design`) awaits approval. No production refactor started; nothing played
+or browser-tested.
+**Open:** AR1 PR approval; platform, browser and real-time qualification.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
 (AR10).
-**Next:** AR1 review; then AR2a and the AR6 pilot (ledger row L0).
+**Next:** AR2–AR6 in AR1's order, starting with AR2a (input value → commands), the only
+prerequisite of the AR6 pilot (L0); then AR6, AR3, AR5, with AR4 independent.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -696,9 +698,10 @@ need separate treatment, not relaxed physics/codec comparisons.
 
 ## AR1 authority/client design — 2026-11-09
 
-Drafted, not reviewed or accepted. [ARCHITECTURE_AR1.md](ARCHITECTURE_AR1.md) holds the
-selections, mode matrix, migration ledger and the user's open decisions; this plan keeps only
-the step status (header and [AR1 step](#ar1--authorityclient-architecture-and-migration-design)).
+Reviewed; product decisions accepted 2026-11-09; implementation not started.
+[ARCHITECTURE_AR1.md](ARCHITECTURE_AR1.md) holds the selections, mode matrix, migration ledger
+and the accepted decisions; this plan keeps only the step status (header and
+[AR1 step](#ar1--authorityclient-architecture-and-migration-design)).
 
 ## Current evidence and limitations
 
@@ -750,3 +753,5 @@ the step status (header and [AR1 step](#ar1--authorityclient-architecture-and-mi
   `PROTEUS_GPU_TESTS=OFF` (fetched sources reused from the main checkout) passed; `ctest --preset
   full` with socket/process access passed all 474 enabled tests in 38.84 s (13 disabled). No
   browser, Windows/Linux, GPU or manual checks; documentation-only beyond the resync commit.
+- 2026-11-09: the user accepted AR1 product decisions D1–D10 as recommended. Product direction
+  only: no implementation exists, and nothing was played or browser-tested.

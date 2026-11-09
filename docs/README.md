@@ -157,7 +157,7 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   envelope, authority rules carried on the wire, version policy and fixtures.
 - [Architecture restructuring plan](ARCHITECTURE_PLAN.md): AR0 merged baseline/contracts and CPU
   verification complete (2026-11-09); the [AR1 authority/client design](ARCHITECTURE_AR1.md),
-  including offline single player, is drafted and awaits review and user decisions. Its
+  including offline single player, is reviewed with its product decisions accepted. Its
   [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
   Owns migration, platform/module restructuring and review reconciliation, then becomes
   `ARCHITECTURE.md`. Production refactoring has not started.

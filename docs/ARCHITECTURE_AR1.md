@@ -1,11 +1,12 @@
 # AR1 authority/client design — 2026-11-09
 
-**Status:** draft for review; no production code, scheduler, worker, protocol extension or mode
-is implemented. The [architecture plan's AR1 step](ARCHITECTURE_PLAN.md#ar1--authorityclient-architecture-and-migration-design)
+**Status:** reviewed (independent reviews, 2026-11-09); the user accepted
+[product decisions](#product-decisions) D1–D10 as recommended on 2026-11-09. No production code,
+scheduler, worker, protocol extension or mode is implemented, and nothing here has been played
+or browser-tested. The [architecture plan's AR1 step](ARCHITECTURE_PLAN.md#ar1--authorityclient-architecture-and-migration-design)
 owns the step status. Observed behaviour is cited at `ab01d92`; it extends the
 [AR0 baseline](ARCHITECTURE_PLAN.md#ar0-merged-baseline-and-contracts--2026-11-09) and
-does not restate it. [Open product decisions](#open-product-decisions) need the user before
-AR6 starts.
+does not restate it.
 
 Selections in one place:
 
@@ -23,8 +24,8 @@ Selections in one place:
   copied bytes; storage adapters in the application write them and return identified acks.
 - **Browser:** authority in the game's main Wasm (no Lua), with the existing isolated objective
   evaluator as its compute service and the T/T+1 gate moved to the authority's tick grant.
-- **Precision:** private sessions keep full-precision commands during migration (pending
-  decision D4); hosted rooms keep v14 quantization.
+- **Precision:** private sessions keep full-precision commands during migration (D4);
+  hosted rooms keep v14 quantization.
 - **Restart:** recreates both endpoints at tick 0.
 
 ## 1. Mode behaviour matrix
@@ -61,8 +62,8 @@ stage calls the opposite endpoint, so delivery is never reentrant.
 3. **Grant:** `G` ticks from the existing accumulator (`boat_time_frame_seconds` or
    `boat_time_work_frame_seconds`, `src/boat_time_control.h:24-37`); `G = 0` while paused,
    replay is playing or an objective transaction gates the authority. `G <= 96`
-   (0.1 s × 8 × 120 Hz), the same bound solo has today. Which states pause and which rates
-   exist depend on decisions D1 and D2.
+   (0.1 s × 8 × 120 Hz), the same bound solo has today. Pause states and rates follow the
+   accepted D1 and D2.
 4. **Chunks:** the grant runs as chunks of at most 12 ticks, each ending at the next multiple
    of 12 (the objective cadence) or at the end of the grant. Per chunk, in this order:
    1. **Client intake:** produce the chunk's commands, addressed to authority ticks
@@ -149,7 +150,7 @@ tick 0 with a new epoch, new client, fresh transport pair), rather than keeping 
 with an offset. Tick 0 keeps today's water phase and trace, so restart traces stay comparable
 with solo, and no net invariant changes. Teardown and recreation are the repeated-session case
 the L0 gates already require. The host runs the in-process handshake in bounded service rounds
-within the restart frame, so the player sees what solo shows today (decision D5 keeps the full
+within the restart frame, so the player sees what solo shows today (the accepted D5 keeps the full
 restart). If the gates show it needs more than one frame, how that frame looks joins D10.
 
 What crosses a restart follows today's `boat_session_restart` (`src/boat_session.c:60-75`), the
@@ -233,7 +234,7 @@ snapshot-stall resync fires after 1 s of elapsed time (`:846-856`).
 | Peer liveness, handshake | 5 s / 10 s elapsed | Disabled: both endpoints are serviced by the same host frame; failure is an explicit endpoint result. Startup has a bounded failure deadline on the elapsed clock. |
 | Ping/RTT, resync and reset rate limits, objective-worker deadline, save attempts | Elapsed | Elapsed (operational, rule 5) |
 
-Assuming decisions D1, D2 and D5 as recommended, this preserves solo semantics exactly: private
+With the accepted D1, D2 and D5, this preserves solo semantics exactly: private
 menu/help/focus pause and replay grant 0; ¼×–8× scaling, the 0.1 s clamp and stall discard come
 from the same functions; the work session's over-1 s suspension rule is its grant function;
 browser suspension resumes through the same clamp. Hosted rooms keep running when a client
@@ -279,7 +280,7 @@ browser cannot host rooms today.
 | **B1 authority in the main Wasm, evaluator as its service** | Net and authority adapters are Lua-free; reuses the firm 5 s evaluator contract, pinned identities, staged commit and quarantine; the gate moves from the client tick loop (`tools/wake_velocity.c:2026-2028`, `tools/wake_velocity_plugin.c:201-302`) to the authority's grant, so T/T+1 behaviour is preserved, not reinvented. | Objective cadence still gates simulation on worker round trips; at high speed the requested rate may not be reached (as today). |
 | B2 authority Worker/Wasm with Lua | Synchronous objectives like native. | Second simulation Wasm with duplicated world resources, cross-thread grants, snapshot hops, worker lifecycle and failure cases; Lua beside authoritative state in the browser. |
 
-**Selected: B1.** With the recommended D7, browser private modes stay those shipped today: free
+**Selected: B1.** Under the accepted D7, browser private modes stay those shipped today: free
 boating, voyages and tours with optional objectives and timers, and the basin time trial.
 Working harbour stays native-only (D7). Offline solo needs no remote server.
 
@@ -322,20 +323,23 @@ browser and phone frame cost of T1 (AR6/L4); objective callback and file I/O wal
 common client (L5, net regression suite); full-precision and handling/water changes in code
 hosted rooms share (L0, net golden and regression gates).
 
-## Open product decisions
+## Product decisions
 
-| ID | Question | Options | Recommendation |
+The user accepted every recommendation below on 2026-11-09. Acceptance settles product direction;
+it is not acceptance of any implementation, which each ledger row's gates still decide.
+
+| ID | Question | Options | Accepted (2026-11-09) |
 | --- | --- | --- | --- |
-| D1 | Private pause | (a) as today: focus loss, help and menu pause; open console simulates with a neutral helm; (b) pause only from the menu | (a) |
-| D2 | Time scaling | (a) keep ¼×–8× in every private mode, practice latch for trials; (b) restrict it | (a) |
-| D3 | Saves | (a) unchanged: working-harbour autosave, course bests, no voyage progress saves; (b) add resumable voyage progress now | (a); new saves are feature work |
-| D4 | Command precision | (a) full precision in private sessions; (b) v14 quantization everywhere after evidence; (c) widen the protocol (v15) | (a) now, revisit with the section 8 evidence |
-| D5 | Free-boating reset | (a) keep the full restart; (b) respawn like rooms | (a) |
-| D6 | Developer studies in the game | (a) private world options; (b) move to review tools, keep validators | (b) |
-| D7 | Browser working harbour | (a) stays native-only; (b) make it browser-capable through the evaluator gate | (a) |
-| D8 | Rollout switch | (a) developer-only switch, never in a release; (b) a user-visible fallback for one release | (a) |
-| D9 | Browser objectives at high speed | (a) keep the T/T+1 gate even if 8× is not reached; (b) revise the gate | (a) |
-| D10 | What the player sees when the private endpoint fails (reliable-queue overflow, failed startup deadline, failed restart) | (a) return to the title with a message, after the leave-time save where one exists; (b) restart the session in place with a notice; (c) stop the game with a diagnostic | (a) |
+| D1 | Private pause | (a) as today: focus loss, help and menu pause; open console simulates with a neutral helm; (b) pause only from the menu | (a) — accepted |
+| D2 | Time scaling | (a) keep ¼×–8× in every private mode, practice latch for trials; (b) restrict it | (a) — accepted |
+| D3 | Saves | (a) unchanged: working-harbour autosave, course bests, no voyage progress saves; (b) add resumable voyage progress now | (a); new saves are feature work — accepted |
+| D4 | Command precision | (a) full precision in private sessions; (b) v14 quantization everywhere after evidence; (c) widen the protocol (v15) | (a) now, revisit with the section 8 evidence — accepted |
+| D5 | Free-boating reset | (a) keep the full restart; (b) respawn like rooms | (a) — accepted |
+| D6 | Developer studies in the game | (a) private world options; (b) move to review tools, keep validators | (b) — accepted |
+| D7 | Browser working harbour | (a) stays native-only; (b) make it browser-capable through the evaluator gate | (a) — accepted |
+| D8 | Rollout switch | (a) developer-only switch, never in a release; (b) a user-visible fallback for one release | (a) — accepted |
+| D9 | Browser objectives at high speed | (a) keep the T/T+1 gate even if 8× is not reached; (b) revise the gate | (a) — accepted |
+| D10 | What the player sees when the private endpoint fails (reliable-queue overflow, failed startup deadline, failed restart) | (a) return to the title with a message, after the leave-time save where one exists; (b) restart the session in place with a notice; (c) stop the game with a diagnostic | (a) — accepted |
 
 ## Evidence
 
