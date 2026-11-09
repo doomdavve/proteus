@@ -409,6 +409,8 @@ if(NOT EMSCRIPTEN)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
+  # AR6 (L0): private free boating as a local authority and client (native only for now).
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_local.c tools/wake_velocity_local.h)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
   target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h)
