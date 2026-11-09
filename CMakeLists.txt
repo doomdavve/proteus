@@ -1131,6 +1131,12 @@ target_link_libraries(validate_boat_net_mux PRIVATE proteus_boat_net)
 target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
+# AR6 (L0): the private local session against the game's direct free-boating path.
+add_executable(validate_boat_local tools/validate_boat_local.c)
+target_link_libraries(validate_boat_local PRIVATE proteus_boat_net proteus_boat_drive)
+target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_local validate_boat_local LABELS core cpu)
+
 add_executable(validate_boat_net tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 # The same room harness over real ENet sockets on 127.0.0.1, still on a virtual clock. Cases
@@ -1801,7 +1807,7 @@ if(PROTEUS_OPTIMIZE_TESTS)
       validate_boat_map_index validate_boat_outer_map validate_boat_voyage validate_boat_fleet
       ambient_bake
       boat_server
-      proteus_boat_net validate_boat_net validate_boat_net_enet)
+      proteus_boat_net validate_boat_net validate_boat_net_enet validate_boat_local)
     target_compile_options(${target} PRIVATE
       $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:AppleClang,Clang,GNU>>:-O2>)
   endforeach()
