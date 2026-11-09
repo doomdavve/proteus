@@ -1,9 +1,8 @@
 # Architecture restructuring plan
 
 **Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) drafted
-on `arch/ar1-design` (in-process queued topology, host-granted ticks for private authorities,
-migration ledger); awaiting review and the user's
-[decisions D1–D9](ARCHITECTURE_AR1.md#open-product-decisions). No production refactor started.
+on `arch/ar1-design`; awaiting review and the user's
+[decisions D1–D10](ARCHITECTURE_AR1.md#open-product-decisions). No production refactor started.
 **Open:** AR1 review and decisions; platform, browser and real-time qualification.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
@@ -697,28 +696,9 @@ need separate treatment, not relaxed physics/codec comparisons.
 
 ## AR1 authority/client design — 2026-11-09
 
-Draft for review; the full design, mode matrix, ledger and decisions are in
-[ARCHITECTURE_AR1.md](ARCHITECTURE_AR1.md). Selections:
-
-- **Topology:** in-process, single-thread, queued (T1) for private sessions over the unimpaired
-  memory transport; hosted rooms keep `boat_server`. Threads, workers and processes are not
-  selected for private play.
-- **Scheduling:** private authorities run exactly a host-granted tick count per frame, computed
-  by today's solo/work frame functions, so pause, ¼×–8×, the 0.1 s clamp and stall discard are
-  unchanged; elapsed time keeps operational deadlines; liveness timeouts are disabled for
-  in-process peers. Hosted rooms keep the elapsed model and keep running when a client pauses.
-- **Contract:** v14 where it fits; a private extension range for private-only state and
-  commands; host management as local calls.
-- **Persistence:** authority captures between ticks and queues copied bytes; storage adapters
-  return identified acks; save formats and paths unchanged.
-- **Browser:** authority in the main Wasm without Lua, the existing objective evaluator as its
-  service, the T/T+1 gate moved to the authority's grant.
-- **Precision:** full-precision commands in private sessions during migration; hosted rooms
-  keep v14 (decision D4).
-- **Order of seams:** AR2a precedes AR6 (L0); AR3 persistence placement and objective-bridge
-  extraction precede L2 and L4; AR5 precedes L1 and L3; AR4 is independent. AR7 group order:
-  L0, L6, L2, L1, L3, L4. No layout change beyond the AR8 proposal: the private codec belongs to
-  net, authority adapters to `session`, storage adapters stay with the application until AR8b.
+Drafted, not reviewed or accepted. [ARCHITECTURE_AR1.md](ARCHITECTURE_AR1.md) holds the
+selections, mode matrix, migration ledger and the user's open decisions; this plan keeps only
+the step status (header and [AR1 step](#ar1--authorityclient-architecture-and-migration-design)).
 
 ## Current evidence and limitations
 
@@ -754,11 +734,14 @@ Draft for review; the full design, mode matrix, ledger and decisions are in
   persistence failure/retry behavior remains unchanged. Documentation-only clarification.
 - 2026-11-09: AR1 design drafted on `arch/ar1-design` ([design](ARCHITECTURE_AR1.md)): mode
   matrix, frame order, contract layers, topology, scheduling resolution, persistence, browser
-  composition, precision and ledger; nine product decisions listed for the user. Not reviewed.
+  composition, precision and ledger; product decisions listed for the user. An independent
+  review the same day required chunked grants, restart by endpoint recreation, tick-based
+  client stall rules, work targets, the full-precision hosted-path risk and proxy labelling;
+  applied.
 - AR1 measurement, 2026-11-09, scratch harness (not committed), Release `proteus_boat_net`, Apple
-  M1 Max, macOS 26.6.2, Apple clang 21.0.0: one predicting client in-process costs about 2–3×
-  direct one-boat stepping (outer 0.032 versus 0.014 ms/tick), worst frame 0.58 ms at an
-  emulated 8×, zero own prediction error. Feasibility on one machine, not qualification.
+  M1 Max, macOS 26.6.2, Apple clang 21.0.0: a proxy run of today's elapsed-`now` server and
+  client in-process (scaled `now` at 8×, 16 ticks per frame) cost about 2–3× direct one-boat
+  stepping. Not the selected scheme; the 96-tick figure in the design is extrapolated.
 - AR1 resync nit (PR #176): a checkpoint at the client's mirror tick is installed while a
   snapshot at that tick is ignored. Investigated and kept as the wake-repair path; comment and
   [protocol](MULTIPLAYER_PROTOCOL.md) and [testing](TESTING.md) updated, and
