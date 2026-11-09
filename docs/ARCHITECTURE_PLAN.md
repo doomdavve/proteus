@@ -457,10 +457,18 @@ Implemented (ledger row L0):
 - Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
 - Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
   or authoring (in practice basin free boating) start a local session; the solo accumulator's
-  ticks become the grant; the client's prediction fills the game's `BoatSession` boat, clock,
-  presentation (stepped per predicted tick) and arcade pool. A restart recreates both endpoints;
-  an endpoint failure returns to the title with its reason (D10; free boating has no save).
-  Debug builds accept `--direct-session` (D8); release builds (`NDEBUG`) do not.
+  ticks become the grant (at most 96 per frame; `boat_local_frame` refuses more and the glue
+  carries any excess in the accumulator); the client's prediction fills the game's `BoatSession`
+  boat, clock, presentation and arcade pool. Presentation steps per predicted tick against the
+  pool the boat read (the previous tick's pool advanced once, before the tick's emission), as
+  `boat_session_step` does. A restart recreates both endpoints; an endpoint failure returns to the
+  title with its reason (D10; free boating has no save). `--direct-session` (D8) is parsed only
+  inside `#ifndef NDEBUG`, so a release build rejects it as an unknown option.
+- Repeated failure is endpoint failure (§5): a private client that is still stalled (snapshot or
+  wake mismatch) when a fourth resync falls due, after `BOAT_NET_LOCAL_RESYNCS` = 3 resyncs with
+  no clean state between them, closes with its reason (about 480 granted ticks). The in-process
+  link is lossless, so one checkpoint repairs a stall; three allow for a checkpoint superseded by
+  a restart or a second mismatch. Hosted clients are unchanged.
 
 Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
 
@@ -477,29 +485,39 @@ Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
 - Outer: every shipped outer solo session is a voyage package, so L0 reaches the game on the
   basin only; outer with current and crossing water is qualified in CTest, and outer play
   migrates with L1.
+- Presentation is stepped while the client takes each predicted tick (the observer inside the
+  chunk), not at §2 stage 7 after the chunk's intake. It reads the same pool and boat as stage 7
+  would, so the result is identical; moving it would need a per-tick history of the prediction.
 - Not done: impaired memory delivery for private sessions (T1 selects none; hosted impairment
   stays in `boat_net`), browser private sessions (L4), the objective-gated stop (no objective in
   L0), real offline startup and the native windowed manual check.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no wall clock):
 
-- `boat_local` (14 quick cases, each under 100 ms) compares every predicted tick and every frame's
-  authority tick bit for bit with the game's direct path (`timed_boat_step`): basin at ¼×, 1× and
+- `boat_local` (16 quick cases, each under 100 ms on Debug) drives the game's own glue
+  (`proteus_local_drive`, the library `wake_velocity` links) and compares every predicted tick's
+  boat, `BoatPresentation` and pool digest, and every frame's authority tick, bit for bit with the
+  game's direct path (`timed_boat_step`): basin at ¼×, 1× and
   8×; outer with waves, current and crossing at 1× and 8×; `G = 96` with 0.25 s stalls clamped at
   8× (9 chunks, a partial first chunk); uneven frames (odd remainders, partial first chunks);
   explorer handling; 30 s of pause; restart with stale old-generation traffic; 100 repeated
-  sessions; startup failure and release; queue saturation; the private range in a hosted room.
+  sessions; startup failure and release; queue saturation; the private range in a hosted room;
+  the 96-tick grant cap; an injected wake mismatch that one resync repairs, then one the authority
+  never repairs, which fails the session after three resyncs.
   Each drive has zero rate-limited, late, future or duplicate commands and every tick integrates
   a received command. Negative checks during development: quantizing the commands at the
-  authority fails `basin_1x` and `outer_8x`.
+  authority fails `basin_1x` and `outer_8x`; presenting against the session's stale pool fails
+  `basin_1x`'s per-tick presentation check. Presenting against the post-emission pool passes:
+  a newborn wake object contributes nothing at its birth tick (its birth envelope is zero).
 - Debug build warning-clean; `ctest --preset full`: see [current evidence](#current-evidence-and-limitations).
 - CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
   byte-identical to an `e1b1175` build (main's tree): captures drive the direct scripted path
   before the frame loop (L6 migrates them).
 - Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
-  outer with waves, current and crossing, no presentation): 16-tick frames at 8× mean 0.53 ms
-  (worst 0.62–0.74 ms) against 0.26 ms for the direct path; `G = 96` frames mean 3.09 ms (worst
-  3.72–3.78 ms). Presentation, stepped per tick on both paths, is not included.
+  outer with waves, current and crossing, through the game glue with presentation): 16-tick
+  frames at 8× mean 1.66 ms (worst 2.10–2.19 ms) against 1.40 ms for the direct path with
+  presentation; `G = 96` frames mean 8.45 ms (worst 13.9–14.1 ms).
+- The Windows CI lane builds and runs `boat_local`; not yet run on CI (no push).
 - Hidden-window smoke run (`--renderer cpu --frames 240 --performance-report`): the local
   session advanced 737 ticks in 280 chunks with no failure. Not a manual check.
 
@@ -861,6 +879,6 @@ and the accepted decisions; this plan keeps only the step status (header and
 - 2026-11-09: the user accepted AR1 product decisions D1–D10 as recommended. Product direction
   only: no implementation exists, and nothing was played or browser-tested.
 - AR6 verification, 2026-11-09, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
-  build warning-clean; `ctest --preset full` passed all 489 enabled tests (13 disabled), including
+  build warning-clean; `ctest --preset full` passed all 491 enabled tests (13 disabled), including
   the 14 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
   windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).
