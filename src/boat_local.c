@@ -138,7 +138,12 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
             if (observer && observer->tick)
                 observer->tick(observer->context, &client->prediction.fleet, client->slot, tick);
         }
-        if (!boat_net_client_flush(client)) {
+        BoatNetTransport *transport = &client->transport;
+        uint64_t dropped = transport->stats(transport->context).dropped;
+        // A full queue drops an unreliable batch without refusing it: in-process that is an
+        // endpoint failure, never a silent repeat of the previous command.
+        if (!boat_net_client_flush(client)
+            || transport->stats(transport->context).dropped != dropped) {
             fail(local, "the local transport refused the client's commands");
             local->running = false;
             return false;
