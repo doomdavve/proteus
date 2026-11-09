@@ -8,10 +8,10 @@
 #include "boat_skin.h"
 #include "boat_ui.h"
 #include "boat_version.h"
-#include "boat_web_touch.h"
 #include "boat_work_menu.h"
 #include "frame_pacer.h"
 #include "raylib.h"
+#include "wake_velocity_input.h"
 #include <stdio.h>
 #if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
@@ -1017,34 +1017,28 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             settled = true;
             continue;
         }
-        Vector2 pointer = GetMousePosition();
-        bool pointer_pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-#if defined(__EMSCRIPTEN__)
-        int touch_click = boat_web_touch_click(&pointer.x);
-        if (touch_click)
-            pointer_pressed = touch_click > 0;
-#endif
-        bool activate = false, back = IsKeyPressed(KEY_ESCAPE);
+        BoatAppInput in = boat_app_input_sample(true);
+        Vector2 pointer = in.pointer;
+        bool pointer_pressed = in.pointer_pressed;
+        bool activate = false, back = in.back;
         int step = 0;
         if (t.editing) {
             bool name = t.editing == s->name;
             edit(&t, name ? sizeof(s->name) : sizeof(s->address), name);
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || back) {
+            if (in.confirm || back) {
                 if (finish_edit(&t, !back) && t.panel == PANEL_JOIN)
                     t.selected = ROW_CONNECT;
                 back = false;
             }
         } else {
             while (GetCharPressed() != 0) { } // Letters typed outside a field are not kept.
-            step = (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
-                - (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W));
-            activate
-                = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE);
+            step = (int)in.down - (int)in.up;
+            activate = in.activate;
             int k = scale();
             Vector2 mouse = pointer;
             Vector2 point = { (mouse.x - (GetScreenWidth() - WIDTH * k) / 2) / k,
                 (mouse.y - (GetScreenHeight() - HEIGHT * k) / 2) / k };
-            Vector2 moved = GetMouseDelta();
+            Vector2 moved = in.pointer_delta;
             for (int i = 0; i < row_count(&t); ++i)
                 if (CheckCollisionPointRec(point, row_bounds(&t, i))) {
                     if (moved.x || moved.y)
@@ -1069,20 +1063,17 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         if (t.panel == PANEL_JOIN && t.selected == ROW_PUBLIC_SERVER && !t.editing
             && public_server_count() > 1) {
             int count = public_server_count();
-            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            int turn = in.right - in.left;
             t.public_shown = (unsigned)((int)t.public_shown + count + turn) % (unsigned)count;
         }
         if (t.panel == PANEL_JOIN && t.selected == ROW_LAN && !t.editing && t.found.count > 1) {
-            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            int turn = in.right - in.left;
             t.shown = (unsigned)((int)(t.shown + t.found.count) + turn) % t.found.count;
         }
         if (t.panel == PANEL_SINGLE) {
             int sel = solo_row(&t, t.selected);
             if (sel <= ROW_SOLO_EDGES) {
-                int step_turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-                    - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+                int step_turn = in.right - in.left;
                 int turn = step_turn + activate > 1 ? 1 : step_turn + activate;
                 if (sel == ROW_SOLO_PLACE) {
                     s->location = (s->location + BOAT_LOCATION_COUNT + 1 + turn)
@@ -1104,8 +1095,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             }
         }
         if (t.panel == PANEL_HOST && t.selected <= ROW_WATER) {
-            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
-                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            int turn = (in.right || activate) - in.left;
             if (t.selected == ROW_MODE)
                 s->host_mode
                     = (s->host_mode + BOAT_TITLE_HOST_MODES + turn) % BOAT_TITLE_HOST_MODES;
@@ -1120,8 +1110,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         if (settings
             && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC
                 || t.selected == ROW_EDGES || t.selected == ROW_LIGHTING)) {
-            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
-                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            int turn = (in.right || activate) - in.left;
             if (t.selected == ROW_BOAT)
                 s->skin = (s->skin + BOAT_SKIN_COUNT + turn) % BOAT_SKIN_COUNT;
             else if (t.selected == ROW_MUSIC)

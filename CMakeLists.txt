@@ -464,7 +464,8 @@ endif()
 # build-tree data directory keeps the player's settings out of the test.
 set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
 file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
-add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c)
+add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c
+  tools/wake_velocity_input.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(validate_boat_title PRIVATE proteus_render proteus_work_save
   proteus_frame_pacer proteus_boat_net_enet)
