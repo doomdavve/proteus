@@ -318,19 +318,25 @@ authoritative state. Keep predicted controls distinct from commits.
 **AR2a status (2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played).**
 Implemented: `BoatAppInput` and `boat_app_input_sample(poll_touch)` in
 `tools/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
-per frame in `study()` (after the menu-toggle block) and once per frame in `boat_title_run`. It
-carries pressed navigation (up/down/left/right, confirm, activate, back, pause), the pointer in
+per frame at the start of the `study()` frame body and once per frame in `boat_title_run`. It
+carries pressed navigation (up/down/left/right, confirm, activate, back, pause, time-scale
+bracket and backslash keys), held Backspace, the pointer in
 window pixels (position, delta, pressed, held; the web touch tap replaces position and press when
 polled) and held helm keys (steer left/right, throttle up/down, precision). Consumers migrated:
-the pause menu (`boat_menu_update` takes the value and reads no raylib input), the title's
+the pause menu (`boat_menu_update` takes the value and reads no raylib input; its per-frame gate
+is the pure `boat_menu_gate`, covered by `app_input`), the Escape/P menu toggle, the time-scale
+bracket/backslash keys, the Backspace reset hold, the title's
 navigation/pointer/turn reads, the game loop's keyboard steering, throttle, precision, native
 mouse-steering delta and the replay timeline pointer. Scene-coordinate conversion stays in each
 consumer. Deliberately unchanged: precedence and event consumption (the menu still runs only
 when open and focused; `GetCharPressed`/`GetKeyPressed` text queues, the console, F-keys, camera
-and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon keys and the
-browser mobile/mouse bridges still read their sources directly). The web touch tap is consumed
-only on frames where the menu update ran before (`poll_touch`), because the bridge's `click()`
-drains it; browser behaviour is not verified. Not done: turning the value into per-tick commands
+and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon reads in
+`wake_velocity_net.c` (Space held for the gun, E and Q presses for grenade and torpedo), the
+`GetCharPressed` time-key characters and the browser mobile/mouse bridges still read their
+sources directly; AR6 owns moving the pausing/time-scale/restart consequences behind host
+management). The web touch tap is consumed by `boat_app_input_poll_touch` only on frames where
+`boat_menu_gate` holds, because the bridge's `click()` drains it; browser behaviour is not
+verified. Open for AR2b/AR6: touch drain depends on menu state. Not done: turning the value into per-tick commands
 (AR6's client), the remaining consumers above, and AR2b.
 Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
 `ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
