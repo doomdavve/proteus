@@ -13,13 +13,11 @@ playground for iterating on effects, timing, audio, and presentation.
 - Keep implementation work local until the user explicitly approves opening a pull request.
   After approval, push the worktree branch and open the pull request for CI checks. Do not
   automatically create a pull request for each experimental iteration.
-- Stack dependent work explicitly: branch each follow-up from its parent branch, open its pull
-  request against that parent rather than `main`, and merge the stack in order. When a parent
-  gains `main` merges or conflict resolutions, merge the updated parent into every open child
-  before asking for review.
+- Keep one branch and one pull request per milestone or track, built from small, focused commits
+  (one per plan step). Do not open a pull request per step or stack pull requests on each other.
 - Keep per-step status in the owning plan. Update the `docs/README.md` overview only when its
-  area-level summary changes; copying each stacked step into the same overview row makes
-  otherwise independent branches conflict.
+  area-level summary changes; copying each step into the same overview row makes otherwise
+  independent branches conflict.
 - Reserve the main checkout for the user to explore and run different branches; do not use it
   for implementation work.
 
