@@ -35,6 +35,8 @@ explain them; a change to one is a change to this list.
    stands in for an elapsed deadline. Tests drive supplied time, never wall time.
 6. **State a timeliness class.** Every time-sensitive boundary states its class (below), its
    bounded work per call, its queue limits and what happens to late, stale or duplicate results.
+   Classify delivery, acceptance and commit separately where their policies differ; state
+   admission, cancellation, supersession and failure outcomes for obligations that must complete.
 7. **Bounded work, no waits.** No unbounded catch-up or queue draining, and no synchronous wait
    for external results on tick or frame paths. Repeated calls to a bounded service must not add
    up to unbounded work per frame. Intentional frame pacing and startup loading are allowed.
@@ -49,13 +51,25 @@ explain them; a change to one is a change to this list.
 ### Timeliness classes
 
 No path in this project is hard real-time: desktop and browser scheduling give no completion
-guarantee. Each boundary is one of:
+guarantee. Classify the relevant operation/stage, not an entire message or subsystem:
 
 | Class | Meaning | Examples |
 | --- | --- | --- |
-| Firm | A result accepted after its deadline has no value and is rejected; the system continues without it. | Browser objective result (rejected at `now >= deadline`), descriptor/query worker receipts. |
-| Soft | A late result is still used; lateness degrades responsiveness or presentation, and is measured. | Frame presentation, snapshot/command delivery, input-to-tick latency. |
-| Must-complete | Never dropped for lateness; delay is bounded where possible and otherwise recorded as a gap. | Authoritative tick commit, revision commit, saves and autosave. |
+| Firm | A result outside its acceptance deadline/window is rejected; lateness cannot justify applying it to finalized state. Recovery follows the operation's policy. | Browser objective result (`now >= deadline`), descriptor/query receipts, commands targeting an already finalized tick. |
+| Soft | Missing a responsiveness target does not alone invalidate otherwise eligible work; lateness is measured. Freshness, identity and supersession checks still apply. | Frame presentation and input-to-tick response; delivery latency of a snapshot that is still eligible at acceptance. |
+| Must-complete | An admitted obligation is not silently abandoned solely for lateness. Its contract requires completion or an explicit failure/cancellation/supersession outcome where permitted, not guaranteed success or unlimited retries. | Authoritative tick transaction, announced revision commit, admitted save attempt. |
+
+Transport arrival is not application acceptance. A command can arrive after its target tick
+and be rejected; a snapshot can arrive after a newer state and be ignored. Neither is made
+usable by a soft delivery-latency target. State deadline comparisons and freshness rules per
+stage rather than treating reliable transport as a completion guarantee.
+
+For must-complete work, define admission, the point after which cancellation/replacement is
+forbidden, allowed terminal outcomes, acknowledgement/diagnostics and retry policy. Proposed
+or staged work may be refused or superseded under its contract; committed obligations cannot
+be forgotten because a latency target was missed. Failure must not be reported as success.
+Bounds or unresolved gaps still apply to each attempt and to retries; the label does not
+authorize indefinite blocking, infinite retry, partial authoritative commits or crash durability.
 
 A boundary's class is part of its contract, so changing it is a behavior change under rule 8.
 
@@ -220,6 +234,8 @@ For each asynchronous service or worker, record:
   behavior under pause, suspension and delayed polling.
 - Its timeliness class, bounded work per poll, and cancellation/close behavior, resource
   release and stale-result identity (epoch, revision, tick, checkpoint).
+- Separate delivery, acceptance and commit policies; for admitted obligations, permitted
+  failure/cancellation/supersession outcomes, observability and bounded retry behavior.
 
 Moving work outside the fixed-step loop does not remove it from the frame budget. Preserve
 non-copyable resource owners, copyable borrowing worlds and stable revision addresses until
@@ -264,7 +280,8 @@ its observed baseline. Decide responsibilities before APIs/layout and preserve c
    a client pauses. Bound work across the whole host frame, not only each service call.
 6. Place course results, saves/resume, autosave, authored revisions and objective state on the
    authority side, with file I/O in a storage adapter outside core/net. Specify safe checkpoint
-   capture and commit acknowledgements. Preserve personal save locations and bests. Pose ghosts
+   capture, commit acknowledgements and failure/cancellation/supersession outcomes where permitted.
+   Preserve personal save locations and bests. Pose ghosts
    stay presentation recordings, distinct from resumable state and P5g records; reuse P5g where
    appropriate without a competing format.
 7. Select browser local-authority composition and mode support. The client Wasm excludes Lua
@@ -600,18 +617,21 @@ numeric wall-time budget is asserted. Rows describe the observed baseline.
 | --- | --- | --- |
 | Solo frame/input/ticks | `boat_time_frame_seconds` clamps real delta to 0.1 s, then scales by ¼× to 8× (`boat_time_control.h`); fixed 120 Hz steps. Inactive/replay/objective-waiting paths reset the accumulator. Stalled time is discarded. Soft. | AR2/AR3: end-to-end input/frame deadline and maximum frame work unqualified. Competitive dropped-time validity deferred. |
 | Work session frame | `boat_time_work_frame_seconds` adds no time when the session was inactive or a gap exceeds 1 s (suspension without a focus event); shorter stalls use the solo clamp. Soft. | AR1 item 5 keeps this suspension rule in the local-authority clock; AR7 working-harbour group verifies it. |
-| Server/client service | At most 128 messages per service call (`BOAT_NET_MESSAGES_PER_SERVICE`); at most `BOAT_NET_CATCH_UP_TICKS` (8) ticks per call; due ticks follow elapsed `now`, with no stall discard; overload after a backlog above 60 ticks lasts over 1 s. Peer timeout 5 s from the same `now`. Input repeats six ticks, neutral after 30. Authoritative state uses ticks. Tick commit must-complete; delivery soft. | AR3/AR5: per-message/callback cost is no proven service-time bound. Preserve timeout, backpressure and overload behavior. |
+| Server/client service | At most 128 messages per service call (`BOAT_NET_MESSAGES_PER_SERVICE`); at most `BOAT_NET_CATCH_UP_TICKS` (8) ticks per call; due ticks follow elapsed `now`, with no stall discard; overload after a backlog above 60 ticks lasts over 1 s. Peer timeout 5 s from the same `now`. Authoritative tick transaction is must-complete; delivery/presentation responsiveness is soft, subject to the separate acceptance rules below. | AR3/AR5: per-message/callback cost is no proven service-time bound. Preserve timeout, backpressure and overload behavior; overload can terminate service rather than promise all future ticks. |
+| Command and snapshot acceptance | Firm command eligibility: authority rejects target ticks `<= finalized`; it also rejects too-far-future, wrong-life and duplicate commands. Missing input repeats six ticks, neutral after 30. Client ignores snapshots `<= mirror_tick`; fresher snapshots must still pass validity/assembly rules. A snapshot has no blanket elapsed-time expiry merely because delivery is late. | AR1/AR6: separate input-response/delivery targets from tick eligibility and state supersession; retain late/stale counters and recovery tests. |
+| Definition revision lifecycle | Staging may fail validation; a newer waiting candidate can replace the previous waiting one, not an announced revision. Announcement pins the revision/commit tick; at that tick the authority commits and disconnects peers that are not ready. Announced authority commit is must-complete; client acceptance has a commit-tick cutoff and stale-revision checks. | AR1/AR7: preserve staged versus announced ownership and outcomes; shutdown/failure behavior must be explicit, not inferred as guaranteed delivery or crash durability. |
 | Local authority scheduling (conflict) | The server model above cannot host solo time scaling: 8× at 60 fps needs 16 ticks per frame against an 8-tick cap, and scaling `now` would also scale peer timeouts. Solo and work sessions discard stalled time; the server catches up. | AR1 item 5 selects the private-authority scheduling input; AR6 verifies it at every speed. |
-| Native/authority objective | Synchronous evaluation every 12 ticks; 64 queued objective events; overflow quarantines. Callback budget 100,000 instructions, migration 500,000 (`boat_plugin.h`). Reload/revision can initialize or migrate synchronously. Must-complete. | AR5: compilation, C calls, allocation and callbacks can hitch; instruction budgets do not bound wall time. No off-thread authority redesign selected. |
+| Native/authority objective | Synchronous evaluation every 12 ticks; 64 queued objective events; overflow quarantines. Callback budget 100,000 instructions, migration 500,000 (`boat_plugin.h`). Reload/revision can initialize or migrate synchronously. Admitted transaction has a must-complete outcome: commit or the existing failure/rollback/quarantine policy, not guaranteed script success. | AR5: compilation, C calls, allocation and callbacks can hitch; instruction budgets do not bound wall time. No off-thread authority redesign selected. |
 | Browser objective | Request copies source/checkpoint/events and pins epoch/revision/tick/digest. Poll rejects `now >= deadline` (5 s), stages an accepted update for the transaction boundary, closes the job and quarantines failure. Simulation gates at T; UI/render continue; no catch-up. Firm. | AR3 extracts this bridge with plugin import/export glue, separately from AR4. Qualify polling/decode/allocation cost without changing transaction policy. |
 | Descriptor/query workers | The stage job owns backend resources and copies its request. Deadline 5 s native, 15 s browser; elapsed `now` passed to start/poll. Close cancels and releases; stale receipts rejected. Firm. | AR4: OS termination/reaping and result validation need bounded-cost evidence; cancellation is not immediate OS/browser scheduling. |
-| Persistence | Replay flush and work autosave run after ticks in the same frame; atomic replacement protects data. Allocation/copy and synchronous file I/O can stall a frame. Must-complete. | AR3 inventories placement; AR7 keeps or separates it only for a real consumer. Do not describe post-tick I/O as outside the frame budget. |
+| Persistence | Replay flush and work autosave run after ticks in the same frame; atomic replacement protects data. Admitted write attempt has a must-complete success/failure outcome. Replay flush reports failure and clears its request; failed autosave retains dirty state for a later policy-driven attempt. Coalescing dirty state does not promise one durable write per event. Allocation/copy/file I/O can stall a frame. | AR3 inventories placement; AR7 preserves acknowledgement, failure and retry/coalescing policy. Do not imply indefinite retries, guaranteed durability or a frame-budget exemption. |
 | Render/audio/resources | View-owned caches, bounded wakes/fleet; scenery loading, GPU rebuild/upload, audio update and present run in frame/startup paths. Pacing waits are intentional. Soft. | AR2/AR3/AR8: frame latency, rebuild spikes and browser suspension stay measured requirements, not guarantees. |
 
 Borrowed resources outlive worlds, sessions, fleets and copies. Host revisions stay at stable
 addresses until commit/rebind; a room objective's initial source is borrowed until an accepted
 reload installs an owned copy. Server revision installation rebinds the borrowed scene before
-later consumers use it. Late authoritative data is not discarded by a generic policy.
+later consumers use it. Authoritative origin alone does not determine acceptance: apply each
+boundary's deadline, freshness and lifecycle policy.
 
 ### Historical review disposition after integration
 
@@ -699,3 +719,7 @@ need separate treatment, not relaxed physics/codec comparisons.
   carry their own platform/manual gates.
 - Documentation links and whitespace checked after each planning change. Build/test results
   qualify the unchanged baseline, not the proposed migration.
+- 2026-11-09: timing clarification with Astra: separated transport responsiveness from command/
+  snapshot acceptance, and staged revisions from announced commit obligations. Must-complete
+  now requires contract-defined outcomes rather than guaranteed success or unlimited retries;
+  persistence failure/retry behavior remains unchanged. Documentation-only clarification.
