@@ -1655,6 +1655,7 @@ static int study(int argc, char **argv)
         double current_frame_started_at = boat_profile_time(true);
         frame_started_at = current_frame_started_at;
         BoatFrameMetrics metrics = { 0 }; // Reset once before any tick in this frame.
+        BoatAppInput app_input = boat_app_input_sample();
         int character;
         bool help_pressed = false;
         // Bracket and backslash sit behind AltGr on many layouts, so time keys also match the
@@ -1706,8 +1707,8 @@ static int study(int argc, char **argv)
             time_normal |= character == '\\' || character == '0';
         }
         if (!console.open) {
-            time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
-            time_normal |= IsKeyPressed(KEY_BACKSLASH);
+            time_direction += (int)app_input.bracket_right - (int)app_input.bracket_left;
+            time_normal |= app_input.backslash;
             time_direction = time_direction > 0 ? 1 : time_direction < 0 ? -1 : 0;
             if (help_pressed)
                 help_visible = !help_visible;
@@ -1715,8 +1716,8 @@ static int study(int argc, char **argv)
         // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        bool menu_pressed = !console.open && !console_was_open
-            && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P));
+        bool menu_pressed
+            = !console.open && !console_was_open && (app_input.back || app_input.pause);
 #if !defined(__EMSCRIPTEN__)
         if (IsKeyPressed(KEY_F11))
             ToggleBorderlessWindowed();
@@ -1732,8 +1733,9 @@ static int study(int argc, char **argv)
             else
                 boat_menu_open(&menu);
         }
-        bool menu_touch_wanted = menu.open && menu_was_open && !help_visible && IsWindowFocused();
-        BoatAppInput app_input = boat_app_input_sample(menu_touch_wanted);
+        bool menu_gate = boat_menu_gate(menu_was_open, menu.open, help_visible, IsWindowFocused());
+        if (menu_gate)
+            boat_app_input_poll_touch(&app_input);
         BoatScreenLayout layout
             = boat_screen_layout(resolution, width, height, GetScreenWidth(), GetScreenHeight());
         int scale = layout.scale;
@@ -1745,7 +1747,7 @@ static int study(int argc, char **argv)
         Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
                                      destination.y + (height - 200) * scale / 2 },
             .zoom = scale };
-        if (menu.open && menu_was_open && !help_visible && IsWindowFocused()) {
+        if (menu_gate) {
             BoatMenuChoice choice
                 = boat_menu_update(&menu, &app_input, menu_camera, GetFrameTime());
             if (choice == BOAT_MENU_RESUME)
@@ -1966,7 +1968,7 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
-        reset_requested |= boat_reset_hold_update(&reset_hold, IsKeyDown(KEY_BACKSPACE),
+        reset_requested |= boat_reset_hold_update(&reset_hold, app_input.backspace_down,
             active && !session.runs.playing && !work_mode, GetFrameTime());
         // A plugin revision changes between this frame's ticks; a new exposure restarts below.
 #if !defined(__EMSCRIPTEN__)

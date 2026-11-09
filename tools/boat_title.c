@@ -1017,7 +1017,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             settled = true;
             continue;
         }
-        BoatAppInput in = boat_app_input_sample(true);
+        BoatAppInput in = boat_app_input_sample();
+        boat_app_input_poll_touch(&in);
         Vector2 pointer = in.pointer;
         bool pointer_pressed = in.pointer_pressed;
         bool activate = false, back = in.back;

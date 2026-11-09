@@ -154,6 +154,28 @@ static void check_clock(void)
     CHECK(menu.time == 0.5);
 }
 
+static void check_menu_gate(void)
+{
+    // All 16 combinations: only an already-open menu, still open, with help hidden and the
+    // window focused lets it update.
+    for (int bits = 0; bits < 16; ++bits) {
+        bool was_open = (bits & 1) != 0;
+        bool open = (bits & 2) != 0;
+        bool help_visible = (bits & 4) != 0;
+        bool focused = (bits & 8) != 0;
+        CHECK(boat_menu_gate(was_open, open, help_visible, focused)
+            == (was_open && open && !help_visible && focused));
+    }
+    // The opening frame must not also activate a row.
+    CHECK(!boat_menu_gate(false, true, false, true));
+    // Help is showing, so the menu yields input to it.
+    CHECK(!boat_menu_gate(true, true, true, true));
+    // An unfocused window must not update the menu.
+    CHECK(!boat_menu_gate(true, true, false, false));
+    // The steady open state updates.
+    CHECK(boat_menu_gate(true, true, false, true));
+}
+
 int main(void)
 {
     check_zero_input();
@@ -163,6 +185,7 @@ int main(void)
     check_fullscreen();
     check_pointer();
     check_clock();
+    check_menu_gate();
     printf("app input ok\n");
     return 0;
 }
