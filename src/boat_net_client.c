@@ -987,7 +987,17 @@ bool boat_net_client_local_service(BoatNetClient *c, double now)
     bool wake_stalled = !c->wake_consistent && c->mismatch_since >= 0
         && clock - c->mismatch_since > BOAT_NET_RESYNC_AFTER;
     bool snapshot_stalled = clock - c->snapshot_at > BOAT_NET_RESYNC_AFTER;
+    if (!wake_stalled && !snapshot_stalled)
+        c->local_resyncs = 0;
     if ((wake_stalled || snapshot_stalled) && clock - c->resync_at > BOAT_NET_RESYNC_AFTER) {
+        // Repeated failure is endpoint failure (D10), never an endless retry.
+        if (c->local_resyncs >= BOAT_NET_LOCAL_RESYNCS) {
+            c->timed_out = 4;
+            c->phase = BOAT_NET_CLIENT_CLOSED;
+            c->transport.disconnect(c->transport.context, 0);
+            return false;
+        }
+        ++c->local_resyncs;
         c->resync_at = clock;
         ++c->stats.resyncs;
         if (snapshot_stalled && !wake_stalled)
@@ -1049,6 +1059,8 @@ const char *boat_net_client_failure(const BoatNetClient *c)
         return "no message from the server for 5 s";
     if (c->timed_out == 3)
         return "the server is reachable but sent no authoritative state for 10 s";
+    if (c->timed_out == 4)
+        return "the local session stayed out of step after repeated resyncs";
     switch (c->leave) {
     case BOAT_NET_LEAVE_TIMEOUT:
         return "the server timed this client out";

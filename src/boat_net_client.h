@@ -10,6 +10,11 @@
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.
 #define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of stall or digest mismatch before a resync request.
 #define BOAT_NET_SNAPSHOT_SILENCE 10.0 // Hard ceiling without an applied authoritative state.
+// A private (local) session fails after this many resyncs in a row that left it stalled. The
+// in-process link is lossless, so one checkpoint repairs a stall within a chunk; three allow for a
+// checkpoint superseded by a restart or a second mismatch, and bound the failure at 480 granted
+// ticks (four resync intervals) instead of retrying forever.
+#define BOAT_NET_LOCAL_RESYNCS 3
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
 // One definition and one checkpoint can both arrive before Accept: two full page sets plus
@@ -115,8 +120,10 @@ typedef struct {
     BoatNetReject reject; // Valid when REJECTED.
     uint8_t leave; // Server's leave reason when CLOSED, zero for a transport close.
     // 1: no handshake/world within 10 s, 2: no server message for 5 s,
-    // 3: messages arrive but no authoritative state has applied for 10 s.
+    // 3: messages arrive but no authoritative state has applied for 10 s,
+    // 4: a private session stayed stalled after BOAT_NET_LOCAL_RESYNCS resyncs.
     uint8_t timed_out;
+    unsigned local_resyncs; // Private sessions: resyncs since state last applied cleanly.
     BoatNetAccept accept;
     uint32_t epoch;
     unsigned slot;
