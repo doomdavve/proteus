@@ -637,9 +637,11 @@ static int study(int argc, char **argv)
     BoatCamera camera_settings = BOAT_CAMERA_DEFAULT;
     bool camera_distance_set = false, camera_height_set = false;
     bool time_set = false, demo = false, mouse_steering = false;
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     // D8: a developer-only switch back to the direct free-boating path (Debug builds only, so
     // never in a release); AR7 removes it with that path.
     bool direct_session = false;
+#endif
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
@@ -824,7 +826,7 @@ static int study(int argc, char **argv)
             work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
-#ifndef NDEBUG
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__) && !defined(NDEBUG)
         } else if (strcmp(argv[i], "--direct-session") == 0) {
             direct_session = true;
 #endif
