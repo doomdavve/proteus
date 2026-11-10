@@ -2,8 +2,10 @@
 // runs each request in a disposable Web Worker; the game Wasm only copies bytes in and out.
 #include "boat_plugin_stage_backend.h"
 
-#include <emscripten.h>
 #include <stdlib.h>
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#endif
 
 // The bridge's reply ceiling, matching browser_read below.
 #define BROWSER_REPLY_MAX 163840u
@@ -24,6 +26,7 @@ struct BoatPluginWorker {
     BoatPluginWorkerRole role;
 };
 
+#if defined(__EMSCRIPTEN__)
 EM_JS(unsigned, browser_start,
     (const unsigned char *data, unsigned size, unsigned base, unsigned low, unsigned high), {
         if (!Module.boatPluginStage)
@@ -49,6 +52,16 @@ EM_JS(unsigned, browser_query_start, (const unsigned char *data, unsigned size),
         return 0;
     return Module.boatPluginStage.query(HEAPU8.slice(data, data + size), [ 0, 0, 0 ]);
 })
+#else
+// A native build of this backend exists only in validate_boat_plugin_stage_web, which links a
+// C model of the page transport (Transport in web/plugin_author.js) in place of these bridges.
+unsigned browser_start(
+    const unsigned char *data, unsigned size, unsigned base, unsigned low, unsigned high);
+int browser_status(unsigned job);
+int browser_read(unsigned job, unsigned char *data);
+void browser_close(unsigned job);
+unsigned browser_query_start(const unsigned char *data, unsigned size);
+#endif
 
 void boat_plugin_worker_binary_stdio(void) { }
 
