@@ -418,24 +418,12 @@ void boat_replay_runs_reset(BoatReplayRuns *runs)
     }
 }
 
-void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatReplaySample after,
-    const BoatCourse *course, bool waves)
+void boat_replay_runs_finish(BoatReplayRuns *runs, BoatReplay *run, bool faster)
 {
-    if (runs->finished)
-        return;
-    bool failed = runs->recording.failed;
-    boat_replay_record(&runs->recording, before, after, course, waves);
-    if (!failed && runs->recording.failed)
-        runs->notice = "Recording stopped (memory or 10 minute limit); best preserved";
-    if (!runs->recording.complete)
-        return;
     boat_replay_destroy(&runs->last);
-    runs->last = runs->recording;
-    runs->recording = (BoatReplay) { 0 };
+    runs->last = *run;
+    *run = (BoatReplay) { 0 };
     runs->finished = true;
-    bool faster = !runs->practice
-        && (!runs->best.complete
-            || runs->last.splits[BOAT_COURSE_GATES - 1] < runs->best.splits[BOAT_COURSE_GATES - 1]);
     runs->notice = runs->practice ? "Practice recorded; best and export preserved"
         : faster                  ? "New personal best!"
                                   : "Run recorded";
@@ -447,6 +435,26 @@ void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatRe
     }
     runs->export_last = !runs->practice && runs->export_path != NULL;
     runs->report_finish = true;
+}
+
+bool boat_replay_runs_faster(const BoatReplayRuns *runs, double time)
+{
+    return !runs->practice
+        && (!runs->best.complete || time < runs->best.splits[BOAT_COURSE_GATES - 1]);
+}
+
+void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatReplaySample after,
+    const BoatCourse *course, bool waves)
+{
+    if (runs->finished)
+        return;
+    bool failed = runs->recording.failed;
+    boat_replay_record(&runs->recording, before, after, course, waves);
+    if (!failed && runs->recording.failed)
+        runs->notice = "Recording stopped (memory or 10 minute limit); best preserved";
+    if (runs->recording.complete)
+        boat_replay_runs_finish(runs, &runs->recording,
+            boat_replay_runs_faster(runs, runs->recording.splits[BOAT_COURSE_GATES - 1]));
 }
 
 bool boat_replay_runs_select_best(
