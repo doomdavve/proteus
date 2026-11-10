@@ -155,6 +155,14 @@ target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
   src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h
   src/boat_plugin_wire.c src/boat_plugin_wire.h)
+# AR4: one isolated-worker backend per platform behind the private boat_plugin_stage_backend.h.
+if(EMSCRIPTEN)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_web.c)
+elseif(WIN32)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_windows.c)
+else()
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_posix.c)
+endif()
 
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The
 # generated table and the lookup/decode helpers form a library that depends on proteus_plugins;

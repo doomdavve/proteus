@@ -1,9 +1,9 @@
 #ifndef PROTEUS_BOAT_PLUGIN_STAGE_BACKEND_H
 #define PROTEUS_BOAT_PLUGIN_STAGE_BACKEND_H
-// Private to boat_plugin_stage.c and its platform worker backend (POSIX, Windows or web).
-// Common staging owns requests, wire framing, limits, deadlines and revision validity; a backend
-// owns launch, polling, byte transfer, termination and its handles. No other file includes this
-// header.
+// Private to boat_plugin_stage.c and its CMake-selected backend: boat_plugin_stage_posix.c,
+// boat_plugin_stage_windows.c or boat_plugin_stage_web.c. Common staging owns requests, wire
+// framing, limits, deadlines and revision validity; a backend owns launch, polling, byte
+// transfer, termination and its handles. No other file includes this header.
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
