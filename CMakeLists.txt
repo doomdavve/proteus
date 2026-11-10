@@ -302,7 +302,8 @@ endif()
 add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
   tools/wake_velocity_menu.c
   tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
-  tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/boat_title.c
+  tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
+  tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
@@ -311,10 +312,10 @@ target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu prote
 # (tools/check_web_wasm.py proves it carries no Lua).
 if(EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c
-    tools/wake_velocity_scenery_web.c)
+    tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c)
 else()
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
-    tools/wake_velocity_scenery.c)
+    tools/wake_velocity_scenery.c tools/wake_velocity_app.c)
   target_link_libraries(wake_velocity PRIVATE proteus_work_session)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
