@@ -3,13 +3,13 @@
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
 [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
 for the single AR2–AR6 milestone PR, unpushed: AR2a, AR3a–AR3d, AR3f, AR4, AR5 and the AR6 pilot
-reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented, review pending. Nothing
-played, browser-built or Windows-built.
+reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented and reviewed (2026-11-10).
+Nothing played, browser-built or Windows-built.
 **Open:** manual native, browser and Windows checks per step; the menu-gated touch tap (AR7);
 untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** final review of AR2b and AR3e; the user's review and manual checks; then AR7.
+**Next:** the user's review and manual checks of the milestone PR; then AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -356,8 +356,8 @@ and browser keyboard/mouse/touch layouts, resizing and focus transitions.
 
 #### AR2b status
 
-2026-11-10, branch `arch/ar2-pilot`, three commits on `f1ed07b`; review pending; not merged, played
-or browser-built (emcc was not installed).
+2026-11-10, branch `arch/ar2-pilot`, three commits on `f1ed07b`; reviewed 2026-11-10; not merged,
+played or browser-built (emcc was not installed).
 
 Implemented: the 14 inline browser bridges left in `wake_velocity.c` moved, bodies unchanged,
 into CMake-selected backends behind C wrappers (`wake_js_*` imports, called only in their file):
