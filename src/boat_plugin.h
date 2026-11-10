@@ -163,14 +163,6 @@ typedef struct {
     uint64_t digest;
 } BoatPluginCourse;
 
-BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);
-BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic);
-BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic);
-BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *race,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 // S1a: MAP is LOCATION's compiled water; scene.work sites run the cargo site survey on it.
@@ -188,10 +180,6 @@ const char *boat_plugin_status_name(BoatPluginStatus status);
 // (may be NULL) is always written.
 BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
     const BoatPluginLimits *limits, BoatPluginManifest *out, BoatPluginDiagnostic *diagnostic);
-// Evaluate BUNDLE and decode its voyage. OUT is written only on success, so a failure leaves the
-// caller's last good definition intact. LIMITS NULL selects the defaults.
-BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginVoyage *out, BoatPluginDiagnostic *diagnostic);
 void boat_plugin_voyage_copy(BoatPluginVoyage *destination, const BoatPluginVoyage *source);
 // FNV-1a over every field of ROUTE, names included, with float bits least significant first.
 uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route);

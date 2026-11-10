@@ -5,6 +5,7 @@
  * through the same rules; and save polling, on a virtual clock, stages each settled save once. */
 #include "boat_fixtures.h"
 #include "boat_plugin_host.h"
+#include "boat_plugin_load.h"
 #include "boat_plugin_lua.h"
 #include "boat_session.h"
 #include "boat_steering.h"

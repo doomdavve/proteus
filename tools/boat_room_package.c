@@ -1,6 +1,7 @@
 #include "boat_room_package.h"
 
 #include "boat_plugin_io.h"
+#include "boat_plugin_load.h"
 #include "waterfront_harbor.h"
 
 #include <math.h>

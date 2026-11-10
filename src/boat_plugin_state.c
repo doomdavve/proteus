@@ -586,60 +586,6 @@ BoatPluginStatus boat_plugin_objective_migrate(BoatPluginObjective *objective, c
     return status;
 }
 
-static void hash_bytes(uint64_t *hash, const void *bytes, size_t size)
-{
-    const unsigned char *p = bytes;
-    for (size_t i = 0; i < size; ++i)
-        *hash = (*hash ^ p[i]) * UINT64_C(1099511628211);
-}
-
-static void hash_integer(uint64_t *hash, uint64_t value)
-{
-    for (unsigned i = 0; i < 8; ++i) {
-        unsigned char byte = (unsigned char)value;
-        hash_bytes(hash, &byte, 1);
-        value >>= 8;
-    }
-}
-
-uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
-{
-    if (!objective || objective->state.size > BOAT_PLUGIN_STATE_BYTES
-        || objective->hud_count > BOAT_PLUGIN_HUD || !boat_plugin_objective_timers_valid(objective))
-        return 0;
-    for (unsigned i = 0; i < objective->hud_count; ++i)
-        if (!memchr(objective->hud[i].id, 0, sizeof(objective->hud[i].id))
-            || !memchr(objective->hud[i].label, 0, sizeof(objective->hud[i].label)))
-            return 0;
-    uint64_t hash = UINT64_C(14695981039346656037);
-    hash_integer(&hash, objective->state.size);
-    hash_bytes(&hash, objective->state.bytes, objective->state.size);
-    hash_integer(&hash, objective->hud_count);
-    for (unsigned i = 0; i < objective->hud_count; ++i) {
-        hash_bytes(&hash, objective->hud[i].id, strlen(objective->hud[i].id) + 1);
-        hash_bytes(&hash, objective->hud[i].label, strlen(objective->hud[i].label) + 1);
-        hash_integer(&hash, (uint64_t)objective->hud[i].value);
-    }
-    hash_integer(&hash, objective->rng);
-    hash_integer(&hash, (uint64_t)objective->acknowledged);
-    hash_integer(&hash, (uint64_t)objective->tick);
-    if (objective->state_version > 1)
-        hash_integer(&hash, objective->state_version);
-    hash_integer(&hash, objective->generation);
-    hash_integer(&hash, objective->initialized);
-    if (objective->work_enabled)
-        hash_bytes(&hash, "work", 4);
-    if (objective->timers_enabled) {
-        hash_bytes(&hash, "timers", 6);
-        hash_integer(&hash, objective->timer_count);
-        for (unsigned i = 0; i < objective->timer_count; ++i) {
-            hash_bytes(&hash, objective->timers[i].id, strlen(objective->timers[i].id) + 1);
-            hash_integer(&hash, (uint64_t)objective->timers[i].tick);
-        }
-    }
-    return hash;
-}
-
 bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
     BoatPluginHudRow *rows, unsigned capacity, unsigned *count)
 {

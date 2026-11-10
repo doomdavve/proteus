@@ -144,17 +144,33 @@ if(NOT MSVC)
   target_link_libraries(proteus_lua PRIVATE m)
 endif()
 
-# The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
-# plus boat_plugin_io for reading a package directory. Core and net never link it.
-add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
-  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
-  src/boat_plugin_objective_codec.c)
-target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
+# AR5: plugin data and codecs. Manifest parsing, descriptor decoding and checks, digests, the
+# stage wire codec and the objective checkpoint codec over caller-owned bytes; no Lua, files,
+# processes or browser bridges (plugin_data_boundary). Data-only consumers link only this.
+add_library(proteus_plugin_data STATIC src/boat_plugin.c src/boat_plugin.h
+  src/boat_plugin_decode.h src/boat_plugin_revision.h src/boat_plugin_race.c
+  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c src/boat_plugin_wire.c
+  src/boat_plugin_wire.h)
+target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
+target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
+
+# The plugin host: restricted Lua evaluation, revisions, objective transitions, isolated
+# staging and boat_plugin_io for reading a package directory. Core and net never link it.
+add_library(proteus_plugins STATIC src/boat_plugin_load.c src/boat_plugin_load.h
+  src/boat_plugin_lua.c src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h
+  src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_state.c src/boat_plugin_state.h)
+target_link_libraries(proteus_plugins PUBLIC proteus_plugin_data PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
-  src/boat_plugin_eval.c src/boat_plugin_eval.h
-  src/boat_plugin_wire.c src/boat_plugin_wire.h)
+  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h)
+# AR4: one isolated-worker backend per platform behind the private boat_plugin_stage_backend.h.
+if(EMSCRIPTEN)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_web.c)
+elseif(WIN32)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_windows.c)
+else()
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_posix.c)
+endif()
 
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The
 # generated table and the lookup/decode helpers form a library that depends on proteus_plugins;
@@ -201,13 +217,15 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
-# SV1b: the sandbox save's byte format. Buffers only: no files, no Lua beyond proteus_plugins.
+# SV1b: the sandbox save's byte format. Buffers only: no files and no Lua (plugin data only).
 add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
-target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
+target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugin_data)
 target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
-target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
+# The work session steps the package's objective, so it links the Lua host.
+target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_plugins
+  proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
@@ -217,7 +235,8 @@ target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
-target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
+# Lookup and decode of pre-evaluated wire bytes: plugin data only, no Lua.
+target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugin_data)
 target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
@@ -608,6 +627,12 @@ target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
 target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
 set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
+# AR5: a data-only consumer. It links the catalog and plugin data only; no Lua or workers.
+add_executable(validate_boat_plugin_data tools/validate_boat_plugin_data.c)
+target_link_libraries(validate_boat_plugin_data PRIVATE proteus_plugin_catalog)
+target_compile_options(validate_boat_plugin_data PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_plugin_data COMMAND validate_boat_plugin_data)
+set_tests_properties(boat_plugin_data PROPERTIES LABELS "cpu;quick")
 add_executable(validate_boat_file tools/validate_boat_file.c)
 target_link_libraries(validate_boat_file PRIVATE proteus_file)
 target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
@@ -1011,6 +1036,15 @@ if(NOT EMSCRIPTEN)
   add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
   set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
+  # AR4: the browser backend and common staging, compiled natively against a C model of the
+  # page transport; the archive's own staging objects are not pulled in.
+  add_executable(validate_boat_plugin_stage_web tools/validate_boat_plugin_stage_web.c
+    src/boat_plugin_stage.c src/boat_plugin_stage_web.c)
+  target_link_libraries(validate_boat_plugin_stage_web PRIVATE proteus_plugins)
+  target_compile_options(validate_boat_plugin_stage_web PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_plugin_stage_web COMMAND validate_boat_plugin_stage_web)
+  set_tests_properties(boat_plugin_stage_web PROPERTIES LABELS "cpu;quick"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 10)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
   add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
     tools/wake_velocity_plugin.c tools/wake_command.c)
@@ -1304,6 +1338,33 @@ add_test(NAME platform_bridges_detects COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --self-test)
 set_tests_properties(platform_bridges_detects PROPERTIES LABELS "cpu;quick"
   PASS_REGULAR_EXPRESSION "platform_bridges_self_test=ok")
+# AR4: common plugin staging holds no OS handles, process launch or JavaScript bridges.
+add_test(NAME plugin_stage_backend COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(plugin_stage_backend PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_stage_backend=ok")
+add_test(NAME plugin_stage_backend_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_stage_backend self-test=ok")
+# AR5: plugin data and its data-only consumers need no Lua, files, processes or bridges.
+set(PLUGIN_DATA_BOUNDARY_NM)
+if(CMAKE_NM AND NOT MSVC)
+  set(PLUGIN_DATA_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_plugin_data>
+    --archive $<TARGET_FILE:proteus_boat_core> --archive $<TARGET_FILE:proteus_json>)
+endif()
+add_test(NAME plugin_data_boundary COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} ${PLUGIN_DATA_BOUNDARY_NM})
+set_tests_properties(plugin_data_boundary PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary=ok")
+add_test(NAME plugin_data_boundary_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_data_boundary_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
@@ -1792,6 +1853,8 @@ set(PROTEUS_SLOW_TESTS
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
 endif()
+# About 0.2-0.4 s each: they copy and check a temporary tree once per planted violation.
+list(APPEND PROTEUS_SLOW_TESTS plugin_stage_backend_self_test plugin_data_boundary_self_test)
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).

@@ -585,6 +585,13 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   service (title, game, plugin glue) do not reach its backends directly; and `CMakeLists.txt`
   names `*_web.c` sources only in EMSCRIPTEN branches. `platform_bridges_detects` is its
   negative control.
+- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`. With comments and string
+  literals blanked, common plugin staging (`boat_plugin_stage.c` and its headers) includes no
+  OS/browser header and names no listed process, handle, Emscripten or platform-macro
+  identifier. Each platform backend includes none of a listed set of other platforms' headers,
+  only staging, its backends and `validate_boat_plugin_stage_web` include the private backend
+  header, and `proteus_plugins` lists each backend once. `plugin_stage_backend_self_test` (slow
+  lane) plants each violation in a temporary copy and checks that it is caught.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
 - `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
@@ -874,8 +881,16 @@ Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_S
 obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 
-The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)) and the pinned interpreter
-(`proteus_lua`) sit outside both boundaries. Configure fails if `proteus_boat_core` or
+The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-free data library
+(`proteus_plugin_data`) and the pinned interpreter (`proteus_lua`) sit outside both boundaries.
+`plugin_data_boundary` (`tools/check_plugin_data_boundary.py`) checks that the data library and
+its data-only consumers (sandbox save, bundled catalog, `validate_boat_plugin_data`) include no
+evaluation, I/O or worker header and name no Lua, file, process or platform identifier, that
+their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and, with nm, that the data
+archive's undefined symbols resolve to core, JSON or allowlisted libc/libm/raymath symbols.
+`plugin_data_boundary_self_test` (slow lane) plants each violation. `boat_plugin_data` runs
+`validate_boat_plugin_data`, which links only the catalog and plugin data, decodes every bundled
+entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or
 `proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
 or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
 for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).
@@ -1054,6 +1069,12 @@ stale epochs after Undo, virtual deadlines against a stuck process, F6 cancellat
 malformed/oversized output, syntax failure and the live F5/completion adapter. Its process
 completion loops await an external event; CTest supplies the failure deadline. No simulated
 clock is advanced to wait for a child. See [live descriptor staging](PLUGIN_API.md#live-descriptor-staging-p42).
+It also covers console queries: answer, syntax error, the exact five-second deadline, cancel and
+worker faults. `boat_plugin_stage_web` (quick) compiles the real common staging and browser
+backend natively against a C model of the page transport, runs workers in process and uses
+virtual time. It covers the empty-host launch receipt, rejected race/match packages, the 15 s
+query deadline message, job release after failed or unreadable queries, and replies at the
+160 KiB bridge limit. It does not run the page's JavaScript or a real Web Worker.
 
 P4.5 adds `boat_plugin_capture` (native, slow render lane): the same script with `--game`
 runs real CPU captures of every outer anchor, repeatable pinned evidence, a rejected candidate and

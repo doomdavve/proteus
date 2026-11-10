@@ -62,7 +62,7 @@ location's map and the full traffic sweep), rejects objective callbacks (except 
 definition, manifest text and source as byte arrays in
 `build/generated/boat_plugin_catalog_data.c`. An invalid package fails the build with its normal
 diagnostic. The generated table and the lookup/decode helpers are `proteus_plugin_catalog`, which
-depends on `proteus_plugins`; the generator never links the catalog.
+depends only on the Lua-free `proteus_plugin_data`; the generator never links the catalog.
 
 Lookup is by ID and by default for a kind and location. A native solo session opens its entry
 through `boat_plugin_host_start_decoded`: revision 1 is installed without evaluating Lua, polling
@@ -1050,8 +1050,18 @@ submits the same lines through the same state.
 
 ## Native interface
 
-`src/boat_plugin.h` works on immutable bytes and does no I/O. `src/boat_plugin_io.h` acquires package files;
-`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport.
+`src/boat_plugin.h` works on immutable bytes and does no I/O. The plugin data library
+`proteus_plugin_data` holds it with the other data headers: `boat_plugin_decode.h` (descriptor
+data as an evaluator returned it, and its Lua-free decoders), `boat_plugin_revision.h`,
+`boat_plugin_objective.h` (checkpoint values, codec and digest) and `boat_plugin_wire.h`.
+`proteus_plugins` adds evaluation: `boat_plugin_load.h` (the `boat_plugin_load_*` calls that run
+Lua), `boat_plugin_lua.h`, `boat_plugin_state.h` (objective transitions) and the host.
+`plugin_data_boundary` keeps Lua, files and processes out of the data library and its data-only
+consumers (the sandbox save and the bundled catalog). `src/boat_plugin_io.h` acquires package files;
+`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport: request and
+reply framing, limits, deadlines and revision validity. One CMake-selected backend behind the
+private `src/boat_plugin_stage_backend.h` launches, polls, transfers bytes and terminates the
+worker: `boat_plugin_stage_posix.c`, `boat_plugin_stage_windows.c` or `boat_plugin_stage_web.c`.
 
 ```c
 BoatPluginFiles *files = malloc(sizeof(*files)); // About 68 KiB of bounded buffers.

@@ -9,7 +9,9 @@ files. Two checks over src/ and tools/:
    reason it still has bridges. A legacy file must have exactly its recorded count, so a
    migration lowers the count in the same change and the list only shrinks.
 2. Files migrated onto a service do not reach the service's backends directly (MIGRATED).
-3. CMakeLists.txt names *_web.c sources only inside an EMSCRIPTEN branch.
+3. CMakeLists.txt names *_web.c sources only inside an EMSCRIPTEN branch, or in the sources of
+   a native test target listed in NATIVE_WEB_TESTS (which compiles a backend against a C model
+   of its page bridges).
 
 --self-test runs both checks against synthetic violations and fails unless they are caught.
 """
@@ -22,12 +24,17 @@ from pathlib import Path
 BRIDGE = re.compile(r"\b(EM_JS|EM_ASYNC_JS|(?:MAIN_THREAD_)?EM_ASM\w*|emscripten_run_script\w*)"
                     r"\s*\(")
 WEB_SOURCE = re.compile(r"[\w/.-]+_web\.c\b")
+TARGET_COMMAND = re.compile(r"\s*(add_executable|add_library|target_sources)\s*\(\s*([\w.+-]+)")
+
+# Native test targets allowed to compile *_web.c sources outside an EMSCRIPTEN branch -> reason.
+NATIVE_WEB_TESTS = {
+    "validate_boat_plugin_stage_web": "AR4: browser staging paths driven natively on virtual time",
+}
 
 # File -> (bridges allowed, owner of their extraction).
 LEGACY = {
     "tools/wake_velocity.c": (14, "AR2b: viewport, canvas, touch, mouse and keyboard capabilities"),
     "tools/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
-    "src/boat_plugin_stage.c": (5, "AR4: plugin worker backends"),
 }
 
 # File -> forbidden patterns: the backends its services own.
@@ -80,10 +87,18 @@ def strip_comments(text):
 
 
 def check_cmake(text, path="CMakeLists.txt"):
-    """*_web.c sources may appear only where EMSCRIPTEN is true."""
+    """*_web.c sources may appear only where EMSCRIPTEN is true or in a NATIVE_WEB_TESTS target."""
     problems, stack = [], []  # Each frame: True browser, False native, None other condition.
+    target, depth = None, 0  # Target of the open add_executable/add_library/target_sources.
     for number, line in enumerate(text.splitlines(), 1):
         code = line.split("#", 1)[0]
+        if depth == 0:
+            started = TARGET_COMMAND.match(code)
+            target = started.group(2) if started else None
+        line_target = target
+        depth = max(0, depth + code.count("(") - code.count(")")) if target else 0
+        if depth == 0:
+            target = None
         command = re.match(r"\s*(if|elseif|else|endif)\s*\((.*)\)", code)
         if command:
             word, condition = command.group(1), command.group(2).strip()
@@ -97,6 +112,8 @@ def check_cmake(text, path="CMakeLists.txt"):
             elif word == "endif" and stack:
                 stack.pop()
         for source in WEB_SOURCE.findall(code):
+            if line_target in NATIVE_WEB_TESTS:
+                continue
             if False in stack or True not in stack:
                 problems.append(f"{path}:{number}: {source} is built outside an EMSCRIPTEN branch")
     return problems
