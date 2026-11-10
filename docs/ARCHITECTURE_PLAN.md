@@ -2,16 +2,16 @@
 
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
 [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`,
-implemented and reviewed, not pushed: AR2a, [AR3a–AR3d, AR3f](#ar3-status),
+implemented and reviewed, not pushed: AR2a, [AR3a–AR3f](#ar3-status),
 [AR4](#ar4--separate-plugin-worker-backends),
 [AR5](#ar5--narrow-plugin-data-and-execution-dependencies) and the
 [AR6 pilot](#ar6-status), for the single AR2–AR6 milestone PR, which awaits the user. Nothing
 played, browser-built or Windows-built.
-**Open:** AR3e (next), AR2b; browser, Windows and manual native checks listed per step; impaired-delivery
+**Open:** AR2b; browser, Windows and manual native checks listed per step; impaired-delivery
 qualification; a pinned `saved_at` for L3's byte-equal saves.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** AR3e; then the user's review and manual checks of the milestone PR, AR2b and AR7.
+**Next:** the user's review and manual checks of the milestone PR; then AR2b and AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -388,9 +388,9 @@ objective-worker checks (descriptor staging tests do not cover the bridge).
 2026-11-10, branch `arch/ar2-pilot`, not merged; nothing played; no browser build (emcc was not
 installed).
 
-Implemented (AR3a–AR3d, AR3f). Each service is a header in `tools/` with a native `.c` and a browser
-`_web.c` that CMake selects for `wake_velocity`; no call waits, and state keeps its previous
-owner (free functions, rule 10):
+Implemented (AR3a–AR3f; AR3e is the objective seam under Decisions). Each service is a header
+in `tools/` with a native `.c` and a browser `_web.c` that CMake selects for `wake_velocity`; no
+call waits, and state keeps its previous owner (free functions, rule 10):
 
 | Service | Contract | Native | Browser | Migrated consumers |
 | --- | --- | --- | --- | --- |
@@ -416,9 +416,17 @@ Decisions (technical, recorded here):
 
 - Only bridge bodies moved for the objective evaluator. Its request copy and pinned identity,
   stale and `now >= deadline` checks, staged commit, BUSY, reset deferral, quarantine and the
-  T/T+1 gate are unchanged in `wake_velocity_plugin.c` under the browser selection. Compiling
-  that policy natively behind a backend seam (needed for an exact-boundary virtual-time test)
-  is AR3e, after AR4 merges here, so plugin glue is not restructured while AR4 is open.
+  T/T+1 gate are unchanged in `wake_velocity_plugin.c` under the browser selection.
+- AR3e (after the AR4 merge): the browser objective branches in `wake_velocity_plugin.c` are
+  selected by `WAKE_PLUGIN_ISOLATED_OBJECTIVE` (1 under `__EMSCRIPTEN__`, else 0) instead of
+  `__EMSCRIPTEN__`, so both builds compile exactly what they did. `validate_wake_plugin_objective`
+  compiles the file with it set natively over a C model of `wake_velocity_plugin_web.h` and
+  evaluates requests with `boat_plugin_eval_execute`. Its cases (`wake_plugin_objective.*`,
+  quick) check a reply first accepted exactly at its 5 s deadline (rejected, quarantined) and
+  just before it (accepted, staged at T and published at T+1), stale and failed receipts, BUSY
+  controls, reset closing the in-flight job (a late reply is never read) and close releasing
+  every job over repeated sessions. Page bridges other than the objective's stay
+  `__EMSCRIPTEN__`, and the model is not the page: `web/plugin_objective.js` stays untested here.
 - EM_JS imports are called only inside their backend file, through C wrappers, and are named
   `wake_js_*`.
 - AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
@@ -442,11 +450,8 @@ authority storage requests:
 | Plugin package (`wake_plugin_save`) or browser export | Console `save` | Temporary file and rename; browser download |
 | Performance report (F4), screenshots | On request | `wake_performance_export`, `ExportImage` |
 
-Remaining AR3 substeps:
+Left outside AR3:
 
-- **AR3e:** compile the browser objective policy natively behind the backend seam; virtual-time
-  tests of a result first accepted exactly at its deadline, stale receipts, cancellation and
-  repeated-session cleanup (`wake_plugin_close` resets the evaluator).
 - AR2b, not AR3: the per-frame viewport bridge, mobile session start/stop, touch and mouse
   bridges and native F11 remain in `study()`.
 - Native-only adapters keep their files (AR0): `--host` child process, `--plugin-bridge`,
