@@ -228,6 +228,8 @@ static int begin(WakePlugin *p, BoatSession *s, double now)
     s->presentation_enabled = false;
     bool opened = wake_plugin_open(p, "plugins/shelter-tour", s, now);
     CHECK(opened);
+    // Read the package once: no frame polls the directory, so a concurrent edit cannot reload.
+    p->watching = false;
     return 0;
 }
 
