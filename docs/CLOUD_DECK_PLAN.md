@@ -4,7 +4,7 @@ Status, 2026-11-10: done locally; user accepted the final cloud/reflection treat
 Open implementation items: none. Broader platform qualification remains outside this track.
 Done: softer deck, deeper-blue Day sky and sparse three-tone reflections are implemented,
 natively verified and user-accepted. Current contract: [3D.md](3D.md#scene-lighting).
-Next: publish the PR authorized by the user on 2026-11-10.
+Next: PR review and CI; publication authorized by the user on 2026-11-10.
 
 ## Scope and decision
 
@@ -176,3 +176,15 @@ closing update changes documentation only. Broader platform checks, cloud wind/g
 water-glitter attenuation and other lighting-plan acceptance remain explicitly deferred.
 Visual acceptance alone did not authorize publication; the user separately requested a PR
 on 2026-11-10. The branch is now authorized for push and PR creation.
+
+
+### PR preparation against current main, 2026-11-10
+
+The user explicitly requested a PR. Integrated `origin/main` at `3080e4c` without
+conflicts, reconfigured and rebuilt Debug with GPU tests enabled, warning-clean.
+`ctest --preset full` passed all 544 enabled tests (15 retired checks disabled)
+in 113.66 s, without retries (`build/pr-full.log`). The updated GPU capture
+`build/pr-cloud-review.png` was inspected and is byte-identical to the accepted
+`build/layers-review.png`; SHA-1 `d93463081c9b47952db1568696f1577926deac2b`.
+`git diff --check origin/main...HEAD` passed. The new suite count includes main's
+architecture work, not extra cloud features. No additional user acceptance is inferred.
