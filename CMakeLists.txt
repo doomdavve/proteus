@@ -153,7 +153,7 @@ add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
-  src/boat_plugin_eval.c src/boat_plugin_eval.h
+  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h
   src/boat_plugin_wire.c src/boat_plugin_wire.h)
 
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The

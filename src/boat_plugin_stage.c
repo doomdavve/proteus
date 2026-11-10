@@ -3,40 +3,19 @@
 #endif
 #include "boat_plugin_stage.h"
 #include "boat_plugin_lua.h"
+#include "boat_plugin_stage_backend.h"
 #include "boat_plugin_wire.h"
 #include "boat_scene_definition.h"
 #include "boat_world.h"
 
-#include <errno.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-#elif defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOGDI
-#define NOUSER
-#include <fcntl.h>
-#include <io.h>
-#include <windows.h>
-#else
-#include <fcntl.h>
-#include <signal.h>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
-extern char **environ;
-#endif
-#include <stdio.h>
 
+// Common staging: request/reply wire framing, limits, deadlines and revision validity. Launch,
+// polling, byte transfer and termination live in the CMake-selected backend.
 #define BOAT_PLUGIN_STAGE_RESPONSE_MAX (BOAT_PLUGIN_SOURCE_MAX + 32768u)
-// Browser workers start and evaluate Lua on the visitor's device; allow a slow phone.
-#if defined(__EMSCRIPTEN__)
-#define BOAT_PLUGIN_BROWSER_DEADLINE 15.0
-#else
-#define BOAT_PLUGIN_BROWSER_DEADLINE 5.0
-#endif
 
 // Deliberately fieldwise: network-order unsigned integers and IEEE-754 binary64 values;
 // strings have bounded uint32 lengths, with no NUL on the wire.
@@ -140,10 +119,7 @@ static bool query_read(Wire *w, BoatPluginFiles *f, char *expression, size_t cap
 
 int boat_plugin_query_worker(void)
 {
-#ifdef _WIN32
-    _setmode(_fileno(stdin), _O_BINARY);
-    _setmode(_fileno(stdout), _O_BINARY);
-#endif
+    boat_plugin_worker_binary_stdio();
     BoatPluginFiles *f = calloc(1, sizeof(*f));
     char *expression = calloc(1, BOAT_PLUGIN_QUERY_MAX);
     char *text = calloc(1, BOAT_PLUGIN_QUERY_REPLY_MAX);
@@ -174,10 +150,7 @@ done:
 
 int boat_plugin_stage_worker(void)
 {
-#ifdef _WIN32
-    _setmode(_fileno(stdin), _O_BINARY);
-    _setmode(_fileno(stdout), _O_BINARY);
-#endif
+    boat_plugin_worker_binary_stdio();
     BoatPluginFiles *f = calloc(1, sizeof(*f));
     BoatPluginDecoded *decoded = calloc(1, sizeof(*decoded));
     BoatPluginRevision *revision = calloc(1, sizeof(*revision));
@@ -198,9 +171,9 @@ int boat_plugin_stage_worker(void)
         snprintf(d.message, sizeof(d.message), "is not a supported kind");
         goto done;
     }
-#ifdef __EMSCRIPTEN__
     // Rooms carry their own definition as data. Browser solo has no race trial or match.
-    if (kind == BOAT_PLUGIN_KIND_RACE || kind == BOAT_PLUGIN_KIND_MATCH) {
+    if (boat_plugin_worker_traits.solo_kinds_only
+        && (kind == BOAT_PLUGIN_KIND_RACE || kind == BOAT_PLUGIN_KIND_MATCH)) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "plugin.json");
         snprintf(d.field, sizeof(d.field), "kind");
@@ -208,7 +181,6 @@ int boat_plugin_stage_worker(void)
             "%s packages are room content; join a room instead of importing one", m.kind);
         goto done;
     }
-#endif
     decoded->kind = kind;
     decoded->manifest_size = f->manifest_size;
     memcpy(decoded->manifest, f->manifest, f->manifest_size);
@@ -328,54 +300,17 @@ struct BoatPluginStageJob {
     BoatPluginFiles files;
     char expression[BOAT_PLUGIN_QUERY_MAX];
     char query_text[BOAT_PLUGIN_QUERY_REPLY_MAX];
-    const char *worker_argument;
     FILE *input, *output;
+    BoatPluginWorker *worker;
     uint64_t epoch;
     unsigned base;
     double deadline;
-    bool running, finished, query;
-#if defined(__EMSCRIPTEN__)
-    unsigned browser_job;
-#elif defined(_WIN32)
-    HANDLE process;
-#else
-    pid_t pid;
-#endif
+    bool finished, query;
 };
-
-#ifdef __EMSCRIPTEN__
-EM_JS(unsigned, browser_start,
-    (const unsigned char *data, unsigned size, unsigned base, unsigned low, unsigned high), {
-        if (!Module.boatPluginStage)
-            return 0;
-        return Module.boatPluginStage.start(
-            HEAPU8.slice(data, data + size), [ base >>> 0, low >>> 0, high >>> 0 ]);
-    })
-EM_JS(int, browser_status, (unsigned job),
-    { return Module.boatPluginStage ? Module.boatPluginStage.status(job) : -1; })
-EM_JS(int, browser_read, (unsigned job, unsigned char *data), {
-    const bytes = Module.boatPluginStage.read(job);
-    if (!bytes || bytes.length > 163840)
-        return -1;
-    HEAPU8.set(bytes, data);
-    return bytes.length;
-})
-EM_JS(void, browser_close, (unsigned job), {
-    if (Module.boatPluginStage)
-        Module.boatPluginStage.close(job);
-})
-EM_JS(unsigned, browser_query_start, (const unsigned char *data, unsigned size), {
-    if (!Module.boatPluginStage || !Module.boatPluginStage.query)
-        return 0;
-    return Module.boatPluginStage.query(HEAPU8.slice(data, data + size), [ 0, 0, 0 ]);
-})
-#endif
 
 _Static_assert(sizeof(BoatPluginStageJob) <= (80u << 10), "staging request exceeds 80 KiB");
 
 size_t boat_plugin_stage_bytes(const BoatPluginStageJob *job) { return job ? sizeof(*job) : 0; }
-
-static BoatPluginStageJob *launch(BoatPluginStageJob *j, const char *executable);
 
 static int failure(BoatPluginStageJob *j, BoatPluginHost *host, const char *reason)
 {
@@ -387,24 +322,38 @@ static int failure(BoatPluginStageJob *j, BoatPluginHost *host, const char *reas
     return -1;
 }
 
+// Hand the request already written to J's input to the backend. Query and staging differ only
+// in the request bytes, the worker role and the browser pin.
+static BoatPluginStageJob *launch(
+    BoatPluginStageJob *j, const char *executable, BoatPluginWorkerRole role)
+{
+    long end = ftell(j->input);
+    if (end < 0)
+        goto failed;
+    rewind(j->input);
+    const unsigned pin[3] = { j->base, (unsigned)j->epoch, (unsigned)(j->epoch >> 32) };
+    j->worker = boat_plugin_worker_start(executable, role, j->input, (size_t)end, j->output, pin);
+    if (!j->worker)
+        goto failed;
+    return j;
+failed:
+    boat_plugin_stage_close(j);
+    return NULL;
+}
+
 BoatPluginStageJob *boat_plugin_stage_start(
     const char *executable, const BoatPluginHost *host, const BoatPluginFiles *files, double now)
 {
-#ifdef __EMSCRIPTEN__
-    (void)executable;
-    if (!isfinite(now))
-#else
-    if (!executable || !isfinite(now) || !host->depth)
-#endif
+    if (!isfinite(now) || (boat_plugin_worker_traits.needs_executable && !executable)
+        || (!boat_plugin_worker_traits.launch_receipt && !host->depth))
         return NULL;
     BoatPluginStageJob *j = calloc(1, sizeof(*j));
     if (!j)
         return NULL;
     j->files = *files;
-    j->worker_argument = "--plugin-stage-worker";
     j->epoch = host->epoch;
     j->base = host->depth ? boat_plugin_host_active(host)->number : 0;
-    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
+    j->deadline = now + boat_plugin_worker_traits.deadline;
     j->input = tmpfile();
     j->output = tmpfile();
     if (!j->input || !j->output)
@@ -412,98 +361,10 @@ BoatPluginStageJob *boat_plugin_stage_start(
     Wire in = { j->input, false, true };
     if (!files_wire(&in, &j->files) || fflush(j->input))
         goto failed;
-    rewind(j->input);
-    return launch(j, executable);
+    return launch(j, executable, BOAT_PLUGIN_WORKER_STAGE);
 failed:
     boat_plugin_stage_close(j);
     return NULL;
-}
-
-// Start the chosen worker for a request already written to J's input. Query and staging differ
-// only in the request bytes and worker argument.
-static BoatPluginStageJob *spawn(BoatPluginStageJob *j, const char *executable);
-
-static BoatPluginStageJob *launch(BoatPluginStageJob *j, const char *executable)
-{
-#if defined(__EMSCRIPTEN__)
-    size_t size = 8 + j->files.manifest_size + j->files.source_size;
-    unsigned char *payload = malloc(size);
-    if (!payload)
-        goto failed;
-    bool read = fread(payload, 1, size, j->input) == size;
-    if (read)
-        j->browser_job = browser_start(
-            payload, (unsigned)size, j->base, (unsigned)j->epoch, (unsigned)(j->epoch >> 32));
-    free(payload);
-    if (!j->browser_job)
-        goto failed;
-    return spawn(j, executable);
-failed:
-    boat_plugin_stage_close(j);
-    return NULL;
-#else
-    return spawn(j, executable);
-#endif
-}
-
-static BoatPluginStageJob *spawn(BoatPluginStageJob *j, const char *executable)
-{
-#if defined(__EMSCRIPTEN__)
-    (void)executable;
-    j->running = true;
-    return j;
-#elif defined(_WIN32)
-    // Inheritable copies only; parent CRT handles stay private.
-    HANDLE input = NULL, output = NULL, current = GetCurrentProcess();
-    if (!DuplicateHandle(current, (HANDLE)_get_osfhandle(_fileno(j->input)), current, &input, 0,
-            TRUE, DUPLICATE_SAME_ACCESS)
-        || !DuplicateHandle(current, (HANDLE)_get_osfhandle(_fileno(j->output)), current, &output,
-            0, TRUE, DUPLICATE_SAME_ACCESS)) {
-        if (input)
-            CloseHandle(input);
-        goto failed;
-    }
-    char command[4096];
-    int n = snprintf(command, sizeof(command), "\"%s\" %s", executable, j->worker_argument);
-    STARTUPINFOA startup = { .cb = sizeof(startup),
-        .dwFlags = STARTF_USESTDHANDLES,
-        .hStdInput = input,
-        .hStdOutput = output,
-        .hStdError = output };
-    PROCESS_INFORMATION process = { 0 };
-    bool started = n > 0 && (size_t)n < sizeof(command) && !strchr(executable, '"')
-        && CreateProcessA(executable, command, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL,
-            &startup, &process);
-    CloseHandle(input);
-    CloseHandle(output);
-    if (!started)
-        goto failed;
-    CloseHandle(process.hThread);
-    j->process = process.hProcess;
-#else
-    if (fcntl(fileno(j->input), F_SETFD, FD_CLOEXEC)
-        || fcntl(fileno(j->output), F_SETFD, FD_CLOEXEC))
-        goto failed;
-    posix_spawn_file_actions_t actions;
-    if (posix_spawn_file_actions_init(&actions))
-        goto failed;
-    int error = posix_spawn_file_actions_adddup2(&actions, fileno(j->input), STDIN_FILENO);
-    error |= posix_spawn_file_actions_adddup2(&actions, fileno(j->output), STDOUT_FILENO);
-    error |= posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
-    char *const argv[] = { (char *)executable, (char *)j->worker_argument, NULL };
-    if (!error)
-        error = posix_spawn(&j->pid, executable, &actions, NULL, argv, environ);
-    posix_spawn_file_actions_destroy(&actions);
-    if (error)
-        goto failed;
-#endif
-    j->running = true;
-    return j;
-#if !defined(__EMSCRIPTEN__)
-failed:
-    boat_plugin_stage_close(j);
-    return NULL;
-#endif
 }
 
 int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double now)
@@ -515,42 +376,13 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     if (host->epoch != j->epoch
         || (host->depth ? boat_plugin_host_active(host)->number : 0) != j->base)
         return failure(j, host, "stale staging base revision");
-    bool success;
-#if defined(__EMSCRIPTEN__)
-    int status = browser_status(j->browser_job);
-    if (!status)
+    const char *reason = "worker poll failed";
+    BoatPluginWorkerState state = boat_plugin_worker_poll(j->worker, j->output, &reason);
+    if (state == BOAT_PLUGIN_WORKER_RUNNING)
         return 0;
-    if (status < 0)
-        return failure(j, host, "browser worker failed, canceled or stale");
-    unsigned char *bytes = malloc(163840);
-    int size = bytes ? browser_read(j->browser_job, bytes) : -1;
-    if (size <= 0 || fwrite(bytes, 1, (size_t)size, j->output) != (size_t)size)
-        size = 0;
-    free(bytes);
-    if (!size)
-        return failure(j, host, "invalid browser worker response");
-    success = status == 1;
-    browser_close(j->browser_job);
-    j->browser_job = 0;
-#elif defined(_WIN32)
-    DWORD code;
-    if (!GetExitCodeProcess(j->process, &code))
-        return failure(j, host, "worker poll failed");
-    if (code == STILL_ACTIVE)
-        return 0;
-    success = code == 0;
-    CloseHandle(j->process);
-    j->process = NULL;
-#else
-    int status;
-    pid_t got = waitpid(j->pid, &status, WNOHANG);
-    if (got == 0)
-        return 0;
-    if (got < 0)
-        return failure(j, host, "worker poll failed");
-    success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
-#endif
-    j->running = false;
+    if (state != BOAT_PLUGIN_WORKER_SUCCEEDED && state != BOAT_PLUGIN_WORKER_FAILED)
+        return failure(j, host, reason);
+    bool success = state == BOAT_PLUGIN_WORKER_SUCCEEDED;
     j->finished = true;
     // Fixed maximum response even if a broken worker writes more.
     if (fseek(j->output, 0, SEEK_END) || ftell(j->output) > (long)BOAT_PLUGIN_STAGE_RESPONSE_MAX)
@@ -633,23 +465,20 @@ BoatPluginStageJob *boat_plugin_query_start(const char *executable, const char *
     size_t manifest_size, const char *source, size_t source_size, const char *expression,
     double now)
 {
-#if defined(__EMSCRIPTEN__)
-    (void)executable;
-    if (!manifest || !source || !expression || !isfinite(now)
-        || manifest_size > BOAT_PLUGIN_MANIFEST_MAX || source_size > BOAT_PLUGIN_SOURCE_MAX
-        || strlen(expression) >= BOAT_PLUGIN_QUERY_MAX)
+    if ((boat_plugin_worker_traits.needs_executable && !executable) || !manifest || !source
+        || !expression || !isfinite(now) || manifest_size > BOAT_PLUGIN_MANIFEST_MAX
+        || source_size > BOAT_PLUGIN_SOURCE_MAX || strlen(expression) >= BOAT_PLUGIN_QUERY_MAX)
         return NULL;
     BoatPluginStageJob *j = calloc(1, sizeof(*j));
     if (!j)
         return NULL;
     j->query = true;
-    j->worker_argument = "--plugin-query-worker";
     j->files.manifest_size = manifest_size;
     j->files.source_size = source_size;
     memcpy(j->files.manifest, manifest, manifest_size);
     memcpy(j->files.source, source, source_size);
     snprintf(j->expression, sizeof(j->expression), "%s", expression);
-    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
+    j->deadline = now + boat_plugin_worker_traits.deadline;
     j->input = tmpfile();
     j->output = tmpfile();
     if (!j->input || !j->output)
@@ -658,53 +487,10 @@ BoatPluginStageJob *boat_plugin_query_start(const char *executable, const char *
     query_write(&in, &j->files, j->expression);
     if (!in.ok || fflush(j->input))
         goto failed;
-    long end = ftell(j->input);
-    if (end <= 0 || end > 131072)
-        goto failed;
-    rewind(j->input);
-    size_t size = (size_t)end;
-    unsigned char *payload = malloc(size);
-    bool read = payload && fread(payload, 1, size, j->input) == size;
-    if (read)
-        j->browser_job = browser_query_start(payload, (unsigned)size);
-    free(payload);
-    if (!j->browser_job)
-        goto failed;
-    j->running = true;
-    return j;
+    return launch(j, executable, BOAT_PLUGIN_WORKER_QUERY);
 failed:
     boat_plugin_stage_close(j);
     return NULL;
-#else
-    if (!executable || !manifest || !source || !expression || !isfinite(now)
-        || manifest_size > BOAT_PLUGIN_MANIFEST_MAX || source_size > BOAT_PLUGIN_SOURCE_MAX
-        || strlen(expression) >= BOAT_PLUGIN_QUERY_MAX)
-        return NULL;
-    BoatPluginStageJob *j = calloc(1, sizeof(*j));
-    if (!j)
-        return NULL;
-    j->query = true;
-    j->worker_argument = "--plugin-query-worker";
-    j->files.manifest_size = manifest_size;
-    j->files.source_size = source_size;
-    memcpy(j->files.manifest, manifest, manifest_size);
-    memcpy(j->files.source, source, source_size);
-    snprintf(j->expression, sizeof(j->expression), "%s", expression);
-    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
-    j->input = tmpfile();
-    j->output = tmpfile();
-    if (!j->input || !j->output)
-        goto failed;
-    Wire in = { j->input, false, true };
-    query_write(&in, &j->files, j->expression);
-    if (!in.ok || fflush(j->input))
-        goto failed;
-    rewind(j->input);
-    return spawn(j, executable);
-failed:
-    boat_plugin_stage_close(j);
-    return NULL;
-#endif
 }
 
 // Read one completed query reply from OUTPUT. Both the native child and the browser worker
@@ -747,91 +533,339 @@ static int query_parse(
 int boat_plugin_query_poll(
     BoatPluginStageJob *j, char *text, size_t capacity, BoatPluginDiagnostic *result, double now)
 {
-#if defined(__EMSCRIPTEN__)
     if (!j || !j->query || !text)
         return -1;
     if (!isfinite(now) || now >= j->deadline) {
         j->finished = true;
-        if (result) {
+        if (result && boat_plugin_worker_traits.query_deadline_message) {
             result->status = BOAT_PLUGIN_IO;
             snprintf(result->message, sizeof(result->message), "worker deadline exceeded");
         }
         return -1;
     }
-    int state = browser_status(j->browser_job);
-    if (state == 0)
+    const char *reason = NULL;
+    BoatPluginWorkerState state = boat_plugin_worker_poll(j->worker, j->output, &reason);
+    if (state == BOAT_PLUGIN_WORKER_RUNNING)
         return 0;
-    j->running = false;
     j->finished = true;
-    if (state < 0)
+    if (state != BOAT_PLUGIN_WORKER_SUCCEEDED && state != BOAT_PLUGIN_WORKER_FAILED)
         return -1;
-    unsigned char *bytes = malloc(BOAT_PLUGIN_QUERY_REPLY_MAX + 8192);
-    if (!bytes)
-        return -1;
-    int size = browser_read(j->browser_job, bytes);
-    if (size < 0) {
-        free(bytes);
-        return -1;
-    }
-    rewind(j->output);
-    bool written = fwrite(bytes, 1, (size_t)size, j->output) == (size_t)size;
-    free(bytes);
-    if (!written || fflush(j->output))
-        return -1;
-    browser_close(j->browser_job);
-    j->browser_job = 0;
-    return query_parse(j->output, state == 1, text, capacity, result);
-#else
-    if (!j || !j->query || !text)
-        return -1;
-    if (!isfinite(now) || now >= j->deadline) {
-        j->finished = true;
-        return -1;
-    }
-    bool success;
-#if defined(_WIN32)
-    DWORD code;
-    if (!GetExitCodeProcess(j->process, &code))
-        return -1;
-    if (code == STILL_ACTIVE)
-        return 0;
-    success = code == 0;
-    CloseHandle(j->process);
-    j->process = NULL;
-#else
-    int status;
-    pid_t got = waitpid(j->pid, &status, WNOHANG);
-    if (got == 0)
-        return 0;
-    if (got < 0)
-        return -1;
-    success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
-#endif
-    j->running = false;
-    j->finished = true;
-    return query_parse(j->output, success, text, capacity, result);
-#endif
+    return query_parse(j->output, state == BOAT_PLUGIN_WORKER_SUCCEEDED, text, capacity, result);
 }
 
 void boat_plugin_stage_close(BoatPluginStageJob *j)
 {
     if (!j)
         return;
-    if (j->running) {
-#if defined(__EMSCRIPTEN__)
-        browser_close(j->browser_job);
-#elif defined(_WIN32)
-        TerminateProcess(j->process, 1);
-        WaitForSingleObject(j->process, INFINITE);
-        CloseHandle(j->process);
-#else
-        kill(j->pid, SIGKILL);
-        while (waitpid(j->pid, NULL, 0) < 0 && errno == EINTR) { }
-#endif
-    }
+    // The backend kills/reaps or terminates a live worker before the files it writes are closed.
+    boat_plugin_worker_close(j->worker);
     if (j->input)
         fclose(j->input);
     if (j->output)
         fclose(j->output);
     free(j);
 }
+
+// Worker backends, selected by platform.
+#if defined(__EMSCRIPTEN__)
+// Browser staging backend: the page's Module.boatPluginStage transport (web/plugin_author.js)
+// runs each request in a disposable Web Worker; the game Wasm only copies bytes in and out.
+
+#include <emscripten.h>
+#include <stdlib.h>
+
+// The bridge's reply ceiling, matching browser_read below.
+#define BROWSER_REPLY_MAX 163840u
+// The bridge's request ceiling, matching Transport.start in web/plugin_author.js.
+#define BROWSER_REQUEST_MAX 131072u
+
+// Browser workers start and evaluate Lua on the visitor's device; allow a slow phone. Browser
+// solo has no race trial or match, and an empty host may consume a prepared launch receipt.
+const BoatPluginWorkerTraits boat_plugin_worker_traits = {
+    .deadline = 15.0,
+    .launch_receipt = true,
+    .solo_kinds_only = true,
+    .query_deadline_message = true,
+};
+
+struct BoatPluginWorker {
+    unsigned job; // Transport job id; 0 once closed.
+    BoatPluginWorkerRole role;
+};
+
+EM_JS(unsigned, browser_start,
+    (const unsigned char *data, unsigned size, unsigned base, unsigned low, unsigned high), {
+        if (!Module.boatPluginStage)
+            return 0;
+        return Module.boatPluginStage.start(
+            HEAPU8.slice(data, data + size), [ base >>> 0, low >>> 0, high >>> 0 ]);
+    })
+EM_JS(int, browser_status, (unsigned job),
+    { return Module.boatPluginStage ? Module.boatPluginStage.status(job) : -1; })
+EM_JS(int, browser_read, (unsigned job, unsigned char *data), {
+    const bytes = Module.boatPluginStage.read(job);
+    if (!bytes || bytes.length > 163840)
+        return -1;
+    HEAPU8.set(bytes, data);
+    return bytes.length;
+})
+EM_JS(void, browser_close, (unsigned job), {
+    if (Module.boatPluginStage)
+        Module.boatPluginStage.close(job);
+})
+EM_JS(unsigned, browser_query_start, (const unsigned char *data, unsigned size), {
+    if (!Module.boatPluginStage || !Module.boatPluginStage.query)
+        return 0;
+    return Module.boatPluginStage.query(HEAPU8.slice(data, data + size), [ 0, 0, 0 ]);
+})
+
+void boat_plugin_worker_binary_stdio(void) { }
+
+BoatPluginWorker *boat_plugin_worker_start(const char *executable, BoatPluginWorkerRole role,
+    FILE *request, size_t request_size, FILE *response, const unsigned pin[3])
+{
+    (void)executable;
+    (void)response;
+    if (!request_size || request_size > BROWSER_REQUEST_MAX)
+        return NULL;
+    BoatPluginWorker *w = calloc(1, sizeof(*w));
+    unsigned char *payload = malloc(request_size);
+    if (w && payload && fread(payload, 1, request_size, request) == request_size) {
+        w->role = role;
+        w->job = role == BOAT_PLUGIN_WORKER_QUERY
+            ? browser_query_start(payload, (unsigned)request_size)
+            : browser_start(payload, (unsigned)request_size, pin[0], pin[1], pin[2]);
+    }
+    free(payload);
+    if (w && !w->job) {
+        free(w);
+        w = NULL;
+    }
+    return w;
+}
+
+BoatPluginWorkerState boat_plugin_worker_poll(
+    BoatPluginWorker *w, FILE *response, const char **reason)
+{
+    int status = browser_status(w->job);
+    if (!status)
+        return BOAT_PLUGIN_WORKER_RUNNING;
+    if (status < 0) {
+        *reason = "browser worker failed, canceled or stale";
+        if (w->role == BOAT_PLUGIN_WORKER_QUERY)
+            w->job = 0; // A failed query's transport job is not closed.
+        return BOAT_PLUGIN_WORKER_BROKEN;
+    }
+    *reason = "invalid browser worker response";
+    unsigned char *bytes
+        = malloc(w->role == BOAT_PLUGIN_WORKER_QUERY ? BOAT_PLUGIN_QUERY_REPLY_MAX + 8192
+                                                     : BROWSER_REPLY_MAX);
+    int size = bytes ? browser_read(w->job, bytes) : -1;
+    // A staging reply always has a header; an empty query reply is left to the query parser.
+    bool read = w->role == BOAT_PLUGIN_WORKER_QUERY ? size >= 0 : size > 0;
+    if (read) {
+        rewind(response);
+        read = fwrite(bytes, 1, (size_t)size, response) == (size_t)size && !fflush(response);
+    }
+    free(bytes);
+    if (!read) {
+        if (w->role == BOAT_PLUGIN_WORKER_QUERY)
+            w->job = 0; // An unreadable query's transport job is not closed.
+        return BOAT_PLUGIN_WORKER_UNREADABLE;
+    }
+    browser_close(w->job);
+    w->job = 0;
+    return status == 1 ? BOAT_PLUGIN_WORKER_SUCCEEDED : BOAT_PLUGIN_WORKER_FAILED;
+}
+
+void boat_plugin_worker_close(BoatPluginWorker *w)
+{
+    if (!w)
+        return;
+    if (w->job)
+        browser_close(w->job);
+    free(w);
+}
+#elif defined(_WIN32)
+// Windows staging backend: CreateProcessA of the executable with inheritable duplicates of the
+// request/response temporary files as stdin/stdout, exit-code polling, and TerminateProcess plus
+// a wait on close.
+
+#include <stdlib.h>
+#include <string.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
+#include <fcntl.h>
+#include <io.h>
+#include <windows.h>
+
+const BoatPluginWorkerTraits boat_plugin_worker_traits = {
+    .deadline = 5.0,
+    .needs_executable = true,
+};
+
+struct BoatPluginWorker {
+    HANDLE process; // NULL once the exit code has been collected.
+};
+
+void boat_plugin_worker_binary_stdio(void)
+{
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+}
+
+BoatPluginWorker *boat_plugin_worker_start(const char *executable, BoatPluginWorkerRole role,
+    FILE *request, size_t request_size, FILE *response, const unsigned pin[3])
+{
+    (void)request_size;
+    (void)pin;
+    BoatPluginWorker *w = calloc(1, sizeof(*w));
+    if (!w)
+        return NULL;
+    const char *argument
+        = role == BOAT_PLUGIN_WORKER_QUERY ? "--plugin-query-worker" : "--plugin-stage-worker";
+    // Inheritable copies only; parent CRT handles stay private.
+    HANDLE input = NULL, output = NULL, current = GetCurrentProcess();
+    if (!DuplicateHandle(current, (HANDLE)_get_osfhandle(_fileno(request)), current, &input, 0,
+            TRUE, DUPLICATE_SAME_ACCESS)
+        || !DuplicateHandle(current, (HANDLE)_get_osfhandle(_fileno(response)), current, &output, 0,
+            TRUE, DUPLICATE_SAME_ACCESS)) {
+        if (input)
+            CloseHandle(input);
+        goto failed;
+    }
+    char command[4096];
+    int n = snprintf(command, sizeof(command), "\"%s\" %s", executable, argument);
+    STARTUPINFOA startup = { .cb = sizeof(startup),
+        .dwFlags = STARTF_USESTDHANDLES,
+        .hStdInput = input,
+        .hStdOutput = output,
+        .hStdError = output };
+    PROCESS_INFORMATION process = { 0 };
+    bool started = n > 0 && (size_t)n < sizeof(command) && !strchr(executable, '"')
+        && CreateProcessA(executable, command, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL,
+            &startup, &process);
+    CloseHandle(input);
+    CloseHandle(output);
+    if (!started)
+        goto failed;
+    CloseHandle(process.hThread);
+    w->process = process.hProcess;
+    return w;
+failed:
+    free(w);
+    return NULL;
+}
+
+BoatPluginWorkerState boat_plugin_worker_poll(
+    BoatPluginWorker *w, FILE *response, const char **reason)
+{
+    (void)response;
+    DWORD code;
+    if (!GetExitCodeProcess(w->process, &code)) {
+        *reason = "worker poll failed";
+        return BOAT_PLUGIN_WORKER_BROKEN;
+    }
+    if (code == STILL_ACTIVE)
+        return BOAT_PLUGIN_WORKER_RUNNING;
+    CloseHandle(w->process);
+    w->process = NULL;
+    return code == 0 ? BOAT_PLUGIN_WORKER_SUCCEEDED : BOAT_PLUGIN_WORKER_FAILED;
+}
+
+void boat_plugin_worker_close(BoatPluginWorker *w)
+{
+    if (!w)
+        return;
+    if (w->process) {
+        TerminateProcess(w->process, 1);
+        WaitForSingleObject(w->process, INFINITE);
+        CloseHandle(w->process);
+    }
+    free(w);
+}
+#else
+// POSIX staging backend: posix_spawn of the executable with request/response temporary files as
+// stdin/stdout, non-blocking waitpid polling, and SIGKILL plus reaping on close.
+
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <spawn.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char **environ;
+
+const BoatPluginWorkerTraits boat_plugin_worker_traits = {
+    .deadline = 5.0,
+    .needs_executable = true,
+};
+
+struct BoatPluginWorker {
+    pid_t pid;
+    bool running; // Spawned and not yet reaped.
+};
+
+void boat_plugin_worker_binary_stdio(void) { }
+
+BoatPluginWorker *boat_plugin_worker_start(const char *executable, BoatPluginWorkerRole role,
+    FILE *request, size_t request_size, FILE *response, const unsigned pin[3])
+{
+    (void)request_size;
+    (void)pin;
+    BoatPluginWorker *w = calloc(1, sizeof(*w));
+    if (!w)
+        return NULL;
+    const char *argument
+        = role == BOAT_PLUGIN_WORKER_QUERY ? "--plugin-query-worker" : "--plugin-stage-worker";
+    if (fcntl(fileno(request), F_SETFD, FD_CLOEXEC) || fcntl(fileno(response), F_SETFD, FD_CLOEXEC))
+        goto failed;
+    posix_spawn_file_actions_t actions;
+    if (posix_spawn_file_actions_init(&actions))
+        goto failed;
+    int error = posix_spawn_file_actions_adddup2(&actions, fileno(request), STDIN_FILENO);
+    error |= posix_spawn_file_actions_adddup2(&actions, fileno(response), STDOUT_FILENO);
+    error |= posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+    char *const argv[] = { (char *)executable, (char *)argument, NULL };
+    if (!error)
+        error = posix_spawn(&w->pid, executable, &actions, NULL, argv, environ);
+    posix_spawn_file_actions_destroy(&actions);
+    if (error)
+        goto failed;
+    w->running = true;
+    return w;
+failed:
+    free(w);
+    return NULL;
+}
+
+BoatPluginWorkerState boat_plugin_worker_poll(
+    BoatPluginWorker *w, FILE *response, const char **reason)
+{
+    (void)response;
+    int status;
+    pid_t got = waitpid(w->pid, &status, WNOHANG);
+    if (got == 0)
+        return BOAT_PLUGIN_WORKER_RUNNING;
+    if (got < 0) {
+        *reason = "worker poll failed";
+        return BOAT_PLUGIN_WORKER_BROKEN;
+    }
+    w->running = false;
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? BOAT_PLUGIN_WORKER_SUCCEEDED
+                                                         : BOAT_PLUGIN_WORKER_FAILED;
+}
+
+void boat_plugin_worker_close(BoatPluginWorker *w)
+{
+    if (!w)
+        return;
+    if (w->running) {
+        kill(w->pid, SIGKILL);
+        while (waitpid(w->pid, NULL, 0) < 0 && errno == EINTR) { }
+    }
+    free(w);
+}
+#endif
