@@ -666,7 +666,9 @@ configuration; Windows timings have not been measured. GPU checks are opt-in thr
 off has less coverage; report that omission.
 
 CPU lighting checks are display-free. The quick `waterfront_lighting` test covers presets,
-continuity, reference repaint/restore, window occupancy and parsing. Its exhaustive
+continuity, reference repaint/restore, window occupancy and parsing. The static cloud
+mask checks require all three terrace bands, valid band values on covered samples and
+zero terrace values outside the underside footprint. Its exhaustive
 `--sky-check` mode is the separate slow `waterfront_lighting_sky` test: it compares the
 visible-sample draw with the full panorama (separate storage/traversal, shared texel recipe)
 across legacy/full hours, sizes, cameras and a squall, and uses `waterfront_sky_stats()` to

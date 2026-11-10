@@ -165,7 +165,7 @@ typedef struct {
     Shader shadow_shader;
     Shader water_shader;
     Shader sky_shader;
-    Texture2D sky_mask; // Static cloud underside/rim flags, uploaded once per scene.
+    Texture2D sky_mask; // Static cloud coverage/rim/terrace mask, uploaded once per scene.
     RenderTexture2D shadow_map;
     RenderTexture2D far_shadow_map;
     // G4: a copy of the main pass's opaque depth taken just before water draws, for shore and

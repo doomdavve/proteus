@@ -36,6 +36,13 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | Human input/audio and wider network review; Firefox deadline | 2026-11-01 | [releases](RELEASES.md#status-and-verification) |
 
+## Cloud deck — accepted locally, 2026-11-10
+
+The user accepted the softer cloud outlines, deeper-blue Day sky and sparser three-tone
+water reflections. The [cloud deck plan](CLOUD_DECK_PLAN.md) is closed locally;
+[3D.md](3D.md#scene-lighting) owns the current contract. Broader platform qualification
+and the existing lighting/graphics loops remain separate. The user authorized a PR.
+
 ## Specs
 
 Plans describe work to do; a spec describes the system as it is, in the present tense and
