@@ -44,5 +44,3 @@ bool wake_lan_receive(WakeLanSearch *search, BoatNetLanRoom *room)
 }
 
 void wake_lan_close(WakeLanSearch *search) { (void)search; }
-
-const char *wake_lan_unavailable_hint(void) { return "JOIN A WEBRTC ROOM: WS:// OR WSS://"; }

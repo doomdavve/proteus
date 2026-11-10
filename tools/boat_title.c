@@ -500,8 +500,8 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
 // What the LAN row's room is, or how to make one appear.
 static const char *lan_hint(const Title *t, char *out, size_t size)
 {
-    if (!t->searching)
-        return wake_lan_unavailable_hint();
+    if (!t->searching) // The browser's WebRTC join hint is chosen before this is asked.
+        return "NO LAN SEARCH: TYPE AN ADDRESS BELOW";
     if (!t->found.count)
         return "NO ROOMS FOUND ON THIS NETWORK YET";
     const BoatNetLanRoom *room = &t->found.rooms[t->shown];

@@ -94,7 +94,6 @@ void wake_lan_close(WakeLanSearch *search)
     (void)search;
     abort();
 }
-const char *wake_lan_unavailable_hint(void) { abort(); }
 
 static void write_text(const char *text)
 {

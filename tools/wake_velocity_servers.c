@@ -89,5 +89,3 @@ void wake_lan_close(WakeLanSearch *search)
     boat_net_enet_cleanup();
     free(search);
 }
-
-const char *wake_lan_unavailable_hint(void) { return "NO LAN SEARCH: TYPE AN ADDRESS BELOW"; }

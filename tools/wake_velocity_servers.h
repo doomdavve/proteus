@@ -27,13 +27,12 @@ void wake_servers_text(int index, WakeServerField field, char *out, size_t size)
 void wake_servers_status(char *out, size_t size);
 
 // LAN room search while the multiplayer panel is open. Open returns NULL when no search is
-// available (always in the browser). Query sends one broadcast; receive returns one heard room.
+// available (always in the browser, whose title shows its WebRTC join hint instead). Query sends
+// one broadcast; receive returns one heard room.
 typedef struct WakeLanSearch WakeLanSearch;
 WakeLanSearch *wake_lan_open(void);
 void wake_lan_query(WakeLanSearch *search);
 bool wake_lan_receive(WakeLanSearch *search, BoatNetLanRoom *room);
 void wake_lan_close(WakeLanSearch *search); // NULL is allowed.
-// The title's hint when the LAN search is unavailable.
-const char *wake_lan_unavailable_hint(void);
 
 #endif
