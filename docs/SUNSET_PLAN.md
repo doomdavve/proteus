@@ -1,5 +1,9 @@
 # Lighting through the day
 
+Day-sky follow-up, 2026-11-10: the [cloud deck track](CLOUD_DECK_PLAN.md) now changes
+the Day/noon background palette for user play review. Earlier claims of exact preservation
+of the original Day sky below describe their dated baselines; other lighting values are retained.
+
 Status, 2026-11-08: #171 merged at `f84e107`, preserving T1–T2c. T3 is implemented locally:
 the existing SETTINGS → LIGHTING row cycles 27 fixed choices, DAY (default), SUNSET, DUSK, then
 00:00 through 23:00, with Left/Right, Enter and click. The named presets and Day default are

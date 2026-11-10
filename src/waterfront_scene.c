@@ -28,7 +28,7 @@ static Vector3 sky_mix(Vector3 a, Vector3 b, float t)
     return Vector3Lerp(a, b, t * t * (3 - 2 * t));
 }
 
-// A fixed cloud deck sampled in world X/Z, so square tiles recede toward the horizon.
+// A fixed, shallow cloud deck sampled in world X/Z, receding toward the horizon.
 static float cloud_hash(int x, int z)
 {
     uint32_t seed = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u;
@@ -36,25 +36,30 @@ static float cloud_hash(int x, int z)
     return (float)((seed ^ (seed >> 16)) & 65535u) / 65535;
 }
 
-static bool cloud_tile(float x, float z)
+// Smooth interpolation removes the coarse square sampling grid while retaining the original
+// broad cloud patches. A little continuous fine detail keeps the boundaries irregular.
+static float cloud_noise(float x, float z)
 {
-    int tile_x = (int)floorf(x / .16f), tile_z = (int)floorf(z / .16f);
-    float gx = tile_x / 5.0f, gz = tile_z / 5.0f;
-    int ix = (int)floorf(gx), iz = (int)floorf(gz);
-    float tx = gx - ix, tz = gz - iz;
+    int ix = (int)floorf(x), iz = (int)floorf(z);
+    float tx = x - ix, tz = z - iz;
     tx = tx * tx * (3 - 2 * tx);
     tz = tz * tz * (3 - 2 * tz);
     float a = Lerp(cloud_hash(ix, iz), cloud_hash(ix + 1, iz), tx);
     float b = Lerp(cloud_hash(ix, iz + 1), cloud_hash(ix + 1, iz + 1), tx);
-    // Broad joined patches, notched edges, holes, and occasional detached little tiles.
-    return Lerp(a, b, tz) * .85f + cloud_hash(tile_x + 137, tile_z - 59) * .15f > .59f;
+    return Lerp(a, b, tz);
+}
+
+static float cloud_density(float x, float z)
+{
+    // Retain the broad patch scale; higher thresholds leave more open sky and water.
+    return cloud_noise(x / .8f, z / .8f) * .94f + cloud_noise(x / .16f + 137, z / .16f - 59) * .06f;
 }
 
 enum { SKY_WIDTH = 1024, SKY_HEIGHT = 512 };
 
 // Static cloud structure for the GPU sky shader and the CPU sky evaluator, sampled at the same
-// panorama texel centres as waterfront_sky_image. R marks the underside, G the lit rim; the
-// flags never depend on light.
+// panorama texel centres as waterfront_sky_image. R marks the underside, G the lit rim;
+// B stores three nested tonal terraces (85/170/255). The mask never depends on light.
 Image waterfront_sky_cloud_mask(void)
 {
     enum { WIDTH = SKY_WIDTH, HEIGHT = SKY_HEIGHT };
@@ -64,16 +69,23 @@ Image waterfront_sky_cloud_mask(void)
         for (int y = 0; y < HEIGHT; ++y) {
             float elevation = 1 - 2 * ((float)y + .5f) / HEIGHT;
             for (int x = 0; x < WIDTH; ++x) {
-                unsigned char underside = 0, rim = 0;
+                unsigned char underside = 0, rim = 0, tone = 0;
                 if (elevation > .075f) {
                     float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
                     float horizontal = sqrtf(1 - elevation * elevation) / elevation;
                     float cx = sinf(azimuth) * horizontal;
                     float cz = cosf(azimuth) * horizontal;
-                    underside = cloud_tile(cx, cz) ? 255 : 0;
-                    rim = cloud_tile(cx * 1.035f, cz * 1.035f) ? 255 : 0;
+                    float density = cloud_density(cx, cz);
+                    underside = density > .68f ? 255 : 0;
+                    rim = cloud_density(cx * 1.035f, cz * 1.035f) > .68f ? 255 : 0;
+                    if (underside) {
+                        // Offset the broad terraces so one edge catches light instead of
+                        // drawing concentric rings around the footprint.
+                        float terrace = cloud_density(cx + .10f, cz - .12f);
+                        tone = terrace > .80f ? 255 : terrace > .74f ? 170 : 85;
+                    }
                 }
-                pixels[y * WIDTH + x] = (Color) { underside, rim, 0, 255 };
+                pixels[y * WIDTH + x] = (Color) { underside, rim, tone, 255 };
             }
         }
         ready = true;
@@ -122,7 +134,12 @@ static Color sky_texel(const WaterfrontLighting *l, const Color *cloud_mask, int
         bool underside = flags.r != 0;
         bool rim = flags.g != 0;
         if (underside || rim) {
-            Vector3 cloud = underside ? l->cloud_underside : l->cloud_rim;
+            // Three broad contour layers survive water distortion without fine texture noise.
+            Vector3 cloud = Vector3Scale(l->cloud_rim, .92f);
+            if (flags.b >= 170)
+                cloud = Vector3Lerp(l->cloud_rim, l->cloud_underside, .45f);
+            if (!underside || flags.b == 255)
+                cloud = Vector3Scale(l->cloud_underside, 1.035f);
             color = sky_mix(color, cloud, (elevation - .075f) / .10f);
         }
     }

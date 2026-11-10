@@ -64,7 +64,7 @@ static float field_step_limit(size_t i)
 
 static int check_presets(void)
 {
-    // Phase zero is the original daytime look: the constants the renderers used before.
+    // Phase zero retains the established daytime scene light, fog and water.
     WaterfrontLighting day = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     CHECK(same3(day.sun_direction, Vector3Normalize((Vector3) { .10f, .48f, -.87f })));
     CHECK(same3(day.ambient, (Vector3) { .48f, .57f, .65f }));
@@ -305,12 +305,19 @@ static int check_sky(void)
     Color *mask_pixels = malloc(mask_bytes);
     CHECK(mask_pixels);
     memcpy(mask_pixels, mask.data, mask_bytes);
-    int underside = 0, rim = 0;
+    int underside = 0, rim = 0, tones[3] = { 0 };
     for (int i = 0; i < mask.width * mask.height; ++i) {
         underside += mask_pixels[i].r != 0;
         rim += mask_pixels[i].g != 0;
+        if (mask_pixels[i].r) {
+            CHECK(mask_pixels[i].b == 85 || mask_pixels[i].b == 170 || mask_pixels[i].b == 255);
+            ++tones[mask_pixels[i].b / 85 - 1];
+        } else {
+            CHECK(mask_pixels[i].b == 0);
+        }
     }
     CHECK(mask.width == 1024 && mask.height == 512 && underside > 1000 && rim > 1000);
+    CHECK(tones[0] > 100 && tones[1] > 100 && tones[2] > 100);
     (void)waterfront_sky_image(&dusk);
     CHECK(waterfront_sky_cloud_mask().data == mask.data
         && memcmp(waterfront_sky_cloud_mask().data, mask_pixels, mask_bytes) == 0);

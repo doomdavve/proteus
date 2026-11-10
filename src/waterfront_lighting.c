@@ -13,7 +13,7 @@ static Vector3 sun_at(float elevation)
     return (Vector3) { bearing.x * cosf(elevation), sinf(elevation), bearing.y * cosf(elevation) };
 }
 
-// The original daytime constants, unchanged.
+// Day keeps the established scene light, with the deeper-blue sky selected for play review.
 static WaterfrontLighting day(void)
 {
     return (WaterfrontLighting) {
@@ -25,9 +25,9 @@ static WaterfrontLighting day(void)
         .cpu_ambient = .30f,
         .cpu_direct = .70f,
         .cpu_tint = { 1, 1, 1 },
-        .sky_horizon = { 186, 229, 244 },
-        .sky_zenith = { 66, 158, 226 },
-        .sky_gradient = .85f,
+        .sky_horizon = { 160, 213, 242 },
+        .sky_zenith = { 22, 91, 190 },
+        .sky_gradient = .65f,
         .sun_halo = { 255, 237, 165 },
         .sun_disc = { 255, 244, 184 },
         .halo_strength = .24f,
@@ -266,6 +266,7 @@ static WaterfrontLighting morning(void)
     l.direct = (Vector3) { 1.0f, .91f, .75f };
     l.sky_horizon = (Vector3) { 200, 230, 242 };
     l.sky_zenith = (Vector3) { 64, 148, 216 };
+    l.sky_gradient = .85f;
     l.fog = (Vector3) { 200.0f / 255.0f, 230.0f / 255.0f, 242.0f / 255.0f };
     return l;
 }
@@ -278,6 +279,7 @@ static WaterfrontLighting afternoon(void)
     l.cpu_tint = (Vector3) { 1.0f, .97f, .92f };
     l.sky_horizon = (Vector3) { 208, 224, 228 };
     l.sky_zenith = (Vector3) { 70, 150, 210 };
+    l.sky_gradient = .85f;
     l.fog = (Vector3) { 200.0f / 255.0f, 218.0f / 255.0f, 226.0f / 255.0f };
     l.water = (Vector3) { 1.0f, .98f, .94f };
     l.unlit = (Vector3) { .98f, .92f, .86f };

@@ -164,7 +164,8 @@ typedef struct {
 
 WaterfrontSkyStats waterfront_sky_stats(void);
 // Borrowed light-independent cloud flags at the same panorama texel centres: R underside,
-// G lit rim, point-sampled by the GPU sky shader. Never repainted or unloaded.
+// G lit rim, B three tonal terraces (85/170/255), point-sampled by the GPU sky shader.
+// Never repainted or unloaded.
 Image waterfront_sky_cloud_mask(void);
 void waterfront_sky_draw(
     Color *pixels, int width, int height, View3D camera, const WaterfrontLighting *lighting);
