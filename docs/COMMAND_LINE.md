@@ -309,11 +309,10 @@ selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to it
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
 
 Plain free boating (a free package without a voyage, objective or live authoring, on the native
-game) runs as a private local authority and client in the game process; captures, `--demo`, the
-developer studies, courses, voyages, `--work` and rooms keep the direct session path. A Debug
-build (no `NDEBUG`) also accepts `--direct-session`, a developer-only switch back to the direct
-path for comparison; release builds do not accept it. At exit the game prints a `Local session:`
-line with its generation, ticks, chunks and restarts.
+game) runs as a private local authority and client in the game process, live, under `--demo` and
+in `--screenshot` captures (whose scripted drive runs on virtual time); the developer studies,
+courses, voyages, `--work`, rooms and the browser keep the direct session path. At exit the game
+prints a `Local session:` line with its generation, ticks, chunks and restarts.
 
 `--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The
 existing `[` / `]` (or typed brackets and `,` / `.`) steps and `\` restore continue to work. It

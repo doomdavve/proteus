@@ -532,11 +532,6 @@ static int study(int argc, char **argv)
     BoatCamera camera_settings = BOAT_CAMERA_DEFAULT;
     bool camera_distance_set = false, camera_height_set = false;
     bool time_set = false, demo = false, mouse_steering = false;
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    // D8: a developer-only switch back to the direct free-boating path (Debug builds only, so
-    // never in a release); AR7 removes it with that path.
-    bool direct_session = false;
-#endif
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
@@ -721,10 +716,6 @@ static int study(int argc, char **argv)
             work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__) && !defined(NDEBUG)
-        } else if (strcmp(argv[i], "--direct-session") == 0) {
-            direct_session = true;
-#endif
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
             screenshot = argv[++i];
         } else if (strcmp(argv[i], "--time") == 0 && i + 1 < argc) {
@@ -1263,6 +1254,16 @@ static int study(int argc, char **argv)
         fprintf(stderr, "Map spawn is not navigable.\n");
         goto cleanup;
     }
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    // AR6 (L0) and L6: plain free boating, live, scripted (`--demo`) or captured, runs as a local
+    // authority and client. Voyages, objectives, courses, the working harbour, rooms and the
+    // developer studies keep the direct path until their ledger rows migrate them.
+    static WakeLocal local;
+#define LOCAL_ELIGIBLE()                                                                           \
+    (!networked && !work_mode && !course && objects && !objects->crossing && !wake                 \
+        && !session.voyage_route && !session.runs.playing && plugin_active && !plugin.authoring    \
+        && plugin.host.kind == BOAT_PLUGIN_KIND_FREE && !plugin.objective.initialized)
+#endif
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;
     BoatPresentation playback_presentation;
@@ -1286,7 +1287,19 @@ static int study(int argc, char **argv)
             goto cleanup;
         }
     } else if (screenshot) {
-        for (int tick = 0; tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
+        bool scripted_local = false;
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+        // L6: the capture's scripted drive runs through the local session on virtual time.
+        scripted_local = LOCAL_ELIGIBLE();
+        if (scripted_local
+            && (!wake_local_open(&local, &session, objects, worlds, 0)
+                || !wake_local_scripted_drive(
+                    &local, &session, objects, (uint64_t)round(time / BOAT_TICK_SECONDS)))) {
+            fprintf(stderr, "Single player could not start: %s.\n", local.local.failure);
+            goto cleanup;
+        }
+#endif
+        for (int tick = 0; !scripted_local && tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
             if (plugin_active)
                 wake_plugin_before_tick(&plugin);
             demo_step(&session, tick, NULL, wake, objects);
@@ -1503,16 +1516,9 @@ static int study(int argc, char **argv)
     if (work_mode)
         wake_work_autosave(&work, true);
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    // AR6 (L0): plain free boating runs as a local authority and client. Voyages, objectives,
-    // courses, the working harbour, rooms, demos and the developer studies keep the direct path
-    // until their ledger rows migrate them.
-    static WakeLocal local;
-#define LOCAL_ELIGIBLE()                                                                           \
-    (!direct_session && !networked && !work_mode && !course && !demo && objects                    \
-        && !objects->crossing && !wake && !session.voyage_route && !session.runs.playing           \
-        && plugin_active && !plugin.authoring && plugin.host.kind == BOAT_PLUGIN_KIND_FREE         \
-        && !plugin.objective.initialized)
-    if (LOCAL_ELIGIBLE() && !wake_local_open(&local, &session, objects, worlds, GetTime())) {
+    // A capture's local session already ran its scripted drive (L6).
+    if (!local.active && LOCAL_ELIGIBLE()
+        && !wake_local_open(&local, &session, objects, worlds, GetTime())) {
         snprintf(study_failure, sizeof(study_failure), "Single player could not start: %s.",
             local.local.failure);
         fprintf(stderr, "%s\n", study_failure);
@@ -1956,9 +1962,12 @@ static int study(int argc, char **argv)
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
             // The grant is the same accumulator arithmetic; the client derives each tick's rates
             // from its predicted boat as the loop below does from the session's.
-            if (local.active
-                && !wake_local_frame(&local, &session, objects, &accumulator, input, thrust_target,
-                    steering_target, GetTime(), &metrics)) {
+            bool local_ok = !local.active
+                || (demo ? wake_local_scripted_frame(
+                               &local, &session, objects, &accumulator, GetTime(), &metrics)
+                         : wake_local_frame(&local, &session, objects, &accumulator, input,
+                               thrust_target, steering_target, GetTime(), &metrics));
+            if (!local_ok) {
                 // D10: no save applies to free boating; back to the title with the reason.
                 snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
                     local.local.failure);
@@ -1967,7 +1976,14 @@ static int study(int argc, char **argv)
                 break;
             }
 #endif
-            while (accumulator >= BOAT_TICK_SECONDS) {
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            // L0's removal point: a local session's ticks never fall back to the direct path;
+            // a grant above BOAT_LOCAL_MAX_GRANT waits in the accumulator for the next frame.
+            bool direct_ticks = !local.active;
+#else
+            bool direct_ticks = true;
+#endif
+            while (direct_ticks && accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
                 if (work_mode) {
