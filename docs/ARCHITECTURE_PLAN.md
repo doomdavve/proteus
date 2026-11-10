@@ -8,7 +8,8 @@
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the remaining manual checks; then AR7.
+**Next:** L6 and L0's removal are implemented on `arch/l6-scripted-drives` ([AR7
+status](#ar7-status)); then L2 (time trial, runs, bests and ghosts).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -695,8 +696,8 @@ Implemented (ledger row L0):
   boat, clock, presentation and arcade pool. Presentation steps per predicted tick against the
   pool the boat read (the previous tick's pool advanced once, before the tick's emission), as
   `boat_session_step` does. A restart recreates both endpoints; an endpoint failure returns to the
-  title with its reason (D10; free boating has no save). `--direct-session` (D8) is parsed only
-  inside `#ifndef NDEBUG`, so a release build rejects it as an unknown option.
+  title with its reason (D10; free boating has no save). `--direct-session` (D8) was parsed only
+  inside `#ifndef NDEBUG`; [L6](#ar7-status) removed it with the direct free-boating path.
 - Repeated failure is endpoint failure (§5): a private client that is still stalled (snapshot or
   wake mismatch) when a fourth resync falls due, after `BOAT_NET_LOCAL_RESYNCS` = 3 resyncs with
   no clean state between them, closes with its reason (about 480 granted ticks). The in-process
@@ -748,8 +749,8 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no
   a newborn wake object contributes nothing at its birth tick (its birth envelope is zero).
 - Debug build warning-clean; `ctest --preset full`: see [current evidence](#current-evidence-and-limitations).
 - CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
-  byte-identical to an `e1b1175` build (main's tree): captures drive the direct scripted path
-  before the frame loop (L6 migrates them).
+  byte-identical to an `e1b1175` build (main's tree): captures drove the direct scripted path
+  before the frame loop (L6 has since migrated basin captures; see [AR7 status](#ar7-status)).
 - Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
   outer with waves, current and crossing, through the game glue with presentation): 16-tick
   frames at 8× mean 1.66 ms (worst 2.13 ms) against 1.40 ms (worst 1.84 ms) for the direct path
@@ -786,6 +787,43 @@ Done when every shipped playable mode uses authority/client composition with led
 local and remote share authoritative rule implementations, and no independent solo gameplay
 path remains. Missing platform/mode support blocks this gate unless the user approves a scope
 change.
+
+#### AR7 status
+
+2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178), not pushed.
+
+L6 (scripted demos and captures) and L0's removal point, implemented:
+
+- Scripted command source: `boat_local_frame_scripted` (`src/boat_local.[ch]`) takes each tick's
+  helm from a `BoatLocalScript` callback given the predicted boat the authority will step; its
+  rates are sent as they are. `demo_input` (`tools/wake_velocity_drive.[ch]`) is the scripted
+  drive's helm, shared by `demo_step` and the glue's `wake_local_scripted_frame` (`--demo` in
+  the frame loop) and `wake_local_scripted_drive` (a capture's drive before the window, in grants
+  of at most 96 on virtual time from 0).
+- The game: a `--screenshot` or `--demo` of plain free boating (the `LOCAL_ELIGIBLE` sessions,
+  no longer excluding demos) runs through the local session. With a local session active the
+  frame loop's direct tick loop is skipped, so its ticks never fall back to `timed_boat_step`
+  (L0's removal point); a grant above 96 waits in the accumulator. The D8 switch
+  `--direct-session` is gone.
+- Unchanged and still direct: outer captures and demos (every outer solo session is a voyage, so
+  L1), the developer studies (wake field, crossing), courses, `--work`, rooms and the browser
+  (L4). `demo_step` remains for them and for `boat_benchmark` and `validate_boat_clock`.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
+
+- `boat_local` gains `scripted_demo` and `scripted_capture` (slow lane, about 0.5 s each) and
+  `scripted_needs_script` (quick); per-tick boat, presentation and pool equal `demo_step`'s past
+  the helm changes at ticks 420 and 1440. Negative check during development: indexing the script
+  by the produced tick instead of the tick before it fails both drives.
+- Basin captures at `--time` 3, 10, 15 and 20 (the last three cross both helm changes) and the
+  outer capture at 3 are byte-identical to a build of `main` (`3080e4c`); the basin run prints
+  `Local session: generation 1, 360 ticks in 30 chunks`. All 57 PNGs the full preset writes match
+  that build's except `wake-work-resumed.png`, which also differs between two runs of the same
+  build (working-harbour resume, direct path; not investigated here).
+- `ctest --preset full -j8`: see [current evidence](#current-evidence-and-limitations).
+
+Owed: a native windowed `--demo` on the basin (it now runs through the local session) and the
+L0 manual items still open from AR6.
 
 ### AR8 — Move files into owning directories
 
@@ -1087,6 +1125,10 @@ and the accepted decisions; this plan keeps only the step status (header and
   `ctest --preset full` failed 12 loopback/socket/process tests under sandbox restrictions; the
   rerun with socket/process access passed all 472 enabled tests in 41.27 s, with 13
   retired/opt-in cases disabled. GPU tests were configured off, not verified.
+- L6, 2026-11-10, same machine, Debug: warning-clean build; `ctest --preset full` and again with
+  `-j8` each passed 511/511 (13 disabled); `test_time`, boundary and `platform_bridges` checks
+  pass; the browser-selected `wake_velocity.c` passes the stub `emscripten.h` syntax check (not
+  an Emscripten build).
 - Not performed: browser build, Windows/Linux runs, GPU/windowed input/audio playback,
   cross-machine play, performance deadline qualification and user acceptance. Later steps
   carry their own platform/manual gates.
