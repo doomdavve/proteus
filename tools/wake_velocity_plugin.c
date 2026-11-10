@@ -16,18 +16,7 @@
 #endif
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-EM_JS(void, browser_owner, (unsigned revision, unsigned low, unsigned high, const char *status), {
-    Module.boatPluginOwner = [ revision >>> 0, low >>> 0, high >>> 0 ];
-    if (Module.boatPluginNotice)
-        Module.boatPluginNotice(UTF8ToString(status));
-})
-EM_JS(bool, browser_editing, (void), { return !!Module.boatPluginEditing; })
-EM_JS(unsigned, browser_actions, (void), {
-    const flags = Module.boatPluginActions || 0;
-    Module.boatPluginActions = 0;
-    return flags;
-})
+#include "wake_velocity_plugin_web.h"
 #endif
 
 #include <errno.h>
@@ -50,8 +39,8 @@ static void report(WakePlugin *plugin, const char *outcome, bool alert, const ch
     plugin->outcome = outcome;
 #ifdef __EMSCRIPTEN__
     if (plugin->host.depth) {
-        browser_owner(boat_plugin_host_active(&plugin->host)->number, (unsigned)plugin->host.epoch,
-            (unsigned)(plugin->host.epoch >> 32), plugin->status);
+        wake_web_plugin_owner(boat_plugin_host_active(&plugin->host)->number,
+            (unsigned)plugin->host.epoch, (unsigned)(plugin->host.epoch >> 32), plugin->status);
     }
 #endif
     fprintf(stderr, "Plugin %s: %s%s%s\n", plugin->directory, plugin->status,
@@ -158,42 +147,10 @@ struct WakePluginEvaluation {
     unsigned job;
     double deadline;
 };
-EM_JS(unsigned, objective_start, (const unsigned char *bytes, unsigned size), {
-    return Module.boatPluginObjective
-        ? Module.boatPluginObjective.start(HEAPU8.slice(bytes, bytes + size))
-        : 0;
-})
-EM_JS(int, objective_status, (unsigned job),
-    { return Module.boatPluginObjective ? Module.boatPluginObjective.status(job) : -1; })
-EM_JS(int, objective_read, (unsigned job, unsigned char *bytes), {
-    const data = Module.boatPluginObjective ?.read(job);
-    if (!data || data.length > 49152)
-        return -1;
-    HEAPU8.set(data, bytes);
-    return data.length;
-})
-EM_JS(void, objective_close, (unsigned job), { Module.boatPluginObjective ?.close(job); })
-EM_JS(void, objective_shutdown, (void), { Module.boatPluginObjective ?.reset(); })
-EM_JS(void, objective_snapshot,
-    (unsigned low, unsigned high, unsigned native_low, unsigned native_high, unsigned generation,
-        bool initialized, bool quarantined, unsigned events, bool waiting,
-        const unsigned char *bytes, unsigned size),
-    {
-        Module.boatPluginCheckpoint = {
-            tick : [ low, high ],
-            nativeTick : [ native_low, native_high ],
-            generation,
-            initialized : !!initialized,
-            quarantined : !!quarantined,
-            events,
-            waiting : !!waiting,
-            state : HEAPU8.slice(bytes, bytes + size)
-        };
-    })
 static void close_evaluation(WakePlugin *plugin)
 {
     if (plugin->evaluation) {
-        objective_close(plugin->evaluation->job);
+        wake_web_objective_close(plugin->evaluation->job);
         free(plugin->evaluation);
         plugin->evaluation = NULL;
     }
@@ -230,7 +187,7 @@ static bool begin_evaluation(
     }
     size_t size = boat_plugin_eval_encode_request(r, bytes, BOAT_PLUGIN_EVAL_REQUEST_MAX);
     if (size)
-        e->job = objective_start(bytes, (unsigned)size);
+        e->job = wake_web_objective_start(bytes, (unsigned)size);
     free(bytes);
     if (!e->job) {
         free(e);
@@ -245,7 +202,7 @@ static bool poll_evaluation(WakePlugin *p, BoatSession *session, double now)
     struct WakePluginEvaluation *e = p->evaluation;
     if (!e)
         return false;
-    int status = objective_status(e->job);
+    int status = wake_web_objective_status(e->job);
     bool stale = p->host.epoch != e->request.epoch
         || boat_plugin_host_active(&p->host)->number != e->request.revision
         || session->tick != (uint64_t)e->request.tick
@@ -261,7 +218,7 @@ static bool poll_evaluation(WakePlugin *p, BoatSession *session, double now)
     if (!status && !stale && !expired)
         return false;
     unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REPLY_MAX);
-    int size = status == 1 && bytes ? objective_read(e->job, bytes) : -1;
+    int size = status == 1 && bytes ? wake_web_objective_read(e->job, bytes) : -1;
     BoatPluginObjective result;
     BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
     bool accepted = !stale && !expired && size > 0
@@ -766,14 +723,14 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
     }
 #ifdef __EMSCRIPTEN__
     close_evaluation(plugin);
-    objective_shutdown();
+    wake_web_objective_shutdown();
 #endif
 }
 
 bool wake_plugin_editing(void)
 {
 #ifdef __EMSCRIPTEN__
-    return browser_editing();
+    return wake_web_plugin_editing();
 #else
     return false;
 #endif
@@ -1065,7 +1022,7 @@ bool wake_plugin_frame(
         return false;
     plugin->frame_now = now;
 #ifdef __EMSCRIPTEN__
-    unsigned actions = browser_actions();
+    unsigned actions = wake_web_plugin_actions();
     if (plugin->evaluation
         && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE
         && ((actions & (2 | 8)) || undo)) {
@@ -1081,7 +1038,7 @@ bool wake_plugin_frame(
         actions &= ~8u;
     }
     bool restart = poll_evaluation(plugin, session, now);
-    objective_snapshot((unsigned)plugin->objective.tick,
+    wake_web_objective_snapshot((unsigned)plugin->objective.tick,
         (unsigned)((uint64_t)plugin->objective.tick >> 32), (unsigned)session->tick,
         (unsigned)(session->tick >> 32), plugin->generation, plugin->objective.initialized,
         plugin->objective.quarantined, plugin->event_count, wake_plugin_waiting(plugin),

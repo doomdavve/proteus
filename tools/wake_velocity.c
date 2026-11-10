@@ -63,6 +63,7 @@
 #include <string.h>
 
 #if defined(__EMSCRIPTEN__)
+#include "wake_velocity_plugin_web.h"
 #include <emscripten/emscripten.h>
 // The canvas buffer's multiple of the logical frame: 3, or the high scene's own scale, which
 // shrinks for tall mobile frames so the buffer holds no more pixels than the scene.
@@ -73,11 +74,6 @@ static int web_window_scale(BoatResolution resolution, int width, int height)
         ? scale
         : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
 }
-
-EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
-    Module.boatPluginResetPending = !!pending;
-    Module.boatPluginMenuOpen = !!menu_open;
-})
 
 EM_JS(int, boat_web_viewport_size, (int axis), {
     const size = Module['boatViewportSize']();
@@ -489,19 +485,6 @@ static double plugin_time(void)
 #endif
 }
 
-#if defined(__EMSCRIPTEN__)
-EM_JS(int, browser_plugin_export,
-    (const unsigned char *manifest, unsigned manifest_size, const unsigned char *source,
-        unsigned source_size),
-    {
-        if (!Module.boatPluginExport)
-            return 0;
-        Module.boatPluginExport(HEAPU8.slice(manifest, manifest + manifest_size),
-            HEAPU8.slice(source, source + source_size));
-        return 1;
-    })
-#endif
-
 static bool console_save(
     void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
 {
@@ -517,7 +500,7 @@ static bool console_save(
     size_t manifest_size = wake_plugin_manifest(plugin, &manifest);
     size_t source_size = wake_plugin_source(plugin, &source);
     if (!manifest_size || !source_size
-        || !browser_plugin_export((const unsigned char *)manifest, (unsigned)manifest_size,
+        || !wake_web_plugin_export((const unsigned char *)manifest, (unsigned)manifest_size,
             (const unsigned char *)source, (unsigned)source_size)) {
         snprintf(message, capacity, "the browser export is unavailable");
         return false;
@@ -2001,7 +1984,7 @@ static int study(int argc, char **argv)
         }
 #ifdef __EMSCRIPTEN__
         if (plugin_active && plugin.authoring)
-            browser_plugin_controls(plugin_reset_pending, menu.open);
+            wake_web_plugin_controls(plugin_reset_pending, menu.open);
 #endif
         if (reset_requested) {
             thrust_target = 0;
