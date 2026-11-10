@@ -976,6 +976,103 @@ static int course_practice(void)
     return clean_commands();
 }
 
+// Drive SCRIPT until the attempt has crossed GATE on both paths.
+static int until_gate(Script script, int gate)
+{
+    for (unsigned frames = 0; direct.session.course.next_gate < gate && frames < 20000; ++frames)
+        if (drive(script, 1))
+            return 1;
+    CHECK(direct.session.course.next_gate >= gate && play.session.course.next_gate >= gate);
+    return 0;
+}
+
+// A restart mid-attempt (after the second gate): a new generation at the course start with no
+// finish, save or practice carried, and the new attempt equal on both paths.
+static int course_restart_mid(void)
+{
+    if (open_course(BASIN) || until_gate(trial, 2))
+        return 1;
+    const BoatReplayRuns *runs = &play.session.runs;
+    CHECK(!runs->finished && runs->recording.count == 0 && game.course.recording.count > 0);
+    if (restart_course())
+        return 1;
+    CHECK(lp->generation == 2 && lp->tick == 0 && game.course.recording.count == 0);
+    CHECK(play.session.course.elapsed == 0 && !runs->finished && !runs->save_best);
+    CHECK(!runs->last.complete && !runs->best.complete && !game.course.has_best);
+    if (drive(trial, 120))
+        return 1;
+    return clean_commands();
+}
+
+// Altered time mid-run: one 8x frame after the first gate latches practice on the authority for
+// the rest of the attempt, so the finish is recorded but never becomes best or saves.
+static int course_practice_mid(void)
+{
+    if (open_course(BASIN) || until_gate(trial, 1))
+        return 1;
+    CHECK(!play.session.runs.practice && !game.course.practice);
+    if (drive(trial_8x, 1))
+        return 1;
+    CHECK(play.session.runs.practice && game.course.practice);
+    if (attempt(trial))
+        return 1;
+    const BoatReplayRuns *runs = &play.session.runs;
+    CHECK(runs->practice && runs->last.complete && !runs->best.complete && !runs->save_best);
+    CHECK(!strcmp(runs->notice, "Practice recorded; best and export preserved"));
+    return 0;
+}
+
+// A new best is saved by the frame's flush and, on the next launch, selected from the data
+// directory and raced as the ghost: the local authority starts from its time, and an equal finish
+// is not a new best. Files go under the test's working directory.
+static int course_saved_ghost(void)
+{
+    static const char directory[] = "boat-local-saves";
+    char path[2048];
+    if (open_course(BASIN))
+        return 1;
+    for (unsigned i = 0; i < 2; ++i) {
+        BoatReplayRuns *runs = i ? &play.session.runs : &direct.session.runs;
+        boat_replay_runs_select_best(runs, i ? directory : "boat-local-saves-direct", world.waves,
+            BOAT_COURSE_STANDARD_DIGEST);
+        remove(runs->best_path);
+    }
+    snprintf(path, sizeof(path), "%s", play.session.runs.best_path);
+    CHECK(path[0] && !FileExists(path));
+    if (attempt(trial))
+        return 1;
+    CHECK(!strcmp(play.session.runs.notice, "New personal best!") && FileExists(path));
+    BoatReplay first = { 0 };
+    CHECK(boat_replay_copy(&first, &play.session.runs.best));
+    remove(direct.session.runs.best_path);
+    // The next launch: a fresh session selects the saved best and races it as the ghost.
+    wake_local_close(&game);
+    for (unsigned i = 0; i < 2; ++i) {
+        Play *p = i ? &play : &direct;
+        boat_session_destroy(&p->session);
+        course_open(p);
+        CHECK(boat_replay_runs_select_best(
+            &p->session.runs, directory, world.waves, BOAT_COURSE_STANDARD_DIGEST));
+        boat_replay_runs_reset(&p->session.runs);
+    }
+    CHECK(same_run(&play.session.runs.best, &first) && play.session.runs.opponent.complete);
+    CHECK(play.session.runs.opponent.count == first.count);
+    course_pilots();
+    CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
+    CHECK(game.course.has_best && game.course.best == first.splits[BOAT_COURSE_GATES - 1]);
+    // Neither session writes this time (an equal run is not a best).
+    if (attempt(trial))
+        return 1;
+    CHECK(!strcmp(play.session.runs.notice, "Run recorded") && !play.session.runs.save_best);
+    BoatViewState ghost;
+    CHECK(boat_replay_sample(&play.session.runs.opponent, 1, &ghost, NULL));
+    remove(path);
+    remove(directory); // Empty directories; left behind where remove() does not take them.
+    remove("boat-local-saves-direct");
+    boat_replay_destroy(&first);
+    return 0;
+}
+
 // The course codec: its private state round-trips into the view and rejects malformed bytes.
 static int course_state(void)
 {
@@ -1102,6 +1199,9 @@ int main(int argc, char **argv)
         TEST_CASE(private_range),
         SLOW_CASE(course_trace),
         SLOW_CASE(course_practice),
+        SLOW_CASE(course_restart_mid),
+        SLOW_CASE(course_practice_mid),
+        SLOW_CASE(course_saved_ghost),
         TEST_CASE(course_state),
         TEST_CASE(private_state_rejected),
     };
