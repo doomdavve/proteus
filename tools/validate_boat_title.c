@@ -1,10 +1,10 @@
 #include "boat_title.h"
 
-#include "boat_directory.h"
 #include "boat_location.h"
 #include "boat_music.h"
 #include "boat_replay.h"
 #include "boat_skin.h"
+#include "wake_velocity_servers.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,34 +49,52 @@ bool wake_work_title_set_aside(const BoatTitleSave *save)
     abort();
 }
 
-// The title object declares its public-server helpers in a native net build, but the settings
-// tests never open or draw the multiplayer panel.
-BoatDirectory *boat_directory_create(void) { abort(); }
-void boat_directory_refresh(BoatDirectory *directory)
+// The title object declares its server-discovery helpers, but the settings tests never open or
+// draw the multiplayer panel.
+void wake_servers_start(void) { abort(); }
+void wake_servers_stop(void) { abort(); }
+void wake_servers_refresh(void) { abort(); }
+void wake_servers_poll(void) { abort(); }
+int wake_servers_count(void) { abort(); }
+bool wake_servers_compatible(int index, int protocol, int physics)
 {
-    (void)directory;
+    (void)index;
+    (void)protocol;
+    (void)physics;
     abort();
 }
-void boat_directory_poll(BoatDirectory *directory)
+void wake_servers_text(int index, WakeServerField field, char *out, size_t size)
 {
-    (void)directory;
+    (void)index;
+    (void)field;
+    (void)out;
+    (void)size;
     abort();
 }
-const BoatDirectoryList *boat_directory_list(const BoatDirectory *directory)
+void wake_servers_status(char *out, size_t size)
 {
-    (void)directory;
+    (void)out;
+    (void)size;
     abort();
 }
-const char *boat_directory_status(const BoatDirectory *directory)
+WakeLanSearch *wake_lan_open(void) { abort(); }
+void wake_lan_query(WakeLanSearch *search)
 {
-    (void)directory;
+    (void)search;
     abort();
 }
-void boat_directory_destroy(BoatDirectory *directory)
+bool wake_lan_receive(WakeLanSearch *search, BoatNetLanRoom *room)
 {
-    (void)directory;
+    (void)search;
+    (void)room;
     abort();
 }
+void wake_lan_close(WakeLanSearch *search)
+{
+    (void)search;
+    abort();
+}
+const char *wake_lan_unavailable_hint(void) { abort(); }
 
 static void write_text(const char *text)
 {

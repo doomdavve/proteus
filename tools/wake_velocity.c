@@ -34,6 +34,7 @@
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
+#include "wake_velocity_servers.h"
 #include "wake_velocity_work.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
@@ -3001,9 +3002,7 @@ int main(int argc, char **argv)
     SetTargetFPS(60);
     InitAudioDevice(); // Start inside the page's Play gesture, before the title yields.
 #endif
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    boat_title_directory_start();
-#endif
+    wake_servers_start();
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
@@ -3023,9 +3022,7 @@ int main(int argc, char **argv)
             break;
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    boat_title_directory_stop();
-#endif
+    wake_servers_stop();
 #if defined(__EMSCRIPTEN__)
     CloseAudioDevice();
 #endif

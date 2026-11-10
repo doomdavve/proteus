@@ -12,57 +12,8 @@
 #include "frame_pacer.h"
 #include "raylib.h"
 #include "wake_velocity_input.h"
+#include "wake_velocity_servers.h"
 #include <stdio.h>
-#if defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-
-// clang-format off
-EM_JS(void, refresh_public_servers, (void), { Module['boatServers'].refresh(); })
-EM_JS(int, public_server_count, (void), { return Module['boatServers'].count(); })
-EM_JS(int, public_server_compatible, (int index, int protocol, int physics),
-    { return Module['boatServers'].compatible(index, protocol, physics); })
-EM_JS(void, public_server_text, (int index, int field, char *out, int size), {
-    const server = Module['boatServers'].server(index);
-    const value = field === 3 ? Module['boatServers'].status()
-        : server ? [server.name, server.description, server.websocket][field] : "";
-    stringToUTF8(value, out, size);
-})
-// clang-format on
-#endif
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-#include "boat_directory.h"
-#include "boat_net_enet.h"
-
-static BoatDirectory *directory;
-void boat_title_directory_start(void)
-{
-    directory = boat_directory_create();
-    boat_directory_refresh(directory);
-}
-void boat_title_directory_stop(void)
-{
-    boat_directory_destroy(directory);
-    directory = NULL;
-}
-static void refresh_public_servers(void) { boat_directory_refresh(directory); }
-static int public_server_count(void) { return (int)boat_directory_list(directory)->count; }
-static int public_server_compatible(int index, int protocol, int physics)
-{
-    const BoatDirectoryList *list = boat_directory_list(directory);
-    return index >= 0 && (unsigned)index < list->count && list->entries[index].protocol == protocol
-        && list->entries[index].physics == physics;
-}
-static void public_server_text(int index, int field, char *out, int size)
-{
-    const BoatDirectoryList *list = boat_directory_list(directory);
-    const char *value = field == 3 ? boat_directory_status(directory) : "";
-    if (field != 3 && index >= 0 && (unsigned)index < list->count) {
-        const BoatDirectoryEntry *entry = &list->entries[index];
-        value = field == 0 ? entry->name : field == 1 ? entry->description : entry->address;
-    }
-    snprintf(out, (size_t)size, "%s", value);
-}
-#endif
 
 #include <ctype.h>
 #include <math.h>
@@ -220,10 +171,8 @@ typedef struct {
     char *editing; // The text field being typed into, if any.
     char before[64]; // Its value when editing started, restored by Escape.
     double time, credits_started;
-    // LAN search while the multiplayer panel is open (native builds).
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    BoatNetLan *lan;
-#endif
+    // LAN search while the multiplayer panel is open (none in the browser).
+    WakeLanSearch *lan;
     bool searching, moved; // MOVED: the player has picked a row since opening the panel.
     BoatNetLanList found;
     unsigned shown; // The found room the LAN row offers.
@@ -239,13 +188,8 @@ typedef struct {
 
 static void stop_search(Title *t)
 {
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    if (t->searching) {
-        boat_net_lan_close(t->lan);
-        boat_net_enet_cleanup();
-    }
+    wake_lan_close(t->lan);
     t->lan = NULL;
-#endif
     t->searching = false;
     t->found.count = 0;
 }
@@ -255,35 +199,28 @@ static void start_search(Title *t)
     t->found.count = t->shown = 0;
     t->moved = false;
     t->queried = -1;
-    refresh_public_servers();
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    char error[160];
-    if (!t->searching && boat_net_enet_startup()) {
-        t->lan = boat_net_lan_search(error, sizeof(error));
+    wake_servers_refresh();
+    if (!t->searching) {
+        t->lan = wake_lan_open();
         t->searching = t->lan != NULL;
-        if (!t->searching)
-            boat_net_enet_cleanup();
     }
-#endif
 }
 
 // Query about once a second and forget rooms silent for three.
 static void search(Title *t)
 {
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    boat_directory_poll(directory);
+    wake_servers_poll();
     if (t->searching && (t->queried < 0 || t->time - t->queried >= 1)) {
-        boat_net_lan_query(t->lan, BOAT_NET_DISCOVERY_PORT);
+        wake_lan_query(t->lan);
         t->queried = t->time;
     }
     BoatNetLanRoom room;
-    while (t->searching && boat_net_lan_receive(t->lan, &room))
+    while (t->searching && wake_lan_receive(t->lan, &room))
         boat_net_lan_list_note(&t->found, &room, t->time);
     boat_net_lan_list_expire(&t->found, t->time, 3.5);
     if (t->shown >= t->found.count)
         t->shown = 0;
-#endif
-    unsigned count = (unsigned)public_server_count();
+    unsigned count = (unsigned)wake_servers_count();
     if (t->public_shown >= count)
         t->public_shown = 0;
 }
@@ -511,14 +448,14 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
 #endif
         *label = labels[row];
         if (row == ROW_PUBLIC_SERVER) {
-            if (public_server_count()) {
+            if (wake_servers_count()) {
                 char name[25];
-                public_server_text((int)t->public_shown, 0, name, sizeof(name));
+                wake_servers_text((int)t->public_shown, WAKE_SERVER_NAME, name, sizeof(name));
                 upper(value, size, name);
-                if (public_server_count() > 1) {
+                if (wake_servers_count() > 1) {
                     static char counted[32];
                     snprintf(counted, sizeof(counted), "SERVER %u/%d", t->public_shown + 1,
-                        public_server_count());
+                        wake_servers_count());
                     *label = counted;
                 }
             } else
@@ -535,7 +472,6 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             int dots = (int)fmod(t->time * 2, 4);
             snprintf(value, size, "SEARCHING%.*s", dots, "...");
         }
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
         else {
             const BoatNetLanRoom *room = &t->found.rooms[t->shown];
             char host[32];
@@ -551,7 +487,6 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
                 *label = counted;
             }
         }
-#endif
         return;
     }
     static const char *labels[MAIN_ROWS]
@@ -567,18 +502,9 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
 static const char *lan_hint(const Title *t, char *out, size_t size)
 {
     if (!t->searching)
-#if defined(__EMSCRIPTEN__)
-        return "JOIN A WEBRTC ROOM: WS:// OR WSS://";
-#else
-        return "NO LAN SEARCH: TYPE AN ADDRESS BELOW";
-#endif
+        return wake_lan_unavailable_hint();
     if (!t->found.count)
         return "NO ROOMS FOUND ON THIS NETWORK YET";
-#if !defined(PROTEUS_BOAT_NET) || defined(__EMSCRIPTEN__)
-    (void)out;
-    (void)size;
-    return NULL;
-#else
     const BoatNetLanRoom *room = &t->found.rooms[t->shown];
     char endpoint[32];
     boat_net_lan_endpoint(room, endpoint, sizeof(endpoint));
@@ -591,7 +517,6 @@ static const char *lan_hint(const Title *t, char *out, size_t size)
         what = "NEEDS A TOKEN";
     snprintf(out, size, "%s AT %s%s", what, endpoint, t->found.count > 1 ? "  < >" : "");
     return out;
-#endif
 }
 
 static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *status)
@@ -674,14 +599,15 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = outer_contents[s->outer_content].hint;
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
-        if (!public_server_count())
-            public_server_text(0, 3, public_hint, sizeof(public_hint));
-        else if (!public_server_compatible(
+        if (!wake_servers_count())
+            wake_servers_status(public_hint, sizeof(public_hint));
+        else if (!wake_servers_compatible(
                      (int)t->public_shown, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION))
             snprintf(public_hint, sizeof(public_hint), "OTHER GAME VERSION; USE MATCHING CLIENT");
         else {
             char description[65];
-            public_server_text((int)t->public_shown, 1, description, sizeof(description));
+            wake_servers_text(
+                (int)t->public_shown, WAKE_SERVER_DESCRIPTION, description, sizeof(description));
             upper(public_hint, sizeof(public_hint), description);
         }
         hint = public_hint;
@@ -1062,8 +988,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         if (t.panel == PANEL_JOIN && !t.editing)
             search(&t);
         if (t.panel == PANEL_JOIN && t.selected == ROW_PUBLIC_SERVER && !t.editing
-            && public_server_count() > 1) {
-            int count = public_server_count();
+            && wake_servers_count() > 1) {
+            int count = wake_servers_count();
             int turn = in.right - in.left;
             t.public_shown = (unsigned)((int)t.public_shown + count + turn) % (unsigned)count;
         }
@@ -1150,9 +1076,10 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     back = true;
             } else if (t.panel == PANEL_JOIN) {
                 if (t.selected == ROW_PUBLIC_SERVER) {
-                    if (public_server_compatible(
+                    if (wake_servers_compatible(
                             (int)t.public_shown, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION)) {
-                        public_server_text((int)t.public_shown, 2, s->address, sizeof(s->address));
+                        wake_servers_text((int)t.public_shown, WAKE_SERVER_ADDRESS, s->address,
+                            sizeof(s->address));
                         choice = BOAT_TITLE_JOIN;
                         chosen = true;
                     }
@@ -1160,14 +1087,12 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     t.panel = PANEL_HOST;
                     t.selected = ROW_START;
                 } else if (t.selected == ROW_LAN) {
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
                     if (t.found.count) {
                         boat_net_lan_endpoint(
                             &t.found.rooms[t.shown], s->address, sizeof(s->address));
                         choice = BOAT_TITLE_JOIN;
                         chosen = true;
                     }
-#endif
                 } else if (t.selected == ROW_ADDRESS)
                     begin_edit(&t, s->address);
                 else if (t.selected == ROW_CONNECT) {
