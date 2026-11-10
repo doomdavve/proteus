@@ -150,6 +150,12 @@ Windows release builds remain available regardless of these filters. GitHub does
 successful check for a skipped workflow; do not require these checks for documentation-only pull
 requests covered by these filters.
 
+The `boat_plugin_author` deterministic-preview integration check runs each package twice
+for 360 virtual ticks. Each preview child has a 30-second failure deadline, and the whole
+CTest has a 180-second deadline to allow Debug runs alongside numerical validators. Package
+subtests identify failures. These limits do not advance simulation time or change the
+production authoring deadline; result and artifact equality remain required.
+
 ### Lua source availability
 
 The checkout includes the unmodified Lua source archive in `third_party/lua`. The shared

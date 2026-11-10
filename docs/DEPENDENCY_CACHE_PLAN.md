@@ -3,7 +3,7 @@
 Status, 2026-11-10: vendored archive implemented and locally verified; updated CI pending.
 Open items: updated native/browser CI, especially Windows cold configuration.
 Done when: fresh builds extract the checksum-verified archive without lua.org or a cache.
-Next: updated #182 CI, then merge before rebasing #180.
+Next: updated #182 CI with preview-test deadline adjustment; then merge before #180.
 
 ## Scope and revised decision
 
@@ -63,3 +63,23 @@ browser workflow (shellcheck disabled/unavailable); the other four workflows wer
 to main because they no longer need cache steps. Changed documentation targets and
 `git diff --check` passed. No audiovisual behavior changed, so no new playback review.
 Updated Windows/browser CI remains pending; no updated hosted success is claimed yet.
+
+## Repeated Linux preview-test timeout, 2026-11-10
+
+The vendored-archive revision passed Windows, macOS and browser CI. Linux configured/built
+successfully but failed `boat_plugin_author`: `Worker.test_preview` exceeded its 10-second
+child deadline on both the original run and a retry; 507 other enabled tests passed. This
+is separate from the resolved Lua download failure. Local preview measurements on the same
+Debug build were approximately 0.04/0.88/0.05/0.03 seconds for langedrag/harbor-life/shelter-tour/
+river-sprint. These measurements do not establish Linux runner timings or prove absence of
+another slowdown. The worker output is a temporary file, so a stdout pipe-fill deadlock is
+not the cause.
+
+Allow 30 seconds per finite preview and 180 seconds for the integration CTest, retaining
+all 360 ticks, eight previews and exact evidence comparisons. Add package subtest labels
+to make any repeated failure actionable. Production virtual deadlines remain unchanged.
+Local verification (Apple Silicon/macOS, Debug): rebuild passed with only the known upstream
+stb_vorbis pointer-comparison warning. The full preset passed all 544 enabled tests (15 retired
+checks disabled), including `boat_plugin_author` and the virtual-time audit; see
+`build/preview-deadline-full.log`. `git diff --check` passed. The hosted Linux result remains
+pending; the larger deadline is not proof of the runner's underlying performance cause.
