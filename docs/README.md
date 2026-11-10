@@ -160,11 +160,10 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   including offline single player, is reviewed with its product decisions accepted. Its
   [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
   Owns migration, platform/module restructuring and review reconciliation, then becomes
-  `ARCHITECTURE.md`. On `arch/ar2-pilot` for one milestone PR, unmerged and unplayed, with no
-  browser or Windows build: AR2a input and AR2b capabilities, the AR3a–d and AR3f platform
-  services plus the AR3e objective seam, AR4 plugin worker backends, the AR5 plugin data split
-  and the AR6 pilot (basin free boating as a local authority and client), all implemented and
-  reviewed (2026-11-10).
+  `ARCHITECTURE.md`. The AR2–AR6 milestone (input and capabilities, platform services and the
+  objective seam, plugin worker backends, the plugin data split and the AR6 local
+  authority/client pilot) merged as PR #178 (2026-11-10); played on macOS by the user, with
+  browser and Windows checks still owed. Next: AR7.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.

@@ -1,15 +1,14 @@
 # Architecture restructuring plan
 
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
-[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
-for the single AR2–AR6 milestone PR, unpushed: AR2a, AR3a–AR3d, AR3f, AR4, AR5 and the AR6 pilot
-reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented and reviewed (2026-11-10).
-Nothing played, browser-built or Windows-built.
-**Open:** manual native, browser and Windows checks per step; the menu-gated touch tap (AR7);
-untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). AR2–AR6 milestone
+(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. The user played it on macOS (see the
+[AR3 status](#ar3-status)); nothing browser-built or Windows-built.
+**Open:** remaining manual native, browser and Windows checks per step; the menu-gated touch
+tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the user's review and manual checks of the milestone PR; then AR7.
+**Next:** the remaining manual checks; then AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -556,6 +555,10 @@ Ctrl/Cmd+V pastes; Esc closes; `--no-vsync` still paces at 60 Hz. AR3f, browser:
 console opens, paste, Tab and the copy notice work, and closing drops queued input; on a
 touch-only phone no console opens; a high-resolution and a tall mobile session size the canvas
 as before; an outer session shows LOADING, then its first frame.
+
+User report, 2026-11-10, macOS, merged `main` (PR #178): the game works; the title's
+MULTIPLAYER panel, LAN join, settings persistence, steering and the menu work. The plugin
+console `save` was not tested. The other native items above and every browser item stay owed.
 
 ### AR4 — Separate plugin worker backends
 
