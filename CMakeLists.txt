@@ -1277,6 +1277,11 @@ add_test(NAME plugin_stage_backend COMMAND ${Python3_EXECUTABLE}
   --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(plugin_stage_backend PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_stage_backend=ok")
+add_test(NAME plugin_stage_backend_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_stage_backend self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
@@ -1765,6 +1770,8 @@ set(PROTEUS_SLOW_TESTS
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
 endif()
+# About 0.2 s: it copies and checks a temporary tree once per planted violation.
+list(APPEND PROTEUS_SLOW_TESTS plugin_stage_backend_self_test)
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
