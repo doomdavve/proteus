@@ -27,6 +27,10 @@ void wake_app_title_close(void);
 // window scale. Browser: 3, or the high scene's own scale, which shrinks for tall mobile frames
 // so the buffer holds no more pixels than the scene.
 int wake_app_canvas_scale(BoatResolution resolution, int width, int height);
+// The browser's bounded low-resolution viewport (logical frame size) once resizing settles:
+// true with WIDTH and HEIGHT set, read each frame before the frame's input. Native: false (the
+// window's frame size does not follow the window).
+bool wake_app_viewport(int *width, int *height);
 // After resizing the window: the page refits the canvas's CSS (browser; native: nothing).
 void wake_app_canvas_fit(void);
 // Once a session's window is ready: the browser grows a canvas smaller than the session's

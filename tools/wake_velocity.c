@@ -67,10 +67,6 @@
 #if defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
 #include <emscripten/emscripten.h>
-EM_JS(int, boat_web_viewport_size, (int axis), {
-    const size = Module['boatViewportSize']();
-    return axis ? size.height : size.width;
-})
 EM_JS(int, boat_web_touch_click, (float *position), {
     const tap = Module['boatMobile']['click']();
     if (Object.is(tap, null))
@@ -1563,11 +1559,10 @@ static int study(int argc, char **argv)
     }
 #endif
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
-#if defined(__EMSCRIPTEN__)
         // The browser supplies a bounded low-resolution viewport after resizing settles.
-        int next_width = boat_web_viewport_size(0);
-        int next_height = boat_web_viewport_size(1);
-        if (gpu_enabled && (next_width != width || next_height != height)) {
+        int next_width = width, next_height = height;
+        if (wake_app_viewport(&next_width, &next_height) && gpu_enabled
+            && (next_width != width || next_height != height)) {
             RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
             int window_scale = wake_app_canvas_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
@@ -1588,7 +1583,6 @@ static int study(int argc, char **argv)
             SetWindowSize(width * window_scale, height * window_scale);
             wake_app_canvas_fit();
         }
-#endif
         double current_frame_started_at = boat_profile_time(true);
         frame_started_at = current_frame_started_at;
         BoatFrameMetrics metrics = { 0 }; // Reset once before any tick in this frame.

@@ -4,6 +4,10 @@
 #include <emscripten/emscripten.h>
 
 EM_JS(void, wake_js_fit_canvas, (void), { Module['boatFitCanvas'](); })
+EM_JS(int, wake_js_viewport_size, (int axis), {
+    const size = Module['boatViewportSize']();
+    return axis ? size.height : size.width;
+})
 
 double wake_app_now(void) { return emscripten_get_now() / 1000.0; }
 
@@ -27,6 +31,13 @@ int wake_app_canvas_scale(BoatResolution resolution, int width, int height)
     return resolution == BOAT_RESOLUTION_LOW
         ? scale
         : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
+}
+
+bool wake_app_viewport(int *width, int *height)
+{
+    *width = wake_js_viewport_size(0);
+    *height = wake_js_viewport_size(1);
+    return true;
 }
 
 void wake_app_canvas_fit(void) { wake_js_fit_canvas(); }

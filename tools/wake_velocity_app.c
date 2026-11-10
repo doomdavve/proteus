@@ -20,6 +20,13 @@ int wake_app_canvas_scale(BoatResolution resolution, int width, int height)
     return boat_resolution_window_scale(resolution);
 }
 
+bool wake_app_viewport(int *width, int *height)
+{
+    (void)width;
+    (void)height;
+    return false;
+}
+
 void wake_app_canvas_fit(void) { }
 
 void wake_app_session_canvas(BoatResolution resolution, int width, int height)
