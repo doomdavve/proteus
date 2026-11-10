@@ -64,7 +64,7 @@ static float field_step_limit(size_t i)
 
 static int check_presets(void)
 {
-    // Phase zero is the original daytime look: the constants the renderers used before.
+    // Phase zero retains the established daytime scene light, fog and water.
     WaterfrontLighting day = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     CHECK(same3(day.sun_direction, Vector3Normalize((Vector3) { .10f, .48f, -.87f })));
     CHECK(same3(day.ambient, (Vector3) { .48f, .57f, .65f }));
