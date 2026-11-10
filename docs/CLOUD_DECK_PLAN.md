@@ -1,10 +1,9 @@
 # Softer edges on the original cloud deck
 
-Status, 2026-11-10: done locally; user accepted the final cloud/reflection treatment.
-Open implementation items: none. Broader platform qualification remains outside this track.
-Done: softer deck, deeper-blue Day sky and sparse three-tone reflections are implemented,
-natively verified and user-accepted. Current contract: [3D.md](3D.md#scene-lighting).
-Next: PR review and CI; publication authorized by the user on 2026-11-10.
+Status, 2026-11-10: grouped-cloud drift implemented and natively verified; user review pending.
+Open items: user visual review of grouped clouds, drift speed/direction and reflections.
+Done when: grouped clouds drift deterministically with matching sky/reflections and seek checks.
+Next: CI and user visual review of the follow-up PR; publication authorized 2026-11-10.
 
 ## Scope and decision
 
@@ -188,3 +187,71 @@ in 113.66 s, without retries (`build/pr-full.log`). The updated GPU capture
 `build/layers-review.png`; SHA-1 `d93463081c9b47952db1568696f1577926deac2b`.
 `git diff --check origin/main...HEAD` passed. The new suite count includes main's
 architecture work, not extra cloud features. No additional user acceptance is inferred.
+
+### Grouped-cloud follow-up, 2026-11-10
+
+The user requested less evenly distributed clouds after PR #179 opened. Added a slower
+density field (3.6 versus 0.8 patch scale), blended at 22%, retaining local patch detail
+and the existing mask, terraces and renderer paths. This reopens distribution acceptance;
+earlier outline/palette acceptance remains historical. Movement was not implemented in
+this grouping-only step; the scrolling follow-up below supersedes that limit.
+
+A future motion step can use a shared scrolling world-plane mask plus a simulation-time
+offset in CPU/GPU sampling, including reflections. This needs cache invalidation, wrapping
+and deterministic seek tests; lighting hour alone should not drive wind. A simple panorama
+rotation is cheaper but looks like rotation around the observer rather than translation.
+
+Native candidate evidence (2026-11-10, Apple Silicon/macOS, Debug): warning-clean
+build; inspected `build/groups-cpu.png` and actual GPU sky/reflections in
+`build/groups-review-access.png`. A 120-frame windowed GPU demo exited 0
+(`build/groups-demo.log`); automated smoke only, no human input/audio acceptance.
+The sandboxed full suite encountered macOS graphics initialization timeouts; a full
+run with graphics access passed all 544 enabled tests (15 retired checks disabled);
+see `build/groups-full-access.log`. `git diff --check` passed. Other platforms
+and user distribution acceptance remain unverified.
+
+### Scrolling field, 2026-11-10
+
+The user requested the scrolling solution next, superseding the earlier motion deferral.
+Replaced the panorama cloud flags with a shared repeating world-plane texture, generated
+once and uploaded only at scene creation. CPU and GPU project the quantized sky rays onto
+the underside/rim planes and sample with the same bounded simulation-time wind offset.
+Main and reflection passes use the same frame time. The CPU visible cache now invalidates
+on time as well as light; it still evaluates each visible texel at most once per generation.
+The time-zero compatibility wrappers remain for static callers and tests. Current behaviour
+is specified in [3D.md](3D.md#scene-lighting). No new control or lighting-hour coupling.
+
+The texture has finite spatial resolution, so outlines advance in small point-sampled steps,
+consistent with the pixel presentation. The repeating field introduces a spatial edge blend
+and can eventually repeat; this is slow drift, not evolving weather or volumetric geometry.
+Wind speed/direction and the grouped distribution await user review. Deferred loops listed
+above remain deferred.
+
+Native verification (2026-11-10, Apple Silicon/macOS, Debug with GPU tests enabled):
+warning-clean build and standalone lighting/sky validators passed. The full CTest preset
+passed all 544 enabled tests (15 retired checks disabled) in 105.41 seconds without retries
+(`build/scroll-full.log`). CPU reference/draw checks cover fixed-time cache reuse, changed
+clouds at fixed light, forward/backward seeks, the period and long-session clocks. GPU
+parity includes nonzero/negative/long-session times, and GPU seeks restore identical bytes.
+Inspected `build/scroll-cpu.png` and actual GPU sky/reflections in `build/scroll-3.png` and
+`build/scroll-60.png`. Capture poses differ because the scripted boat also moves; these
+images are appearance checks, while the fixed-camera tests prove drift. The 600-frame
+windowed GPU demo at 8x simulation speed exited 0 (`build/scroll-demo.log`); this is
+automated smoke, not human motion/input/audio acceptance. Other platforms are unverified.
+The final upload-spy extension then advanced wind across the bounded period during its
+241-sample virtual cycle; rebuilt warning-clean and reran `gpu_surface_materials`, which
+passed with zero sky texture writes (`build/scroll-upload-check.log`). Changed local
+links/anchors and command options were checked; `git diff --check` passed.
+
+### Follow-up PR preparation, 2026-11-10
+
+After PR #179 merged, the user requested rebasing onto main and opening a new PR.
+Rebased only the grouping and scrolling commits onto `origin/main` at `75375b3`,
+without conflicts, on `feat/cloud-groups-drift`. Source, assets, tests and documentation
+were identical before/after the rebase. Publication authorization does not imply visual
+acceptance of the new grouping or wind speed/direction.
+Rebuilt warning-clean and reran the full native Debug preset with graphics access after
+the rebase: all 544 enabled tests passed (15 retired checks disabled) in 125.32 seconds
+without retries (`build/drift-pr-build.log`, `build/drift-pr-full.log`). The existing
+capture/demo evidence above applies to the identical implementation. `git diff --check`
+passed. Other-platform and user visual acceptance limits remain unchanged.

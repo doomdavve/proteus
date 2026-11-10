@@ -3032,7 +3032,7 @@ static void set_sky_lighting_uniforms(
 }
 
 static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontSquall squall,
-    const WaterfrontLighting *lighting, int width, int height, float aspect)
+    const WaterfrontLighting *lighting, int width, int height, float aspect, double time)
 {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
@@ -3040,6 +3040,8 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
     float scale[] = { tanf(camera.vertical_fov * .5f) * aspect, tanf(camera.vertical_fov * .5f) };
     Shader shader = scene->sky_shader;
     set_sky_lighting_uniforms(scene, lighting);
+    Vector2 offset = waterfront_cloud_offset(time);
+    SetShaderValue(shader, cached_location(shader, "cloudOffset"), &offset, SHADER_UNIFORM_VEC2);
     SetShaderValue(shader, cached_location(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, cached_location(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, cached_location(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
@@ -3132,7 +3134,7 @@ static void render_reflection(
     sky_camera.vertical_fov = camera.fovy * DEG2RAD;
     // The fixed-size texture stores this wider frustum, independent of its pixel aspect.
     draw_sky(scene, sky_camera, frame->squall, &frame->lighting, scene->reflection.texture.width,
-        scene->reflection.texture.height, aspect);
+        scene->reflection.texture.height, aspect, frame->time);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(
         camera.fovy * DEG2RAD, aspect, frame->camera.near_plane, frame->camera.far_plane));
@@ -3506,7 +3508,7 @@ static void draw_scene(
     set_atmosphere_uniforms(scene, frame->camera.position, &frame->lighting);
     ClearBackground(BLACK);
     draw_sky(scene, frame->camera, frame->squall, &frame->lighting, width, height,
-        (float)width / height);
+        (float)width / height, frame->time);
     detail_select(scene, DETAIL_MAIN,
         frame->player_active ? frame->camera.target : frame->camera.position,
         frame->camera.vertical_fov, (float)height / fmaxf(1, scene->detail_scale));

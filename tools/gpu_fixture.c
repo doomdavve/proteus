@@ -601,14 +601,15 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
                     .top = 2400,
                     .grown = .8f };
             }
-            waterfront_sky_draw_squall(
-                reference, width, height, frame.camera, frame.squall, &frame.lighting);
+            waterfront_sky_draw_at(
+                reference, width, height, frame.camera, frame.squall, &frame.lighting, frame.time);
             if (squall) {
                 // The case must show the squall: compare with the plain panorama.
                 Color *plain = malloc((size_t)width * height * sizeof(*plain));
                 int changed = 0;
                 if (plain) {
-                    waterfront_sky_draw(plain, width, height, frame.camera, &frame.lighting);
+                    waterfront_sky_draw_at(plain, width, height, frame.camera,
+                        (WaterfrontSquall) { 0 }, &frame.lighting, frame.time);
                     for (int i = 0; i < width * height; ++i)
                         changed += abs(plain[i].r - reference[i].r) > 12;
                     free(plain);
@@ -734,14 +735,16 @@ static bool verify_sky_lighting_targets(WaterfrontGpuScene *scene)
         for (size_t c = 0; ok && c < sizeof(cases) / sizeof(*cases); ++c) {
             WaterfrontSceneFrame frame;
             sky_fixture_frame(&frame, cases[c].view);
+            const double drift_times[] = { 0, 240, 19200, -60, 1e12 };
+            frame.time = drift_times[c % 5];
             if (cases[c].hour)
                 ok = waterfront_lighting_hour(cases[c].value, &frame.lighting);
             else
                 frame.lighting = waterfront_lighting(cases[c].value);
             if (!ok)
                 break;
-            waterfront_sky_draw_squall(
-                reference, width, height, frame.camera, frame.squall, &frame.lighting);
+            waterfront_sky_draw_at(
+                reference, width, height, frame.camera, frame.squall, &frame.lighting, frame.time);
             Image image = { 0 };
             if (!capture_sky(scene, target, &frame, &image)) {
                 ok = false;
@@ -798,6 +801,18 @@ static bool verify_sky_seeks(WaterfrontGpuScene *scene)
         && capture_sky(scene, target, &frame, &again);
     size_t bytes = baseline.data ? (size_t)baseline.width * baseline.height * 4 : 0;
     ok = ok && again.data && memcmp(baseline.data, again.data, bytes) == 0;
+    // Wind at fixed light changes the sky, and seeking back restores the identical image.
+    frame.time = 240;
+    Image wind = { 0 };
+    ok = ok && capture_sky(scene, target, &frame, &wind);
+    ok = ok && wind.data && memcmp(baseline.data, wind.data, bytes) != 0;
+    UnloadImage(wind);
+    frame.time = 19200;
+    wind = (Image) { 0 };
+    ok = ok && capture_sky(scene, target, &frame, &wind);
+    ok = ok && wind.data && memcmp(baseline.data, wind.data, bytes) == 0;
+    UnloadImage(wind);
+    frame.time = 0;
     // A direct forward seek must differ, and returning must restore the same frame.
     ok = ok && waterfront_lighting_hour(12, &frame.lighting)
         && capture_sky(scene, target, &frame, &changed);
@@ -905,6 +920,7 @@ static bool verify_sky_resource_stability(WaterfrontGpuScene *scene)
         Image scratch = { 0 };
         float hour = fmodf(6.5f + (float)i * .1f, 24.0f);
         sky_fixture_frame(&frame, i % 2);
+        frame.time = (double)i * 83; // Cross the bounded wind period as well as midnight.
         ok = waterfront_lighting_hour(hour, &frame.lighting) && ok;
         ok = capture_sky(scene, target, &frame, &scratch) && ok;
         UnloadImage(scratch);

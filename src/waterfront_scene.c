@@ -28,7 +28,7 @@ static Vector3 sky_mix(Vector3 a, Vector3 b, float t)
     return Vector3Lerp(a, b, t * t * (3 - 2 * t));
 }
 
-// A fixed, shallow cloud deck sampled in world X/Z, receding toward the horizon.
+// A shallow cloud deck sampled in world X/Z, receding toward the horizon.
 static float cloud_hash(int x, int z)
 {
     uint32_t seed = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u;
@@ -51,43 +51,45 @@ static float cloud_noise(float x, float z)
 
 static float cloud_density(float x, float z)
 {
-    // Retain the broad patch scale; higher thresholds leave more open sky and water.
-    return cloud_noise(x / .8f, z / .8f) * .94f + cloud_noise(x / .16f + 137, z / .16f - 59) * .06f;
+    // A slower field gathers the existing patches into banks, leaving broad clear regions.
+    // Keep local detail dominant so banks contain separate clouds rather than one solid slab.
+    float bank = cloud_noise(x / 3.6f + 23.4f, z / 3.6f - 17.8f);
+    float patch = cloud_noise(x / .8f, z / .8f);
+    float detail = cloud_noise(x / .16f + 137, z / .16f - 59);
+    return patch * .72f + bank * .22f + detail * .06f + .035f;
 }
 
 enum { SKY_WIDTH = 1024, SKY_HEIGHT = 512 };
 
-// Static cloud structure for the GPU sky shader and the CPU sky evaluator, sampled at the same
-// panorama texel centres as waterfront_sky_image. R marks the underside, G the lit rim;
-// B stores three nested tonal terraces (85/170/255). The mask never depends on light.
+// A repeating world-plane field, uploaded once. Coordinates cover 32 deck-height units.
+static float cloud_periodic_density(float x, float z)
+{
+    float tx = Clamp((x - 12) / 4, 0, 1), tz = Clamp((z - 12) / 4, 0, 1);
+    tx = tx * tx * (3 - 2 * tx);
+    tz = tz * tz * (3 - 2 * tz);
+    return Lerp(Lerp(cloud_density(x, z), cloud_density(x - 32, z), tx),
+        Lerp(cloud_density(x, z - 32), cloud_density(x - 32, z - 32), tx), tz);
+}
+
 Image waterfront_sky_cloud_mask(void)
 {
-    enum { WIDTH = SKY_WIDTH, HEIGHT = SKY_HEIGHT };
+    enum { WIDTH = 1024, HEIGHT = 512 };
     static Color pixels[WIDTH * HEIGHT];
     static bool ready;
     if (!ready) {
-        for (int y = 0; y < HEIGHT; ++y) {
-            float elevation = 1 - 2 * ((float)y + .5f) / HEIGHT;
+        for (int y = 0; y < HEIGHT; ++y)
             for (int x = 0; x < WIDTH; ++x) {
-                unsigned char underside = 0, rim = 0, tone = 0;
-                if (elevation > .075f) {
-                    float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
-                    float horizontal = sqrtf(1 - elevation * elevation) / elevation;
-                    float cx = sinf(azimuth) * horizontal;
-                    float cz = cosf(azimuth) * horizontal;
-                    float density = cloud_density(cx, cz);
-                    underside = density > .68f ? 255 : 0;
-                    rim = cloud_density(cx * 1.035f, cz * 1.035f) > .68f ? 255 : 0;
-                    if (underside) {
-                        // Offset the broad terraces so one edge catches light instead of
-                        // drawing concentric rings around the footprint.
-                        float terrace = cloud_density(cx + .10f, cz - .12f);
-                        tone = terrace > .80f ? 255 : terrace > .74f ? 170 : 85;
-                    }
-                }
-                pixels[y * WIDTH + x] = (Color) { underside, rim, tone, 255 };
+                float cx = ((float)x + .5f) / WIDTH * 32 - 16;
+                float cz = ((float)y + .5f) / HEIGHT * 32 - 16;
+                float density = cloud_periodic_density(cx, cz);
+                float terrace = cloud_periodic_density(cx + .10f, cz - .12f);
+                unsigned char underside = density > .68f ? 255 : 0;
+                unsigned char tone = underside ? (terrace > .80f          ? 255
+                                                         : terrace > .74f ? 170
+                                                                          : 85)
+                                               : 0;
+                pixels[y * WIDTH + x] = (Color) { underside, underside, tone, 255 };
             }
-        }
         ready = true;
     }
     return (Image) { .data = pixels,
@@ -97,6 +99,21 @@ Image waterfront_sky_cloud_mask(void)
         .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
 }
 
+Vector2 waterfront_cloud_offset(double time)
+{
+    // One deck-height unit per five minutes; a common period keeps long sessions bounded.
+    double phase = isfinite(time) ? fmod(time, 19200.0) / 300.0 : 0;
+    return (Vector2) { (float)phase, (float)(phase * .5) };
+}
+
+static Color cloud_sample(const Color *mask, float x, float z)
+{
+    float u = (x + 16) / 32, v = (z + 16) / 32;
+    int ix = (int)floorf((u - floorf(u)) * 1024);
+    int iz = (int)floorf((v - floorf(v)) * 512);
+    return mask[iz * 1024 + ix];
+}
+
 static WaterfrontSkyStats sky_stats;
 
 WaterfrontSkyStats waterfront_sky_stats(void) { return sky_stats; }
@@ -104,7 +121,8 @@ WaterfrontSkyStats waterfront_sky_stats(void) { return sky_stats; }
 // One panorama texel of the light-only sky recipe, excluding the weather squall. The static
 // cloud flags come from waterfront_sky_cloud_mask so the full reference and the visible-sample
 // cache evaluate exactly the same recipe in the same order.
-static Color sky_texel(const WaterfrontLighting *l, const Color *cloud_mask, int x, int y)
+static Color sky_texel(
+    const WaterfrontLighting *l, const Color *cloud_mask, int x, int y, Vector2 offset)
 {
     float elevation = 1 - 2 * ((float)y + .5f) / SKY_HEIGHT;
     float azimuth = (((float)x + .5f) / SKY_WIDTH - .5f) * 2 * PI;
@@ -130,7 +148,10 @@ static Color sky_texel(const WaterfrontLighting *l, const Color *cloud_mask, int
     if (elevation > .075f) {
         // Looking up through a shallow slab: its underside covers the distant rim. Two
         // ray/plane samples give the cloud deck a little visible thickness.
-        Color flags = cloud_mask[y * SKY_WIDTH + x];
+        float horizontal = sqrtf(1 - elevation * elevation) / elevation;
+        float cx = sinf(azimuth) * horizontal, cz = cosf(azimuth) * horizontal;
+        Color flags = cloud_sample(cloud_mask, cx - offset.x, cz - offset.y);
+        flags.g = cloud_sample(cloud_mask, cx * 1.035f - offset.x, cz * 1.035f - offset.y).r;
         bool underside = flags.r != 0;
         bool rim = flags.g != 0;
         if (underside || rim) {
@@ -154,14 +175,23 @@ static Color sky_texel(const WaterfrontLighting *l, const Color *cloud_mask, int
 // comparison baseline for the draw path and is never unloaded.
 Image waterfront_sky_image(const WaterfrontLighting *lighting)
 {
+    return waterfront_sky_image_at(lighting, 0);
+}
+
+Image waterfront_sky_image_at(const WaterfrontLighting *lighting, double time)
+{
+    Vector2 offset = waterfront_cloud_offset(time);
     static Color pixels[SKY_WIDTH * SKY_HEIGHT];
     static bool ready;
     static WaterfrontLighting painted;
-    if (!ready || !waterfront_lighting_same_sky(&painted, lighting)) {
+    static Vector2 previous;
+    if (!ready || !waterfront_lighting_same_sky(&painted, lighting) || offset.x != previous.x
+        || offset.y != previous.y) {
+        previous = offset;
         const Color *mask = waterfront_sky_cloud_mask().data;
         for (int y = 0; y < SKY_HEIGHT; ++y)
             for (int x = 0; x < SKY_WIDTH; ++x) {
-                pixels[y * SKY_WIDTH + x] = sky_texel(lighting, mask, x, y);
+                pixels[y * SKY_WIDTH + x] = sky_texel(lighting, mask, x, y, offset);
                 ++sky_stats.reference_samples;
             }
         painted = *lighting;
@@ -177,7 +207,7 @@ Image waterfront_sky_image(const WaterfrontLighting *lighting)
 // Bounded visible-sample cache for the CPU draw path: one snapshot of colour for the current
 // sky plus a generation stamp per panorama texel. A changed sky starts a new generation, so no
 // old colours are used and no large array is cleared; each sampled texel is evaluated at most
-// once until the next light change. The storage is static (about 4 MiB); drawing is
+// once until the next light or wind-offset change. The storage is static (about 4 MiB); drawing is
 // single-threaded, like the renderer.
 static struct {
     Color colors[SKY_WIDTH * SKY_HEIGHT];
@@ -185,11 +215,15 @@ static struct {
     uint32_t generation;
     bool ready;
     WaterfrontLighting painted;
+    Vector2 offset;
 } sky_draw_cache;
 
-static const WaterfrontLighting *sky_draw_prepare(const WaterfrontLighting *lighting)
+static const WaterfrontLighting *sky_draw_prepare(
+    const WaterfrontLighting *lighting, Vector2 offset)
 {
-    if (!sky_draw_cache.ready || !waterfront_lighting_same_sky(&sky_draw_cache.painted, lighting)) {
+    if (!sky_draw_cache.ready || !waterfront_lighting_same_sky(&sky_draw_cache.painted, lighting)
+        || offset.x != sky_draw_cache.offset.x || offset.y != sky_draw_cache.offset.y) {
+        sky_draw_cache.offset = offset;
         if (sky_draw_cache.generation == UINT32_MAX) {
             memset(sky_draw_cache.stamps, 0, sizeof(sky_draw_cache.stamps));
             sky_draw_cache.generation = 1;
@@ -278,8 +312,15 @@ Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSqual
 void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D camera,
     WaterfrontSquall squall, const WaterfrontLighting *lighting)
 {
+    waterfront_sky_draw_at(pixels, width, height, camera, squall, lighting, 0);
+}
+
+void waterfront_sky_draw_at(Color *pixels, int width, int height, View3D camera,
+    WaterfrontSquall squall, const WaterfrontLighting *lighting, double time)
+{
+    Vector2 offset = waterfront_cloud_offset(time);
     ++sky_stats.draw_calls;
-    const WaterfrontLighting *l = sky_draw_prepare(lighting);
+    const WaterfrontLighting *l = sky_draw_prepare(lighting, offset);
     const Color *mask = waterfront_sky_cloud_mask().data;
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
@@ -295,7 +336,7 @@ void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D cam
             int sy = (int)Clamp((1 - ray.y) * .5f * SKY_HEIGHT, 0, SKY_HEIGHT - 1);
             size_t index = (size_t)sy * SKY_WIDTH + (size_t)sx;
             if (sky_draw_cache.stamps[index] != sky_draw_cache.generation) {
-                sky_draw_cache.colors[index] = sky_texel(l, mask, sx, sy);
+                sky_draw_cache.colors[index] = sky_texel(l, mask, sx, sy, offset);
                 sky_draw_cache.stamps[index] = sky_draw_cache.generation;
                 ++sky_stats.draw_samples;
             } else {

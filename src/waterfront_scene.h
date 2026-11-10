@@ -147,24 +147,29 @@ Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);
 
 // Borrowed full-panorama reference under LIGHTING. Do not unload. It is repainted when another
-// light's sky differs, which invalidates earlier borrowed pixels; the CPU draw path uses its own
-// bounded visible-sample cache, and the GPU instead uploads the mask below once.
-// U is atan2(direction.x, direction.z) / (2*pi) + 0.5; V is (1-direction.y) / 2.
+// light's sky or the timed reference's wind offset differs, invalidating borrowed pixels; the CPU
+// draw path uses its own bounded visible-sample cache, and the GPU instead uploads the mask below
+// once. U is atan2(direction.x, direction.z) / (2*pi) + 0.5; V is (1-direction.y) / 2.
 Image waterfront_sky_image(const WaterfrontLighting *lighting);
+Image waterfront_sky_image_at(const WaterfrontLighting *lighting, double time);
+// Bounded simulation-time wind offset in deck-height units; independent of lighting hour.
+Vector2 waterfront_cloud_offset(double time);
+void waterfront_sky_draw_at(Color *pixels, int width, int height, View3D camera,
+    WaterfrontSquall squall, const WaterfrontLighting *lighting, double time);
 
 // Sky evaluation work for tests and diagnostics. Samples count actual recipe texel evaluations;
-// the draw cache evaluates each visible panorama texel on demand once per distinct sky.
+// the draw cache evaluates each visible panorama texel once per distinct light/wind offset.
 typedef struct {
     unsigned long long reference_samples; // Full-reference texels painted.
     unsigned long long draw_samples; // Visible texels evaluated by the draw cache.
     unsigned long long draw_reused; // Visible texels served from the draw cache.
-    unsigned long long draw_calls; // Calls to waterfront_sky_draw[_squall].
+    unsigned long long draw_calls; // Calls to the sky draw entry points.
     unsigned long long draw_generations; // Distinct skies adopted by the draw cache.
 } WaterfrontSkyStats;
 
 WaterfrontSkyStats waterfront_sky_stats(void);
-// Borrowed light-independent cloud flags at the same panorama texel centres: R underside,
-// G lit rim, B three tonal terraces (85/170/255), point-sampled by the GPU sky shader.
+// Borrowed light-independent flags on a repeating 32-unit world plane: R/G footprint,
+// B three tonal terraces (85/170/255), point-sampled by CPU and GPU.
 // Never repainted or unloaded.
 Image waterfront_sky_cloud_mask(void);
 void waterfront_sky_draw(

@@ -280,7 +280,7 @@ int main(int argc, char **argv)
             EndTextureMode();
         } else {
             if (!waterfront_draw_boating(&cpu, &scenery, pixels, 320, height, frame.camera, waves,
-                    (WaterfrontSquall) { 0 }, &frame.lighting)) {
+                    (WaterfrontSquall) { 0 }, &frame.lighting, frame.time)) {
                 result = 1;
                 break;
             }
