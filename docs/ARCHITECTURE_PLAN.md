@@ -825,7 +825,9 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
 - `ctest --preset full -j8`: see [current evidence](#current-evidence-and-limitations).
 
 User report, 2026-11-10, macOS: a native windowed `./build/wake_velocity --demo` on the basin
-(now through the local session) works. Owed: the L0 manual items still open from AR6.
+(now through the local session) works. Owed: the L0 manual items still open from AR6. The check
+ran L6's glue; it predates L2's change to the glue's frame `run()` (practice forwarding, course
+sync and the script seam).
 
 L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same branch:
 
@@ -833,17 +835,24 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
   `--course`, `--ghost` and course packages ride the arcade wake pool like free boating instead
   of plain water. Bests move to `course-{calm|waves}-physicsN-wakes.run`; older plain-water bests
   are left on disk and never selected. `BOAT_PHYSICS_REVISION` is unchanged (bumping it would
-  break hosted Hello compatibility and every replay file). Lap times change a lot: a scratch
-  course autopilot (not committed) finished in about 41.8 s on the pool against about 57.8 s on
-  plain water, calm and in waves alike; why the pool helps that much is not yet understood.
+  break hosted Hello compatibility and every replay file). Recorded as
+  [D11](ARCHITECTURE_AR1.md#product-decisions), confirmed by the user on 2026-11-10. The real
+  effect is the player's own wake under the hull and the jumps it causes; how much it changes a
+  human lap is unknown. The test autopilot's lap drop (57.80 → about 41.8 s) is an artifact
+  (independent review, 2026-11-10): it circles every gate (about 1363° of turning over 526 m on a
+  course about 145 m long), and crossing its own wakes (2.6 s airborne, 3 landings) knocks it
+  onto a line with one loop fewer, at a lower mean speed (9.15 → 8.81 m/s). With the pool present
+  but empty the lap stays 57.80 s; a full-throttle pilot is slower on the pool (30.5 → 32.4 s).
+  The local path equals the direct path, and the drop already appears at `b76cace`.
 - Authority adapter: `tools/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
   replays, which `proteus_boat_net` may not) is the local authority's `BoatNetRules`. Two new
   optional callbacks, used only by private servers: `committed` (the fleet after each tick,
   read-only) and `private_state` (bytes for the client after each grant). The adapter steps the
-  course from the committed boat, records the run with its own copy of the camera-follow
-  expression (it links no presentation code), and settles a finish at its tick: best selection
+  course from the committed boat, records the run with its own camera-follow value (it links no
+  presentation code), and settles a finish at its tick: best selection
   against the generation's best time, the practice latch, and one pending finish request holding
-  the copied run.
+  the copied run. The camera follow is one pure inline helper (`boat_camera_follow`,
+  `src/boat_presentation.h`) that both the presentation and the recorder call.
 - Wire: private type `0xC1` PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)),
   sent at the end of a grant when it changed; the client keeps the newest
   (`boat_local_state`). The glue decodes it into the session's course and practice latch after
@@ -857,16 +866,29 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
 - The game: `LOCAL_ELIGIBLE` admits course sessions (the course plugin kind) and course
   captures run the scripted drive through the local session. `--replay` keeps the direct path;
   L/B playback during an attempt grants no ticks.
-- Not done, and why: storage acks back to the authority. The course adapter keeps no state that
-  an ack could change (a failed save keeps the run as last and reports it, as before), so the
-  ack is the flush's notice on the client. The work autosave (L3) needs real acks.
+- Deviations from the [AR1 design](ARCHITECTURE_AR1.md#6-authority-side-results-and-persistence):
+  - The finish request has no generation-tagged storage ack back to the authority (AR1 §6
+    "Ack `saved`/`failed(reason)` with run identity and session generation"); deferred to L3.
+    The course adapter keeps no state an ack could change (a failed save keeps the run as last
+    and reports it, as before), so the outcome is the flush's notice on the client. A restart
+    cannot meet a pending request: the host takes it after every frame.
+  - L6 removed `--direct-session` (D8's comparison switch) before the owed L0 manual items were
+    run. Since then the user checked the merged AR2–AR6 milestone on macOS
+    ([AR3 status](#ar3-status), recorded in `a294509`): the game works, with steering and the
+    menu. Of the L0 list ([AR6 status](#ar6-status)) that covers steering and the menu only;
+    throttle feel, mouse and Shift, help and focus-loss pause, time scale to 8×, repeated
+    reset and restart, the three skins and quit to title remain unchecked, and there is no
+    longer a direct path to compare them against.
 - Removal point not reached: `boat_session_step` keeps its course recording for the browser
   (L4) and the validators.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
 
-- `boat_local` gains `course_trace` (3 attempts, about 3.5 s) and `course_practice` (about
-  1.2 s), both slow lane, and `course_state` (quick). Negative checks during development: a
+- `boat_local` gains `course_trace` (3 attempts, about 3.5 s), `course_practice` (about
+  1.2 s), `course_restart_mid` (about 0.15 s), `course_practice_mid` (about 0.9 s) and
+  `course_saved_ghost` (about 2.1 s; a best saved by the flush, selected on a fresh launch and
+  raced as the ghost), all slow lane, and `course_state` and `private_state_rejected` (a hosted
+  server and a playing hosted client reject 0xC1), quick. Negative checks during development: a
   different camera-follow rate and a best comparison that accepts equal times each fail
   `course_trace`.
 - Course captures (`--course`, calm and `--waves`, `--time` 0, 3, 10, 25 and 40), `--ghost` at 4,
@@ -1186,8 +1208,10 @@ and the accepted decisions; this plan keeps only the step status (header and
 - L2, 2026-11-10, same machine, Debug: warning-clean build; `ctest --preset full` and again with
   `-j8` each passed 514/514 (13 disabled); course, ghost, replay and free-boating captures
   byte-identical to the wake-pool commit's build; stub web syntax check passes.
-- Not performed: browser build, Windows/Linux runs, GPU/windowed input/audio playback,
-  cross-machine play, performance deadline qualification and user acceptance. Later steps
+- Not performed by the agent: browser build, Windows/Linux runs, GPU/windowed input/audio
+  playback, cross-machine play, performance deadline qualification and user acceptance. The user
+  has since played native builds on macOS (the merged AR2–AR6 milestone and L6's windowed
+  `--demo`; see the [AR3](#ar3-status) and [AR7](#ar7-status) status). Later steps
   carry their own platform/manual gates.
 - Documentation links and whitespace checked after each planning change. Build/test results
   qualify the unchanged baseline, not the proposed migration.

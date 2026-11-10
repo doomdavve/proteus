@@ -779,8 +779,14 @@ recorded run, best, ghost, notices and save requests equal the direct session's 
 frame; a first finish is a new best, an equal time is not, beating a slower best is; the frame's
 flush fails the save on an empty best path with the same notice), `course_practice` (8x in waves
 latches practice: the run is recorded, never saved or made best; the next attempt is not
-practice), both slow, and `course_state` (the time trial's state codec and the PrivateState
-message, which the v14 and input decoders reject). Each
+practice), `course_restart_mid` (a restart after the second gate starts a new generation with no
+finish, save or practice carried), `course_practice_mid` (one 8x frame after the first gate
+latches practice for the rest of the attempt) and `course_saved_ghost` (a new best saved by the
+frame's flush under the working directory's `boat-local-saves`, selected on a fresh launch and
+raced as the ghost; an equal finish is not a best), all slow; `course_state` (the time trial's
+state codec and the PrivateState message, which the v14 and input decoders reject); and
+`private_state_rejected` (a hosted server counts PrivateState as malformed and rejects the
+sender; a playing hosted client counts it as a decode error and keeps no state). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
