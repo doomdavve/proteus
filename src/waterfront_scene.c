@@ -51,8 +51,12 @@ static float cloud_noise(float x, float z)
 
 static float cloud_density(float x, float z)
 {
-    // Retain the broad patch scale; higher thresholds leave more open sky and water.
-    return cloud_noise(x / .8f, z / .8f) * .94f + cloud_noise(x / .16f + 137, z / .16f - 59) * .06f;
+    // A slower field gathers the existing patches into banks, leaving broad clear regions.
+    // Keep local detail dominant so banks contain separate clouds rather than one solid slab.
+    float bank = cloud_noise(x / 3.6f + 23.4f, z / 3.6f - 17.8f);
+    float patch = cloud_noise(x / .8f, z / .8f);
+    float detail = cloud_noise(x / .16f + 137, z / .16f - 59);
+    return patch * .72f + bank * .22f + detail * .06f + .035f;
 }
 
 enum { SKY_WIDTH = 1024, SKY_HEIGHT = 512 };

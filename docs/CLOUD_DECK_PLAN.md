@@ -1,10 +1,9 @@
 # Softer edges on the original cloud deck
 
-Status, 2026-11-10: done locally; user accepted the final cloud/reflection treatment.
-Open implementation items: none. Broader platform qualification remains outside this track.
-Done: softer deck, deeper-blue Day sky and sparse three-tone reflections are implemented,
-natively verified and user-accepted. Current contract: [3D.md](3D.md#scene-lighting).
-Next: PR review and CI; publication authorized by the user on 2026-11-10.
+Status, 2026-11-10: grouped-cloud follow-up implemented and natively verified; user review pending.
+Open items: user visual acceptance of grouped sky/reflections.
+Done when: grouped distribution retains the accepted outlines, palette and reflected tones.
+Next: review the local candidate for PR #179. Motion remains a separate potential step.
 
 ## Scope and decision
 
@@ -188,3 +187,24 @@ in 113.66 s, without retries (`build/pr-full.log`). The updated GPU capture
 `build/layers-review.png`; SHA-1 `d93463081c9b47952db1568696f1577926deac2b`.
 `git diff --check origin/main...HEAD` passed. The new suite count includes main's
 architecture work, not extra cloud features. No additional user acceptance is inferred.
+
+### Grouped-cloud follow-up, 2026-11-10
+
+The user requested less evenly distributed clouds after PR #179 opened. Added a slower
+density field (3.6 versus 0.8 patch scale), blended at 22%, retaining local patch detail
+and the existing mask, terraces and renderer paths. This reopens distribution acceptance;
+earlier outline/palette acceptance remains historical. Cloud movement is not implemented.
+
+A future motion step can use a shared scrolling world-plane mask plus a simulation-time
+offset in CPU/GPU sampling, including reflections. This needs cache invalidation, wrapping
+and deterministic seek tests; lighting hour alone should not drive wind. A simple panorama
+rotation is cheaper but looks like rotation around the observer rather than translation.
+
+Native candidate evidence (2026-11-10, Apple Silicon/macOS, Debug): warning-clean
+build; inspected `build/groups-cpu.png` and actual GPU sky/reflections in
+`build/groups-review-access.png`. A 120-frame windowed GPU demo exited 0
+(`build/groups-demo.log`); automated smoke only, no human input/audio acceptance.
+The sandboxed full suite encountered macOS graphics initialization timeouts; a full
+run with graphics access passed all 544 enabled tests (15 retired checks disabled);
+see `build/groups-full-access.log`. `git diff --check` passed. Other platforms
+and user distribution acceptance remain unverified.
