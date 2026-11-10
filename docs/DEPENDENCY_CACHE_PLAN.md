@@ -1,9 +1,9 @@
 # Reliable Lua source availability
 
-Status, 2026-11-10: vendored archive implemented and locally verified; updated CI pending.
-Open items: updated native/browser CI, especially Windows cold configuration.
-Done when: fresh builds extract the checksum-verified archive without lua.org or a cache.
-Next: updated #182 CI with preview-test deadline adjustment; then merge before #180.
+Status, 2026-11-10: done; #182 merged and the vendored revision passed all four CI workflows.
+Open items: none for Lua availability; routine CI runtime is owned by [CI_PLAN.md](CI_PLAN.md).
+Done: fresh builds extract the checksum-verified archive without lua.org or a cache.
+Next: bounded routine CI; cloud follow-up #180 is also merged.
 
 ## Scope and revised decision
 
@@ -83,3 +83,9 @@ stb_vorbis pointer-comparison warning. The full preset passed all 544 enabled te
 checks disabled), including `boat_plugin_author` and the virtual-time audit; see
 `build/preview-deadline-full.log`. `git diff --check` passed. The hosted Linux result remains
 pending; the larger deadline is not proof of the runner's underlying performance cause.
+
+## Closing
+
+The final #182 revision passed Linux (5m36s), macOS (8m20s), Windows (7m20s) and browser
+(1m12s) checks before merge. These successful but long runs prompted the separate CI budget
+track. Main `09acc4b` includes #182, #181 and #180; no platform/user play acceptance is inferred.

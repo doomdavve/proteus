@@ -93,8 +93,10 @@ with `ditto`. The plist records the executable's minimum macOS version.
 local version is `dev`. An optional `--raylib-source PATH` supports a custom CMake
 FetchContent source location.
 
-The workflow runs the full display-free CTest suite and checks the extracted app's
-signature and a CPU capture from another working directory. GPU rendering and
+Routine PR/main builds use the [bounded CI lane](TESTING.md#routine-ci-budget) with a
+three-minute job cap. Manual and tagged release qualification runs the full display-free
+CTest suite and checks the extracted app's signature and a CPU capture from another working
+directory; these paths also produce the downloadable app. GPU rendering and
 audio playback require a desktop check; CI does not establish those or Gatekeeper
 behavior after a browser download.
 
