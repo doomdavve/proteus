@@ -16,12 +16,19 @@ on:
 permissions:
   contents: read
 
+# Cancel obsolete PR runs without interrupting main or release qualification.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: windows-2022
     env:
+      PROTEUS_VCPKG_TRIPLET: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 'x64-windows-static' || 'x64-windows-static-release' }}
+      PROTEUS_QUALIFY: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
       PACKAGE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 20 || 3 }}
     defaults:
       run:
         shell: pwsh
@@ -30,17 +37,58 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Identify vcpkg cache
+        id: vcpkg-key
+        run: |
+          $revision = git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tripletHash = (Get-FileHash cmake/triplets/x64-windows-static-release.cmake).Hash
+          "key=windows-2022-vcpkg-v1-$env:ImageVersion-$revision-$env:PROTEUS_VCPKG_TRIPLET-$tripletHash" >> $env:GITHUB_OUTPUT
+
+      - name: Restore vcpkg binary packages
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/proteus-vcpkg-cache
+          key: ${{ steps.vcpkg-key.outputs.key }}
+
       - name: Install static libcurl
-        run: vcpkg install "curl[ssl]:x64-windows-static"
+        env:
+          VCPKG_BINARY_SOURCES: clear;files,${{ runner.temp }}/proteus-vcpkg-cache,readwrite
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/proteus-vcpkg-cache" | Out-Null
+          vcpkg install "curl[ssl]:$env:PROTEUS_VCPKG_TRIPLET" --overlay-triplets=cmake/triplets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save vcpkg binary packages
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/proteus-vcpkg-cache
+          key: ${{ steps.vcpkg-key.outputs.key }}
 
       - name: Configure release with static raylib and C runtime
         run: >-
           cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64
           -DBUILD_SHARED_LIBS=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          -DVCPKG_TARGET_TRIPLET="$env:PROTEUS_VCPKG_TRIPLET"
+          -DVCPKG_OVERLAY_TRIPLETS="$env:GITHUB_WORKSPACE/cmake/triplets"
+
+      - name: Build routine CI targets
+        if: env.PROTEUS_QUALIFY != 'true'
+        run: cmake --build build-win --config Release --target ci --parallel
+
+      - name: Run bounded PR checks
+        if: env.PROTEUS_QUALIFY != 'true'
+        timeout-minutes: 1
+        run: >-
+          ctest --test-dir build-win -C Release -L '^ci$' --parallel 2 --timeout 10
+          --stop-on-failure --no-tests=error --output-on-failure
+          --output-junit ci-results.xml
 
       - name: Build Wake Velocity, room server and validators
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_local', 'validate_boat_directory', 'validate_boat_plugin', 'validate_boat_plugin_session', 'validate_boat_plugin_state', 'boat_plugin_worker', 'validate_boat_plugin_stage', 'validate_boat_plugin_eval', 'validate_wake_bridge', 'validate_boat_plugin_race', 'validate_boat_race_plugin', 'boat_race_trial', 'boat_plugin_bench', 'boat_water_review'
           cmake --build build-win --config Release --target $targets --parallel 2>&1 |
@@ -56,11 +104,13 @@ jobs:
           }
 
       - name: Run boat CPU and multiplayer checks
+        if: env.PROTEUS_QUALIFY == 'true'
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
           -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_local\..*|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host|boat_directory|boat_plugin_author|boat_plugin_capture|boat_plugin_stage|boat_plugin_eval|wake_velocity_bridge|boat_plugin\..*|boat_plugin_session\..*|boat_plugin_state\..*|boat_plugin_race\..*|boat_race_plugin\..*|boat_race_plugin_preview|wake_velocity_plugin_.*)$'
 
       - name: Record native plugin staging and callback costs
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           $bench = & ./build-win/Release/boat_plugin_bench.exe plugins/shelter-tour
           if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -69,6 +119,7 @@ jobs:
             Add-Content $env:GITHUB_STEP_SUMMARY
 
       - name: Package portable Wake Velocity
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           $package = "build-win/package/wake_velocity-$env:PACKAGE_VERSION-windows-x64"
           New-Item -ItemType Directory -Force -Path "$package/assets" | Out-Null
@@ -106,6 +157,7 @@ jobs:
           Set-Content -Path "$package/build.txt" -Value "Version: $env:PACKAGE_VERSION`nCommit: $env:GITHUB_SHA" -Encoding utf8
 
       - name: Check relocated executable from another working directory
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           $exe = (Resolve-Path "build-win/package/wake_velocity-$env:PACKAGE_VERSION-windows-x64/wake_velocity.exe").Path
           Push-Location $env:RUNNER_TEMP
@@ -158,9 +210,19 @@ jobs:
           }
 
       - name: Upload Windows package
+        if: env.PROTEUS_QUALIFY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: wake_velocity-${{ env.PACKAGE_VERSION }}-windows-x64
           path: build-win/package/wake_velocity-${{ env.PACKAGE_VERSION }}-windows-x64/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload routine CI test results
+        if: always() && env.PROTEUS_QUALIFY != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-boat-ci-results
+          path: build-*/ci-results.xml
+          if-no-files-found: ignore
+          retention-days: 7

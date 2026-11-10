@@ -16,18 +16,25 @@ on:
 permissions:
   contents: read
 
+# Cancel obsolete PR runs without interrupting main or release qualification.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: macos-15
     env:
+      PROTEUS_QUALIFY: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
       PACKAGE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 30 || 3 }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Check release publisher without network
+        if: env.PROTEUS_QUALIFY == 'true'
         run: python3 tools/test_publish_release.py
 
       - name: Configure Apple Silicon Release
@@ -37,15 +44,30 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
           -DPROTEUS_GPU_TESTS=OFF
 
+      - name: Build routine CI targets
+        if: env.PROTEUS_QUALIFY != 'true'
+        run: cmake --build build-mac --target ci --parallel 3
+
+      - name: Run bounded PR checks
+        if: env.PROTEUS_QUALIFY != 'true'
+        timeout-minutes: 1
+        run: >-
+          ctest --test-dir build-mac -L '^ci$' --parallel 2 --timeout 10
+          --stop-on-failure --no-tests=error --output-on-failure
+          --output-junit ci-results.xml
+
       - name: Build and test
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           cmake --build build-mac --parallel 3
           ctest --test-dir build-mac --output-on-failure
 
       - name: Package and ad-hoc sign
+        if: env.PROTEUS_QUALIFY == 'true'
         run: python3 tools/macos/package.py --build-dir build-mac --output-dir build-mac/package --version "$PACKAGE_VERSION"
 
       - name: Check extracted app outside the checkout
+        if: env.PROTEUS_QUALIFY == 'true'
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/relocated"
@@ -77,6 +99,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
 
       - name: Upload downloadable app
+        if: env.PROTEUS_QUALIFY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: wake_velocity-${{ env.PACKAGE_VERSION }}-macos-arm64
@@ -85,3 +108,12 @@ jobs:
             build-mac/package/*.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload routine CI test results
+        if: always() && env.PROTEUS_QUALIFY != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-boat-ci-results
+          path: build-*/ci-results.xml
+          if-no-files-found: ignore
+          retention-days: 7

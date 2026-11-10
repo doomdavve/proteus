@@ -1894,6 +1894,8 @@ foreach(test IN LISTS PROTEUS_SLOW_TESTS)
   endif()
 endforeach()
 
+include(cmake/CI.cmake)
+
 # Long deterministic physics runs need optimization even in the development build.
 # This does not define NDEBUG or enable fast-math; all assertions/scenarios remain.
 # The shared boating libraries are compiled once for validators and applications alike, so
