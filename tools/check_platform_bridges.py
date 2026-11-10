@@ -4,7 +4,7 @@
 Rule 9 of docs/ARCHITECTURE_PLAN.md: platform code sits behind small interfaces in CMake-selected
 files. Two checks over src/ and tools/:
 
-1. Inline JavaScript (EM_JS, EM_ASYNC_JS, EM_ASM*, MAIN_THREAD_EM_ASM*, emscripten_run_script*)
+1. Inline JavaScript (EM_JS, EM_ASYNC_JS, EM_ASM*, MAIN_THREAD_EM_ASM*, emscripten_*run_script*)
    appears only in browser implementation files (*_web.c) or in a file listed in LEGACY with the
    reason it still has bridges. A legacy file must have exactly its recorded count, so a
    migration lowers the count in the same change and the list only shrinks.
@@ -12,6 +12,10 @@ files. Two checks over src/ and tools/:
 3. CMakeLists.txt names *_web.c sources only inside an EMSCRIPTEN branch, or in the sources of
    a native test target listed in NATIVE_WEB_TESTS (which compiles a backend against a C model
    of its page bridges).
+
+The CMake parser is deliberately small: it reads only the top-level CMakeLists.txt, follows
+if/elseif/else/endif only when each sits on a single line, and tracks the target of
+add_executable/add_library/target_sources across continuation lines by parenthesis depth.
 
 --self-test runs both checks against synthetic violations and fails unless they are caught.
 """
@@ -21,7 +25,7 @@ import re
 import sys
 from pathlib import Path
 
-BRIDGE = re.compile(r"\b(EM_JS|EM_ASYNC_JS|(?:MAIN_THREAD_)?EM_ASM\w*|emscripten_run_script\w*)"
+BRIDGE = re.compile(r"\b(EM_JS|EM_ASYNC_JS|(?:MAIN_THREAD_)?EM_ASM\w*|emscripten_\w*run_script\w*)"
                     r"\s*\(")
 WEB_SOURCE = re.compile(r"[\w/.-]+_web\.c\b")
 TARGET_COMMAND = re.compile(r"\s*(add_executable|add_library|target_sources)\s*\(\s*([\w.+-]+)")
@@ -150,6 +154,8 @@ def self_test():
          "put them in"),
         ({"tools/new_feature.c": 'void f(void) { emscripten_run_script("x()"); }\n'}, "",
          "put them in"),
+        ({"tools/new_feature.c": 'void f(void) { emscripten_async_run_script("x()", 1); }\n'},
+         "", "put them in"),
         ({"tools/new_feature.c": 'const char *a = "WS://";\n' + bridge}, "", "put them in"),
         ({legacy: ""}, "", "lower LEGACY to 0"),
         ({legacy: bridge + bridge}, "", "put new bridges"),
@@ -160,6 +166,10 @@ def self_test():
          "outside an EMSCRIPTEN branch"),
         ({}, "if(EMSCRIPTEN)\nelse()\n  target_sources(x PRIVATE tools/x_web.c)\nendif()\n",
          "outside an EMSCRIPTEN branch"),
+        ({}, "add_executable(validate_other tools/validate_other.c\n  src/x_web.c)\n",
+         "outside an EMSCRIPTEN branch"),
+        ({}, "add_executable(validate_boat_plugin_stage_web tools/v.c)\n"
+         "add_executable(other src/x_web.c)\n", "outside an EMSCRIPTEN branch"),
     ]
     failed = []
     for number, (files, cmake, expected) in enumerate(cases):
@@ -170,7 +180,9 @@ def self_test():
                    "tools/boat_title.c": 'const char *h = "WS://"; // boat_directory_refresh()\n'})
     clean += check_cmake("if(EMSCRIPTEN)\n  target_sources(x PRIVATE tools/x_web.c) # a_web.c\n"
                          "else()\n  target_sources(x PRIVATE tools/x.c)\nendif()\n"
-                         "# Comments may name tools/x_web.c.\n")
+                         "# Comments may name tools/x_web.c.\n"
+                         "add_executable(validate_boat_plugin_stage_web tools/v.c\n"
+                         "  src/boat_plugin_stage.c src/boat_plugin_stage_web.c)\n")
     if clean:
         failed.append(f"clean input flagged: {clean}")
     for failure in failed:
@@ -198,7 +210,12 @@ def main():
             return 1
     problems = check(files)
     cmake = args.root / "CMakeLists.txt"
-    problems += check_cmake(cmake.read_text(), "CMakeLists.txt")
+    cmake_text = cmake.read_text()
+    problems += check_cmake(cmake_text, "CMakeLists.txt")
+    for target in NATIVE_WEB_TESTS:
+        if not re.search(r"add_executable\s*\(\s*" + re.escape(target) + r"\s", cmake_text):
+            problems.append(f"CMakeLists.txt: NATIVE_WEB_TESTS lists {target}, which it does not "
+                            "build; update the list")
     for problem in problems:
         print(problem)
     if problems:

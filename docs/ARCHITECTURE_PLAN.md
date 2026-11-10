@@ -402,11 +402,14 @@ owner (free functions, rule 10):
 
 Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
 lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
-(`wake_velocity.c` 14, AR2b touch, mouse and viewport capabilities; the AR4 stage files 6, whose
-`src/boat_plugin_stage.c` entry goes when AR4 merges and brings it to 0). The title, game,
-console and plugin glue may not reach a service's backends directly, and `CMakeLists.txt` builds
-`*_web.c` only in EMSCRIPTEN branches. `platform_bridges_detects` is its negative control. The
-title validator now links the protocol, not the ENet transport.
+(`wake_velocity.c` 14, AR2b touch, mouse and viewport capabilities; the native stage worker
+`tools/boat_plugin_stage_worker.c` 1; AR4's merge brought `src/boat_plugin_stage.c` to 0 and
+dropped its entry). The title, game, console and plugin glue may not reach a service's backends
+directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN branches or in the native test
+targets the check allowlists with a reason (`validate_boat_plugin_stage_web`, which compiles the
+browser staging backend against a C model of its page bridges). The CMake parser reads only the
+top-level file and single-line `if(...)` forms. `platform_bridges_detects` is its negative
+control. The title validator now links the protocol, not the ENet transport.
 
 Decisions (technical, recorded here):
 
