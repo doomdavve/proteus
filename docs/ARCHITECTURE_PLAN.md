@@ -1,15 +1,16 @@
 # Architecture restructuring plan
 
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
-[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
-for the single AR2–AR6 milestone PR, unpushed: AR2a, AR3a–AR3d, AR3f, AR4, AR5 and the AR6 pilot
-reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented and reviewed (2026-11-10).
-Nothing played, browser-built or Windows-built.
-**Open:** manual native, browser and Windows checks per step; the menu-gated touch tap (AR7);
-untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). AR2–AR6 milestone
+(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. The user played it on macOS (see the
+[AR3 status](#ar3-status)); nothing browser-built or Windows-built.
+**Open:** remaining manual native, browser and Windows checks per step; the menu-gated touch
+tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the user's review and manual checks of the milestone PR; then AR7.
+**Next:** L6, L0's removal and L2 (time trial on the wake pool and the local authority) are
+implemented on `arch/l6-scripted-drives` ([AR7 status](#ar7-status)); then L1 with L9 (voyages,
+objectives and plugin authoring).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -557,6 +558,10 @@ console opens, paste, Tab and the copy notice work, and closing drops queued inp
 touch-only phone no console opens; a high-resolution and a tall mobile session size the canvas
 as before; an outer session shows LOADING, then its first frame.
 
+User report, 2026-11-10, macOS, merged `main` (PR #178): the game works; the title's
+MULTIPLAYER panel, LAN join, settings persistence, steering and the menu work. The plugin
+console `save` was not tested. The other native items above and every browser item stay owed.
+
 ### AR4 — Separate plugin worker backends
 
 Extract browser, Windows and POSIX worker implementations from `boat_plugin_stage.c`. Keep
@@ -692,8 +697,8 @@ Implemented (ledger row L0):
   boat, clock, presentation and arcade pool. Presentation steps per predicted tick against the
   pool the boat read (the previous tick's pool advanced once, before the tick's emission), as
   `boat_session_step` does. A restart recreates both endpoints; an endpoint failure returns to the
-  title with its reason (D10; free boating has no save). `--direct-session` (D8) is parsed only
-  inside `#ifndef NDEBUG`, so a release build rejects it as an unknown option.
+  title with its reason (D10; free boating has no save). `--direct-session` (D8) was parsed only
+  inside `#ifndef NDEBUG`; [L6](#ar7-status) removed it with the direct free-boating path.
 - Repeated failure is endpoint failure (§5): a private client that is still stalled (snapshot or
   wake mismatch) when a fourth resync falls due, after `BOAT_NET_LOCAL_RESYNCS` = 3 resyncs with
   no clean state between them, closes with its reason (about 480 granted ticks). The in-process
@@ -745,8 +750,8 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no
   a newborn wake object contributes nothing at its birth tick (its birth envelope is zero).
 - Debug build warning-clean; `ctest --preset full`: see [current evidence](#current-evidence-and-limitations).
 - CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
-  byte-identical to an `e1b1175` build (main's tree): captures drive the direct scripted path
-  before the frame loop (L6 migrates them).
+  byte-identical to an `e1b1175` build (main's tree): captures drove the direct scripted path
+  before the frame loop (L6 has since migrated basin captures; see [AR7 status](#ar7-status)).
 - Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
   outer with waves, current and crossing, through the game glue with presentation): 16-tick
   frames at 8× mean 1.66 ms (worst 2.13 ms) against 1.40 ms (worst 1.84 ms) for the direct path
@@ -783,6 +788,118 @@ Done when every shipped playable mode uses authority/client composition with led
 local and remote share authoritative rule implementations, and no independent solo gameplay
 path remains. Missing platform/mode support blocks this gate unless the user approves a scope
 change.
+
+#### AR7 status
+
+2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178), not pushed.
+
+L6 (scripted demos and captures) and L0's removal point, implemented:
+
+- Scripted command source: `boat_local_frame_scripted` (`src/boat_local.[ch]`) takes each tick's
+  helm from a `BoatLocalScript` callback given the predicted boat the authority will step; its
+  rates are sent as they are. `demo_input` (`tools/wake_velocity_drive.[ch]`) is the scripted
+  drive's helm, shared by `demo_step` and the glue's `wake_local_scripted_frame` (`--demo` in
+  the frame loop) and `wake_local_scripted_drive` (a capture's drive before the window, in grants
+  of at most 96 on virtual time from 0).
+- The game: a `--screenshot` or `--demo` of plain free boating (the `LOCAL_ELIGIBLE` sessions,
+  no longer excluding demos) runs through the local session. With a local session active the
+  frame loop's direct tick loop is skipped, so its ticks never fall back to `timed_boat_step`
+  (L0's removal point); a grant above 96 waits in the accumulator. The D8 switch
+  `--direct-session` is gone.
+- Unchanged and still direct at L6: outer captures and demos (every outer solo session is a
+  voyage, so L1), the developer studies (wake field, crossing), courses (since moved by L2),
+  `--work`, rooms and the browser (L4). `demo_step` remains for them and for `boat_benchmark` and
+  `validate_boat_clock`.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
+
+- `boat_local` gains `scripted_demo` and `scripted_capture` (slow lane, about 0.5 s each) and
+  `scripted_needs_script` (quick); per-tick boat, presentation and pool equal `demo_step`'s past
+  the helm changes at ticks 420 and 1440. Negative check during development: indexing the script
+  by the produced tick instead of the tick before it fails both drives.
+- Basin captures at `--time` 3, 10, 15 and 20 (the last three cross both helm changes) and the
+  outer capture at 3 are byte-identical to a build of `main` (`3080e4c`); the basin run prints
+  `Local session: generation 1, 360 ticks in 30 chunks`. All 57 PNGs the full preset writes match
+  that build's except `wake-work-resumed.png`, which also differs between two runs of the same
+  build (working-harbour resume, direct path; not investigated here).
+- `ctest --preset full -j8`: see [current evidence](#current-evidence-and-limitations).
+
+User report, 2026-11-10, macOS: a native windowed `./build/wake_velocity --demo` on the basin
+(now through the local session) works. Owed: the L0 manual items still open from AR6. The check
+ran L6's glue; it predates L2's change to the glue's frame `run()` (practice forwarding, course
+sync and the script seam).
+
+L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same branch:
+
+- Product change first (user decision, 2026-11-10: "Switch the time trial to the wake pool"):
+  `--course`, `--ghost` and course packages ride the arcade wake pool like free boating instead
+  of plain water. Bests move to `course-{calm|waves}-physicsN-wakes.run`; older plain-water bests
+  are left on disk and never selected. `BOAT_PHYSICS_REVISION` is unchanged (bumping it would
+  break hosted Hello compatibility and every replay file). Recorded as
+  [D11](ARCHITECTURE_AR1.md#product-decisions), confirmed by the user on 2026-11-10. The real
+  effect is the player's own wake under the hull and the jumps it causes; how much it changes a
+  human lap is unknown. The test autopilot's lap drop (57.80 → about 41.8 s) is an artifact
+  (independent review, 2026-11-10): it circles every gate (about 1363° of turning over 526 m on a
+  course about 145 m long), and crossing its own wakes (2.6 s airborne, 3 landings) knocks it
+  onto a line with one loop fewer, at a lower mean speed (9.15 → 8.81 m/s). With the pool present
+  but empty the lap stays 57.80 s; a full-throttle pilot is slower on the pool (30.5 → 32.4 s).
+  The local path equals the direct path, and the drop already appears at `b76cace`.
+- Authority adapter: `tools/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
+  replays, which `proteus_boat_net` may not) is the local authority's `BoatNetRules`. Two new
+  optional callbacks, used only by private servers: `committed` (the fleet after each tick,
+  read-only) and `private_state` (bytes for the client after each grant). The adapter steps the
+  course from the committed boat, records the run with its own camera-follow value (it links no
+  presentation code), and settles a finish at its tick: best selection
+  against the generation's best time, the practice latch, and one pending finish request holding
+  the copied run. The camera follow is one pure inline helper (`boat_camera_follow`,
+  `src/boat_presentation.h`) that both the presentation and the recorder call.
+- Wire: private type `0xC1` PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)),
+  sent at the end of a grant when it changed; the client keeps the newest
+  (`boat_local_state`). The glue decodes it into the session's course and practice latch after
+  each frame; the HUD, ghost and L/B keys read those as before.
+- Host management and storage: the game's practice latch (altered time, console) is forwarded to
+  the authority before the frame's ticks. After the frame the glue takes the finish request into
+  the session's runs through `boat_replay_runs_finish` (factored out of `boat_replay_runs_step`,
+  so notices and requests are the direct path's) and the existing `boat_session_flush` writes
+  it. A restart recreates the endpoints and the adapter from the restarted session (best and
+  ghost carried).
+- The game: `LOCAL_ELIGIBLE` admits course sessions (the course plugin kind) and course
+  captures run the scripted drive through the local session. `--replay` keeps the direct path;
+  L/B playback during an attempt grants no ticks.
+- Deviations from the [AR1 design](ARCHITECTURE_AR1.md#6-authority-side-results-and-persistence):
+  - The finish request has no generation-tagged storage ack back to the authority (AR1 §6
+    "Ack `saved`/`failed(reason)` with run identity and session generation"); deferred to L3.
+    The course adapter keeps no state an ack could change (a failed save keeps the run as last
+    and reports it, as before), so the outcome is the flush's notice on the client. A restart
+    cannot meet a pending request: the host takes it after every frame.
+  - L6 removed `--direct-session` (D8's comparison switch) before the owed L0 manual items were
+    run. Since then the user checked the merged AR2–AR6 milestone on macOS
+    ([AR3 status](#ar3-status), recorded in `a294509`): the game works, with steering and the
+    menu. Of the L0 list ([AR6 status](#ar6-status)) that covers steering and the menu only;
+    throttle feel, mouse and Shift, help and focus-loss pause, time scale to 8×, repeated
+    reset and restart, the three skins and quit to title remain unchecked, and there is no
+    longer a direct path to compare them against.
+- Removal point not reached: `boat_session_step` keeps its course recording for the browser
+  (L4) and the validators.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
+
+- `boat_local` gains `course_trace` (3 attempts, about 3.5 s), `course_practice` (about
+  1.2 s), `course_restart_mid` (about 0.15 s), `course_practice_mid` (about 0.9 s) and
+  `course_saved_ghost` (about 2.1 s; a best saved by the flush, selected on a fresh launch and
+  raced as the ghost), all slow lane, and `course_state` and `private_state_rejected` (a hosted
+  server and a playing hosted client reject 0xC1), quick. Negative checks during development: a
+  different camera-follow rate and a best comparison that accepts equal times each fail
+  `course_trace`.
+- Course captures (`--course`, calm and `--waves`, `--time` 0, 3, 10, 25 and 40), `--ghost` at 4,
+  `--replay` at 5 and basin 3/15 and outer 3 free-boating captures are byte-identical to a build
+  of the wake-pool commit `b76cace` (the direct path with the same product change).
+- `ctest --preset full` and again with `-j8` each passed 514/514 (13 disabled); the
+  browser-selected `wake_velocity.c` passes the stub syntax check (not an Emscripten build).
+
+Owed manual checks: a native windowed time trial (feel on the wake pool, finish, new best saved
+and loaded as the ghost on the next launch, practice at altered time, restart), plus the L0 items
+still open from AR6. Browser and Windows: nothing run.
 
 ### AR8 — Move files into owning directories
 
@@ -1084,8 +1201,17 @@ and the accepted decisions; this plan keeps only the step status (header and
   `ctest --preset full` failed 12 loopback/socket/process tests under sandbox restrictions; the
   rerun with socket/process access passed all 472 enabled tests in 41.27 s, with 13
   retired/opt-in cases disabled. GPU tests were configured off, not verified.
-- Not performed: browser build, Windows/Linux runs, GPU/windowed input/audio playback,
-  cross-machine play, performance deadline qualification and user acceptance. Later steps
+- L6, 2026-11-10, same machine, Debug: warning-clean build; `ctest --preset full` and again with
+  `-j8` each passed 511/511 (13 disabled); `test_time`, boundary and `platform_bridges` checks
+  pass; the browser-selected `wake_velocity.c` passes the stub `emscripten.h` syntax check (not
+  an Emscripten build).
+- L2, 2026-11-10, same machine, Debug: warning-clean build; `ctest --preset full` and again with
+  `-j8` each passed 514/514 (13 disabled); course, ghost, replay and free-boating captures
+  byte-identical to the wake-pool commit's build; stub web syntax check passes.
+- Not performed by the agent: browser build, Windows/Linux runs, GPU/windowed input/audio
+  playback, cross-machine play, performance deadline qualification and user acceptance. The user
+  has since played native builds on macOS (the merged AR2–AR6 milestone and L6's windowed
+  `--demo`; see the [AR3](#ar3-status) and [AR7](#ar7-status) status). Later steps
   carry their own platform/manual gates.
 - Documentation links and whitespace checked after each planning change. Build/test results
   qualify the unchanged baseline, not the proposed migration.

@@ -44,6 +44,13 @@ typedef struct {
     // P5f: a definition revision committed after TICK; ROOM is the new running definition. Called
     // between ticks, before any event for the new definition's marks. Optional.
     void (*definition)(void *context, uint64_t tick, const BoatRoomDefinition *room);
+    // L2, private sessions only: the committed FLEET after tick TICK and its events, read-only,
+    // before after_tick. Optional.
+    void (*committed)(void *context, uint64_t tick, const BoatFleet *fleet);
+    // L2, private sessions only: the adapter's state for its client, written into OUT (at most
+    // BOAT_NET_PRIVATE_STATE_BYTES); zero for none. Called at the end of every grant; the state is
+    // sent to each ready peer (BOAT_NET_PRIVATE_STATE) when it differs from the last one sent.
+    size_t (*private_state)(void *context, uint8_t *out);
 } BoatNetRules;
 
 typedef struct {
@@ -114,6 +121,7 @@ typedef struct {
     uint64_t revision_leaves, revision_held_hellos, revision_bytes;
     uint32_t revision; // The running definition's revision (1 at start).
     uint64_t spawn_requests, resyncs, output_faults, emission_failures, births_truncated;
+    uint64_t private_states; // Private state messages sent (L2).
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
 
@@ -159,6 +167,8 @@ typedef struct {
     BoatMarkTracker marks; // Which mark each slot is inside; used when ROOM has marks.
     BoatNetObjectiveState objective; // The HUD clients last received (revision 0: none yet).
     bool has_objective;
+    uint8_t private_sent[BOAT_NET_PRIVATE_STATE_BYTES]; // The private state last sent (L2).
+    size_t private_sent_size;
     BoatNetServerStats stats;
 } BoatNetServer;
 
@@ -172,7 +182,8 @@ bool boat_net_server_init(
 bool boat_net_server_service(BoatNetServer *server, double now);
 // AR6: a private session's service. Handle waiting messages (at most
 // BOAT_NET_MESSAGES_PER_SERVICE, private input batches included), then run exactly TICKS ticks
-// (the host's grant; zero while paused), refilling the input and spawn rate limits per tick. No
+// (the host's grant; zero while paused), refilling the input and spawn rate limits per tick, then
+// send the rules adapter's private state when it changed. No
 // peer timeout, catch-up or overload: NOW only stamps operational deadlines (resync rate limit).
 // False for a hosted room.
 bool boat_net_server_grant(BoatNetServer *server, double now, unsigned ticks);

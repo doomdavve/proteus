@@ -4,6 +4,8 @@
 #include "boat.h"
 #include "boat_flag.h"
 
+#include <math.h>
+
 #define BOAT_WATER_PARTICLES 384
 
 typedef struct {
@@ -29,6 +31,15 @@ typedef struct {
     unsigned seen_landings; // Boat landing count + 1; zero until the first step.
     float fall_speed; // Downward speed after the previous tick, before any touchdown.
 } BoatPresentation;
+
+// One tick of the camera follow toward HEADING. Pure and header-only: the presentation steps it,
+// and the time trial's authority recorder (tools/wake_velocity_course.c) keeps its own copy of
+// the value without linking presentation code (L2), so replay bytes match.
+static inline float boat_camera_follow(float camera_heading, float heading)
+{
+    float camera_delta = remainderf(heading - camera_heading, 2 * PI);
+    return remainderf(camera_heading + camera_delta * (1 - expf(-6 * BOAT_STEP)), 2 * PI);
+}
 
 void boat_presentation_reset(BoatPresentation *presentation);
 // Follow BOAT after its physics tick ending at NOW. Reads BOAT and WORLD; writes neither.

@@ -69,6 +69,7 @@ typedef struct {
     // Definition revisions (v14): committed here; announcements refused as invalid (the client
     // does not answer READY and will be dropped); ignored as duplicate or stale.
     uint64_t revisions, revisions_invalid, revisions_ignored;
+    uint64_t private_states; // Private state messages installed (L2).
 } BoatNetClientStats;
 
 // A deathmatch event as received, with the roster names of that moment (leavers keep theirs).
@@ -203,6 +204,11 @@ typedef struct {
     BoatNetClientStats stats;
     BoatPrediction prediction; // Valid once PLAYING when predicting.
     BoatRemoteHistory remotes; // Recent authoritative boat states, for drawing other boats.
+    // L2, private sessions: the newest private state (BOAT_NET_PRIVATE_STATE) and its authority
+    // tick; size zero before the first. Opaque bytes for the host's rules codec.
+    uint8_t private_state[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t private_state_size;
+    uint64_t private_state_tick;
 } BoatNetClient;
 
 void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,

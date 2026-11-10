@@ -23,6 +23,10 @@ typedef struct {
 
 #define BOAT_NET_PRIVATE_FIRST 0xc0 // First type of the reserved private range.
 #define BOAT_NET_PRIVATE_INPUT_BATCH 0xc0 // C->S: an InputBatch with full-precision rates (D4).
+// S->C on the reliable control channel (L2): the private rules adapter's state after a grant, as
+// opaque bytes the adapter's own codec reads; HEADER.tick is the authority's tick.
+#define BOAT_NET_PRIVATE_STATE 0xc1
+#define BOAT_NET_PRIVATE_STATE_BYTES 256 // The largest private state.
 
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
@@ -34,5 +38,13 @@ size_t boat_net_private_encode_input(
 // rejects non-finite rates. Never writes the destination on failure.
 BoatNetError boat_net_private_decode_input(
     const uint8_t *data, size_t size, BoatNetHeader *header, BoatNetInputBatch *batch);
+
+// A private state message of SIZE (1..BOAT_NET_PRIVATE_STATE_BYTES) bytes of STATE; HEADER's type
+// is ignored. Zero for an invalid size.
+size_t boat_net_private_encode_state(const BoatNetHeader *header, const uint8_t *state, size_t size,
+    uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode a private state message into STATE and *STATE_SIZE. Never writes them on failure.
+BoatNetError boat_net_private_decode_state(const uint8_t *data, size_t size, BoatNetHeader *header,
+    uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES], size_t *state_size);
 
 #endif

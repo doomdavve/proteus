@@ -983,6 +983,8 @@ static void tick(BoatNetServer *s)
         for (unsigned i = 0; i < count; ++i)
             rule_event(s, BOAT_NET_RULE_MARK_REACHED, entries[i].slot, entries[i].mark);
     }
+    if (s->config.local.enabled && s->config.rules.committed)
+        s->config.rules.committed(s->config.rules.context, next, &s->fleet);
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
     objective_poll(s);
@@ -1035,6 +1037,40 @@ bool boat_net_server_service(BoatNetServer *s, double now)
     return !s->overloaded;
 }
 
+// L2: the rules adapter's private state to every ready peer, when it changed since the last send.
+static void send_private_state(BoatNetServer *s)
+{
+    if (!s->config.rules.private_state)
+        return;
+    uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t size = s->config.rules.private_state(s->config.rules.context, state);
+    if (!size || size > sizeof(state)
+        || (size == s->private_sent_size && !memcmp(state, s->private_sent, size)))
+        return;
+    bool sent = false;
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
+        BoatNetServerPeer *p = &s->peers[peer];
+        if (p->phase != BOAT_NET_PEER_READY)
+            continue;
+        BoatNetHeader header = { .epoch = s->config.epoch,
+            .sequence = p->sequence[BOAT_NET_CONTROL]++,
+            .tick = s->fleet.state.tick };
+        uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+        size_t length = boat_net_private_encode_state(&header, state, size, bytes);
+        if (!length) {
+            ++s->stats.output_faults;
+            return;
+        }
+        boat_net_send(&s->transport, peer, BOAT_NET_CONTROL, bytes, length);
+        ++s->stats.private_states;
+        sent = true;
+    }
+    if (sent) {
+        memcpy(s->private_sent, state, size);
+        s->private_sent_size = size;
+    }
+}
+
 bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
 {
     if (!s->config.local.enabled)
@@ -1052,6 +1088,7 @@ bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
         }
         tick(s);
     }
+    send_private_state(s);
     return true;
 }
 

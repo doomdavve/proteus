@@ -56,9 +56,10 @@ void boat_replay_destroy(BoatReplay *run);
 bool boat_replay_load(BoatReplay *run, const char *path);
 bool boat_replay_save(const BoatReplay *run, const char *path);
 bool boat_replay_data_directory(char *path, size_t size);
-// PD1: the saved best path. The standard course keeps its established
-// "course-{calm|waves}-physicsN.run" name, so existing bests stay valid; any other course adds
-// its digest. False when the path does not fit.
+// PD1: the saved best path. The standard course uses "course-{calm|waves}-physicsN-wakes.run"
+// since its time trial rides the arcade wake pool (L2); plain-water bests under the older
+// "course-{calm|waves}-physicsN.run" names are left alone. Any other course adds its digest. False
+// when the path does not fit.
 bool boat_replay_best_path(
     char *path, size_t size, const char *directory, bool waves, uint64_t course_digest);
 
@@ -92,6 +93,12 @@ void boat_replay_runs_reset(BoatReplayRuns *runs);
 // Record one course tick (see boat_replay_record) and settle a finish in memory. No file I/O.
 void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatReplaySample after,
     const BoatCourse *course, bool waves);
+// Settle the finished RUN (moved into last; RUN is left empty) in memory: a FASTER non-practice
+// run also becomes best and requests its save; the export and finish report are requested.
+void boat_replay_runs_finish(BoatReplayRuns *runs, BoatReplay *run, bool faster);
+// True when a finish in TIME seconds beats the best (or there is none) and the attempt is not
+// practice.
+bool boat_replay_runs_faster(const BoatReplayRuns *runs, double time);
 // Write the pending best/export and report the finish notice; nothing when none is pending.
 void boat_replay_runs_flush(BoatReplayRuns *runs);
 // Replace best and best_path with those of COURSE_DIGEST; flush first. False, with a notice, when

@@ -135,37 +135,32 @@ void timed_boat_step(BoatSession *session, BoatInput input, BoatFrameMetrics *me
     }
 }
 
-void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWakePlayer *wake,
-    ObjectStudy *objects)
+BoatInput demo_input(const Boat *boat, const BoatWater *water, bool studies, int tick)
 {
-    const Boat *boat = &session->boat;
-    const BoatWater *water = &session->world.water;
-    if (wake || objects || water->player_wake_enabled) {
+    if (studies || water->player_wake_enabled) {
         float throttle = tick < 1440 ? 1 : 0;
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
-        timed_boat_step(session,
-            (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-                .throttle_rate
-                = Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
-                    1) },
-            metrics, wake, objects);
-        return;
+        return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+            .throttle_rate = Clamp(
+                (throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
     }
     if (water->wake_amplitude != 0 || Vector2LengthSqr(water->current) > 0) {
         // Let the source become visible, approach its spreading wake, then recover in neutral.
         float target = tick < 720 ? 0 : tick < 1200 ? .65f : 0;
-        timed_boat_step(session,
-            (BoatInput) {
-                .throttle_rate = Clamp(
-                    (target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) },
-            metrics, wake, objects);
-        return;
+        return (BoatInput) { .throttle_rate
+            = Clamp((target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
     }
     // Ease through neutral into reverse with the same held steering.
     float target_wheel = tick >= 360 ? 0.65f : 0;
     float wheel_change = fmaxf(-1, fminf(1, (target_wheel - boat->wheel) / BOAT_STEP));
     float throttle_change = tick < 240 ? 1 : tick < 480 ? 0 : tick < 960 ? -1 : 0;
+    return (BoatInput) { .steering_rate = wheel_change, .throttle_rate = throttle_change };
+}
+
+void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWakePlayer *wake,
+    ObjectStudy *objects)
+{
     timed_boat_step(session,
-        (BoatInput) { .steering_rate = wheel_change, .throttle_rate = throttle_change }, metrics,
-        wake, objects);
+        demo_input(&session->boat, &session->world.water, wake || objects, tick), metrics, wake,
+        objects);
 }

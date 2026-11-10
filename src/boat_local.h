@@ -21,6 +21,9 @@ typedef struct {
     unsigned location; // BoatLocationId
     const BoatSceneDefinition *scene; // Copied into the room definition; NULL keeps the defaults.
     BoatNetPrivateSession world; // Water, handling, wake pool and the spawned boat.
+    // L2: the authority's rules adapter (application code, e.g. the time trial's); zero for none.
+    // Its private state reaches the client after each chunk (boat_local_state).
+    BoatNetRules rules;
 } BoatLocalConfig;
 
 // Called after each predicted tick of a chunk's intake: VIEW is the client's prediction at TICK
@@ -32,6 +35,13 @@ typedef struct {
     void (*tick)(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
         const BoatWakeObjects *water);
 } BoatLocalObserver;
+
+// A scripted command source (ledger L6): each tick's helm from PREDICTED, the boat the authority
+// will step to produce TICK. Its rates are sent as they are, with no targets.
+typedef struct {
+    void *context;
+    BoatInput (*command)(void *context, const Boat *predicted, uint64_t tick);
+} BoatLocalScript;
 
 typedef struct {
     uint64_t frames, chunks, ticks, restarts;
@@ -73,9 +83,15 @@ unsigned boat_local_chunk(uint64_t tick, unsigned remaining);
 // text.
 bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
     float thrust_target, float steering_target, const BoatLocalObserver *observer);
+// boat_local_frame with each tick's command from SCRIPT instead of one frame's helm.
+bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
+    const BoatLocalScript *script, const BoatLocalObserver *observer);
 // The client's view: the predicted fleet, at the authority's tick after a frame.
 const BoatFleet *boat_local_view(const BoatLocal *local);
 // The player's slot in the view.
 unsigned boat_local_slot(const BoatLocal *local);
+// L2: the newest private state the client received (NULL before the first), with its size and
+// the authority tick it describes.
+const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *tick);
 
 #endif

@@ -219,7 +219,7 @@ compatibility.
 | Option | Behavior |
 | --- | --- |
 | `--waves` | Gentle crossing ambient waves in any location |
-| `--wake-objects` | Rideable arcade wakes; default in free boating |
+| `--wake-objects` | Rideable arcade wakes; default in free boating and time trials |
 | `--wake-height 0.1..3` | Arcade crest scale in metres; default 1.2 |
 | `--wake-life-ticks 240..1920` | Arcade wake lifetime at 120 Hz; default 1920 (16 seconds) |
 | `--wake-objects-crossing` | Basin rival sharing wake and hull contacts |
@@ -227,8 +227,8 @@ compatibility.
 | `--current` | Authored current, not measured local conditions |
 | `--crossing-wake` | Separate scripted passing boat and physical wake |
 
-Current and scripted crossing-wake options reject courses/replays/ghosts. Courses and
-recordings preserve their water settings and reject explicit player-wake modes. A deliberate
+Current, scripted crossing-wake and `--wake-objects-crossing` options reject
+courses/replays/ghosts. Courses ride the arcade wake pool and reject explicit player-wake modes. A deliberate
 reset clears player wakes and restarts scripted passages. The title's Gothenburg Harbour outing
 includes current, crossing wake and gentle waves; explicit launches use their supplied options.
 
@@ -309,11 +309,14 @@ selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to it
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
 
 Plain free boating (a free package without a voyage, objective or live authoring, on the native
-game) runs as a private local authority and client in the game process; captures, `--demo`, the
-developer studies, courses, voyages, `--work` and rooms keep the direct session path. A Debug
-build (no `NDEBUG`) also accepts `--direct-session`, a developer-only switch back to the direct
-path for comparison; release builds do not accept it. At exit the game prints a `Local session:`
-line with its generation, ticks, chunks and restarts.
+game) and the time trial (`--course`, `--ghost` or a course package) run as a private local
+authority and client in the game process, live, under `--demo` and in `--screenshot` captures
+(whose scripted drive runs on virtual time); the time trial's course, recording, best selection
+and practice latch run on the authority, and its best and last runs are saved after the frame as
+before. Replay viewing is client-side (`--replay` opens no local session; the L/B keys pause the
+attempt's ticks). The developer studies, voyages, `--work`, rooms and the browser keep the direct
+session path. At exit the game
+prints a `Local session:` line with its generation, ticks, chunks and restarts.
 
 `--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The
 existing `[` / `]` (or typed brackets and `,` / `.`) steps and `\` restore continue to work. It

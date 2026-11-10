@@ -518,9 +518,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   duplicate packages and expects its normal diagnostics. `compiled_selection_guard` rejects the
   removed compiled symbols and the fixture library in production sources, CMake targets and the
   built `wake_velocity`/`boat_server` symbols; `compiled_selection_guard_detects` is its negative
-  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves a
-  pre-existing `course-calm-physicsN.run` keeps its path as the best under
-  `BOAT_COURSE_STANDARD_DIGEST` and is not overwritten by an equal or slower run. The catalog
+  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves
+  `course-calm-physicsN-wakes.run` is the best under `BOAT_COURSE_STANDARD_DIGEST` and is not
+  overwritten by an equal or slower run, and that a plain-water best under the older
+  `course-calm-physicsN.run` name is left on disk and never selected. The catalog
   also includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal
   the fixtures at every location) and the two harbor room packages.
 - `boat_room_package` (PD2/PD3) evaluates edited race and deathmatch packages, builds rooms from
@@ -744,7 +745,8 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
-`boat_local` (AR6 ledger row L0, labels `core;cpu;quick`, each case under 100 ms) runs
+`boat_local` (AR6 ledger rows L0, L6 and L2, labels `core;cpu`; quick except the slow-lane
+scripted drives and time trials) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
 glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
@@ -764,9 +766,27 @@ everything); `queue_saturation` (an unreliable or reliable queue overflow stops 
 instead of dropping a command batch silently); `resync_escalation` (an injected wake mismatch that
 one resync repairs, then one whose checkpoints are lost, which fails the session after three
 served resyncs); `resync_8x` (two quick mismatches at 8x with an advancing host clock are both
-repaired: the authority rate-limits private resyncs in granted ticks); and
-`private_range` (the private codec round-trips
-full precision; a hosted room counts the private type as malformed and rejects the sender). Each
+repaired: the authority rate-limits private resyncs in granted ticks); the L6 cases
+`scripted_demo` (`--demo` through the glue's scripted frames: uneven frames at 1x, then 8x, past
+the drive's helm changes at ticks 420 and 1440, every predicted tick equal to `demo_step`'s),
+`scripted_capture` (a capture's 1501-tick drive in grants of at most 96 ends on `demo_step`'s
+session and pool, again after a restart) and `scripted_needs_script` (a scripted frame without a
+script is refused); `private_range` (the private codec round-trips
+full precision; a hosted room counts the private type as malformed and rejects the sender); and
+the L2 time-trial cases, where both paths take a course autopilot that tracks the gates from its
+own boat: `course_trace` (three attempts at 1x with 0.1 s frames: course progress, splits,
+recorded run, best, ghost, notices and save requests equal the direct session's after every
+frame; a first finish is a new best, an equal time is not, beating a slower best is; the frame's
+flush fails the save on an empty best path with the same notice), `course_practice` (8x in waves
+latches practice: the run is recorded, never saved or made best; the next attempt is not
+practice), `course_restart_mid` (a restart after the second gate starts a new generation with no
+finish, save or practice carried), `course_practice_mid` (one 8x frame after the first gate
+latches practice for the rest of the attempt) and `course_saved_ghost` (a new best saved by the
+frame's flush under the working directory's `boat-local-saves`, selected on a fresh launch and
+raced as the ghost; an equal finish is not a best), all slow; `course_state` (the time trial's
+state codec and the PrivateState message, which the v14 and input decoders reject); and
+`private_state_rejected` (a hosted server counts PrivateState as malformed and rejects the
+sender; a playing hosted client counts it as a decode error and keeps no state). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
