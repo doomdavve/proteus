@@ -162,7 +162,8 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   Owns migration, platform/module restructuring and review reconciliation, then becomes
   `ARCHITECTURE.md`. The AR6 pilot (basin free boating as a local authority and client) and the
   AR3a–AR3f platform services, AR4 plugin worker backends and AR5 plugin data split are on
-  `arch/ar2-pilot` for one milestone PR, unmerged and unplayed; AR2b remains.
+  `arch/ar2-pilot` for one milestone PR, unmerged and unplayed, with AR2b (browser touch,
+  mouse and viewport capabilities) implemented on top.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.

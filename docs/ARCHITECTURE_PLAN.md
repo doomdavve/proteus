@@ -5,13 +5,14 @@
 implemented and reviewed, not pushed: AR2a, [AR3a–AR3f](#ar3-status),
 [AR4](#ar4--separate-plugin-worker-backends),
 [AR5](#ar5--narrow-plugin-data-and-execution-dependencies) and the
-[AR6 pilot](#ar6-status), for the single AR2–AR6 milestone PR, which awaits the user. Nothing
-played, browser-built or Windows-built.
-**Open:** AR2b; browser, Windows and manual native checks listed per step; impaired-delivery
-qualification; a pinned `saved_at` for L3's byte-equal saves.
+[AR6 pilot](#ar6-status), for the single AR2–AR6 milestone PR, which awaits the user; AR2b
+([status](#ar2b-status)) is implemented on top, not yet reviewed. Nothing played,
+browser-built or Windows-built.
+**Open:** browser, Windows and manual native checks listed per step; the menu-gated touch tap
+(AR6); impaired-delivery qualification; a pinned `saved_at` for L3's byte-equal saves.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the user's review and manual checks of the milestone PR; then AR2b and AR7.
+**Next:** review of AR2b; the user's review and manual checks of the milestone PR; then AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -337,8 +338,8 @@ and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon rea
 sources directly; AR6 owns moving the pausing/time-scale/restart consequences behind host
 management). The web touch tap is consumed by `boat_app_input_poll_touch` only on frames where
 `boat_menu_gate` holds, because the bridge's `click()` drains it; browser behaviour is not
-verified. Open for AR2b/AR6: touch drain depends on menu state. Not done: turning the value
-into per-tick commands (AR6's client), the remaining consumers above, and AR2b.
+verified. Open for AR6: touch drain depends on menu state (AR2b kept it; see its status). Not
+done: turning the value into per-tick commands (AR6's client) and the remaining consumers above.
 Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
 `ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
 `boat_menu_update` with synthetic values, and `boat_title_settings`); CPU captures
@@ -355,6 +356,66 @@ Done when migrated shared UI code has no platform branches, menus expose the sam
 keyboard, mouse, touch, focus loss and capture keep their behavior. Verify focused
 selection/row/input-consumption contracts, native windowed menus/console/steering/fullscreen,
 and browser keyboard/mouse/touch layouts, resizing and focus transitions.
+
+#### AR2b status
+
+2026-11-10, branch `arch/ar2-pilot`, three commits on `895c7d0`; not reviewed, merged, played or
+browser-built (emcc was not installed).
+
+Implemented: the 14 inline browser bridges left in `wake_velocity.c` moved, bodies unchanged,
+into CMake-selected backends behind C wrappers (`wake_js_*` imports, called only in their file):
+
+| Capability | Contract | Native | Browser |
+| --- | --- | --- | --- |
+| Viewport, `wake_app_viewport` (app service) | The logical frame size the page settled on, read at the top of each frame | False: the frame does not follow the window | `Module.boatViewportSize`; the common resize path reallocates targets when it changes |
+| Touch controls, `wake_touch_*` in `wake_velocity_controls.h` | Session start/stop; MENU press; held buttons (bits) and tilt target; button height; presentation state, whose bits keep fullscreen support (8) apart from fullscreen active (16); hit rectangles; status line; tap | None: 0, NAN, 26, empty | `Module.boatMobile` |
+| Pointer capture, `wake_mouse_*` | Toggle press; capture request returning active (1), released by the platform (2), denied or unsupported (4); steering movement | M; cursor disabled/enabled when the request changes, always granted; the frame's pointer delta | `Module.boatMouse`; movement also drains the scroll wheel |
+| Fullscreen key, `wake_fullscreen_key_pressed` | The application's fullscreen toggle key | F11 | False: the browser keeps F11 |
+
+`study()` now runs one code path for viewport resizing, the touch drawing and hit layout, the MENU
+button, steering inputs, capture fallback and its hint, and the cleanup; `draw_touch_controls`
+returns at once natively (state 0). Gameplay decisions (when controls drive, the keyboard
+fallback, opening the menu on a platform release) stay in `study()`. `wake_velocity_input.c`
+reads the tap through `wake_touch_tap`; `tools/boat_web_touch.h` is gone. The call order is the
+same on both builds: viewport, input sample, MENU button, the gated tap, toggle, touch sample,
+target and height, capture (and its second request), movement and scroll, touch drawing; the
+session starts before the first frame and the cleanup releases capture, then the session. Audio
+unlock and the first frame stay with the app service (AR3f).
+
+Enforcement: `platform_bridges` drops `wake_velocity.c` from the legacy list (14 → 0; the stage
+worker's 1 remains) and forbids it the page objects, the emscripten header, cursor capture and
+the F11/M key reads; `wake_velocity_input.c` may not use inline JavaScript or `Module`. A
+self-test case covers the cursor rule.
+
+Decisions: touch, mouse, viewport and F11 are capabilities over the existing values, not new
+`BoatAppInput` fields, since their reads are ordered within the frame (each page call consumes
+or samples state) and moving them to the frame-start sample would change that order. No
+speculative fields: native returns the values the old `#else` paths used. The tap stays drained
+only on `boat_menu_gate` frames: the page keeps a tap while the game is inactive and drops it on
+active touch-sample frames, so draining every frame would drop taps that today select a menu row
+after help closes or focus returns. That is a behaviour change for AR6 or the user, not AR2b.
+Remaining `__EMSCRIPTEN__` branches in `study()` (the browser's room-leave row, its plugin
+controls, the native tool bridge and room host) select policy or native-only adapters, not
+bridges.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10): each of the three
+commits builds warning-clean and passes `platform_bridges` and its self-test; a script that
+extracts every `EM_JS(...)` from `895c7d0:tools/wake_velocity.c` and from the new files finds
+all 14 byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the
+app backend's existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check
+passes for every `*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin
+and outer CPU captures are byte-identical to a `895c7d0` build; `ctest --preset full`: 508/508
+passed (13 disabled) in 40 s.
+
+Owed (manual). Native windowed: F11 toggles borderless fullscreen in a session; M toggles mouse
+steering, the cursor hides while captured and returns on the menu, on M again and on leaving;
+mouse steering still turns the boat. Desktop browser: resizing the window re-fits the frame;
+M and a canvas click capture the pointer, Escape releases it and opens the menu with mouse mode
+kept, a denied capture shows MOUSE UNAVAILABLE and falls back to the keyboard; scrolling does
+nothing; F11 is the browser's. Phone browser: the touch buttons draw and drive (forward, reverse,
+left, right), MENU opens the menu and a tap selects a row, tilt and recenter work, FULLSCREEN
+toggles and its label follows, the status line shows, rotation re-lays the buttons, and leaving
+then starting another session leaves no held control.
 
 ### AR3 — Extract application platform services
 
@@ -403,14 +464,15 @@ call waits, and state keeps its previous owner (free functions, rule 10):
 
 Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
 lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
-(`wake_velocity.c` 14, AR2b touch, mouse and viewport capabilities; the native stage worker
-`tools/boat_plugin_stage_worker.c` 1; AR4's merge brought `src/boat_plugin_stage.c` to 0 and
-dropped its entry). The title, game, console and plugin glue may not reach a service's backends
-directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN branches or in the native test
-targets the check allowlists with a reason (`validate_boat_plugin_stage_web`, which compiles the
-browser staging backend against a C model of its page bridges). The CMake parser reads only the
-top-level file and single-line `if(...)` forms. `platform_bridges_detects` is its negative
-control. The title validator now links the protocol, not the ENet transport.
+(`wake_velocity.c` had 14 for AR2b touch, mouse and viewport capabilities, now 0 and delisted; the
+native stage worker `tools/boat_plugin_stage_worker.c` 1; AR4's merge brought
+`src/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
+not reach a service's backends directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN
+branches or in the native test targets the check allowlists with a reason
+(`validate_boat_plugin_stage_web`, which compiles the browser staging backend against a C model of
+its page bridges). The CMake parser reads only the top-level file and single-line `if(...)` forms.
+`platform_bridges_detects` is its negative control. The title validator now links the protocol, not
+the ENet transport.
 
 Decisions (technical, recorded here):
 
@@ -437,7 +499,8 @@ Decisions (technical, recorded here):
   stripping, the CMake check, one source for the LAN hint, `wake_js_` names, and the clock
   comment (a direct native `--plugin` launch stamps its first request before `InitWindow`).
 - Browser row layout and text, the default `ws://` address, touch, mouse, viewport and keyboard
-  bridges and native F11 are capabilities (AR2b), not services, and stay where they are.
+  bridges and native F11 are capabilities (AR2b), not services; AR2b has since moved the
+  touch, mouse, viewport and F11 ones ([status](#ar2b-status)).
 
 Persistence placement (the AR0 persistence row), unchanged by AR3; L2/L3 move these writes behind
 authority storage requests:
@@ -453,7 +516,7 @@ authority storage requests:
 Left outside AR3:
 
 - AR2b, not AR3: the per-frame viewport bridge, mobile session start/stop, touch and mouse
-  bridges and native F11 remain in `study()`.
+  bridges and native F11 remained in `study()` (moved by AR2b since).
 - Native-only adapters keep their files (AR0): `--host` child process, `--plugin-bridge`,
   `--serve`, worker entry points.
 

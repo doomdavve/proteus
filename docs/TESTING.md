@@ -587,9 +587,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 - `platform_bridges` runs `tools/check_platform_bridges.py`: inline JavaScript (`EM_JS`,
   `EM_ASM`, `emscripten_*run_script*`) lives only in CMake-selected `*_web.c` backends or in the
   listed legacy files, each at exactly its recorded count; files migrated onto an application
-  service (title, game, plugin glue) do not reach its backends directly; and `CMakeLists.txt`
-  names `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted native test targets
-  (`validate_boat_plugin_stage_web`). `platform_bridges_detects` is its negative control.
+  service (title, game, input, console, plugin glue) do not reach its backends directly; and
+  `CMakeLists.txt` names `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
+  native test targets (`validate_boat_plugin_stage_web`). `platform_bridges_detects` is its
+  negative control.
 - `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`. With comments and string
   literals blanked, common plugin staging (`boat_plugin_stage.c` and its headers) includes no
   OS/browser header and names no listed process, handle, Emscripten or platform-macro
