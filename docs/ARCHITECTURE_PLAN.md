@@ -371,13 +371,15 @@ and revision validity; `boat_plugin_stage_{posix,windows,web}.c` implement the p
 `boat_plugin_stage_backend.h` (launch, poll, byte transfer, termination), selected in CMake.
 Platform policy differences (5 s/15 s deadline, executable, browser launch receipt, solo-only
 kinds, browser query deadline message) are backend traits, not `#if` in common code. The public
-staging API, wire and limits are unchanged. Two browser fixes: close now releases every transport
-job, including failed queries that used to stay in the page's two-job table, and query replies
-are read into a buffer sized to the bridge limit (it was 12 KiB against a 160 KiB copy).
+staging API, wire and limits are unchanged. Two browser fixes, in their own commit: close now
+releases every transport job (before, after two failed, unreadable or page-expired console
+queries the page refused all further staging and queries until a reload), and query replies
+are read into a buffer sized to the 160 KiB bridge limit (it was 12 KiB).
 Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
-475/475 (13 disabled), including the new `plugin_stage_backend` include check and query
-lifecycle cases in `boat_plugin_stage` (exact 5 s virtual deadline, cancel, faults) and the Node
-`web_plugin_author` transport test.
+477/477 (13 disabled), including the new `plugin_stage_backend` include check and query
+lifecycle cases in `boat_plugin_stage` (exact 5 s virtual deadline, cancel, faults), its
+self-test, `boat_plugin_stage_web` (browser backend against a C model of the page transport)
+and the Node `web_plugin_author` transport test.
 **Open:** Emscripten and Windows builds and the `tools/package_web.py` browser checks
 (`check_web_plugin_author.py`, `check_web_plugin_objective.py`, `check_web_wasm.py`) were not run
 (no emcc or Windows here); OS termination/reaping still blocks in close without bounded-cost

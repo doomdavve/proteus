@@ -579,10 +579,13 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   controlled speed. It prints both times, the exposed seconds and any capsizes.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
-- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`: common plugin staging
-  (`boat_plugin_stage.c` and its headers) names no OS handles, process launch or JavaScript
-  bridge, each platform backend includes only its own headers, and the private backend header
-  stays private.
+- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`. With comments and string
+  literals blanked, common plugin staging (`boat_plugin_stage.c` and its headers) includes no
+  OS/browser header and names no listed process, handle, Emscripten or platform-macro
+  identifier. Each platform backend includes none of a listed set of other platforms' headers,
+  only staging, its backends and `validate_boat_plugin_stage_web` include the private backend
+  header, and `proteus_plugins` lists each backend once. `plugin_stage_backend_self_test` (slow
+  lane) plants each violation in a temporary copy and checks that it is caught.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
 - `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
@@ -1023,6 +1026,12 @@ stale epochs after Undo, virtual deadlines against a stuck process, F6 cancellat
 malformed/oversized output, syntax failure and the live F5/completion adapter. Its process
 completion loops await an external event; CTest supplies the failure deadline. No simulated
 clock is advanced to wait for a child. See [live descriptor staging](PLUGIN_API.md#live-descriptor-staging-p42).
+It also covers console queries: answer, syntax error, the exact five-second deadline, cancel and
+worker faults. `boat_plugin_stage_web` (quick) compiles the real common staging and browser
+backend natively against a C model of the page transport, runs workers in process and uses
+virtual time. It covers the empty-host launch receipt, rejected race/match packages, the 15 s
+query deadline message, job release after failed or unreadable queries, and replies at the
+160 KiB bridge limit. It does not run the page's JavaScript or a real Web Worker.
 
 P4.5 adds `boat_plugin_capture` (native, slow render lane): the same script with `--game`
 runs real CPU captures of every outer anchor, repeatable pinned evidence, a rejected candidate and
