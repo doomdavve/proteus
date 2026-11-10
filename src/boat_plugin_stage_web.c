@@ -1,6 +1,5 @@
 // Browser staging backend: the page's Module.boatPluginStage transport (web/plugin_author.js)
 // runs each request in a disposable Web Worker; the game Wasm only copies bytes in and out.
-#include "boat_plugin.h"
 #include "boat_plugin_stage_backend.h"
 
 #include <emscripten.h>
@@ -84,14 +83,10 @@ BoatPluginWorkerState boat_plugin_worker_poll(
         return BOAT_PLUGIN_WORKER_RUNNING;
     if (status < 0) {
         *reason = "browser worker failed, canceled or stale";
-        if (w->role == BOAT_PLUGIN_WORKER_QUERY)
-            w->job = 0; // A failed query's transport job is not closed.
         return BOAT_PLUGIN_WORKER_BROKEN;
     }
     *reason = "invalid browser worker response";
-    unsigned char *bytes
-        = malloc(w->role == BOAT_PLUGIN_WORKER_QUERY ? BOAT_PLUGIN_QUERY_REPLY_MAX + 8192
-                                                     : BROWSER_REPLY_MAX);
+    unsigned char *bytes = malloc(BROWSER_REPLY_MAX);
     int size = bytes ? browser_read(w->job, bytes) : -1;
     // A staging reply always has a header; an empty query reply is left to the query parser.
     bool read = w->role == BOAT_PLUGIN_WORKER_QUERY ? size >= 0 : size > 0;
@@ -100,11 +95,8 @@ BoatPluginWorkerState boat_plugin_worker_poll(
         read = fwrite(bytes, 1, (size_t)size, response) == (size_t)size && !fflush(response);
     }
     free(bytes);
-    if (!read) {
-        if (w->role == BOAT_PLUGIN_WORKER_QUERY)
-            w->job = 0; // An unreadable query's transport job is not closed.
+    if (!read)
         return BOAT_PLUGIN_WORKER_UNREADABLE;
-    }
     browser_close(w->job);
     w->job = 0;
     return status == 1 ? BOAT_PLUGIN_WORKER_SUCCEEDED : BOAT_PLUGIN_WORKER_FAILED;
@@ -114,6 +106,8 @@ void boat_plugin_worker_close(BoatPluginWorker *w)
 {
     if (!w)
         return;
+    // Closing an already finished transport job only drops its entry, so every job leaves the
+    // page's bounded job table here.
     if (w->job)
         browser_close(w->job);
     free(w);
