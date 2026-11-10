@@ -822,8 +822,8 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
   build (working-harbour resume, direct path; not investigated here).
 - `ctest --preset full -j8`: see [current evidence](#current-evidence-and-limitations).
 
-Owed: a native windowed `--demo` on the basin (it now runs through the local session) and the
-L0 manual items still open from AR6.
+User report, 2026-11-10, macOS: a native windowed `./build/wake_velocity --demo` on the basin
+(now through the local session) works. Owed: the L0 manual items still open from AR6.
 
 ### AR8 — Move files into owning directories
 
