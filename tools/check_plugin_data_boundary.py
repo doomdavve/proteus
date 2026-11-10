@@ -93,9 +93,9 @@ for line in open(path, encoding="utf-8"):
         continue
     kind, name = parts
     if kind == "U" and "-u" in options:
-        print(f"                 U _{name}")
+        print(f"                 U {name}")
     elif kind == "T" and "-u" not in options:
-        print(f"0000000000000000 T _{name}")
+        print(f"0000000000000000 T {name}")
 """
 
 
@@ -296,6 +296,16 @@ def copy_tree(root, destination):
 
 
 def self_test(root):
+    # The stand-in nm prints names as written, so the self-test fixes the format itself.
+    global MACHO
+    saved, MACHO = MACHO, False
+    try:
+        return run_self_test(root)
+    finally:
+        MACHO = saved
+
+
+def run_self_test(root):
     with tempfile.TemporaryDirectory() as temporary:
         base = Path(temporary) / "base"
         copy_tree(root, base)
@@ -365,19 +375,19 @@ def self_test(root):
                 print(problem, file=sys.stderr)
             return 1
 
-        def elf_case(lines):
-            global MACHO
-            saved, MACHO = MACHO, False
-            try:
-                return check(base, nm, [write_archive("elf.a", lines), core])
-            finally:
-                MACHO = saved
-
-        problems = elf_case(["U __stack_chk_fail", "U __memcpy_chk", "U __snprintf_chk",
-                             "U boat_core_thing"])
-        if problems or not elf_case(["U _unknown", "U __fopen_unknown"]):
-            print("plugin_data_boundary self-test failed: ELF names are not handled as "
-                  f"written: {problems}", file=sys.stderr)
+        problems = check(base, nm, [write_archive("elf.a", [
+            "U __stack_chk_fail", "U __memcpy_chk", "U __snprintf_chk", "U boat_core_thing"]), core])
+        macho = write_archive("macho.a", ["U ___stack_chk_fail", "U _memcpy", "U _boat_core_thing"])
+        mach_core = write_archive("mach_core.a", ["T _boat_core_thing"])
+        MACHO_saved = globals()["MACHO"]
+        globals()["MACHO"] = True
+        try:
+            problems += check(base, nm, [macho, mach_core])
+        finally:
+            globals()["MACHO"] = MACHO_saved
+        if problems or not check(base, nm, [write_archive("bad.a", ["U _unknown"]), core]):
+            print(f"plugin_data_boundary self-test failed: ELF/Mach-O names: {problems}",
+                  file=sys.stderr)
             return 1
 
         archive_cases = (
