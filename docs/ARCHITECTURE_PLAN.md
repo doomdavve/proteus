@@ -1,16 +1,17 @@
 # Architecture restructuring plan
 
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
-[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
-(not merged): AR2a input value, the [AR6 pilot](#ar6-status) (native basin free boating as a
-local authority and client, L0 gates passing in CTest) and [AR3a–AR3d, AR3f](#ar3-status)
-platform services. Nothing played, browser-built or browser-tested.
-**Open:** manual input/pilot/service checks below; AR2b; AR3e; impaired-delivery and browser
-qualification.
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`,
+implemented and reviewed, not pushed: AR2a, [AR3a–AR3d, AR3f](#ar3-status),
+[AR4](#ar4--separate-plugin-worker-backends),
+[AR5](#ar5--narrow-plugin-data-and-execution-dependencies) and the
+[AR6 pilot](#ar6-status), for the single AR2–AR6 milestone PR, which awaits the user. Nothing
+played, browser-built or Windows-built.
+**Open:** AR3e (next), AR2b; browser, Windows and manual native checks listed per step; impaired-delivery
+qualification; a pinned `saved_at` for L3's byte-equal saves.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
-directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
-(AR10).
-**Next:** the user's manual checks; merge AR4 here, then AR3e, AR5 and AR7's ledger order.
+directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
+**Next:** AR3e; then the user's review and manual checks of the milestone PR, AR2b and AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -336,8 +337,8 @@ and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon rea
 sources directly; AR6 owns moving the pausing/time-scale/restart consequences behind host
 management). The web touch tap is consumed by `boat_app_input_poll_touch` only on frames where
 `boat_menu_gate` holds, because the bridge's `click()` drains it; browser behaviour is not
-verified. Open for AR2b/AR6: touch drain depends on menu state. Not done: turning the value into per-tick commands
-(AR6's client), the remaining consumers above, and AR2b.
+verified. Open for AR2b/AR6: touch drain depends on menu state. Not done: turning the value
+into per-tick commands (AR6's client), the remaining consumers above, and AR2b.
 Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
 `ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
 `boat_menu_update` with synthetic values, and `boat_title_settings`); CPU captures
