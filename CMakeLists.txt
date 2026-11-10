@@ -477,9 +477,10 @@ file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
 add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c
   tools/wake_velocity_input.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# The title reaches discovery only through wake_velocity_servers.h (stubbed here), so it links
+# the pure protocol for LAN room lists and no transport.
 target_link_libraries(validate_boat_title PRIVATE proteus_render proteus_work_save
-  proteus_frame_pacer proteus_boat_net_enet)
-target_compile_definitions(validate_boat_title PRIVATE PROTEUS_BOAT_NET=1)
+  proteus_frame_pacer proteus_boat_net)
 target_compile_options(validate_boat_title PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_title_settings COMMAND validate_boat_title "${BOAT_TITLE_SETTINGS_DIR}")
 set_tests_properties(boat_title_settings PROPERTIES LABELS "cpu")
