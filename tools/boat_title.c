@@ -471,8 +471,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         } else if (!t->found.count) {
             int dots = (int)fmod(t->time * 2, 4);
             snprintf(value, size, "SEARCHING%.*s", dots, "...");
-        }
-        else {
+        } else {
             const BoatNetLanRoom *room = &t->found.rooms[t->shown];
             char host[32];
             boat_net_lan_endpoint(room, host, sizeof(host));
