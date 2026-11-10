@@ -160,8 +160,8 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   including offline single player, is reviewed with its product decisions accepted. Its
   [rules in force](ARCHITECTURE_PLAN.md#rules-in-force-now) apply to all new work now.
   Owns migration, platform/module restructuring and review reconciliation, then becomes
-  `ARCHITECTURE.md`. The AR6 pilot (basin free boating as a local authority and client) is on
-  `arch/ar2-pilot`, unmerged and unplayed.
+  `ARCHITECTURE.md`. The AR6 pilot (basin free boating as a local authority and client) and the
+  AR3a–AR3d platform services are on `arch/ar2-pilot`, unmerged and unplayed.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.
