@@ -23,7 +23,7 @@ typedef struct {
     Vector3 cpu_tint;
     // Sky panorama, in 0..255 channel values: the vertical gradient reaches the zenith at
     // sky_gradient elevation; a halo and disc around the sun; a warm glow along the horizon
-    // under the sun (none by day); the cloud deck's underside and its thin rim.
+    // under the sun (none by day); the cloud deck's light and shade palette.
     Vector3 sky_horizon, sky_zenith;
     float sky_gradient;
     Vector3 sun_halo, sun_disc, horizon_glow;

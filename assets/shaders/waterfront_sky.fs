@@ -1,7 +1,7 @@
 #version 330
 
 in vec2 fragTexCoord;
-// Static cloud flags at the original 1024x512 panorama texel centres: R underside, G lit rim.
+// Static mask at panorama texel centres: R underside, G rim, B three tonal terraces.
 uniform sampler2D skyMask;
 uniform vec3 skyForward;
 uniform vec3 skyRight;
@@ -123,7 +123,9 @@ void main()
         vec4 flags = texelFetch(skyMask, ivec2(sx, sy), 0);
         bool underside = flags.r > 0.5, rim = flags.g > 0.5;
         if (underside || rim) {
-            vec3 cloud = underside ? cloudUnderside : cloudRim;
+            vec3 cloud = cloudRim * 0.92;
+            if (flags.b > 0.5) cloud = mix(cloudRim, cloudUnderside, 0.45);
+            if (!underside || flags.b > 0.8) cloud = cloudUnderside * 1.035;
             color = skyMix(color, cloud, (elevation - 0.075) / 0.10);
         }
     }
