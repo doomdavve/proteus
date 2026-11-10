@@ -17,6 +17,42 @@
         }                                                                                          \
     } while (0)
 
+// Equality of independently initialized states must ignore C padding, which MSVC need not
+// copy or zero during aggregate assignment. Rejected-operation checks below still compare
+// an object's original bytes to verify it was not touched.
+static bool same_vector(Vector3 a, Vector3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
+
+static bool same_crane(const BoatCargoCrane *a, const BoatCargoCrane *b)
+{
+    return same_vector(a->origin, b->origin) && a->heading == b->heading && a->angle == b->angle
+        && a->reach == b->reach && a->rope == b->rope && a->preset == b->preset
+        && a->hidden == b->hidden;
+}
+
+static bool same_sandbox(const BoatCargoSandbox *a, const BoatCargoSandbox *b)
+{
+    const BoatCargo *x = &a->cargo, *y = &b->cargo;
+    if (x->state != y->state || !same_vector(x->position, y->position)
+        || !same_vector(x->velocity, y->velocity) || !same_vector(x->deck_local, y->deck_local)
+        || !same_vector(x->rotation, y->rotation) || x->settled != y->settled || x->pad != y->pad
+        || x->deck_contact != y->deck_contact || x->delivered != y->delivered
+        || x->receivers != y->receivers || x->support.kind != y->support.kind
+        || x->support.pad != y->support.pad
+        || !same_vector(x->support.deck_local, y->support.deck_local) || x->load != y->load
+        || x->wet != y->wet || x->rest != y->rest || a->crane_count != b->crane_count
+        || a->active != b->active || a->source != b->source || a->boat != b->boat
+        || a->moored != b->moored || a->mooring != b->mooring || a->event_count != b->event_count)
+        return false;
+    for (unsigned i = 0; i < BOAT_SCENE_WORK_SITES; ++i)
+        if (!same_crane(&a->cranes[i], &b->cranes[i]))
+            return false;
+    for (unsigned i = 0; i < BOAT_CARGO_EVENTS; ++i)
+        if (a->events[i].kind != b->events[i].kind || a->events[i].site != b->events[i].site
+            || a->events[i].load != b->events[i].load)
+            return false;
+    return true;
+}
+
 static int compare_cost(const void *a, const void *b)
 {
     double x = *(const double *)a, y = *(const double *)b;
@@ -686,7 +722,7 @@ static void check_snapshot(BoatWorld *world)
         boat_cargo_motor(&second.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
         step(&first, &first_boat, world, i);
         step(&second, &second_boat, world, i);
-        CHECK(memcmp(&first, &second, sizeof(first)) == 0);
+        CHECK(same_sandbox(&first, &second));
         CHECK(first.event_count == 0 && first.cargo.receivers == (1u << 1));
     }
 }
@@ -719,7 +755,7 @@ int main(int argc, char **argv)
         boat_cargo_motor(&repeat.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
         step(&s, &boat, &world, i);
         step(&repeat, &boat, &world, i);
-        CHECK(memcmp(&s, &repeat, sizeof(s)) == 0);
+        CHECK(same_sandbox(&s, &repeat));
         Vector3 anchor
             = Vector3Subtract(boat_cargo_tip(&s.cranes[0]), (Vector3) { 0, BOAT_CARGO_HALF, 0 });
         CHECK(Vector3Distance(s.cargo.position, anchor) <= s.cranes[0].rope + .02f);
@@ -864,7 +900,7 @@ int main(int argc, char **argv)
     BoatCargoSandbox from_site, from_origin;
     CHECK(boat_cargo_reset_sites(&from_site, &site, 1));
     boat_cargo_reset_at(&from_origin, (Vector2) { 10, 245 });
-    CHECK(!memcmp(&from_site, &from_origin, sizeof(from_site)));
+    CHECK(same_sandbox(&from_site, &from_origin));
     CHECK(boat_cargo_site_clear(&outer.map, NULL, boat_water_gentle(), &site));
     BoatSceneWorkSite near = { .id = "near", .x = 20, .z = 250 };
     BoatSceneWorkSite far = { .id = "far", .x = -105, .z = 0 };
@@ -885,7 +921,7 @@ int main(int argc, char **argv)
     CHECK(!boat_cargo_reset_sites(&from_site, pair, 1));
     CHECK(boat_cargo_reset_sites(&from_site, pair, 2));
     CHECK(from_site.active == 1 && from_site.moored && from_site.cargo.pad == 1);
-    CHECK(!memcmp(&from_site.cranes[1], &from_origin.cranes[0], sizeof(from_origin.cranes[0])));
+    CHECK(same_crane(&from_site.cranes[1], &from_origin.cranes[0]));
     CHECK(Vector3Distance(from_site.cargo.position, from_origin.cargo.position) == 0);
     check_turned_site(&mapped, pair);
     // Traffic alone blocks a site: a present empty vessel list clears the same water.

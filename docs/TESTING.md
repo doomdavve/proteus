@@ -185,7 +185,8 @@ Wayland/X11 smoke checks. Browser manual qualification keeps its three-engine ch
 30-minute limit. PR/main jobs no longer produce native download packages; use release or
 manual qualification when a package is needed.
 
-Windows routine Release builds use `x64-windows-static-release` to avoid compiling unused
+Windows routine builds use Ninja with the same MSVC compiler; manual/release qualification
+keeps the Visual Studio generator. Windows routine Release builds use `x64-windows-static-release` to avoid compiling unused
 Debug curl/zlib variants. ABI-checked vcpkg binary archives are restored/saved around dependency
 installation, keyed by runner image, vcpkg revision and triplet contents. They are saved after
 installation even if later tests fail. Manual/release packaging retains the standard

@@ -47,7 +47,7 @@ No Windows development tools are needed on your Mac or the test machine.
 
 Routine PR/main builds use the [bounded CI lane](TESTING.md#routine-ci-budget) with a
 three-minute total job cap. They build only the game/selected validators, run the curated
-checks, and use a cached Release-only static curl triplet. Manual/tagged release qualification
+checks using Ninja/MSVC, and use a cached Release-only static curl triplet. Manual/tagged release qualification
 retains the broader checks, standard static triplet and portable package/relocation checks.
 
 The checkout ships the pinned Lua archive, so even a cold CI build extracts it locally

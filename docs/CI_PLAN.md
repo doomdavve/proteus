@@ -75,3 +75,11 @@ one second, configured in 31 seconds and built for 46 seconds before failing (2m
 flag that MSVC rejected. Scope `-Wno-unused-function` to GNU/Clang-family compilers and keep
 the protocol checks. Neither failed run establishes successful cold Windows qualification.
 Final hosted measurements remain pending.
+
+The corrected first warm Windows run failed in 2m42s (42892238965) on a pre-existing cargo
+validator comparison of independent structs including padding. Compare all defined cargo,
+crane and event fields instead; keep byte comparisons only where testing no mutation of the
+same object. No production cargo behavior changes. Configuration took 66s versus 31s in
+the earlier run; use Ninja with the same MSVC compiler for routine checks to reduce setup/
+project overhead. Manual/release qualification retains its Visual Studio generator.
+Linux passed in 1m30s, macOS 1m12s and browser 1m36s on that revision.
