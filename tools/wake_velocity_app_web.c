@@ -3,6 +3,8 @@
 #include "raylib.h"
 #include <emscripten/emscripten.h>
 
+EM_JS(void, wake_js_fit_canvas, (void), { Module['boatFitCanvas'](); })
+
 double wake_app_now(void) { return emscripten_get_now() / 1000.0; }
 
 unsigned wake_app_window_flags(bool hidden)
@@ -18,3 +20,28 @@ void wake_app_title_open(void)
 }
 
 void wake_app_title_close(void) { CloseAudioDevice(); }
+
+int wake_app_canvas_scale(BoatResolution resolution, int width, int height)
+{
+    int scale = boat_resolution_window_scale(resolution);
+    return resolution == BOAT_RESOLUTION_LOW
+        ? scale
+        : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
+}
+
+void wake_app_canvas_fit(void) { wake_js_fit_canvas(); }
+
+void wake_app_session_canvas(BoatResolution resolution, int width, int height)
+{
+    int window_scale = wake_app_canvas_scale(resolution, width, height);
+    if (GetScreenWidth() < width * window_scale) {
+        SetWindowSize(width * window_scale, height * window_scale);
+        wake_app_canvas_fit();
+    }
+}
+
+void wake_app_session_open(bool vsync)
+{
+    (void)vsync;
+    SetTargetFPS(60);
+}

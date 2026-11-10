@@ -15,6 +15,8 @@ bool wake_scenery_startup(const char *assets)
     return true;
 }
 
+bool wake_scenery_deferred(void) { return true; }
+
 bool wake_scenery_request(const BoatWorldDefinition *location, const char *assets)
 {
     char path[4096];

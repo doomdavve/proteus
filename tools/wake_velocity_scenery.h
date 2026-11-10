@@ -15,6 +15,9 @@ typedef enum { WAKE_SCENERY_PENDING, WAKE_SCENERY_READY, WAKE_SCENERY_FAILED } W
 // Once at startup, before any session: native loads every mapped pack (false when one fails);
 // the browser loads nothing and returns true.
 bool wake_scenery_startup(const char *assets);
+// Whether acquisition waits for a window: the browser fetches after a session's window opens, so
+// the session's first CPU draw (and its capture) waits for the pack. Native: false.
+bool wake_scenery_deferred(void);
 // Begin acquiring LOCATION's pack (mapped, not yet loaded). False when it cannot be requested.
 bool wake_scenery_request(const BoatWorldDefinition *location, const char *assets);
 // The request's status; PROGRESS (0 to 1) is written while it is pending.

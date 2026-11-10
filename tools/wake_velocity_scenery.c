@@ -3,6 +3,8 @@
 
 bool wake_scenery_startup(const char *assets) { return boat_scenery_load_all(assets); }
 
+bool wake_scenery_deferred(void) { return false; }
+
 bool wake_scenery_request(const BoatWorldDefinition *location, const char *assets)
 {
     (void)location;
