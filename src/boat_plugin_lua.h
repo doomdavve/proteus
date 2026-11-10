@@ -80,6 +80,12 @@ typedef struct {
     BoatSceneDefinition scene;
 } BoatPluginMatchData;
 
+// Parse BUNDLE's manifest under LIMITS (defaults when NULL), require KIND and bound the source:
+// the checks every load makes before evaluating the entry.
+BoatPluginStatus boat_plugin_bundle_manifest(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginKind kind, BoatPluginManifest *manifest,
+    BoatPluginDiagnostic *diagnostic);
+
 // PD2: the shared scene capability check for free, race and match packages.
 BoatPluginStatus boat_plugin_take_scene(const BoatPluginManifest *manifest, bool has_scene,
     const BoatSceneDefinition *scene, bool *out_has_scene, BoatSceneDefinition *out_scene,

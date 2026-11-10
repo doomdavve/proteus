@@ -445,22 +445,14 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
 {
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    limits = bounded(limits);
     BoatPluginManifest manifest;
     BoatPluginStatus status
-        = boat_plugin_parse_manifest(bundle->manifest, bundle->manifest_size, limits, &manifest, d);
+        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_VOYAGE, &manifest, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
-    if (strcmp(manifest.kind, "voyage"))
-        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "kind", "requires a voyage host");
-    if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
-        return diagnose(d, BOAT_PLUGIN_LIMIT, manifest.entry, "", "is %zu bytes; the limit is %zu",
-            bundle->source_size,
-            limits->source_bytes < BOAT_PLUGIN_SOURCE_MAX ? limits->source_bytes
-                                                          : (size_t)BOAT_PLUGIN_SOURCE_MAX);
     BoatPluginVoyageData data;
     status = boat_plugin_lua_voyage(
-        bundle->source, bundle->source_size, manifest.entry, limits, &data, d);
+        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
     return boat_plugin_decode_voyage(&manifest, &data, out, d);
@@ -1132,9 +1124,9 @@ BoatPluginStatus boat_plugin_decode_course(const BoatPluginManifest *manifest,
     return BOAT_PLUGIN_OK;
 }
 
-static BoatPluginStatus load_manifest(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginDiagnostic *d, BoatPluginManifest *manifest,
-    BoatPluginKind kind)
+BoatPluginStatus boat_plugin_bundle_manifest(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginKind kind, BoatPluginManifest *manifest,
+    BoatPluginDiagnostic *d)
 {
     limits = bounded(limits);
     BoatPluginStatus status
@@ -1158,7 +1150,8 @@ BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
     BoatPluginManifest manifest;
-    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_FREE);
+    BoatPluginStatus status
+        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_FREE, &manifest, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
     BoatPluginFreeData data;
@@ -1175,7 +1168,8 @@ BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
     BoatPluginManifest manifest;
-    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_COURSE);
+    BoatPluginStatus status
+        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_COURSE, &manifest, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
     BoatPluginCourseData data;
@@ -1465,7 +1459,8 @@ BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
     BoatPluginManifest manifest;
-    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_MATCH);
+    BoatPluginStatus status
+        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_MATCH, &manifest, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
     BoatPluginMatchData data;
