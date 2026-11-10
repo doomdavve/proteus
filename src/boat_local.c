@@ -1,5 +1,6 @@
 #include "boat_local.h"
 
+#include <math.h>
 #include <string.h>
 
 static void fail(BoatLocal *local, const char *text)
@@ -115,8 +116,9 @@ unsigned boat_local_chunk(uint64_t tick, unsigned remaining)
     return remaining < boundary ? remaining : boundary;
 }
 
-bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
-    float thrust_target, float steering_target, const BoatLocalObserver *observer)
+static bool run_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
+    float thrust_target, float steering_target, const BoatLocalScript *script,
+    const BoatLocalObserver *observer)
 {
     if (!local->running) {
         fail(local, "the local session is not running");
@@ -139,7 +141,13 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
                 local->water = client->prediction.fleet.state.wakes;
                 boat_wake_objects_advance(&local->water);
             }
-            if (!boat_net_client_command(client, tick, input, thrust_target, steering_target)) {
+            bool commanded = script
+                ? boat_net_client_command(client, tick,
+                      script->command(script->context,
+                          &client->prediction.fleet.state.slots[client->slot].boat, tick),
+                      NAN, NAN)
+                : boat_net_client_command(client, tick, input, thrust_target, steering_target);
+            if (!commanded) {
                 fail(local, "the local client could not command its boat");
                 local->running = false;
                 return false;
@@ -173,6 +181,22 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
     if (chunks > local->stats.max_chunks)
         local->stats.max_chunks = chunks;
     return true;
+}
+
+bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
+    float thrust_target, float steering_target, const BoatLocalObserver *observer)
+{
+    return run_frame(local, now, grant, input, thrust_target, steering_target, NULL, observer);
+}
+
+bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
+    const BoatLocalScript *script, const BoatLocalObserver *observer)
+{
+    if (!script || !script->command) {
+        fail(local, "the local session has no script");
+        return false;
+    }
+    return run_frame(local, now, grant, (BoatInput) { 0 }, NAN, NAN, script, observer);
 }
 
 const BoatFleet *boat_local_view(const BoatLocal *local) { return &local->client.prediction.fleet; }

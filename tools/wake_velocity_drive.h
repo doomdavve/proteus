@@ -22,5 +22,9 @@ void object_study_reset(ObjectStudy *, BoatSession *, bool, unsigned, float);
 const BoatWakeObjects *object_study_wakes(const ObjectStudy *);
 const Boat *object_study_other(const ObjectStudy *);
 void timed_boat_step(BoatSession *, BoatInput, BoatFrameMetrics *, BoatWakePlayer *, ObjectStudy *);
+// The scripted drive's helm at TICK (ticks since the session started) from BOAT. STUDIES: a wake
+// field or the arcade pool is present. demo_step steps the session with it; a local session's
+// script sends it from the predicted boat (ledger L6).
+BoatInput demo_input(const Boat *boat, const BoatWater *water, bool studies, int tick);
 void demo_step(BoatSession *, int, BoatFrameMetrics *, BoatWakePlayer *, ObjectStudy *);
 #endif

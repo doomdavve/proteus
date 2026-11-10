@@ -2,8 +2,10 @@
  * client in one process over the memory transport, driven by host grants. Every scenario runs the
  * game's direct free-boating path (BoatSession stepped by timed_boat_step with the arcade wake
  * pool) beside a local session fed the same frames, and requires bit-identical boats and wake
- * pools at every predicted tick and at every frame's authority tick. Frame time is a scripted
- * value, never wall time. `--bench` reports per-frame cost (not a test). */
+ * pools at every predicted tick and at every frame's authority tick. The L6 cases drive both with
+ * the scripted drive instead (demo_step against the glue's scripted frames and capture drive).
+ * Frame time is a scripted value, never wall time. `--bench` reports per-frame cost (not a test).
+ */
 #include "boat_helm.h"
 #include "boat_local.h"
 #include "boat_test_cases.h"
@@ -65,6 +67,9 @@ typedef struct {
     uint64_t wakes;
 } Expected;
 static Expected expected[TRACE];
+// L6: both paths take the scripted drive (demo_step; the glue's scripted frames) instead of the
+// frames' helm.
+static bool scripted;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -139,10 +144,13 @@ static void direct_frame(Frame f)
     unsigned ticks = boat_time_grant(&direct.accumulator, UINT_MAX);
     for (unsigned i = 0; i < ticks; ++i) {
         BoatSession *s = &direct.session;
-        timed_boat_step(s,
-            boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
-                f.thrust_target, f.steering_target),
-            NULL, NULL, &direct.objects);
+        if (scripted)
+            demo_step(s, (int)s->tick, NULL, NULL, &direct.objects);
+        else
+            timed_boat_step(s,
+                boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
+                    f.thrust_target, f.steering_target),
+                NULL, NULL, &direct.objects);
         if (expected_count < TRACE)
             expected[expected_count++] = (Expected) { s->tick, s->boat, s->presentation,
                 boat_net_wake_digest(object_study_wakes(&direct.objects)) };
@@ -186,6 +194,9 @@ static bool local_frame(Frame f, double at)
         play.accumulator = 0;
     else
         play.accumulator += boat_time_frame_seconds(f.seconds, f.speed);
+    if (scripted)
+        return wake_local_scripted_frame(
+            &game, &play.session, &play.objects, &play.accumulator, at, NULL);
     return wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
         (BoatInput) { .steering_rate = f.steering_rate }, f.thrust_target, f.steering_target, at,
         NULL);
@@ -225,6 +236,7 @@ static int drive(Script script, unsigned frames)
 static int open_world(World w)
 {
     world = w;
+    scripted = false;
     play_open(&direct);
     play_open(&play);
     now = 100;
@@ -339,6 +351,53 @@ static int basin_quarter(void) { return run(BASIN, quarter, 400); }
 static int basin_8x(void) { return run(BASIN, eight, 40); }
 static int outer_8x(void) { return run(OUTER, eight, 30); }
 static int outer_1x(void) { return run(OUTER, one, 200); }
+
+// L6: `--demo` through the local session. The scripted drive's helm changes at ticks 420 and
+// 1440; uneven frames at 1x and 8x cross both, every predicted tick equal to demo_step's.
+static int scripted_demo(void)
+{
+    if (open_world(BASIN))
+        return 1;
+    scripted = true;
+    if (drive(uneven, 300) || drive(eight, 160) || clean_commands())
+        return 1;
+    CHECK(lp->tick > 1500);
+    return 0;
+}
+
+// L6: a capture's drive (wake_local_scripted_drive, grants of at most 96 on virtual time) ends
+// on demo_step's session, boat, presentation and pool, after a restart too.
+static int scripted_capture(void)
+{
+    for (unsigned round = 0; round < 2; ++round) {
+        if (round ? restart_both() : open_world(BASIN))
+            return 1;
+        const uint64_t ticks = 1501;
+        for (uint64_t tick = 0; tick < ticks; ++tick)
+            demo_step(&direct.session, (int)tick, NULL, NULL, &direct.objects);
+        game.traced = NULL;
+        CHECK(wake_local_scripted_drive(&game, &play.session, &play.objects, ticks));
+        game.traced = traced;
+        CHECK(lp->tick == ticks && lp->stats.max_chunks <= 9);
+        CHECK(same_authority());
+        if (clean_commands())
+            return 1;
+    }
+    CHECK(lp->generation == 2);
+    return 0;
+}
+
+// A script is required: a scripted frame without one is refused and grants nothing.
+static int scripted_needs_script(void)
+{
+    if (open_world(BASIN))
+        return 1;
+    CHECK(!boat_local_frame_scripted(lp, now, 12, NULL, NULL));
+    BoatLocalScript empty = { NULL, NULL };
+    CHECK(!boat_local_frame_scripted(lp, now, 12, &empty, NULL));
+    CHECK(lp->tick == 0);
+    return 0;
+}
 
 static int grant_96(void)
 {
@@ -698,6 +757,9 @@ int main(int argc, char **argv)
         TEST_CASE(basin_8x),
         TEST_CASE(outer_1x),
         TEST_CASE(outer_8x),
+        SLOW_CASE(scripted_demo),
+        SLOW_CASE(scripted_capture),
+        TEST_CASE(scripted_needs_script),
         TEST_CASE(grant_96),
         TEST_CASE(grant_cap),
         TEST_CASE(odd_chunk_sizes),

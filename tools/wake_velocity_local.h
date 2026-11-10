@@ -30,6 +30,14 @@ bool wake_local_restart(
 bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
     BoatFrameMetrics *metrics);
+// L6: wake_local_frame with each tick's helm from the scripted drive (demo_input at the
+// session's tick, from the predicted boat) instead of the player's.
+bool wake_local_scripted_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    double *accumulator, double now, BoatFrameMetrics *metrics);
+// L6: the scripted drive's first TICKS ticks for a capture, granted in frames of at most
+// BOAT_LOCAL_MAX_GRANT on virtual time (each grant at its starting tick's time).
+bool wake_local_scripted_drive(
+    WakeLocal *local, BoatSession *session, ObjectStudy *objects, uint64_t ticks);
 void wake_local_close(WakeLocal *local);
 
 #endif

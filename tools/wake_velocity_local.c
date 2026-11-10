@@ -59,16 +59,25 @@ static void present(void *context, const BoatFleet *view, unsigned slot, uint64_
         p->local->traced(p->local->traced_context, session, view);
 }
 
-bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
-    double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
+// The scripted drive's helm: demo_input at the tick before TICK, from the predicted boat.
+static BoatInput scripted(void *context, const Boat *predicted, uint64_t tick)
+{
+    const BoatSession *session = context;
+    return demo_input(predicted, &session->world.water, true, (int)(tick - 1));
+}
+
+// One grant of the player's helm, or of the scripted drive's when SCRIPT.
+static bool run(WakeLocal *local, BoatSession *session, ObjectStudy *objects, unsigned grant,
+    BoatInput input, float thrust_target, float steering_target, bool script, double now,
     BoatFrameMetrics *metrics)
 {
-    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
     double started = boat_profile_time(IsWindowReady());
     Present context = { local, session };
     BoatLocalObserver observer = { &context, present };
-    bool ok = boat_local_frame(
-        &local->local, now, grant, input, thrust_target, steering_target, &observer);
+    BoatLocalScript drive = { session, scripted };
+    bool ok = script ? boat_local_frame_scripted(&local->local, now, grant, &drive, &observer)
+                     : boat_local_frame(&local->local, now, grant, input, thrust_target,
+                           steering_target, &observer);
     if (ok && grant)
         objects->wakes = boat_local_view(&local->local)->state.wakes;
     float elapsed = (float)((boat_profile_time(IsWindowReady()) - started) * 1000.0);
@@ -79,6 +88,35 @@ bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objec
     }
     local->active = ok;
     return ok;
+}
+
+bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
+    BoatFrameMetrics *metrics)
+{
+    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
+    return run(
+        local, session, objects, grant, input, thrust_target, steering_target, false, now, metrics);
+}
+
+bool wake_local_scripted_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    double *accumulator, double now, BoatFrameMetrics *metrics)
+{
+    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
+    return run(local, session, objects, grant, (BoatInput) { 0 }, NAN, NAN, true, now, metrics);
+}
+
+bool wake_local_scripted_drive(
+    WakeLocal *local, BoatSession *session, ObjectStudy *objects, uint64_t ticks)
+{
+    while (local->local.tick < ticks) {
+        uint64_t left = ticks - local->local.tick;
+        unsigned grant = left < BOAT_LOCAL_MAX_GRANT ? (unsigned)left : BOAT_LOCAL_MAX_GRANT;
+        double now = boat_tick_seconds(local->local.tick);
+        if (!run(local, session, objects, grant, (BoatInput) { 0 }, NAN, NAN, true, now, NULL))
+            return false;
+    }
+    return true;
 }
 
 void wake_local_close(WakeLocal *local)
