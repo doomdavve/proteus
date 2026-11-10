@@ -28,7 +28,7 @@ static Vector3 sky_mix(Vector3 a, Vector3 b, float t)
     return Vector3Lerp(a, b, t * t * (3 - 2 * t));
 }
 
-// A fixed cloud deck sampled in world X/Z, so square tiles recede toward the horizon.
+// A fixed, shallow cloud deck sampled in world X/Z, receding toward the horizon.
 static float cloud_hash(int x, int z)
 {
     uint32_t seed = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u;
@@ -36,18 +36,24 @@ static float cloud_hash(int x, int z)
     return (float)((seed ^ (seed >> 16)) & 65535u) / 65535;
 }
 
-static bool cloud_tile(float x, float z)
+// Smooth interpolation removes the coarse square sampling grid while retaining the original
+// broad cloud patches. A little continuous fine detail keeps the boundaries irregular.
+static float cloud_noise(float x, float z)
 {
-    int tile_x = (int)floorf(x / .16f), tile_z = (int)floorf(z / .16f);
-    float gx = tile_x / 5.0f, gz = tile_z / 5.0f;
-    int ix = (int)floorf(gx), iz = (int)floorf(gz);
-    float tx = gx - ix, tz = gz - iz;
+    int ix = (int)floorf(x), iz = (int)floorf(z);
+    float tx = x - ix, tz = z - iz;
     tx = tx * tx * (3 - 2 * tx);
     tz = tz * tz * (3 - 2 * tz);
     float a = Lerp(cloud_hash(ix, iz), cloud_hash(ix + 1, iz), tx);
     float b = Lerp(cloud_hash(ix, iz + 1), cloud_hash(ix + 1, iz + 1), tx);
-    // Broad joined patches, notched edges, holes, and occasional detached little tiles.
-    return Lerp(a, b, tz) * .85f + cloud_hash(tile_x + 137, tile_z - 59) * .15f > .59f;
+    return Lerp(a, b, tz);
+}
+
+static bool cloud_tile(float x, float z)
+{
+    // Keep the original .8-unit patch scale and approximately the same sky coverage.
+    return cloud_noise(x / .8f, z / .8f) * .94f + cloud_noise(x / .16f + 137, z / .16f - 59) * .06f
+        > .60f;
 }
 
 enum { SKY_WIDTH = 1024, SKY_HEIGHT = 512 };

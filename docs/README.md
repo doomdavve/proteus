@@ -27,6 +27,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Multiplayer | M6, M7 and M8 acceptance: human play, platform/impairment/soak and browser qualification | 2026-10-26 | [M6](MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging), [browser](WEB_BUILD.md#webrtc-rooms) |
 | Deathmatch | Playtest steps not started (step 0 first); "cannot jump over a boat" re-reported | 2026-11-01 | [playtest plan](DEATHMATCH_PLAYTEST_PLAN.md) |
 | Race | List the improvements from the first human race; assess 63-71 s pacing | 2026-10-24 | [race plan](RACE_PLAN.md) |
+| Cloud deck | Softer edges on the original shallow deck; daytime visual review pending | 2026-11-10 | [cloud deck plan](CLOUD_DECK_PLAN.md) |
 | Graphics | Batch C review and the returned Windows report | 2026-11-04 | [graphics plan](GRAPHICS_OVERHAUL_PLAN.md) |
 | Gothenburg Harbour | Paused by the user; low-bridge duck and scrape score (GH8), then sights | 2026-11-04 | [harbour plan](GOTHENBURG_HARBOUR_PLAN.md) |
 | Sunset | Step 3 (transitions, controls, title phase) needs the user's decisions | 2026-11-03 | [sunset plan](SUNSET_PLAN.md) |
