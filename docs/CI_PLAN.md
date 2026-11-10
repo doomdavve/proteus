@@ -5,7 +5,7 @@ Budget: three minutes per routine workflow, including setup/build/tests; test st
 Open items: hosted cold/warm Windows timings and manual/release path validation.
 Done when: routine jobs enforce the budget and run a curated, size-limited lane; full
 qualification remains manual/release, and obsolete PR revisions are cancelled.
-Next: PR authorization, then validate hosted three-minute jobs (especially cold Windows).
+Next: measure hosted three-minute jobs and cold/warm Windows; PR authorized 2026-11-10.
 
 ## Scope and deferrals
 
@@ -58,3 +58,5 @@ need CI evidence. Full manual/release routing was reviewed and linted but not ex
 GitHub locally. Queue/runner allocation time is outside the job timeout. No PR is opened
 without the user's approval. These limits remain explicit rather than claiming a three-minute
 end-to-end guarantee from local test timings.
+
+The user authorized opening the PR and measuring hosted workflow time on 2026-11-10.
