@@ -846,8 +846,16 @@ Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_S
 obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 
-The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)) and the pinned interpreter
-(`proteus_lua`) sit outside both boundaries. Configure fails if `proteus_boat_core` or
+The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-free data library
+(`proteus_plugin_data`) and the pinned interpreter (`proteus_lua`) sit outside both boundaries.
+`plugin_data_boundary` (`tools/check_plugin_data_boundary.py`) checks that the data library and
+its data-only consumers (sandbox save, bundled catalog, `validate_boat_plugin_data`) include no
+evaluation, I/O or worker header and name no Lua, file, process or platform identifier, that
+their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and, with nm, that the data
+archive's undefined symbols resolve to core, JSON or allowlisted libc/libm/raymath symbols.
+`plugin_data_boundary_self_test` (slow lane) plants each violation. `boat_plugin_data` runs
+`validate_boat_plugin_data`, which links only the catalog and plugin data, decodes every bundled
+entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or
 `proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
 or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
 for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).

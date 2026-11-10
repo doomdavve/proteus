@@ -407,6 +407,31 @@ generic plugin values out of multiplayer.
 Done when data-only consumers do not require evaluation/workers, core/net stay independent of
 plugin execution, formats and transaction behavior are unchanged, and targets have no cycles.
 
+**AR5 status, 2026-11-10 (branch `arch/ar4-plugin-workers`, for the AR2–AR6 milestone PR):**
+implemented; not played or browser-tested. `proteus_plugin_data` (manifest parsing, decode and
+location checks, digests and classification in `boat_plugin.c`/`boat_plugin_race.c`, the stage
+wire codec, and the objective checkpoint codec and digest; core and JSON only) is split out of
+`proteus_plugins`, which keeps Lua evaluation (`boat_plugin_load.c` now holds the five
+`boat_plugin_load_*` calls), the host, objective transitions, package I/O and staging and links
+the data library publicly. Data headers `boat_plugin_decode.h`, `boat_plugin_revision.h` and
+`boat_plugin_objective.h`, plus the evaluation header `boat_plugin_load.h`, take declarations
+moved verbatim from the combined headers. The sandbox save and the bundled catalog link only
+plugin data; the work session, which steps objectives, links the host explicitly. The dependency
+chain is acyclic: data -> core/JSON; plugins -> data + Lua; catalog/sandbox save -> data.
+Enforcement: `plugin_data_boundary` (sources, CMake links and archive symbols), its slow-lane
+self-test, and the data-only consumer `validate_boat_plugin_data`. Net still includes no plugin
+header, and `BoatRoomObjective` stays in `tools/`.
+Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
+480/480 (13 disabled); under `git rebase -x` every commit built warning-free and passed the
+plugin, boundary and lint tests at `-j8`, except one unidentified failure on the final docs-only
+commit that did not recur in six reruns (the full preset on the same tree passed). Against the pre-AR5 build, the generated catalog source, `net-golden` output and
+every save fixture are byte-identical except `sandbox-save-tests/resume.sav` and
+`work-save-tests/work.sav`, which already differ between two runs of the same build.
+**Open:** browser game Wasm still links `proteus_plugins` (the host and worker bridge) and relies
+on the linker dropping Lua; `check_web_wasm.py`, the Emscripten build and Windows were not run.
+Header narrowing is limited to data-only consumers: `boat_plugin_host.h` still includes I/O and
+state headers for its callers. No physics trace comparison was run (no simulation code changed).
+
 ### AR6 — Local authority/client pilot
 
 After the seams AR1 selects, migrate private native free boating first unless the ledger
