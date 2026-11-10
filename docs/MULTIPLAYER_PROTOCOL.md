@@ -454,6 +454,20 @@ The authority accepts a command for tick t only when the slot is active on that 
 fleet tick < t ≤ fleet tick + 24, and no command for t is stored yet. Stored commands are
 immutable, so repeated copies in later batches cannot change them.
 
+### Private range (in-process sessions only)
+
+Types 0xC0 and above are reserved for a private session's authority and client in one process
+(`docs/ARCHITECTURE_AR1.md` section 3). They use the 32-byte header above with version 14;
+`boat_net_decode` rejects them as BAD_TYPE, so a hosted room counts one as malformed (a Hello-phase
+peer is rejected), and remote peers never send them. Only a server configured as private
+(`BoatNetServerConfig.local`) accepts them.
+
+`0xC0` PrivateInputBatch (channel 1, client to server): the InputBatch fields with full-precision
+rates (D4): `u32` life, `u8` count (1–12, ≤ header tick), three reserved bytes, `u64` snapshot
+tick, then per command: `f32` steering rate, `f32` throttle rate (finite; not clamped or
+quantized), `u8` flags, `u16` grenade request, `u8` torpedo request (12 bytes per command). The
+authority applies the same acceptance rules as InputBatch.
+
 ### Other control messages
 
 - SpawnRequest: `u32` request ID, `u32` life to reset. It is honoured only while the slot is on
@@ -696,6 +710,9 @@ must not exceed their capacities, and expired ≤ emitted.
   Either is rejected at Hello. Room content (course, rules, scenes) instead travels in the
   definition and must validate on the client.
 - CombatPage uses channel 3. Additional registry formats, prediction acknowledgements or remote-input history require a later version.
+- The private range is not part of the hosted wire: adding or changing a private message changes
+  no hosted byte and does not increment the protocol version, but must keep the range unaccepted
+  by hosted rooms.
 
 ## Fixtures
 

@@ -142,6 +142,10 @@ typedef struct {
     uint8_t flags;
     uint16_t grenade;
     uint8_t torpedo;
+    // AR6 (D4): private sessions carry the float rates unrounded. Never encoded by this codec:
+    // v14 bytes carry STEERING and THROTTLE, and decoded commands leave PRECISE false.
+    bool precise;
+    float steering_rate, throttle_rate;
 } BoatNetCommand;
 
 typedef struct {
@@ -391,6 +395,9 @@ bool boat_net_sequence_newer(uint32_t a, uint32_t b);
 // Rates to the wire and back. Non-finite rates encode as zero.
 BoatNetCommand boat_net_command(BoatInput input, uint8_t flags);
 BoatInput boat_net_command_input(BoatNetCommand command);
+// A private-session command: the v14 fields as boat_net_command() and the finite rates unrounded
+// (a non-finite rate is zero, as the fleet integrates it).
+BoatNetCommand boat_net_precise_command(BoatInput input, uint8_t flags);
 // The command an inactive or silent slot integrates: controls easing toward neutral.
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags);
 

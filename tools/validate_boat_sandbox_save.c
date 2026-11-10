@@ -1,3 +1,4 @@
+#include "boat_plugin_state.h"
 #include "boat_sandbox_save.h"
 
 #include <math.h>

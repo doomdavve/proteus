@@ -226,7 +226,7 @@ static int golden(void)
     // Snapshot layout: sizes and a pinned digest of a hand-built state's bytes.
     BoatFleetState state = { .tick = 1000, .next_request = 5 };
     BoatNetSlotInput records[BOAT_FLEET_SLOTS]
-        = { { .tick = 999, .state = 1, .used = { 127, -64, 1, 0, 17 } } };
+        = { { .tick = 999, .state = 1, .used = { .steering = 127, .throttle = -64, .flags = 1, .torpedo = 17 } } };
     state.slots[0] = (BoatFleetSlot) { .requested = 3, .life = 2, .request = 1, .active = true };
     state.slots[0].boat.position = (Vector2) { 12.5f, -3.25f };
     state.slots[0].boat.heading = 1.5f;
@@ -556,7 +556,7 @@ static int checkpoints(void)
     for (int waves = 0; waves < 2; ++waves) {
         busy_fleet(&fleet, 2400, waves);
         boat_fleet_request_spawn(&fleet, 2); // A pending reset is part of the checkpoint.
-        BoatNetSlotInput records[BOAT_FLEET_SLOTS] = { { 2399, 1, { 127, 0, 0, 0, 0 } } };
+        BoatNetSlotInput records[BOAT_FLEET_SLOTS] = { { 2399, 1, { .steering = 127 } } };
         uint64_t go = waves ? 4321 : 0, go_back = 1;
         size_t size = boat_net_checkpoint_encode(&fleet.state, records, go, bytes, sizeof(bytes));
         CHECK(size > 0 && size <= BOAT_NET_MAX_CHECKPOINT);

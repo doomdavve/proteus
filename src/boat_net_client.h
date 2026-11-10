@@ -1,6 +1,7 @@
 #ifndef PROTEUS_BOAT_NET_CLIENT_H
 #define PROTEUS_BOAT_NET_CLIENT_H
 
+#include "boat_net_private.h"
 #include "boat_net_transport.h"
 #include "boat_prediction.h"
 #include "boat_remote_view.h"
@@ -9,6 +10,11 @@
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.
 #define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of stall or digest mismatch before a resync request.
 #define BOAT_NET_SNAPSHOT_SILENCE 10.0 // Hard ceiling without an applied authoritative state.
+// A private (local) session fails after this many resyncs in a row that left it stalled. The
+// in-process link is lossless, so one checkpoint repairs a stall within a chunk; three allow for a
+// checkpoint superseded by a restart or a second mismatch, and bound the failure at 480 granted
+// ticks (four resync intervals) instead of retrying forever.
+#define BOAT_NET_LOCAL_RESYNCS 3
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
 // One definition and one checkpoint can both arrive before Accept: two full page sets plus
@@ -26,6 +32,9 @@ typedef struct {
     // BOAT_LOCATION_COUNT owners indexed by location ID, borrowed for the client's lifetime.
     // The room picks the location; an unready entry fails its bootstrap.
     const BoatWorldResources *resources;
+    // AR6: a private session's world, as its authority's (spawn unused). Requires PREDICT; the
+    // host drives it with boat_net_client_command/flush/local_service only.
+    BoatNetPrivateSession local;
 } BoatNetClientConfig;
 
 typedef enum {
@@ -95,6 +104,7 @@ typedef struct {
 // fleet, which each command advances to its target tick; the caller draws that instead.
 typedef struct {
     BoatNetTransport transport;
+    BoatNetPrivateSession local; // Config: zero for hosted rooms.
     char name[BOAT_NET_NAME_BYTES + 1], token[BOAT_NET_TOKEN_BYTES + 1];
     char build[BOAT_NET_BUILD_BYTES + 1];
     uint32_t first_sequence;
@@ -110,8 +120,10 @@ typedef struct {
     BoatNetReject reject; // Valid when REJECTED.
     uint8_t leave; // Server's leave reason when CLOSED, zero for a transport close.
     // 1: no handshake/world within 10 s, 2: no server message for 5 s,
-    // 3: messages arrive but no authoritative state has applied for 10 s.
+    // 3: messages arrive but no authoritative state has applied for 10 s,
+    // 4: a private session stayed stalled after BOAT_NET_LOCAL_RESYNCS resyncs.
     uint8_t timed_out;
+    unsigned local_resyncs; // Private sessions: resyncs since state last applied cleanly.
     BoatNetAccept accept;
     uint32_t epoch;
     unsigned slot;
@@ -208,6 +220,21 @@ bool boat_net_client_service_thrust(
 // As above, with optional absolute wheel target; NAN keeps INPUT's steering rate.
 bool boat_net_client_service_targets(BoatNetClient *client, double now, BoatInput input,
     bool inactive, float thrust_target, float steering_target);
+// AR6 private session (config.local): the host addresses each command to the authority tick it
+// will grant. TICK must follow the previous command (or the mirror's tick); the target-derived
+// rates come from the predicted boat at TICK - 1, as solo derives them from its boat, at full
+// precision. Records and predicts the command; sends nothing. False when the client has no boat,
+// the tick is out of order or the prediction is not at TICK - 1.
+bool boat_net_client_command(BoatNetClient *client, uint64_t tick, BoatInput input,
+    float thrust_target, float steering_target);
+// Send the commands recorded since the last flush as one private batch (at most
+// BOAT_NET_MAX_COMMANDS). False when there are too many or the transport refused it.
+bool boat_net_client_flush(BoatNetClient *client);
+// Handle waiting messages and correct the prediction once. Stall resync, wake-mismatch resync and
+// the prediction hold count granted ticks (the newest commanded tick), never elapsed time; there
+// is no peer timeout, snapshot-silence close or ping. NOW only bounds startup
+// (BOAT_NET_HANDSHAKE_TIMEOUT). False once rejected, closed or timed out joining.
+bool boat_net_client_local_service(BoatNetClient *client, double now);
 // Ask the authority for a new life at a safe spawn (menu action or held Backspace).
 void boat_net_client_request_reset(BoatNetClient *client);
 // Progress of the latest reset request; SECONDS (may be NULL) receives its age.

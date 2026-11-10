@@ -7,27 +7,12 @@
 // Nothing here reads files or the clock: the application acquires bytes and passes the time.
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_plugin_revision.h"
 #include "boat_plugin_state.h"
 
 #define BOAT_PLUGIN_UNDO 8 // Prior revisions that Undo can reinstall.
 #define BOAT_PLUGIN_POLL 0.25 // Seconds between save polls.
 #define BOAT_PLUGIN_SETTLE 0.3 // A save must stay unchanged this long before it is staged.
-
-typedef struct {
-    BoatPluginManifest manifest; // Canonical copy; the kind-specific record repeats it.
-    // Exactly one record is live, selected by MANIFEST.kind. A union keeps ten retained
-    // revisions (each with a possible scene) inside the fixed native owner budget.
-    union {
-        BoatPluginVoyage voyage;
-        BoatPluginRace race; // Used instead of VOYAGE by a race host.
-        BoatPluginFree free; // Used by a free-boating host.
-        BoatPluginCourse course; // Used by a time-trial host.
-        BoatPluginMatch match; // Used by a room authority.
-    };
-    char source[BOAT_PLUGIN_SOURCE_MAX];
-    size_t source_size;
-    unsigned number; // 1 for the launch revision, then one more for each staged definition.
-} BoatPluginRevision;
 
 typedef struct {
     BoatPluginKind kind; // One descriptor kind for the lifetime of this host.

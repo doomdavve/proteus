@@ -8,6 +8,7 @@
 #include "boat_course_view.h"
 #include "boat_gpu.h"
 #include "boat_gpu_timer.h"
+#include "boat_helm.h"
 #include "boat_hud.h"
 #include "boat_minimap.h"
 #include "boat_music.h"
@@ -27,11 +28,17 @@
 #include "cli_usage.h"
 #include "wake_command.h"
 #include "wake_console.h"
+#include "wake_console_bridge.h"
+#include "wake_velocity_app.h"
+#include "wake_velocity_controls.h"
 #include "wake_velocity_drive.h"
+#include "wake_velocity_input.h"
 #include "wake_velocity_lighting_review.h"
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
+#include "wake_velocity_scenery.h"
+#include "wake_velocity_servers.h"
 #include "wake_velocity_work.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
@@ -40,12 +47,12 @@
 #include "boat_server.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_host.h"
+#include "wake_velocity_local.h"
 #endif
 #include "wake_velocity_net.h"
 #endif
 #include "boat_screen.h"
 #include "boat_title.h"
-#include "boat_web_touch.h"
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
@@ -58,87 +65,15 @@
 #include <string.h>
 
 #if defined(__EMSCRIPTEN__)
-#include <emscripten/emscripten.h>
-// The canvas buffer's multiple of the logical frame: 3, or the high scene's own scale, which
-// shrinks for tall mobile frames so the buffer holds no more pixels than the scene.
-static int web_window_scale(BoatResolution resolution, int width, int height)
-{
-    int scale = boat_resolution_window_scale(resolution);
-    return resolution == BOAT_RESOLUTION_LOW
-        ? scale
-        : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
-}
-
-EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
-    Module.boatPluginResetPending = !!pending;
-    Module.boatPluginMenuOpen = !!menu_open;
-})
-
-EM_JS(int, boat_web_viewport_size, (int axis), {
-    const size = Module['boatViewportSize']();
-    return axis ? size.height : size.width;
-})
-EM_JS(void, boat_web_fit_canvas, (void), { Module['boatFitCanvas'](); })
-EM_JS(int, boat_web_touch_click, (float *position), {
-    const tap = Module['boatMobile']['click']();
-    if (Object.is(tap, null))
-        return 0;
-    if (Object.is(tap, false))
-        return -1;
-    HEAPF32[position >> 2] = tap.x;
-    HEAPF32[(position >> 2) + 1] = tap.y;
-    return 1;
-})
-EM_JS(void, boat_web_mobile_session, (int enabled), { Module['boatMobile']['session'](enabled); })
-EM_JS(int, boat_web_mobile_menu, (void), { return Module['boatMobile']['menu'](); })
-EM_JS(int, boat_web_mobile_sample, (int active), { return Module['boatMobile']['sample'](active); })
-EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['target'](); })
-EM_JS(int, boat_web_mobile_state, (void), { return Module['boatMobile']['state'](); })
-EM_JS(int, boat_web_mobile_size, (int width), {
-    return Math.max(26, Math.ceil(48 * width / Module['canvas'].getBoundingClientRect().width));
-})
-EM_JS(void, boat_web_mobile_status, (char *text, int capacity),
-    { stringToUTF8(Module['boatMobile']['status'](), text, capacity); })
-EM_JS(void, boat_web_mobile_layout, (const float *rects), {
-    const regions = [];
-    for (let i = 0; i < 8; ++i) {
-        const offset = (rects >> 2) + i * 4;
-        regions.push(Array.from(HEAPF32.subarray(offset, offset + 4)));
-    }
-    Module['boatMobile']['layout'](regions);
-})
-EM_JS(int, boat_web_mouse_state, (int wanted, int available),
-    { return Module['boatMouse']['state'](wanted, available); })
-EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
-// clang-format would split JavaScript's === into == =.
-// clang-format off
-EM_JS(int, boat_web_physical_keyboard, (void), {
-    return (window.matchMedia && window.matchMedia('(pointer: fine)').matches)
-        || (navigator.maxTouchPoints || 0) === 0;
-})
-// clang-format on
-EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
-    Module.boatConsoleOpen = !!open;
-    Module.boatConsoleAvailable = !!available;
-    Module.boatConsoleFocused = !!focused;
-})
-EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
-EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
-EM_JS(void, boat_web_scenery_start, (const char *name, const char *path),
-    { Module['boatScenery'].start(UTF8ToString(name), UTF8ToString(path)); })
-EM_JS(int, boat_web_scenery_state, (const char *name),
-    { return Module['boatScenery'].state(UTF8ToString(name)); })
-EM_JS(float, boat_web_scenery_progress, (const char *name),
-    { return Module['boatScenery'].progress(UTF8ToString(name)); })
+#include "wake_velocity_plugin_web.h"
 #endif
 
-#if defined(__EMSCRIPTEN__)
 // Draw into the game's low-resolution frame. Publish these exact hit rectangles to the
 // browser, which captures each finger and delivers ordinary pedal/steering inputs to C.
 static void draw_touch_controls(
     int width, int height, Rectangle destination, bool enabled, int buttons, int button_height)
 {
-    int state = boat_web_mobile_state();
+    int state = wake_touch_state();
     if (!(state & 1))
         return;
     int steering_width = button_height > 30 ? button_height : 30;
@@ -180,12 +115,11 @@ static void draw_touch_controls(
         boat_ui_text(labels[i], (int)(box.x + (box.width - boat_ui_width(labels[i], 10)) / 2),
             (int)box.y + (button_height - 10) / 2, 10, text);
     }
-    boat_web_mobile_layout(&regions[0][0]);
+    wake_touch_layout(&regions[0][0]);
     char status[128];
-    boat_web_mobile_status(status, sizeof(status));
+    wake_touch_status(status, sizeof(status));
     boat_ui_text(status, 4, button_height + 7, 10, palette.text);
 }
-#endif
 
 static void usage(void)
 {
@@ -320,34 +254,22 @@ static void usage(void)
     puts("\nSee docs/COMMAND_LINE.md for examples, restrictions and defaults.");
 }
 
-// Native builds load every mapped location's scenery pack at start. The browser fetches the
-// outer pack when a session there needs it (scenery_ready); the river kit's layout pack is
-// bundled with the page.
-static bool load_scenery(const char *assets)
-{
-#if defined(__EMSCRIPTEN__)
-    (void)assets;
-    return true;
-#else
-    return boat_scenery_load_all(assets);
-#endif
-}
-
-// LOCATION's scenery, loaded now if it is not yet. The browser first fetches the pack, drawing
-// its progress until it arrives; false if it cannot be fetched or loaded.
+// LOCATION's scenery, loaded now if it is not yet. Acquisition (wake_velocity_scenery.h) is
+// immediate in native builds, which read every pack at start; the browser fetches the outer pack
+// when a session there first needs it, and this draws its progress until it arrives. The river
+// kit's layout pack is bundled with the page. False if it cannot be acquired or loaded.
 static bool scenery_ready(const BoatWorldDefinition *location, const char *assets)
 {
     if (!location->mapped || boat_scenery_of(location->map))
         return true;
-#if defined(__EMSCRIPTEN__)
-    char path[4096];
-    if (!boat_scenery_path(location, assets, path, sizeof(path)))
+    if (!wake_scenery_request(location, assets))
         return false;
-    boat_web_scenery_start(location->name, path);
-    while (boat_web_scenery_state(location->name) == 1 && !WindowShouldClose()) {
+    float progress = 0;
+    WakeSceneryStatus status;
+    while ((status = wake_scenery_poll(location, &progress)) == WAKE_SCENERY_PENDING
+        && !WindowShouldClose()) {
         char text[64];
-        snprintf(text, sizeof(text), "LOADING %s %d%%", location->title,
-            (int)(100 * boat_web_scenery_progress(location->name)));
+        snprintf(text, sizeof(text), "LOADING %s %d%%", location->title, (int)(100 * progress));
         int scale = GetScreenHeight() / 200 > 1 ? GetScreenHeight() / 200 : 1;
         BoatUiPalette palette = boat_ui_palette();
         BeginDrawing();
@@ -356,9 +278,8 @@ static bool scenery_ready(const BoatWorldDefinition *location, const char *asset
             GetScreenHeight() / 2 - 4 * scale, 8 * scale, palette.text);
         EndDrawing(); // Yields to the page, which receives the pack meanwhile.
     }
-    if (boat_web_scenery_state(location->name) != 2)
+    if (status != WAKE_SCENERY_READY)
         return false;
-#endif
     return boat_scenery_load_location(location, assets);
 }
 
@@ -492,30 +413,6 @@ static char study_failure[192];
 
 // One session with explicit options. Uses the title's window when one is open and then leaves it
 // open; the Escape menu's last row ends the session.
-// Browser initialization begins before InitWindow resets GLFW's clock. Keep all plugin
-// request/acceptance timestamps on the same monotonic origin throughout that startup.
-static double plugin_time(void)
-{
-#ifdef __EMSCRIPTEN__
-    return emscripten_get_now() / 1000.0;
-#else
-    return GetTime();
-#endif
-}
-
-#if defined(__EMSCRIPTEN__)
-EM_JS(int, browser_plugin_export,
-    (const unsigned char *manifest, unsigned manifest_size, const unsigned char *source,
-        unsigned source_size),
-    {
-        if (!Module.boatPluginExport)
-            return 0;
-        Module.boatPluginExport(HEAPU8.slice(manifest, manifest + manifest_size),
-            HEAPU8.slice(source, source + source_size));
-        return 1;
-    })
-#endif
-
 static bool console_save(
     void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
 {
@@ -531,7 +428,7 @@ static bool console_save(
     size_t manifest_size = wake_plugin_manifest(plugin, &manifest);
     size_t source_size = wake_plugin_source(plugin, &source);
     if (!manifest_size || !source_size
-        || !browser_plugin_export((const unsigned char *)manifest, (unsigned)manifest_size,
+        || !wake_web_plugin_export((const unsigned char *)manifest, (unsigned)manifest_size,
             (const unsigned char *)source, (unsigned)source_size)) {
         snprintf(message, capacity, "the browser export is unavailable");
         return false;
@@ -635,6 +532,11 @@ static int study(int argc, char **argv)
     BoatCamera camera_settings = BOAT_CAMERA_DEFAULT;
     bool camera_distance_set = false, camera_height_set = false;
     bool time_set = false, demo = false, mouse_steering = false;
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    // D8: a developer-only switch back to the direct free-boating path (Debug builds only, so
+    // never in a release); AR7 removes it with that path.
+    bool direct_session = false;
+#endif
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
@@ -819,6 +721,10 @@ static int study(int argc, char **argv)
             work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__) && !defined(NDEBUG)
+        } else if (strcmp(argv[i], "--direct-session") == 0) {
+            direct_session = true;
+#endif
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
             screenshot = argv[++i];
         } else if (strcmp(argv[i], "--time") == 0 && i + 1 < argc) {
@@ -1177,7 +1083,7 @@ static int study(int argc, char **argv)
     // The mapped locations' scenery packs, which every view draws (the core uses only their
     // compiled water). The browser fetches the outer pack the first time it is needed.
     char assets[4096];
-    if (!boat_asset_path(assets, sizeof(assets), "") || !load_scenery(assets)) {
+    if (!boat_asset_path(assets, sizeof(assets), "") || !wake_scenery_startup(assets)) {
         fprintf(stderr, "Cannot load the map scenery from %sgeometry/.\n", assets);
         for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
             boat_world_resources_destroy(&worlds[i]);
@@ -1227,7 +1133,7 @@ static int study(int argc, char **argv)
     wake_console_init(&console);
     wake_command_init(&command, wake_console_print, wake_console_clear, console_save, &console);
     if (plugin_path) {
-        if (!wake_plugin_open(&plugin, plugin_path, &session, plugin_time())) {
+        if (!wake_plugin_open(&plugin, plugin_path, &session, wake_app_now())) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
             goto cleanup;
         }
@@ -1415,33 +1321,24 @@ static int study(int argc, char **argv)
         ghost_view_flag = &ghost_cloth;
         ghost_opacity = .5f;
     }
-#if defined(__EMSCRIPTEN__)
     // The browser's mapped scenery registry is filled by scenery_ready() below, after the
-    // window exists. Defer the initial CPU draw and its screenshot export until then.
-    bool initial_cpu_draw_pending = !gpu_enabled;
-#else
-    if (!gpu_enabled
+    // window exists (wake_scenery_deferred). Defer the initial CPU draw and its screenshot
+    // export until then.
+    bool scenery_deferred = wake_scenery_deferred();
+    bool initial_cpu_draw_pending = !gpu_enabled && scenery_deferred;
+    if (!gpu_enabled && !scenery_deferred
         && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
-#endif
     Image image = { pixels, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
-#if !defined(__EMSCRIPTEN__)
-    if (screenshot && !gpu_enabled) {
+    if (screenshot && !gpu_enabled && !scenery_deferred) {
         result = ExportImage(image, screenshot) ? 0 : 1;
         goto cleanup;
     }
-#endif
 
     if (!IsWindowReady()) {
-#if defined(__EMSCRIPTEN__)
-        // CSS sizing belongs to the page; mobile gameplay adapts the drawing buffer below.
-        SetConfigFlags(0);
-#else
-        SetConfigFlags(screenshot || performance_report ? FLAG_WINDOW_HIDDEN
-                                                        : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-#endif
+        SetConfigFlags(wake_app_window_flags(screenshot || performance_report));
         int window_scale = boat_resolution_window_scale(resolution);
         InitWindow(width * window_scale, height * window_scale, "Wake Velocity");
         if (!IsWindowReady())
@@ -1450,30 +1347,14 @@ static int study(int argc, char **argv)
         SetWindowMinSize(width, height);
     }
     window_ready = true;
-#if defined(__EMSCRIPTEN__)
-    // The canvas keeps the size the title or a previous session left; high resolution draws
-    // into a buffer of its own scale (CSS still fits the page).
-    {
-        int window_scale = web_window_scale(resolution, width, height);
-        if (GetScreenWidth() < width * window_scale) {
-            SetWindowSize(width * window_scale, height * window_scale);
-            boat_web_fit_canvas();
-        }
-    }
-#endif
+    wake_app_session_canvas(resolution, width, height);
     if (!boat_ui_load())
         goto cleanup;
-#if defined(__EMSCRIPTEN__)
-    SetTargetFPS(60);
-    if (!scenery_ready(location, assets)) {
+    wake_app_session_open(vsync);
+    if (scenery_deferred && !scenery_ready(location, assets)) {
         fprintf(stderr, "Cannot load the %s scenery.\n", location->name);
         goto cleanup;
     }
-#else
-    if (!vsync)
-        ClearWindowState(FLAG_VSYNC_HINT);
-#endif
-#if defined(__EMSCRIPTEN__)
     if (initial_cpu_draw_pending) {
         if (!boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
                 view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
@@ -1484,7 +1365,6 @@ static int study(int argc, char **argv)
             goto cleanup;
         }
     }
-#endif
     FramePacer pacer;
     frame_pacer_init_window(&pacer);
     if (gpu_enabled) {
@@ -1584,10 +1464,8 @@ static int study(int argc, char **argv)
     menu.can_leave = !window_owned;
 #endif
     float mouse_wheel = session.boat.wheel;
-#if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
-    boat_web_mobile_session(1);
-#endif
+    wake_touch_session(true);
     SetExitKey(KEY_NULL);
     Profiler profiler = { 0 };
     BoatProfile boat_profile = { 0 };
@@ -1624,14 +1502,31 @@ static int study(int argc, char **argv)
     result = 0;
     if (work_mode)
         wake_work_autosave(&work, true);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    // AR6 (L0): plain free boating runs as a local authority and client. Voyages, objectives,
+    // courses, the working harbour, rooms, demos and the developer studies keep the direct path
+    // until their ledger rows migrate them.
+    static WakeLocal local;
+#define LOCAL_ELIGIBLE()                                                                           \
+    (!direct_session && !networked && !work_mode && !course && !demo && objects                    \
+        && !objects->crossing && !wake && !session.voyage_route && !session.runs.playing           \
+        && plugin_active && !plugin.authoring && plugin.host.kind == BOAT_PLUGIN_KIND_FREE         \
+        && !plugin.objective.initialized)
+    if (LOCAL_ELIGIBLE() && !wake_local_open(&local, &session, objects, worlds, GetTime())) {
+        snprintf(study_failure, sizeof(study_failure), "Single player could not start: %s.",
+            local.local.failure);
+        fprintf(stderr, "%s\n", study_failure);
+        result = 1;
+        goto cleanup;
+    }
+#endif
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
-#if defined(__EMSCRIPTEN__)
         // The browser supplies a bounded low-resolution viewport after resizing settles.
-        int next_width = boat_web_viewport_size(0);
-        int next_height = boat_web_viewport_size(1);
-        if (gpu_enabled && (next_width != width || next_height != height)) {
+        int next_width = width, next_height = height;
+        if (wake_app_viewport(&next_width, &next_height) && gpu_enabled
+            && (next_width != width || next_height != height)) {
             RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
-            int window_scale = web_window_scale(resolution, next_width, next_height);
+            int window_scale = wake_app_canvas_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
                 next_width * window_scale, next_height * window_scale);
             if (!IsRenderTextureValid(next_frame) || !apply_screen_layout(&gpu, next_layout)) {
@@ -1648,12 +1543,12 @@ static int study(int argc, char **argv)
             texture = gpu.target.texture;
             size = (VirtualSize) { width, height };
             SetWindowSize(width * window_scale, height * window_scale);
-            boat_web_fit_canvas();
+            wake_app_canvas_fit();
         }
-#endif
         double current_frame_started_at = boat_profile_time(true);
         frame_started_at = current_frame_started_at;
         BoatFrameMetrics metrics = { 0 }; // Reset once before any tick in this frame.
+        BoatAppInput app_input = boat_app_input_sample();
         int character;
         bool help_pressed = false;
         // Bracket and backslash sit behind AltGr on many layouts, so time keys also match the
@@ -1668,33 +1563,27 @@ static int study(int argc, char **argv)
         bool console_just_opened = false;
         console_was_open = console.open;
         bool console_available = false;
-#if defined(__EMSCRIPTEN__)
         // Desktop browsers with a physical keyboard get the same console; touch-only phones do
         // not, because the panel would cover the game and has no text-entry affordance.
         console_available = plugin_active && !networked && !demo && !screenshot
-            && !session.runs.playing && !menu.open && !help_visible && boat_web_physical_keyboard();
-#else
-        console_available = plugin_active && !networked && !demo && !screenshot
-            && !session.runs.playing && !menu.open && !help_visible;
-#endif
+            && !session.runs.playing && !menu.open && !help_visible
+            && wake_console_bridge_text_entry();
         bool console_open_key
             = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F2) || IsKeyPressed(161);
         if (console_available && !console.open && console_open_key && IsWindowFocused()) {
             wake_console_open(&console, PROTEUS_VERSION);
             console_was_open = true; // Consume the opening key's own character this frame.
             console_just_opened = true;
-            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
         }
-#if defined(__EMSCRIPTEN__)
-        boat_web_console_state(console.open, console_available, IsWindowFocused());
-#endif
+        wake_console_bridge_state(console.open, console_available, IsWindowFocused());
         if (console.open && !console_just_opened
             && wake_console_update(&console, width, height, console_line, sizeof(console_line))) {
             wake_console_begin_command(&console, console_line);
             if (course)
                 session.runs.practice = true;
             plugin_restart
-                |= wake_command_submit(&command, &plugin, &session, console_line, plugin_time());
+                |= wake_command_submit(&command, &plugin, &session, console_line, wake_app_now());
         }
         while ((character = GetCharPressed()) != 0) {
             if (console.open || console_was_open)
@@ -1705,8 +1594,8 @@ static int study(int argc, char **argv)
             time_normal |= character == '\\' || character == '0';
         }
         if (!console.open) {
-            time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
-            time_normal |= IsKeyPressed(KEY_BACKSLASH);
+            time_direction += (int)app_input.bracket_right - (int)app_input.bracket_left;
+            time_normal |= app_input.backslash;
             time_direction = time_direction > 0 ? 1 : time_direction < 0 ? -1 : 0;
             if (help_pressed)
                 help_visible = !help_visible;
@@ -1714,15 +1603,11 @@ static int study(int argc, char **argv)
         // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        bool menu_pressed = !console.open && !console_was_open
-            && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P));
-#if !defined(__EMSCRIPTEN__)
-        if (IsKeyPressed(KEY_F11))
+        bool menu_pressed
+            = !console.open && !console_was_open && (app_input.back || app_input.pause);
+        if (wake_fullscreen_key_pressed())
             ToggleBorderlessWindowed();
-#endif
-#if defined(__EMSCRIPTEN__)
-        menu_pressed |= boat_web_mobile_menu() != 0;
-#endif
+        menu_pressed |= wake_touch_menu_pressed();
         if (menu_pressed) {
             if (help_visible)
                 help_visible = false;
@@ -1731,6 +1616,9 @@ static int study(int argc, char **argv)
             else
                 boat_menu_open(&menu);
         }
+        bool menu_gate = boat_menu_gate(menu_was_open, menu.open, help_visible, IsWindowFocused());
+        if (menu_gate)
+            boat_app_input_poll_touch(&app_input);
         BoatScreenLayout layout
             = boat_screen_layout(resolution, width, height, GetScreenWidth(), GetScreenHeight());
         int scale = layout.scale;
@@ -1742,8 +1630,9 @@ static int study(int argc, char **argv)
         Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
                                      destination.y + (height - 200) * scale / 2 },
             .zoom = scale };
-        if (menu.open && menu_was_open && !help_visible && IsWindowFocused()) {
-            BoatMenuChoice choice = boat_menu_update(&menu, menu_camera, GetFrameTime());
+        if (menu_gate) {
+            BoatMenuChoice choice
+                = boat_menu_update(&menu, &app_input, menu_camera, GetFrameTime());
             if (choice == BOAT_MENU_RESUME)
                 menu.open = false;
             else if (choice == BOAT_MENU_CONTROLS)
@@ -1759,9 +1648,7 @@ static int study(int argc, char **argv)
             else if (choice == BOAT_MENU_FULLSCREEN)
                 ToggleBorderlessWindowed();
             else if (choice == BOAT_MENU_STEERING) {
-#if defined(__EMSCRIPTEN__)
                 mouse_unavailable = false;
-#endif
                 mouse_steering = !mouse_steering;
                 if (mouse_steering)
                     mouse_wheel = session.boat.wheel;
@@ -1773,16 +1660,10 @@ static int study(int argc, char **argv)
             active = false;
         if (plugin_path && wake_plugin_editing())
             active = false;
-#if defined(__EMSCRIPTEN__)
-        bool mouse_toggle_pressed = boat_web_mouse_toggle() != 0;
-#else
-        bool mouse_toggle_pressed = IsKeyPressed(KEY_M);
-#endif
+        bool mouse_toggle_pressed = wake_mouse_toggle_pressed();
         bool toggle_mouse = active && !demo && !session.runs.playing && mouse_toggle_pressed;
         if (toggle_mouse) {
-#if defined(__EMSCRIPTEN__)
             mouse_unavailable = false;
-#endif
             mouse_steering = !mouse_steering;
             if (mouse_steering)
                 mouse_wheel = session.boat.wheel;
@@ -1790,47 +1671,31 @@ static int study(int argc, char **argv)
         float mobile_target = NAN;
         int mobile_buttons = 0;
         int mobile_button_height = 26;
-#if defined(__EMSCRIPTEN__)
-        mobile_buttons = boat_web_mobile_sample(active && !demo && !session.runs.playing);
-        mobile_target = boat_web_mobile_target();
-        mobile_button_height = boat_web_mobile_size(width);
-#endif
-        bool keyboard_steering
-            = IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A);
+        mobile_buttons = wake_touch_buttons(active && !demo && !session.runs.playing);
+        mobile_target = wake_touch_target();
+        mobile_button_height = wake_touch_button_height(width);
+        bool keyboard_steering = app_input.helm_right || app_input.helm_left;
         bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
         bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
-#if defined(__EMSCRIPTEN__)
-        int browser_mouse = boat_web_mouse_state(
-            active && mouse_driving, active && !demo && !session.runs.playing && !mobile_driving);
-        if (browser_mouse & 4) {
+        int capture_state = wake_mouse_capture(active && mouse_driving,
+            active && !demo && !session.runs.playing && !mobile_driving, mouse_captured);
+        if (capture_state & 4) {
             // Denied or missing capture falls back to the keyboard.
             mouse_unavailable = true;
             mouse_steering = mouse_driving = false;
-        } else if (browser_mouse & 2) {
+        } else if (capture_state & 2) {
             // The browser's own Escape (or focus loss) unlocked: open the menu, keep mouse mode.
             if (!menu.open)
                 boat_menu_open(&menu);
             active = false;
         }
-        if (browser_mouse & 6)
-            browser_mouse = boat_web_mouse_state(0, active && !demo && !session.runs.playing);
-        bool capture_mouse = (browser_mouse & 1) != 0;
+        if (capture_state & 6)
+            capture_state = wake_mouse_capture(
+                false, active && !demo && !session.runs.playing, mouse_captured);
+        bool capture_mouse = (capture_state & 1) != 0;
         bool capture_changed = capture_mouse != mouse_captured;
         mouse_captured = capture_mouse;
-        float mouse_delta = boat_web_mouse_movement();
-        (void)boat_web_mouse_scroll(); // Drain browser input; scrolling no longer applies thrust.
-#else
-        bool capture_mouse = active && mouse_driving;
-        bool capture_changed = capture_mouse != mouse_captured;
-        if (capture_changed) {
-            if (capture_mouse)
-                DisableCursor();
-            else
-                EnableCursor();
-            mouse_captured = capture_mouse;
-        }
-        float mouse_delta = GetMouseDelta().x;
-#endif
+        float mouse_delta = wake_mouse_movement(app_input.pointer_delta.x);
         // Capture warps the native cursor; discard that frame's delta. Stop moving to
         // hold this target, rather than deriving steering from a screen position.
         if (mouse_captured && !capture_changed)
@@ -1841,8 +1706,7 @@ static int study(int argc, char **argv)
             : !keyboard_steering              ? mobile_target
                                               : NAN;
         float steering_rate = keyboard_steering
-            ? (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                  - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)))
+            ? (float)((int)app_input.helm_right - (int)app_input.helm_left)
             : (float)(((mobile_buttons & 8) != 0) - ((mobile_buttons & 4) != 0));
         // The open console takes typed input, but the world keeps running with a neutral helm.
         bool console_simulating = false;
@@ -1887,11 +1751,10 @@ static int study(int argc, char **argv)
             if (IsKeyPressed(KEY_C))
                 camera_settings = camera_default;
         }
-        bool precision = active && !demo && !session.runs.playing
-            && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+        bool precision = active && !demo && !session.runs.playing && app_input.precision;
         thrust_target = active && !demo && !session.runs.playing
-            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) || (mobile_buttons & 1),
-                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S) || (mobile_buttons & 2), precision)
+            ? boat_pedal_target(app_input.throttle_up || (mobile_buttons & 1),
+                  app_input.throttle_down || (mobile_buttons & 2), precision)
             : 0;
         bool replay_adjusted = false;
         if (!active)
@@ -1939,14 +1802,16 @@ static int study(int argc, char **argv)
                 }
                 Rectangle bar = replay_timeline(GetScreenWidth());
                 Rectangle hit = { bar.x - 4, bar.y - 6, bar.width + 8, bar.height + 12 };
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-                    && CheckCollisionPointRec(GetMousePosition(), hit))
+                // On the web a consumed touch tap may have overwritten the app's pointer values,
+                // but only while the menu is open, when this replay block is inactive.
+                if (app_input.pointer_pressed && CheckCollisionPointRec(app_input.pointer, hit))
                     replay_dragging = true;
                 if (replay_dragging) {
-                    boat_replay_seek(&session.runs, (GetMouseX() - bar.x) / bar.width * duration);
+                    boat_replay_seek(
+                        &session.runs, (app_input.pointer.x - bar.x) / bar.width * duration);
                     session.runs.paused = true;
                     replay_adjusted = true;
-                    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+                    if (!app_input.pointer_down)
                         replay_dragging = false;
                 }
             }
@@ -1963,7 +1828,7 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
-        reset_requested |= boat_reset_hold_update(&reset_hold, IsKeyDown(KEY_BACKSPACE),
+        reset_requested |= boat_reset_hold_update(&reset_hold, app_input.backspace_down,
             active && !session.runs.playing && !work_mode, GetFrameTime());
         // A plugin revision changes between this frame's ticks; a new exposure restarts below.
 #if !defined(__EMSCRIPTEN__)
@@ -1973,9 +1838,9 @@ static int study(int argc, char **argv)
 #endif
         if (plugin_active && plugin.authoring)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
-                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
+                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), wake_app_now());
         if (plugin_active)
-            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
         if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
         else if (plugin_reset_pending) {
@@ -1984,7 +1849,7 @@ static int study(int argc, char **argv)
         }
 #ifdef __EMSCRIPTEN__
         if (plugin_active && plugin.authoring)
-            browser_plugin_controls(plugin_reset_pending, menu.open);
+            wake_web_plugin_controls(plugin_reset_pending, menu.open);
 #endif
         if (reset_requested) {
             thrust_target = 0;
@@ -2055,6 +1920,19 @@ static int study(int argc, char **argv)
             accumulator = 0;
             if (plugin_active)
                 wake_plugin_reset_objective(&plugin, &session);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            // A restart recreates both endpoints with a new generation; a revision that is no
+            // longer plain free boating continues on the direct path from the reset session.
+            if (local.active && !LOCAL_ELIGIBLE())
+                wake_local_close(&local);
+            else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
+                snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                    local.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
+#endif
             demo_tick = 0;
             replay_dragging = false;
         } else if (session.runs.playing) {
@@ -2075,6 +1953,20 @@ static int study(int argc, char **argv)
             accumulator += work_mode
                 ? boat_time_work_frame_seconds(raw_active_delta, time_speed_index, work_was_active)
                 : boat_time_frame_seconds(raw_active_delta, time_speed_index);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            // The grant is the same accumulator arithmetic; the client derives each tick's rates
+            // from its predicted boat as the loop below does from the session's.
+            if (local.active
+                && !wake_local_frame(&local, &session, objects, &accumulator, input, thrust_target,
+                    steering_target, GetTime(), &metrics)) {
+                // D10: no save applies to free boating; back to the title with the reason.
+                snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                    local.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
+#endif
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
@@ -2094,13 +1986,10 @@ static int study(int argc, char **argv)
                         &work, &session, work_drive.slew, work_drive.reach, work_drive.hoist, helm);
                 } else if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
-                else {
-                    if (isfinite(steering_target))
-                        input.steering_rate
-                            = boat_steering_rate(session.boat.wheel, steering_target);
-                    input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
-                    timed_boat_step(&session, input, &metrics, wake, objects);
-                }
+                else
+                    timed_boat_step(&session,
+                        boat_helm_input(&session.boat, input, thrust_target, steering_target),
+                        &metrics, wake, objects);
                 if (plugin_active)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
@@ -2332,11 +2221,9 @@ static int study(int argc, char **argv)
                 hint_top, 10, (Color) { 218, 223, 202, 255 });
         else if (!(mobile_buttons & 16) && !menu.open)
             boat_ui_text("P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
-#if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
             boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
                 (Color) { 218, 223, 202, 255 });
-#endif
         if (review_label_frames > 0 && review_label) {
             --review_label_frames;
             boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
@@ -2347,10 +2234,8 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
-#if defined(__EMSCRIPTEN__)
         draw_touch_controls(width, height, destination, active && !demo && !session.runs.playing,
             mobile_buttons, mobile_button_height);
-#endif
         if (hud_overlay)
             boat_screen_end_overlay();
         EndTextureMode();
@@ -2611,6 +2496,17 @@ static int study(int argc, char **argv)
         }
     }
 cleanup:
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    if (local.local.stats.frames)
+        fprintf(stdout,
+            "Local session: generation %u, %llu ticks in %llu chunks (at most %u per frame), "
+            "%llu restarts\n",
+            (unsigned)local.local.generation, (unsigned long long)local.local.stats.ticks,
+            (unsigned long long)local.local.stats.chunks, local.local.stats.max_chunks,
+            (unsigned long long)local.local.stats.restarts);
+    wake_local_close(&local);
+    local.local.stats = (BoatLocalStats) { 0 };
+#endif
     if (lighting_review.state) {
         if (performance_timer.supported)
             boat_gpu_timer_poll(
@@ -2670,13 +2566,8 @@ cleanup:
     if (window_ready) {
         wake_console_unload();
         boat_ui_unload();
-#if defined(__EMSCRIPTEN__)
-        boat_web_mouse_state(0, 0);
-        boat_web_mobile_session(0);
-#else
-        if (mouse_captured)
-            EnableCursor();
-#endif
+        (void)wake_mouse_capture(false, false, mouse_captured);
+        wake_touch_session(false);
         boat_rearview_destroy(&mirror);
         for (int mode = 0; mode < BOAT_MINIMAP_MODES; ++mode)
             if (minimap_textures[mode].id)
@@ -2914,11 +2805,7 @@ int main(int argc, char **argv)
         }
     }
     SetTraceLogLevel(LOG_WARNING);
-#if defined(__EMSCRIPTEN__)
-    SetConfigFlags(0);
-#else
-    SetConfigFlags(capture ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-#endif
+    SetConfigFlags(wake_app_window_flags(capture));
     InitWindow(320 * 3, 200 * 3, "Wake Velocity");
     if (!IsWindowReady())
         return 1;
@@ -2928,13 +2815,8 @@ int main(int argc, char **argv)
         CloseWindow();
         return ok ? 0 : 1;
     }
-#if defined(__EMSCRIPTEN__)
-    SetTargetFPS(60);
-    InitAudioDevice(); // Start inside the page's Play gesture, before the title yields.
-#endif
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    boat_title_directory_start();
-#endif
+    wake_app_title_open();
+    wake_servers_start();
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
@@ -2954,12 +2836,8 @@ int main(int argc, char **argv)
             break;
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    boat_title_directory_stop();
-#endif
-#if defined(__EMSCRIPTEN__)
-    CloseAudioDevice();
-#endif
+    wake_servers_stop();
+    wake_app_title_close();
     CloseWindow();
     return 0;
 }

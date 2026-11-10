@@ -1,6 +1,6 @@
 #include "wake_velocity_menu.h"
 #include "boat_ui.h"
-#include "boat_web_touch.h"
+#include "wake_velocity_input.h"
 
 #include <stddef.h>
 
@@ -45,24 +45,18 @@ void boat_menu_open(BoatMenu *menu)
     menu->time = 0;
 }
 
-BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt)
+BoatMenuChoice boat_menu_update(
+    BoatMenu *menu, const BoatAppInput *input, Camera2D camera, float dt)
 {
     menu->time += dt;
     int count = row_count(menu);
-    int step = (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
-        - (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W));
+    int step = input->down - input->up;
     menu->selected = (menu->selected + step + count) % count;
-    bool activate
-        = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE);
-    Vector2 pointer = GetMousePosition();
-    bool pointer_pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-#if defined(__EMSCRIPTEN__)
-    int touch_click = boat_web_touch_click(&pointer.x);
-    if (touch_click)
-        pointer_pressed = touch_click > 0;
-#endif
+    bool activate = input->activate;
+    Vector2 pointer = input->pointer;
+    bool pointer_pressed = input->pointer_pressed;
     Vector2 point = GetScreenToWorld2D(pointer, camera);
-    Vector2 moved = GetMouseDelta();
+    Vector2 moved = input->pointer_delta;
     for (int i = 0; i < count; ++i)
         if (CheckCollisionPointRec(point, row_bounds(menu, i))) {
             if (moved.x || moved.y)
@@ -74,14 +68,10 @@ BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt)
         }
     int selected_row = row_at(menu, menu->selected);
 #if !defined(__EMSCRIPTEN__)
-    if (selected_row == ROW_FULLSCREEN
-        && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)
-            || IsKeyPressed(KEY_D)))
+    if (selected_row == ROW_FULLSCREEN && (input->left || input->right))
         activate = true;
 #endif
-    if (selected_row == ROW_STEERING
-        && (activate || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)
-            || IsKeyPressed(KEY_D)))
+    if (selected_row == ROW_STEERING && (activate || input->left || input->right))
         return BOAT_MENU_STEERING;
     if (!activate)
         return BOAT_MENU_NONE;

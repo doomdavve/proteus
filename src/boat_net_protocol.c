@@ -1115,15 +1115,30 @@ static int8_t rate(float value)
 
 BoatNetCommand boat_net_command(BoatInput input, uint8_t flags)
 {
-    return (BoatNetCommand) { rate(input.steering_rate), rate(input.throttle_rate),
-        (uint8_t)((flags & BOAT_NET_COMMAND_INACTIVE) | (input.gun ? BOAT_NET_COMMAND_GUN : 0)),
-        input.grenade, input.torpedo };
+    return (BoatNetCommand) { .steering = rate(input.steering_rate),
+        .throttle = rate(input.throttle_rate),
+        .flags
+        = (uint8_t)((flags & BOAT_NET_COMMAND_INACTIVE) | (input.gun ? BOAT_NET_COMMAND_GUN : 0)),
+        .grenade = input.grenade,
+        .torpedo = input.torpedo };
 }
 
 BoatInput boat_net_command_input(BoatNetCommand command)
 {
+    if (command.precise)
+        return (BoatInput) { command.steering_rate, command.throttle_rate,
+            (command.flags & BOAT_NET_COMMAND_GUN) != 0, command.grenade, command.torpedo };
     return (BoatInput) { command.steering / 127.0f, command.throttle / 127.0f,
         (command.flags & BOAT_NET_COMMAND_GUN) != 0, command.grenade, command.torpedo };
+}
+
+BoatNetCommand boat_net_precise_command(BoatInput input, uint8_t flags)
+{
+    BoatNetCommand command = boat_net_command(input, flags);
+    command.precise = true;
+    command.steering_rate = isfinite(input.steering_rate) ? input.steering_rate : 0;
+    command.throttle_rate = isfinite(input.throttle_rate) ? input.throttle_rate : 0;
+    return command;
 }
 
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
