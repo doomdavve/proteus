@@ -6,8 +6,11 @@
 // owners; this holds only what differs between the native loop and the page.
 #include <stdbool.h>
 
-// Monotonic seconds on one origin for the whole process (plugin request and acceptance
-// timestamps). The browser's starts before InitWindow resets GLFW's clock; native uses GetTime.
+// Monotonic seconds for plugin request and acceptance timestamps. The browser's clock
+// (performance.now) keeps one origin for the page, across InitWindow resetting GLFW's clock.
+// Native uses GetTime, whose origin InitWindow sets: a direct --plugin launch opens its package
+// in study() before the window exists, so that first timestamp is on an earlier origin than the
+// session's frames (as before AR3).
 double wake_app_now(void);
 // raylib config flags for a window the game opens: native opens HIDDEN windows for captures and
 // reports, otherwise resizable with vsync; the page owns the canvas's CSS size (no flags).
