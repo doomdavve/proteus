@@ -43,6 +43,13 @@ water reflections. The [cloud deck plan](CLOUD_DECK_PLAN.md) is closed locally;
 [3D.md](3D.md#scene-lighting) owns the current contract. Broader platform qualification
 and the existing lighting/graphics loops remain separate. The user authorized a PR.
 
+## Lua source availability
+
+The [dependency availability plan](DEPENDENCY_CACHE_PLAN.md) replaces the failed cold-cache
+bootstrap with a vendored, checksum-verified Lua archive; [testing](TESTING.md#lua-source-availability)
+owns the contract. Local cold/offline extraction, integrity checks and all 544 tests passed;
+the updated #182 CI run remains pending.
+
 ## Specs
 
 Plans describe work to do; a spec describes the system as it is, in the present tense and

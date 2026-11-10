@@ -67,8 +67,9 @@ playground for iterating on effects, timing, audio, and presentation.
 
 ## Build and verify
 
-The first configure fetches pinned raylib 6.0 and Lua 5.4.9 sources (and, for native builds, ENet
-v1.3.18) and therefore needs network access.
+The first configure fetches pinned raylib 6.0 sources (and, for native builds, ENet v1.3.18)
+and therefore needs network access. Lua 5.4.9 is extracted from the checksum-verified
+archive shipped in `third_party/lua`, without a network request.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug

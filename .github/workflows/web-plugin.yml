@@ -5,6 +5,8 @@ on:
     paths:
       - 'web/**'
       - 'cmake/Web.cmake'
+      - 'cmake/LuaSource.cmake'
+      - 'third_party/lua/**'
       - 'src/boat_plugin*'
       - 'tools/*plugin*'
       - 'tools/package_web.py'

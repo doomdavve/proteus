@@ -602,19 +602,22 @@ class Worker(unittest.TestCase):
 
     def test_preview(self):
         for name in ("langedrag", "harbor-life", "shelter-tour", "river-sprint"):
-            payload = author.snapshot(ROOT / "plugins" / name)
-            evidence = []
-            for _ in range(2):
-                job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=360)
-                try:
-                    job.process.wait(timeout=10)  # Failure deadline, no simulation clock.
-                    self.assertEqual(job.poll(1)["status"], "ok", job.result)
-                    self.assertEqual(job.result["operation"], "preview")
-                    self.assertEqual(len(job.result["artifact_id"]), 64)
-                    evidence.append(job.result)
-                finally:
-                    job.close()
-            self.assertEqual(evidence[0], evidence[1])
+            with self.subTest(package=name):
+                payload = author.snapshot(ROOT / "plugins" / name)
+                evidence = []
+                for _ in range(2):
+                    job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=360)
+                    try:
+                        # Failure deadline: Debug CI shares CPUs with other numerical validators.
+                        # The preview still advances exactly 360 virtual ticks.
+                        job.process.wait(timeout=30)  # Failure deadline, no simulation clock.
+                        self.assertEqual(job.poll(1)["status"], "ok", job.result)
+                        self.assertEqual(job.result["operation"], "preview")
+                        self.assertEqual(len(job.result["artifact_id"]), 64)
+                        evidence.append(job.result)
+                    finally:
+                        job.close()
+                self.assertEqual(evidence[0], evidence[1])
         for ticks in (-1, 72001, 1.5):
             with self.assertRaises(ValueError):
                 author.ValidationJob(WORKER, b"", 0, 0, operation="preview", ticks=ticks)

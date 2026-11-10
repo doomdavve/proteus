@@ -150,6 +150,26 @@ Windows release builds remain available regardless of these filters. GitHub does
 successful check for a skipped workflow; do not require these checks for documentation-only pull
 requests covered by these filters.
 
+The `boat_plugin_author` deterministic-preview integration check runs each package twice
+for 360 virtual ticks. Each preview child has a 30-second failure deadline, and the whole
+CTest has a 180-second deadline to allow Debug runs alongside numerical validators. Package
+subtests identify failures. These limits do not advance simulation time or change the
+production authoring deadline; result and artifact equality remain required.
+
+### Lua source availability
+
+The checkout includes the unmodified Lua source archive in `third_party/lua`. The shared
+`cmake/LuaSource.cmake` declaration extracts that local archive with the published SHA-256
+check, including in fresh native and browser builds. Lua requires neither lua.org access
+nor an Actions cache. Existing `FETCHCONTENT_SOURCE_DIR_LUA` overrides remain available.
+The archive's provenance, license and upgrade procedure are in
+[the vendor guide](../third_party/lua/README.md).
+
+Raylib/ENet Git fetches, libcurl and SDKs still require their existing setup/network access.
+Older release tags retain their original Lua fetching behaviour. The browser authoring path
+filter includes both the Lua declaration and archive so dependency updates trigger its build.
+Implementation/evidence: [dependency availability plan](DEPENDENCY_CACHE_PLAN.md).
+
 2026-11-03 workflow filter follow-up: PR #135 included `tools/windows/README.txt` and therefore
 started all three native builds under the former Markdown-only filter. The push/PR filters now
 exclude plain-text READMEs too. Completed: aligned Linux/macOS/Windows filters; release, manual

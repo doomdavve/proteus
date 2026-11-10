@@ -113,12 +113,7 @@ target_compile_options(proteus_json PRIVATE ${PROTEUS_WARNINGS})
 # lua.h), pinned by lua.org's published SHA-256. Only the VM and the base, string, table and math
 # libraries are compiled: io, os, debug, package/require, coroutine and utf8 do not exist. A fixed
 # string-hash seed keeps table traversal, and so diagnostics, identical from run to run.
-FetchContent_Declare(
-  lua
-  URL https://www.lua.org/ftp/lua-5.4.9.tar.gz
-  URL_HASH SHA256=2335b6c582a52654f94612bf10d2f4672805d05329aa6568b1d8cd9e5c6fb8e6
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
+include(cmake/LuaSource.cmake)
 FetchContent_MakeAvailable(lua)
 # Lua's MIT notice, from the end of lua.h, for the native packages (lua-LICENSE.txt).
 file(READ ${lua_SOURCE_DIR}/src/lua.h PROTEUS_LUA_HEADER)
@@ -1088,7 +1083,8 @@ if(NOT EMSCRIPTEN)
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>
     --bridge-server $<TARGET_FILE:validate_wake_bridge>)
-  set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 90)
+  # Four packages are previewed twice; Debug CI can exceed the old 10 s child deadline.
+  set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 180)
   # P4.5 pinned frame captures through the game's CPU screenshot path, also from a P4.7
   # release layout of the authoring tools.
   add_test(NAME boat_plugin_capture COMMAND ${Python3_EXECUTABLE}

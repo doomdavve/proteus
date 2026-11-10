@@ -45,6 +45,10 @@ on windows-2022 with Visual Studio 2022. It runs on pushes and can also be
 started manually from the Actions tab after the workflow exists on the default branch.
 No Windows development tools are needed on your Mac or the test machine.
 
+The checkout ships the pinned Lua archive, so even a cold CI build extracts it locally
+without contacting lua.org. CMake still checks the published SHA-256; see
+[Lua source availability](TESTING.md#lua-source-availability).
+
 ## HUD/control qualification, 2026-10-24
 
 Merged into `main` on 2026-10-24 (after `29d1afb`), the `boat-marine-hud` work adds relative captured mouse steering (M/Esc releases),
