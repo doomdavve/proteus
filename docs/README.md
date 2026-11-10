@@ -54,8 +54,9 @@ the vendored revision passed native/browser CI and is merged.
 
 The [CI plan](CI_PLAN.md) tracks a three-minute routine workflow limit and a curated test
 lane with a 150-check ceiling. [Testing](TESTING.md#routine-ci-budget) owns selection,
-commands and manual/release qualification. The corrected 108-check lane and the full suite
-passed locally; final hosted three-minute and cold/warm Windows timing remains open.
+commands and manual/release qualification. All four routine workflows passed within the cap, including a deliberately cold Windows
+run at 2m30s. The final focused lane has 106 local checks; the plan owns timing samples and
+verification limits.
 
 ## Specs
 

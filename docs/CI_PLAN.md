@@ -1,11 +1,10 @@
 # Bounded routine CI
 
-Status, 2026-11-10: implemented and locally verified on merged main; hosted timing pending.
+Status, 2026-11-10: implemented and measured on #183; all routine workflows pass under 3 minutes.
 Budget: three minutes per routine workflow, including setup/build/tests; test step one minute.
-Open items: hosted cold/warm Windows timings and manual/release path validation.
-Done when: routine jobs enforce the budget and run a curated, size-limited lane; full
-qualification remains manual/release, and obsolete PR revisions are cancelled.
-Next: measure hosted three-minute jobs and cold/warm Windows; PR authorized 2026-11-10.
+Open items: manual/release routes were reviewed/linted but not executed in this track.
+Done: curated lane and size guard; old PR revisions cancelled; cold Windows verified at 2m30s.
+Next: PR review/merge; keep future additions within the existing budget.
 
 ## Scope and deferrals
 
@@ -91,3 +90,39 @@ The budget is not raised. Upload JUnit artifacts only for failing runs, and corr
 `race_room` (70 virtual seconds with clients) and `scene_contact_room` (track sampling plus
 a 25-second networked contact run) slow, like the existing impairment variants. These remain
 in full qualification. Final cold/warm measurements are repeated after these cuts.
+
+## Final measured routine lane, 2026-11-10
+
+Code revision `d2a3fb4`, native/platform settings from the workflows: all four workflows
+passed. Durations below use each GitHub job's startedAt/completedAt, include setup/build/
+tests/cleanup, and exclude queue/runner allocation before job start.
+
+| Workflow | Full job | Native test step | Evidence |
+| --- | --- | --- | --- |
+| Linux, Debug | 1m45s | 6s | [42894617272](https://github.com/doomdavve/proteus/actions/runs/42894617272) |
+| macOS, Release | 1m16s | 5s | [42894617392](https://github.com/doomdavve/proteus/actions/runs/42894617392) |
+| Windows, Release, deliberately cold dependency cache | 2m30s | 8s | [42894617183](https://github.com/doomdavve/proteus/actions/runs/42894617183) |
+| Browser PR build | 59s | separate browser contract/build lane | [42894617256](https://github.com/doomdavve/proteus/actions/runs/42894617256) |
+
+For the Windows cold measurement, deleted only the PR-scoped 7 MB vcpkg binary archive
+cache before the run. Installation rebuilt the dependencies in 68s, cache save took 1s,
+MSVC setup 2s, Ninja configuration 20s and compilation 36s. An earlier warm run of the same
+Ninja/MSVC setup (before the last room-case reductions) passed in 1m41s, with installation
+28s, configure 19s and build 28s (42893264938 attempt 1). The final documentation-only update
+will also trigger a warm run; its latest timing can be inspected in PR #183. These are
+observed samples, not a promise that network or runner load never reaches the enforced cap.
+
+The final lane has 106 checks locally (105 on Windows), retains quick decoding/catalog/
+state checks and the two asset-loading captures, and keeps all room simulations in the full
+suite. Local final focused lane passed in 3.22s (`build/ci-trimmed-tests.log`). The guard's
+failure-path tests and all-workflow Actionlint checks passed. The local full preset passed
+all 555 enabled tests before the cargo padding comparison fix. After that test-only fix,
+the full local attempt passed all 520 CPU checks but 35 GPU cases could not initialize a
+macOS monitor; a targeted retry hit the same display failure (`build/ci-portability-full-tests.log`,
+`build/ci-portability-gpu-retry.log`). Final GPU re-verification is therefore unavailable,
+not claimed passed. Hosted native routine checks, including cargo, passed on all three OSes.
+
+The current contract is in [testing](TESTING.md#routine-ci-budget); there are no routine-lane
+implementation leftovers. Manual/release jobs retain their existing broader qualification
+and longer limits, but those paths were not executed on GitHub in this track. No product
+visual/input/audio behavior changed, and no human playback/acceptance is inferred.
