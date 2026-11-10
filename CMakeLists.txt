@@ -467,7 +467,7 @@ if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
   target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c
-    tools/wake_velocity_servers_web.c)
+    tools/wake_velocity_servers_web.c tools/wake_velocity_plugin_web.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
