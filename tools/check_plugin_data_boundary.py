@@ -28,6 +28,7 @@ CONSUMER_FILES = ("src/boat_sandbox_save.c", "src/boat_sandbox_save.h",
                   "src/boat_plugin_catalog.c", "src/boat_plugin_catalog.h",
                   "tools/validate_boat_plugin_data.c")
 FILES = DATA_FILES + CONSUMER_FILES
+MACHO = sys.platform == "darwin"
 TEST_PROGRAM = "tools/validate_boat_plugin_data.c"
 
 EXECUTION_HEADERS = frozenset({
@@ -238,7 +239,8 @@ def nm_symbols(nm, archive, options):
         if not line or line.endswith(":"):
             continue
         name = line.split()[-1].split("@")[0]
-        yield name[1:] if name.startswith("_") else name
+        # Only Mach-O prefixes C symbols with an underscore; ELF names are used as written.
+        yield name[1:] if MACHO and name.startswith("_") else name
 
 
 def archive_problems(nm, archive, defined):
@@ -361,6 +363,21 @@ def self_test(root):
                   "against the listed archives", file=sys.stderr)
             for problem in problems:
                 print(problem, file=sys.stderr)
+            return 1
+
+        def elf_case(lines):
+            global MACHO
+            saved, MACHO = MACHO, False
+            try:
+                return check(base, nm, [write_archive("elf.a", lines), core])
+            finally:
+                MACHO = saved
+
+        problems = elf_case(["U __stack_chk_fail", "U __memcpy_chk", "U __snprintf_chk",
+                             "U boat_core_thing"])
+        if problems or not elf_case(["U _unknown", "U __fopen_unknown"]):
+            print("plugin_data_boundary self-test failed: ELF names are not handled as "
+                  f"written: {problems}", file=sys.stderr)
             return 1
 
         archive_cases = (
