@@ -2,8 +2,7 @@
 
 #include "boat_cargo.h"
 #include "boat_json.h"
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
+#include "boat_plugin_decode.h"
 #include "raymath.h"
 #include "waterfront_harbor.h"
 #include "waterfront_outer.h"
@@ -439,24 +438,6 @@ uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route)
             fold(&hash, route->shelters[i].caption, strlen(route->shelters[i].caption) + 1);
     }
     return hash;
-}
-
-BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginVoyage *out, BoatPluginDiagnostic *diagnostic)
-{
-    BoatPluginDiagnostic scratch;
-    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    BoatPluginManifest manifest;
-    BoatPluginStatus status
-        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_VOYAGE, &manifest, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    BoatPluginVoyageData data;
-    status = boat_plugin_lua_voyage(
-        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    return boat_plugin_decode_voyage(&manifest, &data, out, d);
 }
 
 BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
@@ -1145,42 +1126,6 @@ BoatPluginStatus boat_plugin_bundle_manifest(const BoatPluginBundle *bundle,
     return BOAT_PLUGIN_OK;
 }
 
-BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic)
-{
-    BoatPluginDiagnostic scratch;
-    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    BoatPluginManifest manifest;
-    BoatPluginStatus status
-        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_FREE, &manifest, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    BoatPluginFreeData data;
-    status = boat_plugin_lua_free(
-        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    return boat_plugin_decode_free(&manifest, &data, out, d);
-}
-
-BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic)
-{
-    BoatPluginDiagnostic scratch;
-    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    BoatPluginManifest manifest;
-    BoatPluginStatus status
-        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_COURSE, &manifest, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    BoatPluginCourseData data;
-    status = boat_plugin_lua_course(
-        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    return boat_plugin_decode_course(&manifest, &data, out, d);
-}
-
 static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
 {
@@ -1452,24 +1397,6 @@ BoatPluginStatus boat_plugin_decode_match(const BoatPluginManifest *manifest,
     BoatPluginCost cost = d->cost;
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
     return BOAT_PLUGIN_OK;
-}
-
-BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic)
-{
-    BoatPluginDiagnostic scratch;
-    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    BoatPluginManifest manifest;
-    BoatPluginStatus status
-        = boat_plugin_bundle_manifest(bundle, limits, BOAT_PLUGIN_KIND_MATCH, &manifest, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    BoatPluginMatchData data;
-    status = boat_plugin_lua_match(
-        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    return boat_plugin_decode_match(&manifest, &data, out, d);
 }
 
 BoatPluginStatus boat_plugin_match_check_location(const BoatPluginMatch *match,

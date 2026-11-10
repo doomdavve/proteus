@@ -1,5 +1,4 @@
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
+#include "boat_plugin_decode.h"
 #include "raymath.h"
 
 #include <math.h>
@@ -40,30 +39,6 @@ static BoatRaceGate gate(const double *v)
     return (BoatRaceGate) { .centre = { (float)v[0], (float)v[1] },
         .direction = { (float)v[2], (float)v[3] },
         .half_width = (float)v[4] };
-}
-
-BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
-    const BoatPluginLimits *limits, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic)
-{
-    BoatPluginDiagnostic scratch;
-    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
-    if (!limits)
-        limits = &boat_plugin_default_limits;
-    BoatPluginRace r = { 0 };
-    BoatPluginStatus status = boat_plugin_parse_manifest(
-        bundle->manifest, bundle->manifest_size, limits, &r.manifest, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    if (strcmp(r.manifest.kind, "race"))
-        return fail(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "kind", "requires a race host");
-    const char *file = r.manifest.entry;
-    if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
-        return fail(d, BOAT_PLUGIN_LIMIT, file, "", "source exceeds the host limit");
-    BoatPluginRaceData data;
-    status = boat_plugin_lua_race(bundle->source, bundle->source_size, file, limits, &data, d);
-    if (status != BOAT_PLUGIN_OK)
-        return status;
-    return boat_plugin_decode_race(&r.manifest, &data, out, d);
 }
 
 BoatPluginStatus boat_plugin_decode_race(const BoatPluginManifest *manifest,
