@@ -2,6 +2,7 @@
  * time-trial defaults equal the compiled definitions; and catalog decoding starts no Lua VM. */
 #include "boat_fixtures.h"
 #include "boat_plugin_catalog.h"
+#include "boat_plugin_load.h"
 #include "boat_plugin_lua.h"
 #include "boat_plugin_wire.h"
 #include "boat_test_cases.h"

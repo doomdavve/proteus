@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 #include "boat_cargo.h"
-#include "boat_plugin_state.h"
+#include "boat_plugin_objective.h"
 #include "boat_scene_definition.h"
 
 #define BOAT_SANDBOX_SAVE_FORMAT 2

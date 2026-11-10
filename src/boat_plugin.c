@@ -2,6 +2,7 @@
 
 #include "boat_cargo.h"
 #include "boat_json.h"
+#include "boat_plugin_load.h"
 #include "boat_plugin_lua.h"
 #include "raymath.h"
 #include "waterfront_harbor.h"

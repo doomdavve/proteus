@@ -1,4 +1,4 @@
-#include "boat_plugin_state.h"
+#include "boat_plugin_objective.h"
 
 #include <string.h>
 
@@ -66,7 +66,8 @@ bool boat_plugin_objective_encode(
 {
     if (!objective || !out || !size || objective->hud_count > BOAT_PLUGIN_HUD
         || objective->timer_count > BOAT_PLUGIN_TIMERS
-        || objective->state.size > BOAT_PLUGIN_STATE_BYTES || !boat_plugin_objective_timers_valid(objective)
+        || objective->state.size > BOAT_PLUGIN_STATE_BYTES
+        || !boat_plugin_objective_timers_valid(objective)
         || !state_canonical(objective->state.bytes, objective->state.size))
         return false; // Never write what decode would refuse.
     unsigned char flags = (unsigned char)((objective->timers_enabled ? 1u : 0u)
@@ -298,7 +299,8 @@ bool boat_plugin_objective_decode(
             return false;
         memcpy(&next.timers[i].tick, &due, sizeof(next.timers[i].tick));
     }
-    if (at != size || !boat_plugin_objective_timers_valid(&next) || !state_canonical(next.state.bytes, next.state.size))
+    if (at != size || !boat_plugin_objective_timers_valid(&next)
+        || !state_canonical(next.state.bytes, next.state.size))
         return false;
     *objective = next;
     return true;

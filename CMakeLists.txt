@@ -146,10 +146,11 @@ endif()
 
 # The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
-add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
-  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
-  src/boat_plugin_objective_codec.c)
+add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_decode.h
+  src/boat_plugin_load.h src/boat_plugin_lua.c src/boat_plugin_lua.h src/boat_plugin_io.c
+  src/boat_plugin_io.h src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_revision.h
+  src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
+  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h

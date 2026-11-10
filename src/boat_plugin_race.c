@@ -1,3 +1,4 @@
+#include "boat_plugin_load.h"
 #include "boat_plugin_lua.h"
 #include "raymath.h"
 
