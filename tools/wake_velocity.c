@@ -28,6 +28,7 @@
 #include "cli_usage.h"
 #include "wake_command.h"
 #include "wake_console.h"
+#include "wake_velocity_app.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_input.h"
 #include "wake_velocity_lighting_review.h"
@@ -474,17 +475,6 @@ static char study_failure[192];
 
 // One session with explicit options. Uses the title's window when one is open and then leaves it
 // open; the Escape menu's last row ends the session.
-// Browser initialization begins before InitWindow resets GLFW's clock. Keep all plugin
-// request/acceptance timestamps on the same monotonic origin throughout that startup.
-static double plugin_time(void)
-{
-#ifdef __EMSCRIPTEN__
-    return emscripten_get_now() / 1000.0;
-#else
-    return GetTime();
-#endif
-}
-
 static bool console_save(
     void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
 {
@@ -1205,7 +1195,7 @@ static int study(int argc, char **argv)
     wake_console_init(&console);
     wake_command_init(&command, wake_console_print, wake_console_clear, console_save, &console);
     if (plugin_path) {
-        if (!wake_plugin_open(&plugin, plugin_path, &session, plugin_time())) {
+        if (!wake_plugin_open(&plugin, plugin_path, &session, wake_app_now())) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
             goto cleanup;
         }
@@ -1413,13 +1403,7 @@ static int study(int argc, char **argv)
 #endif
 
     if (!IsWindowReady()) {
-#if defined(__EMSCRIPTEN__)
-        // CSS sizing belongs to the page; mobile gameplay adapts the drawing buffer below.
-        SetConfigFlags(0);
-#else
-        SetConfigFlags(screenshot || performance_report ? FLAG_WINDOW_HIDDEN
-                                                        : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-#endif
+        SetConfigFlags(wake_app_window_flags(screenshot || performance_report));
         int window_scale = boat_resolution_window_scale(resolution);
         InitWindow(width * window_scale, height * window_scale, "Wake Velocity");
         if (!IsWindowReady())
@@ -1680,7 +1664,7 @@ static int study(int argc, char **argv)
             wake_console_open(&console, PROTEUS_VERSION);
             console_was_open = true; // Consume the opening key's own character this frame.
             console_just_opened = true;
-            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
         }
 #if defined(__EMSCRIPTEN__)
         boat_web_console_state(console.open, console_available, IsWindowFocused());
@@ -1691,7 +1675,7 @@ static int study(int argc, char **argv)
             if (course)
                 session.runs.practice = true;
             plugin_restart
-                |= wake_command_submit(&command, &plugin, &session, console_line, plugin_time());
+                |= wake_command_submit(&command, &plugin, &session, console_line, wake_app_now());
         }
         while ((character = GetCharPressed()) != 0) {
             if (console.open || console_was_open)
@@ -1973,9 +1957,9 @@ static int study(int argc, char **argv)
 #endif
         if (plugin_active && plugin.authoring)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
-                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
+                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), wake_app_now());
         if (plugin_active)
-            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
         if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
         else if (plugin_reset_pending) {
@@ -2949,11 +2933,7 @@ int main(int argc, char **argv)
         }
     }
     SetTraceLogLevel(LOG_WARNING);
-#if defined(__EMSCRIPTEN__)
-    SetConfigFlags(0);
-#else
-    SetConfigFlags(capture ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-#endif
+    SetConfigFlags(wake_app_window_flags(capture));
     InitWindow(320 * 3, 200 * 3, "Wake Velocity");
     if (!IsWindowReady())
         return 1;
@@ -2963,10 +2943,7 @@ int main(int argc, char **argv)
         CloseWindow();
         return ok ? 0 : 1;
     }
-#if defined(__EMSCRIPTEN__)
-    SetTargetFPS(60);
-    InitAudioDevice(); // Start inside the page's Play gesture, before the title yields.
-#endif
+    wake_app_title_open();
     wake_servers_start();
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
@@ -2988,9 +2965,7 @@ int main(int argc, char **argv)
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
     wake_servers_stop();
-#if defined(__EMSCRIPTEN__)
-    CloseAudioDevice();
-#endif
+    wake_app_title_close();
     CloseWindow();
     return 0;
 }
