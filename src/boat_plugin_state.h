@@ -38,7 +38,5 @@ typedef struct {
 } BoatPluginHudRow;
 bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
     BoatPluginHudRow *rows, unsigned capacity, unsigned *count);
-// Canonical hash of the complete committed checkpoint, excluding quarantine/struct padding.
-uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective);
 
 #endif
