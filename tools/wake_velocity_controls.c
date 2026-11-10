@@ -1,5 +1,7 @@
 #include "wake_velocity_controls.h"
 
+#include "raylib.h"
+
 #include <math.h>
 
 void wake_touch_session(bool enabled) { (void)enabled; }
@@ -35,3 +37,21 @@ int wake_touch_tap(float *position)
     (void)position;
     return 0;
 }
+
+bool wake_mouse_toggle_pressed(void) { return IsKeyPressed(KEY_M); }
+
+int wake_mouse_capture(bool wanted, bool available, bool captured)
+{
+    (void)available;
+    if (wanted != captured) {
+        if (wanted)
+            DisableCursor();
+        else
+            EnableCursor();
+    }
+    return wanted ? 1 : 0;
+}
+
+float wake_mouse_movement(float native_delta) { return native_delta; }
+
+bool wake_fullscreen_key_pressed(void) { return IsKeyPressed(KEY_F11); }

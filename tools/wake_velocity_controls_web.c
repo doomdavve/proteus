@@ -32,6 +32,13 @@ EM_JS(void, wake_js_mobile_layout, (const float *rects), {
     Module['boatMobile']['layout'](regions);
 })
 
+// Mouse steering capture: web/mouse_controls.js.
+EM_JS(int, wake_js_mouse_state, (int wanted, int available),
+    { return Module['boatMouse']['state'](wanted, available); })
+EM_JS(int, wake_js_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
+EM_JS(float, wake_js_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
+EM_JS(float, wake_js_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
+
 void wake_touch_session(bool enabled) { wake_js_mobile_session(enabled); }
 bool wake_touch_menu_pressed(void) { return wake_js_mobile_menu() != 0; }
 int wake_touch_buttons(bool active) { return wake_js_mobile_sample(active); }
@@ -41,3 +48,18 @@ int wake_touch_state(void) { return wake_js_mobile_state(); }
 void wake_touch_layout(const float *rects) { wake_js_mobile_layout(rects); }
 void wake_touch_status(char *text, int capacity) { wake_js_mobile_status(text, capacity); }
 int wake_touch_tap(float *position) { return wake_js_touch_click(position); }
+
+bool wake_mouse_toggle_pressed(void) { return wake_js_mouse_toggle() != 0; }
+int wake_mouse_capture(bool wanted, bool available, bool captured)
+{
+    (void)captured; // The page tracks its own capture.
+    return wake_js_mouse_state(wanted, available);
+}
+float wake_mouse_movement(float native_delta)
+{
+    (void)native_delta;
+    float movement = wake_js_mouse_movement();
+    (void)wake_js_mouse_scroll(); // Drain browser input; scrolling no longer applies thrust.
+    return movement;
+}
+bool wake_fullscreen_key_pressed(void) { return false; }

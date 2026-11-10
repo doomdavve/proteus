@@ -37,7 +37,6 @@ NATIVE_WEB_TESTS = {
 
 # File -> (bridges allowed, owner of their extraction).
 LEGACY = {
-    "tools/wake_velocity.c": (4, "AR2b: mouse capture capabilities"),
     "tools/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
 }
 
@@ -53,7 +52,8 @@ MIGRATED = {
         r"boatScenery", r"boatServers", r"boatPlugin", r"\bemscripten_get_now\s*\(",
         r"\bboat_scenery_load_all\s*\(", r"\bboat_directory_\w+\s*\(", r"boatFitCanvas",
         r"boatConsole", r"matchMedia", r"\bSetTargetFPS\s*\(", r"\bInitAudioDevice\s*\(",
-        r"boatViewportSize", r"boatMobile",
+        r"boatViewportSize", r"boatMobile", r"boatMouse", r"#\s*include\s*[<\"]emscripten",
+        r"\b(Disable|Enable)Cursor\s*\(", r"\bKEY_F11\b", r"\bKEY_M\b",
     ],
     "tools/wake_velocity_input.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", BRIDGE.pattern,
@@ -165,6 +165,7 @@ def self_test():
         ({legacy: bridge + bridge}, "", "put new bridges"),
         ({"tools/boat_title.c": '#include "boat_directory.h"\n'}, "", "boat_directory"),
         ({"tools/wake_velocity_plugin.c": "void f(void) { Module.x = 1; }\n"}, "", "Module"),
+        ({"tools/wake_velocity.c": "void f(void) { DisableCursor(); }\n"}, "", "Cursor"),
         ({}, "add_executable(x tools/x_web.c)\n", "outside an EMSCRIPTEN branch"),
         ({}, "if(NOT EMSCRIPTEN)\n  target_sources(x PRIVATE tools/x_web.c)\nendif()\n",
          "outside an EMSCRIPTEN branch"),

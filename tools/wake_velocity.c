@@ -66,12 +66,6 @@
 
 #if defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
-#include <emscripten/emscripten.h>
-EM_JS(int, boat_web_mouse_state, (int wanted, int available),
-    { return Module['boatMouse']['state'](wanted, available); })
-EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
-EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
-EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
 #endif
 
 // Draw into the game's low-resolution frame. Publish these exact hit rectangles to the
@@ -1470,9 +1464,7 @@ static int study(int argc, char **argv)
     menu.can_leave = !window_owned;
 #endif
     float mouse_wheel = session.boat.wheel;
-#if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
-#endif
     wake_touch_session(true);
     SetExitKey(KEY_NULL);
     Profiler profiler = { 0 };
@@ -1613,10 +1605,8 @@ static int study(int argc, char **argv)
         bool menu_was_open = menu.open;
         bool menu_pressed
             = !console.open && !console_was_open && (app_input.back || app_input.pause);
-#if !defined(__EMSCRIPTEN__)
-        if (IsKeyPressed(KEY_F11))
+        if (wake_fullscreen_key_pressed())
             ToggleBorderlessWindowed();
-#endif
         menu_pressed |= wake_touch_menu_pressed();
         if (menu_pressed) {
             if (help_visible)
@@ -1658,9 +1648,7 @@ static int study(int argc, char **argv)
             else if (choice == BOAT_MENU_FULLSCREEN)
                 ToggleBorderlessWindowed();
             else if (choice == BOAT_MENU_STEERING) {
-#if defined(__EMSCRIPTEN__)
                 mouse_unavailable = false;
-#endif
                 mouse_steering = !mouse_steering;
                 if (mouse_steering)
                     mouse_wheel = session.boat.wheel;
@@ -1672,16 +1660,10 @@ static int study(int argc, char **argv)
             active = false;
         if (plugin_path && wake_plugin_editing())
             active = false;
-#if defined(__EMSCRIPTEN__)
-        bool mouse_toggle_pressed = boat_web_mouse_toggle() != 0;
-#else
-        bool mouse_toggle_pressed = IsKeyPressed(KEY_M);
-#endif
+        bool mouse_toggle_pressed = wake_mouse_toggle_pressed();
         bool toggle_mouse = active && !demo && !session.runs.playing && mouse_toggle_pressed;
         if (toggle_mouse) {
-#if defined(__EMSCRIPTEN__)
             mouse_unavailable = false;
-#endif
             mouse_steering = !mouse_steering;
             if (mouse_steering)
                 mouse_wheel = session.boat.wheel;
@@ -1695,38 +1677,25 @@ static int study(int argc, char **argv)
         bool keyboard_steering = app_input.helm_right || app_input.helm_left;
         bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
         bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
-#if defined(__EMSCRIPTEN__)
-        int browser_mouse = boat_web_mouse_state(
-            active && mouse_driving, active && !demo && !session.runs.playing && !mobile_driving);
-        if (browser_mouse & 4) {
+        int capture_state = wake_mouse_capture(active && mouse_driving,
+            active && !demo && !session.runs.playing && !mobile_driving, mouse_captured);
+        if (capture_state & 4) {
             // Denied or missing capture falls back to the keyboard.
             mouse_unavailable = true;
             mouse_steering = mouse_driving = false;
-        } else if (browser_mouse & 2) {
+        } else if (capture_state & 2) {
             // The browser's own Escape (or focus loss) unlocked: open the menu, keep mouse mode.
             if (!menu.open)
                 boat_menu_open(&menu);
             active = false;
         }
-        if (browser_mouse & 6)
-            browser_mouse = boat_web_mouse_state(0, active && !demo && !session.runs.playing);
-        bool capture_mouse = (browser_mouse & 1) != 0;
+        if (capture_state & 6)
+            capture_state = wake_mouse_capture(
+                false, active && !demo && !session.runs.playing, mouse_captured);
+        bool capture_mouse = (capture_state & 1) != 0;
         bool capture_changed = capture_mouse != mouse_captured;
         mouse_captured = capture_mouse;
-        float mouse_delta = boat_web_mouse_movement();
-        (void)boat_web_mouse_scroll(); // Drain browser input; scrolling no longer applies thrust.
-#else
-        bool capture_mouse = active && mouse_driving;
-        bool capture_changed = capture_mouse != mouse_captured;
-        if (capture_changed) {
-            if (capture_mouse)
-                DisableCursor();
-            else
-                EnableCursor();
-            mouse_captured = capture_mouse;
-        }
-        float mouse_delta = app_input.pointer_delta.x;
-#endif
+        float mouse_delta = wake_mouse_movement(app_input.pointer_delta.x);
         // Capture warps the native cursor; discard that frame's delta. Stop moving to
         // hold this target, rather than deriving steering from a screen position.
         if (mouse_captured && !capture_changed)
@@ -2252,11 +2221,9 @@ static int study(int argc, char **argv)
                 hint_top, 10, (Color) { 218, 223, 202, 255 });
         else if (!(mobile_buttons & 16) && !menu.open)
             boat_ui_text("P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
-#if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
             boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
                 (Color) { 218, 223, 202, 255 });
-#endif
         if (review_label_frames > 0 && review_label) {
             --review_label_frames;
             boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
@@ -2599,13 +2566,8 @@ cleanup:
     if (window_ready) {
         wake_console_unload();
         boat_ui_unload();
-#if defined(__EMSCRIPTEN__)
-        boat_web_mouse_state(0, 0);
+        (void)wake_mouse_capture(false, false, mouse_captured);
         wake_touch_session(false);
-#else
-        if (mouse_captured)
-            EnableCursor();
-#endif
         boat_rearview_destroy(&mirror);
         for (int mode = 0; mode < BOAT_MINIMAP_MODES; ++mode)
             if (minimap_textures[mode].id)
