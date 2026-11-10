@@ -788,6 +788,69 @@ static int private_range(void)
     return 0;
 }
 
+// L2: PrivateState (0xC1) never crosses a hosted link. A hosted server counts it as malformed and
+// rejects the sender; a playing hosted client counts it as a decode error and keeps no state.
+// Virtual time: every service is stamped by the loop, never the wall clock.
+static int private_state_rejected(void)
+{
+    uint8_t state[WAKE_COURSE_STATE_BYTES] = { 0 }, bytes[BOAT_NET_MAX_MESSAGE];
+    static BoatNetServer hosted;
+    BoatRoomDefinition room = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_BASIN
+    };
+    memcpy(room.id, "hosted", 7);
+    memcpy(room.name, "Hosted", 7);
+    BoatNetServerConfig config = { .token = "",
+        .epoch = 1,
+        .max_players = 1,
+        .room = &room,
+        .resources = test_world(BOAT_LOCATION_BASIN) };
+    for (unsigned to_client = 0; to_client < 2; ++to_client) {
+        BoatNetMemory *network = boat_net_memory_create(11);
+        CHECK(network);
+        BoatNetTransport transport;
+        unsigned peer;
+        bool ok = boat_net_server_init(&hosted, boat_net_memory_server(network), &config)
+            && boat_net_memory_client(network, &peer, &transport);
+        if (!to_client) {
+            BoatNetHeader header = { .epoch = 1, .tick = 1 };
+            size_t size = boat_net_private_encode_state(&header, state, sizeof(state), bytes);
+            ok = ok && size && boat_net_send(&transport, 0, BOAT_NET_CONTROL, bytes, size)
+                && boat_net_server_service(&hosted, 0);
+            boat_net_memory_destroy(network);
+            CHECK(ok);
+            CHECK(hosted.stats.malformed == 1
+                && hosted.stats.rejected[BOAT_NET_REJECT_MALFORMED] == 1);
+            continue;
+        }
+        static BoatNetClient remote;
+        world = BASIN;
+        BoatNetClientConfig client = { .name = "remote", .token = "", .resources = worlds() };
+        boat_net_client_init(&remote, transport, &client, 0);
+        double at = 0;
+        for (unsigned round = 0; ok && round < 600 && remote.phase != BOAT_NET_CLIENT_PLAYING;
+            ++round) {
+            at += 1.0 / 120;
+            boat_net_memory_set_time(network, at);
+            ok = boat_net_server_service(&hosted, at)
+                && boat_net_client_service(&remote, at, (BoatInput) { 0 }, false);
+        }
+        CHECK(ok && remote.phase == BOAT_NET_CLIENT_PLAYING);
+        uint64_t errors = remote.stats.decode_errors;
+        BoatNetHeader header = { .epoch = remote.epoch, .tick = hosted.fleet.state.tick };
+        size_t size = boat_net_private_encode_state(&header, state, sizeof(state), bytes);
+        ok = size && boat_net_send(&hosted.transport, peer, BOAT_NET_CONTROL, bytes, size);
+        at += 1.0 / 120;
+        boat_net_memory_set_time(network, at);
+        ok = ok && boat_net_client_service(&remote, at, (BoatInput) { 0 }, false);
+        boat_net_memory_destroy(network);
+        CHECK(ok);
+        CHECK(remote.stats.decode_errors == errors + 1 && remote.stats.private_states == 0);
+        CHECK(remote.private_state_size == 0 && remote.phase == BOAT_NET_CLIENT_PLAYING);
+    }
+    return 0;
+}
+
 // L2: a time trial as the game opens one: the course start, recording runs, the pool reset after
 // the start. No best path, so a new best's save fails (the storage failure path) without files.
 static void course_open(Play *p)
@@ -1040,6 +1103,7 @@ int main(int argc, char **argv)
         SLOW_CASE(course_trace),
         SLOW_CASE(course_practice),
         TEST_CASE(course_state),
+        TEST_CASE(private_state_rejected),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     boat_local_stop(lp);
