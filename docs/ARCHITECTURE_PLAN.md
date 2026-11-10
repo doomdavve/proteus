@@ -469,6 +469,13 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug):
   not committed); a call with wrong arguments fails it. This is not an Emscripten build.
 - Every AR3 commit builds natively warning-clean and passes the syntax check and
   `platform_bridges` (`git rebase -x` over the range).
+- After the AR4/AR5 merge (2026-11-10, same machine): `ctest --preset full` and again with
+  `-j8` each passed 508/508 (13 disabled); every first-parent commit after the merge builds
+  warning-clean and passes the lint, plugin staging, objective and save tests, except the merge
+  commit itself, whose `platform_bridges` fails until the next commit allowlists AR4's native
+  browser-staging validator; basin and outer CPU captures are byte-identical to the pre-merge
+  `8b6be48` build; the stub syntax check passes for every `*_web.c`, title, game, console,
+  plugin glue and staging source.
 
 Owed to the user. Native: the title's MULTIPLAYER panel lists public servers (or the directory
 status) and finds a LAN room hosted from a second instance; joining both works; leaving and
