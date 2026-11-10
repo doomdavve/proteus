@@ -312,10 +312,11 @@ target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu prote
 # (tools/check_web_wasm.py proves it carries no Lua).
 if(EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c
-    tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c)
+    tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c
+    tools/wake_console_bridge_web.c)
 else()
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
-    tools/wake_velocity_scenery.c tools/wake_velocity_app.c)
+    tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c)
   target_link_libraries(wake_velocity PRIVATE proteus_work_session)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -458,7 +459,8 @@ endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
-  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
+  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h
+  tools/wake_console_bridge.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
@@ -1023,7 +1025,8 @@ if(NOT EMSCRIPTEN)
   # PC: the command layer, console input/scrollback and live scene application, headless under a
   # virtual clock and through the real isolated worker.
   add_executable(validate_wake_command tools/validate_wake_command.c
-    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c)
+    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c
+    tools/wake_console_bridge.c)
   target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_plugin_catalog
     proteus_boat_session)
   target_compile_options(validate_wake_command PRIVATE ${PROTEUS_WARNINGS})
