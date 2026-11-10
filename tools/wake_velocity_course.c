@@ -28,14 +28,6 @@ void wake_course_init(WakeCourseAuthority *course, const BoatSession *session, u
         .camera_heading = session->presentation.camera_heading };
 }
 
-// The recorder's copy of the presentation's camera follow (src/boat_presentation.c), so the
-// authority links no presentation code and replay bytes stay those of the direct path.
-static float follow(float camera_heading, float heading)
-{
-    float camera_delta = remainderf(heading - camera_heading, 2 * PI);
-    return remainderf(camera_heading + camera_delta * (1 - expf(-6 * BOAT_STEP)), 2 * PI);
-}
-
 static BoatReplaySample pose(const Boat *boat, float camera_heading, double time)
 {
     static const BoatPresentation none;
@@ -56,7 +48,7 @@ static void committed(void *context, uint64_t tick, const BoatFleet *fleet)
         : (BoatReplaySample) { 0 };
     boat_course_step(&c->course, c->previous.position, boat->position, BOAT_TICK_SECONDS);
     if (c->follow)
-        c->camera_heading = follow(c->camera_heading, boat->heading);
+        c->camera_heading = boat_camera_follow(c->camera_heading, boat->heading);
     c->previous = *boat;
     if (!record)
         return;
