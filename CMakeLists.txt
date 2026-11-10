@@ -1308,6 +1308,22 @@ add_test(NAME plugin_stage_backend_self_test COMMAND ${Python3_EXECUTABLE}
   --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
 set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_stage_backend self-test=ok")
+# AR5: plugin data and its data-only consumers need no Lua, files, processes or bridges.
+set(PLUGIN_DATA_BOUNDARY_NM)
+if(CMAKE_NM AND NOT MSVC)
+  set(PLUGIN_DATA_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_plugin_data>
+    --archive $<TARGET_FILE:proteus_boat_core> --archive $<TARGET_FILE:proteus_json>)
+endif()
+add_test(NAME plugin_data_boundary COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} ${PLUGIN_DATA_BOUNDARY_NM})
+set_tests_properties(plugin_data_boundary PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary=ok")
+add_test(NAME plugin_data_boundary_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_data_boundary_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
@@ -1796,8 +1812,8 @@ set(PROTEUS_SLOW_TESTS
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
 endif()
-# About 0.2 s: it copies and checks a temporary tree once per planted violation.
-list(APPEND PROTEUS_SLOW_TESTS plugin_stage_backend_self_test)
+# About 0.2-0.4 s each: they copy and check a temporary tree once per planted violation.
+list(APPEND PROTEUS_SLOW_TESTS plugin_stage_backend_self_test plugin_data_boundary_self_test)
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
