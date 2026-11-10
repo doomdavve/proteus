@@ -3,7 +3,7 @@
 Status, 2026-11-10: grouped-cloud drift implemented and natively verified; user review pending.
 Open items: user visual review of grouped clouds, drift speed/direction and reflections.
 Done when: grouped clouds drift deterministically with matching sky/reflections and seek checks.
-Next: review the local candidate for PR #179; publication remains pending.
+Next: CI and user visual review of the follow-up PR; publication authorized 2026-11-10.
 
 ## Scope and decision
 
@@ -242,3 +242,16 @@ The final upload-spy extension then advanced wind across the bounded period duri
 241-sample virtual cycle; rebuilt warning-clean and reran `gpu_surface_materials`, which
 passed with zero sky texture writes (`build/scroll-upload-check.log`). Changed local
 links/anchors and command options were checked; `git diff --check` passed.
+
+### Follow-up PR preparation, 2026-11-10
+
+After PR #179 merged, the user requested rebasing onto main and opening a new PR.
+Rebased only the grouping and scrolling commits onto `origin/main` at `75375b3`,
+without conflicts, on `feat/cloud-groups-drift`. Source, assets, tests and documentation
+were identical before/after the rebase. Publication authorization does not imply visual
+acceptance of the new grouping or wind speed/direction.
+Rebuilt warning-clean and reran the full native Debug preset with graphics access after
+the rebase: all 544 enabled tests passed (15 retired checks disabled) in 125.32 seconds
+without retries (`build/drift-pr-build.log`, `build/drift-pr-full.log`). The existing
+capture/demo evidence above applies to the identical implementation. `git diff --check`
+passed. Other-platform and user visual acceptance limits remain unchanged.
