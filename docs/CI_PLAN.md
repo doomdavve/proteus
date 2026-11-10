@@ -60,3 +60,18 @@ without the user's approval. These limits remain explicit rather than claiming a
 end-to-end guarantee from local test timings.
 
 The user authorized opening the PR and measuring hosted workflow time on 2026-11-10.
+
+## First hosted measurement, 2026-11-10
+
+PR #183's first revision: Linux passed in 1m13s (42891501294), browser passed in 1m11s
+(42891501508). macOS failed in 1m29s (42891501473): `boat_room_package.match_room` ran a
+13-second three-client combat simulation but was incorrectly labelled quick, exceeding the
+10-second child deadline. Mark it slow so it stays in full qualification; do not raise the
+routine deadline. The corrected 108-check local lane passed in 5.32 seconds.
+
+Cold Windows completed dependency installation in 66 seconds, saved its binary cache in
+one second, configured in 31 seconds and built for 46 seconds before failing (2m38s total,
+42891501388). The newly selected ENet validator exposed an existing unguarded GCC warning
+flag that MSVC rejected. Scope `-Wno-unused-function` to GNU/Clang-family compilers and keep
+the protocol checks. Neither failed run establishes successful cold Windows qualification.
+Final hosted measurements remain pending.

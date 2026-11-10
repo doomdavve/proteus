@@ -764,7 +764,7 @@ static const TestCase cases[] = {
     SLOW_CASE(scene_resync_contact_room),
     TEST_CASE(catalog_rooms),
     TEST_CASE(race_room),
-    TEST_CASE(match_room),
+    SLOW_CASE(match_room),
     TEST_CASE(definition_size),
 };
 
