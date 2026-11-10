@@ -13,6 +13,14 @@
   ],
   "testPresets": [
     {
+      "name": "ci",
+      "displayName": "Bounded routine CI checks",
+      "configurePreset": "dev",
+      "filter": { "include": { "label": "^ci$" } },
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 2, "stopOnFailure": true, "noTestsAction": "error", "timeout": 10 }
+    },
+    {
       "name": "quick",
       "displayName": "Quick lane: tests under about 100 ms, for the edit loop",
       "configurePreset": "dev",

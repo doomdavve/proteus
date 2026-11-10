@@ -48,7 +48,15 @@ and the existing lighting/graphics loops remain separate. The user authorized a 
 The [dependency availability plan](DEPENDENCY_CACHE_PLAN.md) replaces the failed cold-cache
 bootstrap with a vendored, checksum-verified Lua archive; [testing](TESTING.md#lua-source-availability)
 owns the contract. Local cold/offline extraction, integrity checks and all 544 tests passed;
-the updated #182 CI run remains pending.
+the vendored revision passed native/browser CI and is merged.
+
+## Routine CI budget
+
+The [CI plan](CI_PLAN.md) tracks a three-minute routine workflow limit and a curated test
+lane with a 150-check ceiling. [Testing](TESTING.md#routine-ci-budget) owns selection,
+commands and manual/release qualification. All four routine workflows passed within the cap, including a deliberately cold Windows
+run at 2m30s. The final focused lane has 106 local checks; the plan owns timing samples and
+verification limits.
 
 ## Specs
 

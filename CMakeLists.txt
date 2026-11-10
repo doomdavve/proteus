@@ -1204,7 +1204,8 @@ target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 add_executable(validate_boat_net_enet tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net_enet PRIVATE proteus_boat_net_enet)
 target_compile_definitions(validate_boat_net_enet PRIVATE BOAT_NET_TEST_ENET)
-target_compile_options(validate_boat_net_enet PRIVATE ${PROTEUS_WARNINGS} -Wno-unused-function)
+target_compile_options(validate_boat_net_enet PRIVATE ${PROTEUS_WARNINGS}
+  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wno-unused-function>)
 foreach(target validate_boat_combat validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()
@@ -1893,6 +1894,8 @@ foreach(test IN LISTS PROTEUS_SLOW_TESTS)
     message(AUTHOR_WARNING "PROTEUS_SLOW_TESTS names no test: ${test}")
   endif()
 endforeach()
+
+include(cmake/CI.cmake)
 
 # Long deterministic physics runs need optimization even in the development build.
 # This does not define NDEBUG or enable fast-math; all assertions/scenarios remain.

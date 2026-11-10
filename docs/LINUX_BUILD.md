@@ -5,9 +5,10 @@ The pinned GLFW selects Wayland in a Wayland session and X11 in an X11 session, 
 `XDG_SESSION_TYPE` and the available display environment. With no recognized session type,
 it tries Wayland before X11. No simulation or renderer changes are needed.
 `.github/workflows/linux-boat.yml` builds both backends on Ubuntu 24.04, runs the routine
-CPU suite, checks native Wayland startup/clean exit with headless Weston, and retains the
-Xvfb X11 smoke check. Both checks assert the backend reported by raylib. The workflow runs
-on branch pushes or manual dispatch. Earlier Linux CI compiled and ran the CPU suite;
+[bounded CI lane](TESTING.md#routine-ci-budget) on pull requests/main with a three-minute
+job cap. Manual dispatch runs the full CPU suite, checks native Wayland startup/clean exit
+with headless Weston, and retains the Xvfb X11 smoke check. Both desktop checks assert the
+backend reported by raylib. Earlier Linux CI compiled and ran the CPU suite;
 the native Wayland CI smoke run now reaches a startup crash described below. A targeted
 GLFW backport is implemented; its Linux rerun and user acceptance remain pending.
 

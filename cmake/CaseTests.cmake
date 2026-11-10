@@ -21,6 +21,7 @@ function(proteus_add_case_tests prefix target)
   string(REPLACE ";" "," args "${ARG_ARGS}")
   add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -D PROTEUS_CASE_EXE=$<TARGET_FILE:${target}>
+      -D PROTEUS_CASE_CI=$<BOOL:$<TARGET_PROPERTY:${target},PROTEUS_CI_CASES>>
       -D PROTEUS_CASE_PREFIX=${prefix} -D PROTEUS_CASE_OUT=${cases}
       -D PROTEUS_CASE_LABELS=${labels} -D PROTEUS_CASE_DIR=${ARG_WORKING_DIRECTORY}
       -D PROTEUS_CASE_ARGS=${args}
@@ -54,9 +55,14 @@ if(CMAKE_SCRIPT_MODE_FILE AND PROTEUS_CASE_EXE)
   foreach(line IN LISTS lines)
     if(line MATCHES "^([A-Za-z0-9_]+) (quick|slow)$")
       set(name ${PROTEUS_CASE_PREFIX}.${CMAKE_MATCH_1})
+      set(lane ${CMAKE_MATCH_2})
+      set(ci_label "")
+      if(PROTEUS_CASE_CI AND lane STREQUAL "quick")
+        set(ci_label ";ci")
+      endif()
       string(APPEND script
         "add_test(${name} \"${PROTEUS_CASE_EXE}\"${arguments} --case ${CMAKE_MATCH_1})\n"
-        "set_tests_properties(${name} PROPERTIES LABELS \"${PROTEUS_CASE_LABELS};${CMAKE_MATCH_2}\""
+        "set_tests_properties(${name} PROPERTIES LABELS \"${PROTEUS_CASE_LABELS};${lane}${ci_label}\""
         " WORKING_DIRECTORY \"${PROTEUS_CASE_DIR}\")\n")
     elseif(NOT line STREQUAL "")
       message(FATAL_ERROR "${PROTEUS_CASE_EXE} --list: unexpected line '${line}'")

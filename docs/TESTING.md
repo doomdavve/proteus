@@ -143,14 +143,59 @@ owns implementation status and manual review limits.
 
 The Linux, macOS and Windows Actions builds run on pull requests and pushes to `main`, skipping
 events that change only Markdown files or `README.txt` files (including packaged READMEs).
-Other changes run the normal builds and tests, including mixed documentation/code pull requests.
+Other changes run the bounded routine build/test lane, including mixed documentation/code pull requests.
 The filter deliberately names `README.txt` rather than all `.txt` files so `CMakeLists.txt`
 and other build inputs still trigger CI. Manual workflow runs and the macOS and
 Windows release builds remain available regardless of these filters. GitHub does not create a
 successful check for a skipped workflow; do not require these checks for documentation-only pull
 requests covered by these filters.
 
-The `boat_plugin_author` deterministic-preview integration check runs each package twice
+### Routine CI budget
+
+Routine native PR and `main` jobs have a **three-minute job timeout**, including checkout,
+dependency setup, configuration, compilation and tests. Browser authoring PR jobs have the
+same cap. GitHub queue/runner allocation time is outside the job timeout. Each native test
+step has a one-minute cap, fails on the first failure, and writes JUnit results.
+JUnit artifacts are uploaded only on failures; passing runs retain their logs and timings. Older PR
+revisions are cancelled when a newer revision is pushed; release jobs are not cancelled.
+A timeout is a failing check, not permission to retry or increase the budget automatically.
+
+Build the same lane locally:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target ci -j
+ctest --preset ci
+```
+
+The `ci` target builds the game and selected validators, then checks the actual discovered
+CTest lane. `cmake/CI.cmake` owns the selection: fast boat handling, codec/session protocol,
+Lua descriptor/state/catalog, room-package, cargo, save/file/input and lighting checks;
+source/library boundaries; and one basin plus one mapped CPU asset-loading capture.
+Only quick cases from the selected validator families are promoted. The guard rejects fewer
+than 50 or more than 150 checks, missing essential checks, and disabled/GPU/exhaustive cases.
+Its own test covers those failure paths. The local preset's ten-second timeout is CTest's
+fallback; the hosted one-minute test-step cap is the total test budget.
+
+Routine jobs skip exhaustive route/physics runs, repeated captures, Python authoring preview
+integration, benchmarks, desktop-startup qualification and package/relocation/signing checks.
+Those tests remain in local `ctest --preset full`. Native manual dispatch runs the existing
+broader qualification paths; tagged release calls retain macOS/Windows packaging and their
+existing longer timeouts. Linux manual dispatch retains the full CPU suite, benchmarks and
+Wayland/X11 smoke checks. Browser manual qualification keeps its three-engine checks and
+30-minute limit. PR/main jobs no longer produce native download packages; use release or
+manual qualification when a package is needed.
+
+Windows routine builds use Ninja with the same MSVC compiler; manual/release qualification
+keeps the Visual Studio generator. Windows routine Release builds use `x64-windows-static-release` to avoid compiling unused
+Debug curl/zlib variants. ABI-checked vcpkg binary archives are restored/saved around dependency
+installation, keyed by runner image, vcpkg revision and triplet contents. They are saved after
+installation even if later tests fail. Manual/release packaging retains the standard
+`x64-windows-static` triplet. Cold dependency/setup timings still need hosted validation;
+the timeout alone does not prove every cold run fits. Keep setup/build costs inside the
+three-minute budget when changing dependencies. Implementation/evidence: [CI plan](CI_PLAN.md).
+
+The full/manual-only `boat_plugin_author` deterministic-preview integration check runs each package twice
 for 360 virtual ticks. Each preview child has a 30-second failure deadline, and the whole
 CTest has a 180-second deadline to allow Debug runs alongside numerical validators. Package
 subtests identify failures. These limits do not advance simulation time or change the

@@ -15,10 +15,17 @@ on:
 permissions:
   contents: read
 
+# Cancel obsolete PR runs without interrupting main or release qualification.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    env:
+      PROTEUS_QUALIFY: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+    timeout-minutes: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 20 || 3 }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,26 +34,55 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev wayland-protocols pkg-config weston xvfb xauth
-      - name: Configure, build and test
+      - name: Configure
+        run: >-
+          cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF
+          -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
+
+      - name: Build routine CI targets
+        if: env.PROTEUS_QUALIFY != 'true'
+        run: cmake --build build-linux --target ci --parallel 2
+
+      - name: Run bounded PR checks
+        if: env.PROTEUS_QUALIFY != 'true'
+        timeout-minutes: 1
+        run: >-
+          ctest --test-dir build-linux -L '^ci$' --parallel 2 --timeout 10
+          --stop-on-failure --no-tests=error --output-on-failure
+          --output-junit ci-results.xml
+
+      - name: Build and test full qualification
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
-          cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
           cmake --build build-linux --parallel 2
           ctest --test-dir build-linux -j 4 --output-on-failure
       - name: Record native plugin staging and callback costs
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           { echo '### Linux plugin costs (boat_plugin_bench, shelter-tour)'; echo '```'
             ./build-linux/boat_plugin_bench plugins/shelter-tour; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Check native Wayland startup and clean exit
+        if: env.PROTEUS_QUALIFY == 'true'
         run: bash tools/check_wayland.sh build-linux
       - name: Check mouse capture startup and clean exit under X11
+        if: env.PROTEUS_QUALIFY == 'true'
         run: |
           set -o pipefail
           XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/wake_velocity --verbose --location basin --mouse-steering --frames 120 2>&1 | tee build-linux/x11-smoke.log
           grep -F 'PLATFORM: DESKTOP (GLFW - X11): Initialized successfully' build-linux/x11-smoke.log
       - name: Upload desktop smoke logs
-        if: always()
+        if: always() && env.PROTEUS_QUALIFY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: linux-desktop-smoke-logs
           path: build-linux/*smoke.log
           if-no-files-found: ignore
+
+      - name: Upload failing routine CI test results
+        if: failure() && env.PROTEUS_QUALIFY != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-boat-ci-results
+          path: build-*/ci-results.xml
+          if-no-files-found: ignore
+          retention-days: 7

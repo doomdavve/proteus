@@ -81,6 +81,10 @@ While iterating, `ctest --preset quick` runs the tests labelled `quick` (each un
 about a second in all). Heavy validators are split into `<prefix>.<case>` tests; see
 `docs/TESTING.md` for the lanes, the case runner and `tools/test_timing.py`.
 
+Routine PR/main CI builds `--target ci` and runs `ctest --preset ci` under a three-minute
+workflow cap; exhaustive checks and packaging are manual/release qualification. See
+`docs/TESTING.md#routine-ci-budget`. The required local full verification below is unchanged.
+
 Tests never wait for wall-clock time. Code that depends on time takes `now` as an input, and its
 test drives a virtual clock; wall-clock limits are only failure deadlines. The `test_time` test
 (`tools/check_test_time.py`) enforces this.
