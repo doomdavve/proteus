@@ -1,10 +1,10 @@
 # Softer edges on the original cloud deck
 
-Status, 2026-11-10: local candidate implemented; native checks and scene captures verified.
+Status, 2026-11-10: user prefers the softer deck; deeper-blue Day preview rendered.
 Open: user visual/motion acceptance, browser and other-platform review.
 Done when: the original shallow deck looks less blocky in Day, its shared CPU/GPU
 rendering passes verification, and the user accepts the result.
-Next: user review of the daytime cloud outlines in play.
+Next: user review of the deeper-blue colour preview; motion review remains open.
 
 ## Scope and decision
 
@@ -76,3 +76,21 @@ were checked. User acceptance, browser, Windows and Linux were not exercised.
 Local ignored evidence: `build/cloud-before.png`, `build/cloud-after.png`,
 `build/cloud-after-high.png`, `build/cloud-build.log`, `build/cloud-full.log`,
 `build/cloud-rerun.log`, `build/cloud-gpu-retry.log` and `build/cloud-demo.log`.
+
+
+### Deeper-blue preview, 2026-11-10
+
+The user preferred the softer deck ("I like this a lot better!") and requested a
+preview of a deeper blue inspired by a supplied sky photograph. This is appearance
+feedback, not a claimed motion or platform acceptance.
+
+Rendered the same outer GPU scene/camera at 1280×800, HDR off, with temporary
+sky-only colour values: horizon RGB (160, 213, 242), zenith (22, 91, 190), gradient
+span 0.65. Cloud colours and geometry, fog and scene light retain the candidate values.
+The actual game's reflection pass also sees the temporary sky recipe. The preview
+uses the existing shader evaluator with those background inputs substituted; it is
+not an image edit. Inspected `build/deeper-blue-preview.png` and restored the packaged
+shader afterward; source and shader files are unchanged by the preview. This does not
+implement a new Day palette or change the full-hour evaluator. No new build, suite or
+motion check was needed for this temporary colour comparison. The native verification
+above still applies to the unchanged implementation. Palette acceptance is pending.
