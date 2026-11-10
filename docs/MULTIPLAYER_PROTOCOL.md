@@ -468,6 +468,13 @@ tick, then per command: `f32` steering rate, `f32` throttle rate (finite; not cl
 quantized), `u8` flags, `u16` grenade request, `u8` torpedo request (12 bytes per command). The
 authority applies the same acceptance rules as InputBatch.
 
+`0xC1` PrivateState (channel 0, server to client): 1–256 opaque bytes, the private rules adapter's
+state after a grant (header tick: the authority's tick). The authority sends it at the end of a
+grant only when it differs from the last one sent; the client keeps the newest of its epoch. Its
+bytes belong to the adapter's own codec: the time trial's (`tools/wake_velocity_course.c`) is
+`u8` next gate, `u8` flags (1 practice, 2 finished, 4 recording stopped), then `f64` elapsed,
+four `f64` splits and four `f64` crossings (74 bytes).
+
 ### Other control messages
 
 - SpawnRequest: `u32` request ID, `u32` life to reset. It is honoured only while the slot is on

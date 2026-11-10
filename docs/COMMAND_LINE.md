@@ -309,9 +309,13 @@ selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to it
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
 
 Plain free boating (a free package without a voyage, objective or live authoring, on the native
-game) runs as a private local authority and client in the game process, live, under `--demo` and
-in `--screenshot` captures (whose scripted drive runs on virtual time); the developer studies,
-courses, voyages, `--work`, rooms and the browser keep the direct session path. At exit the game
+game) and the time trial (`--course`, `--ghost` or a course package) run as a private local
+authority and client in the game process, live, under `--demo` and in `--screenshot` captures
+(whose scripted drive runs on virtual time); the time trial's course, recording, best selection
+and practice latch run on the authority, and its best and last runs are saved after the frame as
+before. Replay viewing is client-side (`--replay` opens no local session; the L/B keys pause the
+attempt's ticks). The developer studies, voyages, `--work`, rooms and the browser keep the direct
+session path. At exit the game
 prints a `Local session:` line with its generation, ticks, chunks and restarts.
 
 `--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The

@@ -743,8 +743,8 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
-`boat_local` (AR6 ledger rows L0 and L6, labels `core;cpu`; quick except the two slow-lane
-scripted drives) runs
+`boat_local` (AR6 ledger rows L0, L6 and L2, labels `core;cpu`; quick except the slow-lane
+scripted drives and time trials) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
 glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
@@ -769,8 +769,16 @@ repaired: the authority rate-limits private resyncs in granted ticks); the L6 ca
 the drive's helm changes at ticks 420 and 1440, every predicted tick equal to `demo_step`'s),
 `scripted_capture` (a capture's 1501-tick drive in grants of at most 96 ends on `demo_step`'s
 session and pool, again after a restart) and `scripted_needs_script` (a scripted frame without a
-script is refused); and `private_range` (the private codec round-trips
-full precision; a hosted room counts the private type as malformed and rejects the sender). Each
+script is refused); `private_range` (the private codec round-trips
+full precision; a hosted room counts the private type as malformed and rejects the sender); and
+the L2 time-trial cases, where both paths take a course autopilot that tracks the gates from its
+own boat: `course_trace` (three attempts at 1x with 0.1 s frames: course progress, splits,
+recorded run, best, ghost, notices and save requests equal the direct session's after every
+frame; a first finish is a new best, an equal time is not, beating a slower best is; the frame's
+flush fails the save on an empty best path with the same notice), `course_practice` (8x in waves
+latches practice: the run is recorded, never saved or made best; the next attempt is not
+practice), both slow, and `course_state` (the time trial's state codec and the PrivateState
+message, which the v14 and input decoders reject). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
