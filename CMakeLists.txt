@@ -144,19 +144,25 @@ if(NOT MSVC)
   target_link_libraries(proteus_lua PRIVATE m)
 endif()
 
-# The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
-# plus boat_plugin_io for reading a package directory. Core and net never link it.
-add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_decode.h
-  src/boat_plugin_load.c src/boat_plugin_load.h src/boat_plugin_lua.c src/boat_plugin_lua.h
-  src/boat_plugin_io.c
-  src/boat_plugin_io.h src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_revision.h
-  src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
-  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c)
-target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
+# AR5: plugin data and codecs. Manifest parsing, descriptor decoding and checks, digests, the
+# stage wire codec and the objective checkpoint codec over caller-owned bytes; no Lua, files,
+# processes or browser bridges (plugin_data_boundary). Data-only consumers link only this.
+add_library(proteus_plugin_data STATIC src/boat_plugin.c src/boat_plugin.h
+  src/boat_plugin_decode.h src/boat_plugin_revision.h src/boat_plugin_race.c
+  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c src/boat_plugin_wire.c
+  src/boat_plugin_wire.h)
+target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
+target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
+
+# The plugin host: restricted Lua evaluation, revisions, objective transitions, isolated
+# staging and boat_plugin_io for reading a package directory. Core and net never link it.
+add_library(proteus_plugins STATIC src/boat_plugin_load.c src/boat_plugin_load.h
+  src/boat_plugin_lua.c src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h
+  src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_state.c src/boat_plugin_state.h)
+target_link_libraries(proteus_plugins PUBLIC proteus_plugin_data PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
-  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h
-  src/boat_plugin_wire.c src/boat_plugin_wire.h)
+  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h)
 # AR4: one isolated-worker backend per platform behind the private boat_plugin_stage_backend.h.
 if(EMSCRIPTEN)
   target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_web.c)
@@ -211,13 +217,15 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
-# SV1b: the sandbox save's byte format. Buffers only: no files, no Lua beyond proteus_plugins.
+# SV1b: the sandbox save's byte format. Buffers only: no files and no Lua (plugin data only).
 add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
-target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
+target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugin_data)
 target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
-target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
+# The work session steps the package's objective, so it links the Lua host.
+target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_plugins
+  proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
@@ -227,7 +235,8 @@ target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
-target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
+# Lookup and decode of pre-evaluated wire bytes: plugin data only, no Lua.
+target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugin_data)
 target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
