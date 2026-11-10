@@ -210,9 +210,12 @@ Calm and wave-course bests are stored separately. Native storage uses:
 | Windows | `%LOCALAPPDATA%/Proteus/` |
 | Linux | `$XDG_DATA_HOME/proteus/` or `~/.local/share/proteus/` |
 
-The current files are `course-calm-physics9.run` and `course-waves-physics9.run`.
-Title settings live alongside them in `title.txt`. Use `--data-dir DIR` to override the
-native directory. Bests from older physics revisions stay on disk and are not overwritten;
+The current files are `course-calm-physics9-wakes.run` and `course-waves-physics9-wakes.run`.
+The time trial rides the same arcade wakes as free boating, so bests from before that change
+(`course-calm-physics9.run`, `course-waves-physics9.run`, set on plain water) stay on disk but
+are no longer loaded. Title settings live alongside them in `title.txt`. Use `--data-dir DIR`
+to override the native directory. Bests from older physics revisions stay on disk and are not
+overwritten;
 incompatible or damaged runs are ignored with a message. A failed save preserves the best
 in memory. Recording is limited to ten minutes; longer runs can finish but cannot replace
 recorded bests. See [import/export commands](COMMAND_LINE.md#courses-and-recordings).

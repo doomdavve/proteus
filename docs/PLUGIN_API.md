@@ -439,7 +439,7 @@ return {
 ```
 
 The gameplay digest covers the start, heading and every gate. When it equals
-`BOAT_COURSE_STANDARD_DIGEST`, saved bests keep `course-{calm|waves}-physicsN.run`; another
+`BOAT_COURSE_STANDARD_DIGEST`, saved bests use `course-{calm|waves}-physicsN-wakes.run`; another
 course adds its digest to the name and refuses `--replay`/`--ghost`. `--plugin` still refuses the
 course.
 

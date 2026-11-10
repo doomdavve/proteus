@@ -56,9 +56,9 @@ void boat_replay_destroy(BoatReplay *run);
 bool boat_replay_load(BoatReplay *run, const char *path);
 bool boat_replay_save(const BoatReplay *run, const char *path);
 bool boat_replay_data_directory(char *path, size_t size);
-// PD1: the saved best path. The standard course keeps its established
-// "course-{calm|waves}-physicsN.run" name, so existing bests stay valid; any other course adds
-// its digest. False when the path does not fit.
+// PD1: the saved best path. The standard course uses "course-{calm|waves}-physicsN-wakes.run"
+// since its time trial rides the arcade wake pool (L2); plain-water bests under the older
+// "course-{calm|waves}-physicsN.run" names are left alone. Any other course adds its digest. False when the path does not fit.
 bool boat_replay_best_path(
     char *path, size_t size, const char *directory, bool waves, uint64_t course_digest);
 

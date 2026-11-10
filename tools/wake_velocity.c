@@ -996,17 +996,17 @@ static int study(int argc, char **argv)
             stderr, "--player-wake requires free boating, without course/replay/ghost modes.\n");
         goto invalid;
     }
-    // Choose the free-boating default after parsing so explicit alternatives and
-    // recorded course/replay water remain independent of argument order.
-    if (!wake_objects && !wake_field && !player_wake_set && !course && !ghost_path && !work_mode)
+    // Choose the default after parsing so explicit alternatives remain independent of argument
+    // order. Time trials ride the same arcade wake pool as free boating and rooms.
+    if (!wake_objects && !wake_field && !player_wake_set && !work_mode)
         wake_objects = true;
     if ((object_tuning && !wake_objects)
         || (wake_objects
-            && (wake_field || course || ghost_path || (player_wake_set && player_wake)
-                || (object_crossing && location->mapped)))) {
+            && (wake_field || (player_wake_set && player_wake)
+                || (object_crossing && (location->mapped || course))))) {
         fprintf(stderr,
-            "Wake objects require free boating, without another player-wake mode; "
-            "the scripted crossing boat requires the basin.\n");
+            "Wake objects cannot be combined with another player-wake mode; "
+            "the scripted crossing boat requires basin free boating.\n");
         goto invalid;
     }
     if (wake_objects)
@@ -1040,7 +1040,7 @@ static int study(int argc, char **argv)
                 "AA to check frame pacing.\n");
     }
     if (course || ghost_path)
-        player_wake = false; // Existing course/replay comparisons retain their original water.
+        player_wake = false; // Courses and replays never use the legacy trail.
     BoatCamera camera_default
         = { .distance = location->camera_distance, .height = location->camera_height };
     if (skin == BOAT_SKIN_GRODAN && !connect_to) {

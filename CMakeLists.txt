@@ -826,7 +826,8 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(wake_objects_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 120)
 endif()
-add_test(NAME wake_objects_course_rejected COMMAND wake_velocity --wake-objects --course)
+# Time trials ride the wake pool; only the scripted crossing boat stays free-boating only.
+add_test(NAME wake_objects_course_rejected COMMAND wake_velocity --wake-objects-crossing --course)
 add_test(NAME wake_objects_mixed_rejected COMMAND wake_velocity --wake-objects --wake-field)
 add_test(NAME wake_objects_lifetime_rejected COMMAND wake_velocity --wake-objects --wake-life-ticks 1921)
 set_tests_properties(wake_objects_course_rejected wake_objects_mixed_rejected

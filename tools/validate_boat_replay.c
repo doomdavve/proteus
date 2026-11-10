@@ -426,10 +426,25 @@ static int legacy_best(const char *directory, const BoatReplay *fast)
     char legacy[2048], other[2048];
     CHECK(boat_replay_best_path(
         legacy, sizeof(legacy), directory, false, BOAT_COURSE_STANDARD_DIGEST));
-    CHECK(snprintf(other, sizeof(other), "%s/course-calm-physics%d.run", directory,
+    CHECK(snprintf(other, sizeof(other), "%s/course-calm-physics%d-wakes.run", directory,
               BOAT_PHYSICS_REVISION)
         == (int)strlen(legacy));
     CHECK(!strcmp(legacy, other));
+    // A plain-water best under the pre-pool name is left alone and never selected.
+    char plain[2048];
+    CHECK(snprintf(plain, sizeof(plain), "%s/course-calm-physics%d.run", directory,
+              BOAT_PHYSICS_REVISION)
+        > 0);
+    remove(legacy);
+    CHECK(boat_replay_save(fast, plain));
+    BoatReplayRuns fresh = { 0 };
+    CHECK(boat_replay_runs_select_best(&fresh, directory, false, BOAT_COURSE_STANDARD_DIGEST));
+    CHECK(!fresh.best.complete && !strcmp(fresh.best_path, legacy));
+    boat_replay_runs_destroy(&fresh);
+    BoatReplay kept = { 0 };
+    CHECK(boat_replay_load(&kept, plain) && kept.complete);
+    boat_replay_destroy(&kept);
+    remove(plain);
     uint64_t changed = BOAT_COURSE_STANDARD_DIGEST ^ 1u;
     CHECK(boat_replay_best_path(other, sizeof(other), directory, false, changed));
     char suffix[64];
@@ -495,7 +510,7 @@ int main(int argc, char **argv)
     CHECK(snprintf(best_path, sizeof(best_path), "%s/best.run", argv[1]) > 0);
     CHECK(snprintf(invalid, sizeof(invalid), "%s/invalid.run", argv[1]) > 0);
     CHECK(snprintf(wave_path, sizeof(wave_path), "%s/waves.run", argv[1]) > 0);
-    CHECK(snprintf(saved_best, sizeof(saved_best), "%s/course-calm-physics%d.run", argv[1],
+    CHECK(snprintf(saved_best, sizeof(saved_best), "%s/course-calm-physics%d-wakes.run", argv[1],
               BOAT_PHYSICS_REVISION)
         > 0);
     CHECK(banked_course(argv[1]) == 0);

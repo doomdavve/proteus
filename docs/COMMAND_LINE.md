@@ -219,7 +219,7 @@ compatibility.
 | Option | Behavior |
 | --- | --- |
 | `--waves` | Gentle crossing ambient waves in any location |
-| `--wake-objects` | Rideable arcade wakes; default in free boating |
+| `--wake-objects` | Rideable arcade wakes; default in free boating and time trials |
 | `--wake-height 0.1..3` | Arcade crest scale in metres; default 1.2 |
 | `--wake-life-ticks 240..1920` | Arcade wake lifetime at 120 Hz; default 1920 (16 seconds) |
 | `--wake-objects-crossing` | Basin rival sharing wake and hull contacts |
@@ -227,8 +227,8 @@ compatibility.
 | `--current` | Authored current, not measured local conditions |
 | `--crossing-wake` | Separate scripted passing boat and physical wake |
 
-Current and scripted crossing-wake options reject courses/replays/ghosts. Courses and
-recordings preserve their water settings and reject explicit player-wake modes. A deliberate
+Current, scripted crossing-wake and `--wake-objects-crossing` options reject
+courses/replays/ghosts. Courses ride the arcade wake pool and reject explicit player-wake modes. A deliberate
 reset clears player wakes and restarts scripted passages. The title's Gothenburg Harbour outing
 includes current, crossing wake and gentle waves; explicit launches use their supplied options.
 

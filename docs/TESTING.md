@@ -518,9 +518,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   duplicate packages and expects its normal diagnostics. `compiled_selection_guard` rejects the
   removed compiled symbols and the fixture library in production sources, CMake targets and the
   built `wake_velocity`/`boat_server` symbols; `compiled_selection_guard_detects` is its negative
-  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves a
-  pre-existing `course-calm-physicsN.run` keeps its path as the best under
-  `BOAT_COURSE_STANDARD_DIGEST` and is not overwritten by an equal or slower run. The catalog
+  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves
+  `course-calm-physicsN-wakes.run` is the best under `BOAT_COURSE_STANDARD_DIGEST` and is not
+  overwritten by an equal or slower run, and that a plain-water best under the older
+  `course-calm-physicsN.run` name is left on disk and never selected. The catalog
   also includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal
   the fixtures at every location) and the two harbor room packages.
 - `boat_room_package` (PD2/PD3) evaluates edited race and deathmatch packages, builds rooms from

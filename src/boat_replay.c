@@ -344,8 +344,8 @@ bool boat_replay_best_path(
 {
     int n;
     if (course_digest == BOAT_COURSE_STANDARD_DIGEST)
-        n = snprintf(path, size, "%s/course-%s-physics%d.run", directory, waves ? "waves" : "calm",
-            BOAT_PHYSICS_REVISION);
+        n = snprintf(path, size, "%s/course-%s-physics%d-wakes.run", directory,
+            waves ? "waves" : "calm", BOAT_PHYSICS_REVISION);
     else
         n = snprintf(path, size, "%s/course-%s-physics%d-%016llx.run", directory,
             waves ? "waves" : "calm", BOAT_PHYSICS_REVISION, (unsigned long long)course_digest);
