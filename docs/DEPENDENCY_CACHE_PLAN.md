@@ -4,7 +4,7 @@ Status, 2026-11-10: local implementation and verification complete; hosted cache
 Open items: hosted cache miss/save/hit evidence after publication.
 Done when: restored archives configure without upstream access, pins invalidate the cache,
 and the shared CMake declaration retains SHA-256 verification.
-Next: PR authorization, then inspect hosted cache miss/save/hit on CI.
+Next: inspect hosted cache miss/save/hit on CI; PR publication authorized 2026-11-10.
 
 ## Scope
 
@@ -24,7 +24,7 @@ vendor third-party sources or cache compiled outputs. The contract is in
 1. Implement the shared download location and native/browser workflow caches: done locally.
 2. Verify archive reuse offline, workflow syntax, native build and full suite: done locally.
 3. Close the local implementation: done; contract in the testing spec and evidence below.
-   Hosted Actions cache behavior remains a follow-up after a separately authorized PR.
+   Hosted Actions cache behavior remains a follow-up after publication.
 
 ## Verification
 
@@ -41,3 +41,6 @@ validated all five changed workflows (shellcheck unavailable/disabled). Changed 
 links/anchors and `git diff --check` passed. No audiovisual behavior changed; no new manual
 playback review was needed. Windows/browser execution and hosted cache save/hit behavior
 remain unverified locally.
+
+The user authorized opening the PR on 2026-11-10. Main remains at `75375b3`, the
+verified base; this publication update changes documentation only.
