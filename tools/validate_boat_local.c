@@ -492,18 +492,27 @@ static void inject_mismatch(void)
         .born = w->tick };
 }
 
-// Section 5: a mismatch that one checkpoint repairs recovers in place; a stall that outlasts
-// BOAT_NET_LOCAL_RESYNCS resyncs is endpoint failure (D10). The frozen host clock makes the
-// authority rate-limit every resync after the first, so the second mismatch is never repaired.
-static int resync_escalation(void)
+static bool (*real_poll)(void *context, BoatNetEvent *event);
+
+// The client's transport with every checkpoint message lost; snapshots and births still arrive.
+static bool deaf_poll(void *context, BoatNetEvent *event)
 {
-    if (open_world(BASIN) || drive(one, 30))
-        return 1;
-    inject_mismatch();
-    for (unsigned n = 0; n < 200; ++n)
-        CHECK(local_frame(helm(n), now));
+    while (real_poll(context, event)) {
+        BoatNetMessage m;
+        if (event->kind != BOAT_NET_EVENT_MESSAGE
+            || boat_net_decode(event->data, event->size, &m) != BOAT_NET_OK
+            || m.header.type < BOAT_NET_WORLD_BEGIN || m.header.type > BOAT_NET_WORLD_END)
+            return true;
+    }
+    return false;
+}
+
+// The view, the authority and the pools agree after a repaired stall.
+static int repaired(unsigned resyncs)
+{
     const BoatNetClient *c = &lp->client;
-    CHECK(c->stats.resyncs == 1 && lp->server.stats.resyncs == 1);
+    CHECK(c->stats.resyncs == resyncs && lp->server.stats.resyncs == resyncs);
+    CHECK(lp->server.stats.rate_limited == 0);
     CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->wake_consistent && c->local_resyncs == 0);
     const BoatFleet *view = boat_local_view(lp);
     CHECK(view->state.tick == lp->server.fleet.state.tick);
@@ -511,15 +520,62 @@ static int resync_escalation(void)
         == 0);
     CHECK(boat_net_wake_digest(&view->state.wakes)
         == boat_net_wake_digest(&lp->server.fleet.state.wakes));
+    return 0;
+}
+
+// Section 5: a mismatch that one checkpoint repairs recovers in place; a stall that outlasts
+// BOAT_NET_LOCAL_RESYNCS resyncs is endpoint failure (D10). The second stall cannot be repaired:
+// a wake mismatch whose checkpoints the client's transport loses, so each resync the authority
+// serves completes without applied state.
+static int resync_escalation(void)
+{
+    if (open_world(BASIN) || drive(one, 30))
+        return 1;
+    inject_mismatch();
+    for (unsigned n = 0; n < 200; ++n) {
+        now += 1.0 / 60;
+        CHECK(local_frame(helm(n), now));
+    }
+    if (repaired(1))
+        return 1;
 
     inject_mismatch();
+    real_poll = lp->client.transport.poll;
+    lp->client.transport.poll = deaf_poll;
     unsigned n = 0;
-    while (n < 1000 && local_frame(helm(n), now))
+    while (n < 1000 && (now += 1.0 / 60, local_frame(helm(n), now)))
         ++n;
+    const BoatNetClient *c = &lp->client;
     CHECK(n < 1000 && !lp->running && strstr(lp->failure, "repeated resyncs"));
     CHECK(c->stats.resyncs == 1 + BOAT_NET_LOCAL_RESYNCS);
-    CHECK(lp->server.stats.resyncs == 1 && lp->server.stats.rate_limited == BOAT_NET_LOCAL_RESYNCS);
+    CHECK(lp->server.stats.resyncs == 1 + BOAT_NET_LOCAL_RESYNCS);
+    CHECK(lp->server.stats.rate_limited == 0);
     CHECK(!local_frame(helm(n), now));
+    return 0;
+}
+
+// At 8x a second of granted ticks is an eighth of a second of host time: the authority must count
+// the resync rate limit in granted ticks as the client does, or it refuses the client's next
+// requests and a repairable stall escalates to failure. Two mismatches in quick succession are
+// both repaired.
+static int resync_8x(void)
+{
+    if (open_world(BASIN) || drive(eight, 4))
+        return 1;
+    for (unsigned resyncs = 1; resyncs <= 2; ++resyncs) {
+        inject_mismatch();
+        unsigned n = 0;
+        while (n < 40 && lp->client.stats.resyncs < resyncs) {
+            now += 1.0 / 60;
+            CHECK(local_frame(eight(n++), now));
+        }
+        for (unsigned k = 0; k < 4; ++k) {
+            now += 1.0 / 60;
+            CHECK(local_frame(eight(n++), now));
+        }
+        if (repaired(resyncs))
+            return 1;
+    }
     return 0;
 }
 
@@ -603,15 +659,28 @@ static int bench(void)
         total / frames, worst, frames);
     printf("outer 8x 0.1 s frames (G = 96): mean %.3f ms, worst %.3f ms over %u frames\n",
         total_96 / frames, worst_96, frames);
-    // The direct path for the same 16-tick frames, with presentation, as the local frames above.
+    // The direct path for the same frames, with presentation, as the local frames above.
     play_open(&direct);
-    clock_t start = clock();
-    for (unsigned n = 0; n < frames; ++n) {
+    worst = total = worst_96 = total_96 = 0;
+    for (unsigned n = 0; n < 2 * frames; ++n) {
+        Frame f = eight(n);
+        if (n >= frames)
+            f.seconds = .1;
         expected_count = 0;
-        direct_frame(eight(n));
+        clock_t start = clock();
+        direct_frame(f);
+        double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;
+        if (n < frames) {
+            total += ms;
+            worst = fmax(worst, ms);
+        } else {
+            total_96 += ms;
+            worst_96 = fmax(worst_96, ms);
+        }
     }
-    printf("direct path, outer 8x 60 Hz: mean %.3f ms per frame\n",
-        (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC / frames);
+    printf("direct path, outer 8x 60 Hz: mean %.3f ms, worst %.3f ms\n", total / frames, worst);
+    printf(
+        "direct path, outer 8x G = 96: mean %.3f ms, worst %.3f ms\n", total_96 / frames, worst_96);
     return 0;
 }
 
@@ -639,6 +708,7 @@ int main(int argc, char **argv)
         TEST_CASE(startup_failure),
         TEST_CASE(queue_saturation),
         TEST_CASE(resync_escalation),
+        TEST_CASE(resync_8x),
         TEST_CASE(private_range),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
