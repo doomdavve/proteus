@@ -436,7 +436,8 @@ if(NOT EMSCRIPTEN)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
   # AR6 (L0): private free boating as a local authority and client (native only for now). The
   # glue is a library so validate_boat_local drives the game's own code.
-  add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h)
+  add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
+    tools/wake_velocity_course.c tools/wake_velocity_course.h)
   target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
   target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net)
   target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
@@ -1196,7 +1197,7 @@ add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 # AR6 (L0): the private local session against the game's direct free-boating path.
 add_executable(validate_boat_local tools/validate_boat_local.c)
-target_link_libraries(validate_boat_local PRIVATE proteus_local_drive)
+target_link_libraries(validate_boat_local PRIVATE proteus_local_drive proteus_boat_fixtures)
 target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_local validate_boat_local LABELS core cpu)
 

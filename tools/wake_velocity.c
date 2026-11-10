@@ -1255,14 +1255,16 @@ static int study(int argc, char **argv)
         goto cleanup;
     }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    // AR6 (L0) and L6: plain free boating, live, scripted (`--demo`) or captured, runs as a local
-    // authority and client. Voyages, objectives, courses, the working harbour, rooms and the
-    // developer studies keep the direct path until their ledger rows migrate them.
+    // AR6 (L0), L6 and L2: plain free boating and the time trial (bundled or a course package),
+    // live, scripted (`--demo`) or captured, run as a local authority and client. Voyages,
+    // objectives, the working harbour, rooms, replay viewing and the developer studies keep the
+    // direct path until their ledger rows migrate them.
     static WakeLocal local;
 #define LOCAL_ELIGIBLE()                                                                           \
-    (!networked && !work_mode && !course && objects && !objects->crossing && !wake                 \
-        && !session.voyage_route && !session.runs.playing && plugin_active && !plugin.authoring    \
-        && plugin.host.kind == BOAT_PLUGIN_KIND_FREE && !plugin.objective.initialized)
+    (!networked && !work_mode && objects && !objects->crossing && !wake && !session.voyage_route   \
+        && !session.runs.playing && plugin_active && !plugin.authoring                             \
+        && plugin.host.kind == (course ? BOAT_PLUGIN_KIND_COURSE : BOAT_PLUGIN_KIND_FREE)          \
+        && !plugin.objective.initialized)
 #endif
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;

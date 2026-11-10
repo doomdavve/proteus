@@ -3,15 +3,21 @@
  * game's direct free-boating path (BoatSession stepped by timed_boat_step with the arcade wake
  * pool) beside a local session fed the same frames, and requires bit-identical boats and wake
  * pools at every predicted tick and at every frame's authority tick. The L6 cases drive both with
- * the scripted drive instead (demo_step against the glue's scripted frames and capture drive).
+ * the scripted drive instead (demo_step against the glue's scripted frames and capture drive). The
+ * L2 cases run the time trial: a course autopilot through the direct session's own course and
+ * recorder beside the local authority's course adapter, with equal course state, runs, bests,
+ * notices and save requests after every frame.
  * Frame time is a scripted value, never wall time. `--bench` reports per-frame cost (not a test).
  */
+#include "boat_fixtures.h"
 #include "boat_helm.h"
 #include "boat_local.h"
 #include "boat_test_cases.h"
 #include "boat_test_world.h"
 #include "boat_time_control.h"
 #include "wake_velocity_local.h"
+
+#include "raymath.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -70,6 +76,13 @@ static Expected expected[TRACE];
 // L6: both paths take the scripted drive (demo_step; the glue's scripted frames) instead of the
 // frames' helm.
 static bool scripted;
+// L2: both paths take the course autopilot, each tracking the gates from its own boat.
+typedef struct {
+    BoatCourse course;
+    Vector2 previous;
+} Pilot;
+static Pilot pilots[2];
+static bool autopilot;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -133,6 +146,38 @@ static bool same_presentation(const BoatPresentation *a, const BoatPresentation 
     return true;
 }
 
+static void pilot_reset(Pilot *p, const Boat *boat)
+{
+    *p = (Pilot) { .course = { .enabled = true, .definition = &boat_fixture_course_default },
+        .previous = boat->position };
+}
+
+// The banked-course controller (tools/validate_boat_replay.c) at a time trial's pace: the next
+// gate from the boat's own crossings, full throttle on the straights.
+static BoatInput pilot_input(Pilot *p, const Boat *b)
+{
+    boat_course_step(&p->course, p->previous, b->position, BOAT_TICK_SECONDS);
+    p->previous = b->position;
+    int gate = p->course.next_gate < BOAT_COURSE_GATES ? p->course.next_gate : 0;
+    Vector2 target = boat_fixture_course_gates[gate].centre;
+    target.y -= 2;
+    Vector2 delta = Vector2Subtract(target, b->position);
+    float error = remainderf(atan2f(delta.x, -delta.y) - b->heading, 2 * PI);
+    float wheel = Clamp(3.0f * error - .7f * b->yaw_velocity, -1, 1);
+    float throttle = fabsf(error) > .4f ? .25f : 1;
+    return (BoatInput) { .steering_rate = Clamp((wheel - b->wheel) / BOAT_STEP, -1, 1),
+        .throttle_rate
+        = Clamp((throttle - b->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
+}
+
+static BoatInput pilot_script(void *context, const Boat *predicted, uint64_t tick)
+{
+    (void)tick;
+    return pilot_input(context, predicted);
+}
+
+static const BoatLocalScript PILOT = { &pilots[1], pilot_script };
+
 // The game's direct free-boating branch for one frame.
 static void direct_frame(Frame f)
 {
@@ -146,6 +191,8 @@ static void direct_frame(Frame f)
         BoatSession *s = &direct.session;
         if (scripted)
             demo_step(s, (int)s->tick, NULL, NULL, &direct.objects);
+        else if (autopilot)
+            timed_boat_step(s, pilot_input(&pilots[0], &s->boat), NULL, NULL, &direct.objects);
         else
             timed_boat_step(s,
                 boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
@@ -194,12 +241,48 @@ static bool local_frame(Frame f, double at)
         play.accumulator = 0;
     else
         play.accumulator += boat_time_frame_seconds(f.seconds, f.speed);
-    if (scripted)
+    if (scripted || autopilot)
         return wake_local_scripted_frame(
             &game, &play.session, &play.objects, &play.accumulator, at, NULL);
     return wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
         (BoatInput) { .steering_rate = f.steering_rate }, f.thrust_target, f.steering_target, at,
         NULL);
+}
+
+static bool same_text(const char *a, const char *b) { return a == b || (a && b && !strcmp(a, b)); }
+
+static bool same_run(const BoatReplay *a, const BoatReplay *b)
+{
+    if (a->count != b->count || a->complete != b->complete || a->failed != b->failed
+        || a->waves != b->waves || memcmp(a->splits, b->splits, sizeof(a->splits)))
+        return false;
+    for (size_t i = 0; i < a->count; ++i) {
+        const BoatReplaySample *x = &a->samples[i], *y = &b->samples[i];
+        // Field by field: the sample has padding.
+        if (x->at != y->at || memcmp(&x->position, &y->position, sizeof(Vector2))
+            || memcmp(&x->velocity, &y->velocity, sizeof(Vector2)) || x->heading != y->heading
+            || x->height != y->height || x->pitch != y->pitch || x->roll != y->roll
+            || x->engine_angle != y->engine_angle || x->wheel != y->wheel
+            || x->throttle != y->throttle || x->engine_response != y->engine_response
+            || x->camera_heading != y->camera_heading || x->world_time != y->world_time)
+            return false;
+    }
+    return true;
+}
+
+// L2: the client's course view and the session's runs equal the direct session's.
+static bool same_course(void)
+{
+    const BoatCourse *a = &direct.session.course, *b = &play.session.course;
+    if (a->enabled != b->enabled || a->next_gate != b->next_gate || a->elapsed != b->elapsed
+        || memcmp(a->splits, b->splits, sizeof(a->splits))
+        || memcmp(a->crossing, b->crossing, sizeof(a->crossing)))
+        return false;
+    const BoatReplayRuns *r = &direct.session.runs, *q = &play.session.runs;
+    return r->finished == q->finished && r->practice == q->practice && r->save_best == q->save_best
+        && r->export_last == q->export_last && r->report_finish == q->report_finish
+        && same_text(r->notice, q->notice) && same_run(&r->last, &q->last)
+        && same_run(&r->best, &q->best) && same_run(&r->opponent, &q->opponent);
 }
 
 // Run FRAMES of SCRIPT through both paths; compare at every tick and after every frame.
@@ -208,6 +291,13 @@ static int drive(Script script, unsigned frames)
     for (unsigned n = 0; n < frames; ++n) {
         Frame f = script(n);
         expected_count = 0;
+        // The game's practice latch: altered time before the attempt finished.
+        if (autopilot && f.speed != BOAT_TIME_NORMAL && !f.paused)
+            for (unsigned i = 0; i < 2; ++i) {
+                BoatReplayRuns *runs = i ? &play.session.runs : &direct.session.runs;
+                if (!runs->finished)
+                    runs->practice = true;
+            }
         direct_frame(f);
         unsigned before = observed;
         uint64_t tick = lp->tick;
@@ -229,6 +319,13 @@ static int drive(Script script, unsigned frames)
         CHECK(observed - before == ticks);
         CHECK(mismatches == 0);
         CHECK(same_authority());
+        if (autopilot) {
+            CHECK(same_course());
+            // The frame's storage service: both flush (an empty best path fails the save).
+            boat_session_flush(&direct.session);
+            boat_session_flush(&play.session);
+            CHECK(same_course());
+        }
     }
     return 0;
 }
@@ -236,7 +333,8 @@ static int drive(Script script, unsigned frames)
 static int open_world(World w)
 {
     world = w;
-    scripted = false;
+    scripted = autopilot = false;
+    game.script = NULL;
     play_open(&direct);
     play_open(&play);
     now = 100;
@@ -690,6 +788,173 @@ static int private_range(void)
     return 0;
 }
 
+// L2: a time trial as the game opens one: the course start, recording runs, the pool reset after
+// the start. No best path, so a new best's save fails (the storage failure path) without files.
+static void course_open(Play *p)
+{
+    boat_session_init(&p->session, test_world(world.location), world_water());
+    boat_session_set_course_definition(&p->session, &boat_fixture_course_default);
+    boat_session_start_course(&p->session);
+    p->session.record_runs = true;
+    p->session.runs.ghost_visible = true;
+    object_study_reset(
+        &p->objects, &p->session, false, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT);
+    p->accumulator = 0;
+}
+
+static void course_pilots(void)
+{
+    pilot_reset(&pilots[0], &direct.session.boat);
+    pilot_reset(&pilots[1], &play.session.boat);
+}
+
+static int open_course(World w)
+{
+    if (open_world(w))
+        return 1;
+    boat_session_destroy(&direct.session);
+    boat_session_destroy(&play.session);
+    wake_local_close(&game);
+    course_open(&direct);
+    course_open(&play);
+    autopilot = true;
+    game.script = &PILOT;
+    course_pilots();
+    CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
+    CHECK(game.course_active && same_authority() && same_course());
+    return 0;
+}
+
+static int restart_course(void)
+{
+    if (restart_both())
+        return 1;
+    course_pilots();
+    CHECK(same_course() && play.session.course.next_gate == 0 && !play.session.runs.finished);
+    return 0;
+}
+
+// Time-trial frames: 1x with an occasional 0.1 s frame (12-tick grants), or 8x.
+static Frame trial(unsigned n)
+{
+    return (Frame) {
+        .seconds = n % 7 == 3 ? .1 : 1.0 / 60, .speed = BOAT_TIME_NORMAL, .steering_target = NAN
+    };
+}
+
+static Frame trial_8x(unsigned n)
+{
+    Frame f = trial(n);
+    f.speed = BOAT_TIME_MAX_INDEX;
+    return f;
+}
+
+// Drive SCRIPT until both paths finished the attempt and a few frames beyond.
+static int attempt(Script script)
+{
+    unsigned frames = 0;
+    while (!direct.session.runs.finished && frames < 20000) {
+        if (drive(script, 1))
+            return 1;
+        ++frames;
+    }
+    CHECK(direct.session.runs.finished && play.session.runs.finished);
+    if (drive(script, 30))
+        return 1;
+    CHECK(direct.session.course.next_gate == BOAT_COURSE_GATES);
+    return clean_commands();
+}
+
+// Equal course progress, splits, finish and recorded run from the same commands; best selection
+// (a first finish is a new best, an equal time is not, beating a slower saved best is); the save
+// request's failure notice; a restart starts a new attempt against the new best as ghost.
+static int course_trace(void)
+{
+    if (open_course(BASIN) || attempt(trial))
+        return 1;
+    const BoatReplayRuns *runs = &play.session.runs;
+    CHECK(runs->last.complete && runs->best.complete && runs->last.count > 1000);
+    CHECK(!strcmp(runs->notice, "New best kept in memory; could not save to disk"));
+    double time = runs->best.splits[BOAT_COURSE_GATES - 1];
+    printf("time trial: %.3f s, %zu samples\n", time, runs->last.count);
+    if (restart_course() || attempt(trial))
+        return 1;
+    CHECK(!strcmp(runs->notice, "Run recorded") && !runs->save_best);
+    CHECK(runs->best.splits[BOAT_COURSE_GATES - 1] == time && runs->opponent.complete);
+    // A slower saved best: the next finish replaces it.
+    direct.session.runs.best.splits[BOAT_COURSE_GATES - 1] += 1;
+    play.session.runs.best.splits[BOAT_COURSE_GATES - 1] += 1;
+    if (restart_course() || attempt(trial))
+        return 1;
+    CHECK(!strcmp(runs->notice, "New best kept in memory; could not save to disk"));
+    CHECK(runs->best.splits[BOAT_COURSE_GATES - 1] == time);
+    CHECK(lp->generation == 3);
+    return 0;
+}
+
+// Altered time latches practice: the run is recorded but never replaces the best or saves, in
+// waves too; the next attempt at 1x is not practice.
+static int course_practice(void)
+{
+    World w = BASIN;
+    w.waves = true;
+    if (open_course(w) || attempt(trial_8x))
+        return 1;
+    const BoatReplayRuns *runs = &play.session.runs;
+    CHECK(runs->practice && runs->last.complete && runs->last.waves && !runs->best.complete);
+    CHECK(!strcmp(runs->notice, "Practice recorded; best and export preserved"));
+    CHECK(!runs->save_best && !runs->export_last);
+    if (restart_course())
+        return 1;
+    CHECK(!runs->practice);
+    if (drive(trial, 300))
+        return 1;
+    CHECK(!runs->practice && play.session.course.elapsed > 0);
+    return clean_commands();
+}
+
+// The course codec: its private state round-trips into the view and rejects malformed bytes.
+static int course_state(void)
+{
+    WakeCourseAuthority a = { 0 };
+    BoatSession s = { 0 };
+    s.course_definition = &boat_fixture_course_default;
+    s.presentation_enabled = true;
+    wake_course_init(&a, &s, 0);
+    a.course.next_gate = 2;
+    a.course.elapsed = 12.5;
+    a.course.splits[0] = 1.25;
+    a.course.crossing[1] = .5;
+    a.practice = true;
+    uint8_t bytes[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t size = wake_course_encode(&a, bytes);
+    CHECK(size == WAKE_COURSE_STATE_BYTES);
+    s.course = (BoatCourse) { .enabled = true, .definition = &boat_fixture_course_default };
+    CHECK(wake_course_view(bytes, size, &s));
+    CHECK(s.course.next_gate == 2 && s.course.elapsed == 12.5 && s.course.splits[0] == 1.25
+        && s.course.crossing[1] == .5 && s.course.enabled && s.runs.practice);
+    CHECK(!wake_course_view(bytes, size - 1, &s));
+    bytes[0] = BOAT_COURSE_GATES + 1;
+    CHECK(!wake_course_view(bytes, size, &s) && s.course.next_gate == 2);
+    // The private state message: decoded only as private state, never as v14.
+    BoatNetHeader header = { .epoch = 3, .sequence = 9, .tick = 40 }, back;
+    uint8_t message[BOAT_NET_MAX_MESSAGE], state[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t length = boat_net_private_encode_state(&header, bytes, size, message), got = 0;
+    CHECK(length == BOAT_NET_HEADER_BYTES + size && boat_net_private_message(message, length));
+    static BoatNetMessage decoded;
+    CHECK(boat_net_decode(message, length, &decoded) == BOAT_NET_BAD_TYPE);
+    BoatNetInputBatch batch;
+    CHECK(boat_net_private_decode_input(message, length, &back, &batch) == BOAT_NET_BAD_TYPE);
+    CHECK(boat_net_private_decode_state(message, length, &back, state, &got) == BOAT_NET_OK);
+    CHECK(got == size && !memcmp(state, bytes, size) && back.tick == 40 && back.epoch == 3);
+    CHECK(boat_net_private_decode_state(message, length - 1, &back, state, &got) != BOAT_NET_OK);
+    CHECK(!boat_net_private_encode_state(&header, bytes, 0, message));
+    CHECK(
+        !boat_net_private_encode_state(&header, bytes, BOAT_NET_PRIVATE_STATE_BYTES + 1, message));
+    wake_course_destroy(&a);
+    return 0;
+}
+
 // Per-frame cost at 8x on outer: processor time of one frame's grant through both endpoints.
 static int bench(void)
 {
@@ -772,6 +1037,9 @@ int main(int argc, char **argv)
         TEST_CASE(resync_escalation),
         TEST_CASE(resync_8x),
         TEST_CASE(private_range),
+        SLOW_CASE(course_trace),
+        SLOW_CASE(course_practice),
+        TEST_CASE(course_state),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     boat_local_stop(lp);
