@@ -15,7 +15,17 @@
 #include <unistd.h>
 #endif
 
+// The browser evaluates objectives (and runs its page panel's actions) through the isolated
+// worker policy below; native evaluates synchronously. A native validator selects the browser
+// policy with WAKE_PLUGIN_ISOLATED_OBJECTIVE=1 over a C model of the page bridges (AR3e).
+#ifndef WAKE_PLUGIN_ISOLATED_OBJECTIVE
 #ifdef __EMSCRIPTEN__
+#define WAKE_PLUGIN_ISOLATED_OBJECTIVE 1
+#else
+#define WAKE_PLUGIN_ISOLATED_OBJECTIVE 0
+#endif
+#endif
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE || defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
 #endif
 
@@ -141,7 +151,7 @@ static bool scene_differs(const BoatPluginRevision *active, const BoatPluginRevi
     return active->voyage.has_scene != candidate->voyage.has_scene
         || active->voyage.scene_digest != candidate->voyage.scene_digest;
 }
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
 struct WakePluginEvaluation {
     BoatPluginEvalRequest request;
     unsigned job;
@@ -262,7 +272,7 @@ bool wake_plugin_waiting(const WakePlugin *plugin) { return plugin->evaluation !
 
 void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
 {
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     close_evaluation(plugin);
 #endif
     plugin->objective = (BoatPluginObjective) { .generation = ++plugin->generation, .rng = 12345 };
@@ -283,7 +293,7 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
                 "objective clock or generation exhausted");
             return;
         }
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
         if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_INIT, (int64_t)session->tick, r)) {
             plugin->objective.quarantined = true;
             plugin->objective_diagnostic.status = BOAT_PLUGIN_IO;
@@ -348,7 +358,7 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
     if (session->tick % 12 || (int64_t)session->tick <= plugin->objective.tick
         || plugin->objective_pending)
         return;
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_UPDATE, (int64_t)session->tick, r)) {
         plugin->objective.quarantined = true;
         plugin->objective_diagnostic.status = BOAT_PLUGIN_IO;
@@ -497,7 +507,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     bool undo = plugin->host.undo;
     const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
     if (change == BOAT_PLUGIN_MIGRATE && held) {
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
         if (!plugin->evaluation_migrated) {
             if (session->tick > INT64_MAX || plugin->generation == UINT_MAX
                 || !begin_evaluation(
@@ -721,7 +731,7 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
         }
         session->world.scene = NULL;
     }
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     close_evaluation(plugin);
     wake_web_objective_shutdown();
 #endif
@@ -1021,7 +1031,7 @@ bool wake_plugin_frame(
     if (!plugin->authoring)
         return false;
     plugin->frame_now = now;
-#ifdef __EMSCRIPTEN__
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     unsigned actions = wake_web_plugin_actions();
     if (plugin->evaluation
         && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE

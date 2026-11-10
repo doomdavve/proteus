@@ -502,6 +502,11 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   session with identical input to Långedrag and compares the boat, the water and every voyage
   field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
   check that `--plugin` is refused with a room, the course, another location or a missing package.
+  `wake_plugin_objective` runs `validate_wake_plugin_objective`, which compiles the game's browser
+  objective policy natively (`WAKE_PLUGIN_ISOLATED_OBJECTIVE=1`) over a C model of the page
+  bridges and checks, on virtual time, a reply first accepted exactly at its 5 s deadline
+  (rejected) and just before it (accepted, published at T+1), stale and failed receipts, BUSY
+  controls, and reset/close cleanup over repeated sessions.
 - `boat_plugin_catalog` (PD1/PD5) decodes every generated entry and proves it equals evaluating
   its embedded source, that the basin-free, outer-voyage and time-trial defaults equal
   the shipped `proteus_boat_fixtures` values, and that catalog decoding creates no Lua state (the

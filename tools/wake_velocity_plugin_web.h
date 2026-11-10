@@ -4,7 +4,8 @@
 // (Module.boatPluginOwner/Notice/Editing/Actions/ResetPending/MenuOpen), package export
 // (Module.boatPluginExport) and the isolated objective evaluator (Module.boatPluginObjective,
 // web/plugin_objective.js). Only the browser build compiles wake_velocity_plugin_web.c; the
-// request/acceptance policy, deadlines and the T/T+1 gate stay in wake_velocity_plugin.c.
+// request/acceptance policy, deadlines and the T/T+1 gate stay in wake_velocity_plugin.c, which
+// validate_wake_plugin_objective compiles natively over a C model of these functions (AR3e).
 #include <stdbool.h>
 
 // Publish the active revision's owner identity and status line.
