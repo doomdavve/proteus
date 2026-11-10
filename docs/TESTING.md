@@ -3,9 +3,9 @@
 `boat_sandbox_save` (SV1b, `cpu;quick`) checks the sandbox save's byte format, header-only discovery, corruption and
 bounds, compatibility verdicts, the work digest and the pure autosave policy (SV1c) on byte buffers and virtual
 ticks only. `boat_file` (SV1d, `cpu;quick`) checks atomic writes with `.bak`, failed writes, set-aside, bounded listing and
-reads in a build-tree directory. `boat_work_menu` (SV1h, `cpu;quick`) checks the Single Player menu's save discovery in build-tree directories (none, one, corrupt, newer format, changed package, many files, ignored names, fixed time zone), set-aside, delete-only-that-package and the SAVE row's confirmations with no clock, plus the save identity's writer string. `wake_velocity_title_start.outer-working-harbour` (slow lane) starts the menu's content without a window. No title capture is a CTest (it needs a window): run `wake_velocity --title --screenshot FILE --content working-harbour --data-dir DIR [--save-mode new --ask]` by hand. `cargo_sandbox_save_*` and `cargo_sandbox_autosave*` (SV1d, slow lane) write, resume and
+reads in a build-tree directory. `app_input` (AR2a, `cpu;quick`) drives the pause menu's `boat_menu_update` with synthetic `BoatAppInput` values (navigation wrap, per-row activation, steering/fullscreen turns, pointer hover/press, menu clock); no window or raylib input. `boat_work_menu` (SV1h, `cpu;quick`) checks the Single Player menu's save discovery in build-tree directories (none, one, corrupt, newer format, changed package, many files, ignored names, fixed time zone), set-aside, delete-only-that-package and the SAVE row's confirmations with no clock, plus the save identity's writer string. `wake_velocity_title_start.outer-working-harbour` (slow lane) starts the menu's content without a window. No title capture is a CTest (it needs a window): run `wake_velocity --title --screenshot FILE --content working-harbour --data-dir DIR [--save-mode new --ask]` by hand. `cargo_sandbox_save_*` and `cargo_sandbox_autosave*` (SV1d, slow lane) write, resume and
 reject saves under `build/sandbox-save-tests` and drive the loop's autosave on a virtual clock; none touches the user's
-data directory; each fails on the program's exit code (`--expect resumed|rejected`). `cargo_sandbox_scene_survives_reset`
+data directory; each fails on the program's exit code (`--expect resumed|rejected`; a rejected fixture is moved back afterwards, so `ctest --repeat` can rerun it). `cargo_sandbox_scene_survives_reset`
 (`--scene-check`) requires a session reset to keep the package's scene, with its custom notice. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
 resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
 
@@ -502,6 +502,11 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   session with identical input to Långedrag and compares the boat, the water and every voyage
   field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
   check that `--plugin` is refused with a room, the course, another location or a missing package.
+  `wake_plugin_objective` runs `validate_wake_plugin_objective`, which compiles the game's browser
+  objective policy natively (`WAKE_PLUGIN_ISOLATED_OBJECTIVE=1`) over a C model of the page
+  bridges and checks, on virtual time, a reply first accepted exactly at its 5 s deadline
+  (rejected) and just before it (accepted, published at T+1), stale and failed receipts, BUSY
+  controls, and reset/close cleanup over repeated sessions.
 - `boat_plugin_catalog` (PD1/PD5) decodes every generated entry and proves it equals evaluating
   its embedded source, that the basin-free, outer-voyage and time-trial defaults equal
   the shipped `proteus_boat_fixtures` values, and that catalog decoding creates no Lua state (the
@@ -579,6 +584,20 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   controlled speed. It prints both times, the exposed seconds and any capsizes.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
+- `platform_bridges` runs `tools/check_platform_bridges.py`: inline JavaScript (`EM_JS`,
+  `EM_ASM`, `emscripten_*run_script*`) lives only in CMake-selected `*_web.c` backends or in the
+  listed legacy files, each at exactly its recorded count; files migrated onto an application
+  service (title, game, input, console, plugin glue) do not reach its backends directly; and
+  `CMakeLists.txt` names `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
+  native test targets (`validate_boat_plugin_stage_web`). `platform_bridges_detects` is its
+  negative control.
+- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`. With comments and string
+  literals blanked, common plugin staging (`boat_plugin_stage.c` and its headers) includes no
+  OS/browser header and names no listed process, handle, Emscripten or platform-macro
+  identifier. Each platform backend includes none of a listed set of other platforms' headers,
+  only staging, its backends and `validate_boat_plugin_stage_web` include the private backend
+  header, and `proteus_plugins` lists each backend once. `plugin_stage_backend_self_test` (slow
+  lane) plants each violation in a temporary copy and checks that it is caught.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
 - `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
@@ -725,6 +744,35 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
+`boat_local` (AR6 ledger row L0, labels `core;cpu;quick`, each case under 100 ms) runs
+`tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
+glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
+scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
+with the arcade wake pool) beside a private local session (`src/boat_local.c`: one authority and
+one predicting client over the memory transport, driven by host grants) fed the same scripted
+frames through the glue, and requires bit-identical boats, presentations and wake pools at every
+predicted tick and at each frame's authority tick. Cases: `basin_1x`, `basin_quarter`, `basin_8x`, `outer_1x` and `outer_8x`
+(outer with waves, current and crossing water); `grant_96` (0.1 s frames and 0.25 s stalls
+clamped to 0.1 s at 8x, after a short first frame, so a grant of 96 starts mid-cadence and takes
+9 chunks); `grant_cap` (a frame refuses 97 ticks; the glue grants 96 and carries the rest);
+`odd_chunk_sizes` (uneven frame times: partial first chunks and odd remainders);
+`explorer_handling`; `pause_and_focus` (30 s of paused frames: no timeout, resync or close);
+`restart_generation` (a restart recreates both endpoints with the next generation; an
+old-generation command batch and READY are counted stale and change nothing); `repeated_sessions`
+(100 restarts); `startup_failure` (invalid configuration and a refused water recipe release
+everything); `queue_saturation` (an unreliable or reliable queue overflow stops the session
+instead of dropping a command batch silently); `resync_escalation` (an injected wake mismatch that
+one resync repairs, then one whose checkpoints are lost, which fails the session after three
+served resyncs); `resync_8x` (two quick mismatches at 8x with an advancing host clock are both
+repaired: the authority rate-limits private resyncs in granted ticks); and
+`private_range` (the private codec round-trips
+full precision; a hosted room counts the private type as malformed and rejects the sender). Each
+drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
+integrating a received command, no resync and zero prediction correction error. Frame time is a
+scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
+processor time per frame through the glue (with presentation) at 8x on `outer` for 16-tick frames
+and 96-tick grants, and the direct path with presentation for both.
+
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
 a few seconds. It covers:
 
@@ -841,8 +889,18 @@ Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_S
 obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 
-The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)) and the pinned interpreter
-(`proteus_lua`) sit outside both boundaries. Configure fails if `proteus_boat_core` or
+The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-free data library
+(`proteus_plugin_data`) and the pinned interpreter (`proteus_lua`) sit outside both boundaries.
+`plugin_data_boundary` (`tools/check_plugin_data_boundary.py`) checks that the data library and
+its data-only consumers (sandbox save, bundled catalog, `validate_boat_plugin_data`) include no
+evaluation, I/O or worker header and name no Lua, file, process or platform identifier, that
+their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and that the
+`proteus_plugin_data` source list matches the checker's files. With nm, the data archive's and
+each `--consumer-archive`'s undefined symbols must resolve to symbols defined by the listed
+archives or allowlisted libc/libm/raymath symbols.
+`plugin_data_boundary_self_test` (slow lane) plants each violation. `boat_plugin_data` runs
+`validate_boat_plugin_data`, which links only the catalog and plugin data, decodes every bundled
+entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or
 `proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
 or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
 for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).
@@ -1021,6 +1079,12 @@ stale epochs after Undo, virtual deadlines against a stuck process, F6 cancellat
 malformed/oversized output, syntax failure and the live F5/completion adapter. Its process
 completion loops await an external event; CTest supplies the failure deadline. No simulated
 clock is advanced to wait for a child. See [live descriptor staging](PLUGIN_API.md#live-descriptor-staging-p42).
+It also covers console queries: answer, syntax error, the exact five-second deadline, cancel and
+worker faults. `boat_plugin_stage_web` (quick) compiles the real common staging and browser
+backend natively against a C model of the page transport, runs workers in process and uses
+virtual time. It covers the empty-host launch receipt, rejected race/match packages, the 15 s
+query deadline message, job release after failed or unreadable queries, and replies at the
+160 KiB bridge limit. It does not run the page's JavaScript or a real Web Worker.
 
 P4.5 adds `boat_plugin_capture` (native, slow render lane): the same script with `--game`
 runs real CPU captures of every outer anchor, repeatable pinned evidence, a rejected candidate and

@@ -72,7 +72,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_scene_definition.c src/boat_scene_definition.h
   src/boat_marks.c src/boat_marks.h
   src/waterfront_flock.c src/waterfront_flock.h
-  src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
+  src/boat_input.h src/boat_helm.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
   src/boat_voyage.c src/boat_voyage.h src/boat_water.h src/boat_world.c src/boat_world.h
   src/geometry3d.h
@@ -144,17 +144,33 @@ if(NOT MSVC)
   target_link_libraries(proteus_lua PRIVATE m)
 endif()
 
-# The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
-# plus boat_plugin_io for reading a package directory. Core and net never link it.
-add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
-  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
-  src/boat_plugin_objective_codec.c)
-target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
+# AR5: plugin data and codecs. Manifest parsing, descriptor decoding and checks, digests, the
+# stage wire codec and the objective checkpoint codec over caller-owned bytes; no Lua, files,
+# processes or browser bridges (plugin_data_boundary). Data-only consumers link only this.
+add_library(proteus_plugin_data STATIC src/boat_plugin.c src/boat_plugin.h
+  src/boat_plugin_decode.h src/boat_plugin_revision.h src/boat_plugin_race.c
+  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c src/boat_plugin_wire.c
+  src/boat_plugin_wire.h)
+target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
+target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
+
+# The plugin host: restricted Lua evaluation, revisions, objective transitions, isolated
+# staging and boat_plugin_io for reading a package directory. Core and net never link it.
+add_library(proteus_plugins STATIC src/boat_plugin_load.c src/boat_plugin_load.h
+  src/boat_plugin_lua.c src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h
+  src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_state.c src/boat_plugin_state.h)
+target_link_libraries(proteus_plugins PUBLIC proteus_plugin_data PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
-  src/boat_plugin_eval.c src/boat_plugin_eval.h
-  src/boat_plugin_wire.c src/boat_plugin_wire.h)
+  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h)
+# AR4: one isolated-worker backend per platform behind the private boat_plugin_stage_backend.h.
+if(EMSCRIPTEN)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_web.c)
+elseif(WIN32)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_windows.c)
+else()
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_posix.c)
+endif()
 
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The
 # generated table and the lookup/decode helpers form a library that depends on proteus_plugins;
@@ -201,13 +217,15 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
-# SV1b: the sandbox save's byte format. Buffers only: no files, no Lua beyond proteus_plugins.
+# SV1b: the sandbox save's byte format. Buffers only: no files and no Lua (plugin data only).
 add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
-target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
+target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugin_data)
 target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
-target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
+# The work session steps the package's objective, so it links the Lua host.
+target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_plugins
+  proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
@@ -217,7 +235,8 @@ target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
-target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
+# Lookup and decode of pre-evaluated wire bytes: plugin data only, no Lua.
+target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugin_data)
 target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
@@ -299,9 +318,12 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
+  tools/wake_velocity_menu.c
   tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
-  tools/wake_velocity_work.h tools/boat_title.c
+  tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
+  tools/wake_velocity_controls.h
+  tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
@@ -309,9 +331,13 @@ target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu prote
 # WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
 # (tools/check_web_wasm.py proves it carries no Lua).
 if(EMSCRIPTEN)
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c
+    tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c
+    tools/wake_console_bridge_web.c tools/wake_velocity_controls_web.c)
 else()
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
+    tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c
+    tools/wake_velocity_controls.c)
   target_link_libraries(wake_velocity PRIVATE proteus_work_session)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -354,6 +380,7 @@ set(PROTEUS_BOAT_NET_SOURCES
   src/boat_net_mux.c src/boat_net_mux.h
   src/boat_net_client.c src/boat_net_client.h src/boat_net_memory.c src/boat_net_protocol.c
   src/boat_net_protocol.h src/boat_net_server.c src/boat_net_server.h src/boat_net_transport.h
+  src/boat_net_private.c src/boat_net_private.h src/boat_local.c src/boat_local.h
   src/boat_prediction.c src/boat_prediction.h src/boat_remote_view.c src/boat_remote_view.h)
 add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
 target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
@@ -407,9 +434,17 @@ if(NOT EMSCRIPTEN)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
+  # AR6 (L0): private free boating as a local authority and client (native only for now). The
+  # glue is a library so validate_boat_local drives the game's own code.
+  add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h)
+  target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+  target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net)
+  target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
+  target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
-  target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h)
+  target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h
+    tools/wake_velocity_servers.c tools/wake_velocity_servers.h)
   target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads proteus_json)
   add_executable(validate_boat_directory tools/validate_boat_directory.c tools/boat_directory.c)
   target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl
@@ -445,7 +480,8 @@ endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
-  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
+  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h
+  tools/wake_console_bridge.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
@@ -454,7 +490,8 @@ endif()
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c)
+  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c
+    tools/wake_velocity_servers_web.c tools/wake_velocity_plugin_web.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
@@ -463,11 +500,13 @@ endif()
 # build-tree data directory keeps the player's settings out of the test.
 set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
 file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
-add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c)
+add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c
+  tools/wake_velocity_input.c tools/wake_velocity_controls.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# The title reaches discovery only through wake_velocity_servers.h (stubbed here), so it links
+# the pure protocol for LAN room lists and no transport.
 target_link_libraries(validate_boat_title PRIVATE proteus_render proteus_work_save
-  proteus_frame_pacer proteus_boat_net_enet)
-target_compile_definitions(validate_boat_title PRIVATE PROTEUS_BOAT_NET=1)
+  proteus_frame_pacer proteus_boat_net)
 target_compile_options(validate_boat_title PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_title_settings COMMAND validate_boat_title "${BOAT_TITLE_SETTINGS_DIR}")
 set_tests_properties(boat_title_settings PROPERTIES LABELS "cpu")
@@ -590,6 +629,12 @@ target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
 target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
 set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
+# AR5: a data-only consumer. It links the catalog and plugin data only; no Lua or workers.
+add_executable(validate_boat_plugin_data tools/validate_boat_plugin_data.c)
+target_link_libraries(validate_boat_plugin_data PRIVATE proteus_plugin_catalog)
+target_compile_options(validate_boat_plugin_data PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_plugin_data COMMAND validate_boat_plugin_data)
+set_tests_properties(boat_plugin_data PROPERTIES LABELS "cpu;quick")
 add_executable(validate_boat_file tools/validate_boat_file.c)
 target_link_libraries(validate_boat_file PRIVATE proteus_file)
 target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
@@ -601,6 +646,13 @@ target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_
 target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
 set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
+# The pause menu's input handling, driven by synthetic BoatAppInput values (no window or raylib
+# input reads).
+add_executable(validate_app_input tools/validate_app_input.c tools/wake_velocity_menu.c)
+target_link_libraries(validate_app_input PRIVATE proteus_render)
+target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME app_input COMMAND validate_app_input)
+set_tests_properties(app_input PROPERTIES LABELS "cpu;quick")
 # The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
 add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
 target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
@@ -935,6 +987,16 @@ target_compile_definitions(validate_boat_plugin_session PRIVATE
   BOAT_PLUGIN_SESSION_DIR="${BOAT_PLUGIN_SESSION_DIR}")
 proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# AR3e: the browser objective policy compiled natively over a C model of its page bridges.
+add_executable(validate_wake_plugin_objective tools/validate_wake_plugin_objective.c
+  tools/wake_velocity_plugin.c)
+target_compile_definitions(validate_wake_plugin_objective PRIVATE
+  WAKE_PLUGIN_ISOLATED_OBJECTIVE=1)
+target_link_libraries(validate_wake_plugin_objective PRIVATE proteus_plugins
+  proteus_plugin_catalog proteus_boat_session)
+target_compile_options(validate_wake_plugin_objective PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(wake_plugin_objective validate_wake_plugin_objective LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # PD1: bundled catalog entries equal their evaluated sources and compiled defaults; no Lua VM.
 add_executable(validate_boat_plugin_catalog tools/validate_boat_plugin_catalog.c)
 target_link_libraries(validate_boat_plugin_catalog PRIVATE proteus_plugins proteus_plugin_catalog)
@@ -986,6 +1048,15 @@ if(NOT EMSCRIPTEN)
   add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
   set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
+  # AR4: the browser backend and common staging, compiled natively against a C model of the
+  # page transport; the archive's own staging objects are not pulled in.
+  add_executable(validate_boat_plugin_stage_web tools/validate_boat_plugin_stage_web.c
+    src/boat_plugin_stage.c src/boat_plugin_stage_web.c)
+  target_link_libraries(validate_boat_plugin_stage_web PRIVATE proteus_plugins)
+  target_compile_options(validate_boat_plugin_stage_web PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_plugin_stage_web COMMAND validate_boat_plugin_stage_web)
+  set_tests_properties(boat_plugin_stage_web PROPERTIES LABELS "cpu;quick"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 10)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
   add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
     tools/wake_velocity_plugin.c tools/wake_command.c)
@@ -1000,7 +1071,8 @@ if(NOT EMSCRIPTEN)
   # PC: the command layer, console input/scrollback and live scene application, headless under a
   # virtual clock and through the real isolated worker.
   add_executable(validate_wake_command tools/validate_wake_command.c
-    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c)
+    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c
+    tools/wake_console_bridge.c)
   target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_plugin_catalog
     proteus_boat_session)
   target_compile_options(validate_wake_command PRIVATE ${PROTEUS_WARNINGS})
@@ -1121,6 +1193,12 @@ target_link_libraries(validate_boat_net_mux PRIVATE proteus_boat_net)
 target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
+# AR6 (L0): the private local session against the game's direct free-boating path.
+add_executable(validate_boat_local tools/validate_boat_local.c)
+target_link_libraries(validate_boat_local PRIVATE proteus_local_drive)
+target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_local validate_boat_local LABELS core cpu)
+
 add_executable(validate_boat_net tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 # The same room harness over real ENet sockets on 127.0.0.1, still on a virtual clock. Cases
@@ -1263,6 +1341,44 @@ endif()
 add_test(NAME test_time COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_test_time.py --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(test_time PROPERTIES PASS_REGULAR_EXPRESSION "test_time=ok")
+# AR3: browser bridges live in CMake-selected *_web.c backends; migrated files use their services.
+add_test(NAME platform_bridges COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(platform_bridges PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "platform_bridges=ok")
+add_test(NAME platform_bridges_detects COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --self-test)
+set_tests_properties(platform_bridges_detects PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "platform_bridges_self_test=ok")
+# AR4: common plugin staging holds no OS handles, process launch or JavaScript bridges.
+add_test(NAME plugin_stage_backend COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(plugin_stage_backend PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_stage_backend=ok")
+add_test(NAME plugin_stage_backend_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_stage_backend self-test=ok")
+# AR5: plugin data and its data-only consumers need no Lua, files, processes or bridges.
+set(PLUGIN_DATA_BOUNDARY_NM)
+if(CMAKE_NM AND NOT MSVC)
+  set(PLUGIN_DATA_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_plugin_data>
+    --archive $<TARGET_FILE:proteus_boat_core> --archive $<TARGET_FILE:proteus_json>
+    --consumer-archive $<TARGET_FILE:proteus_sandbox_save>
+    --consumer-archive $<TARGET_FILE:proteus_plugin_catalog>)
+endif()
+add_test(NAME plugin_data_boundary COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} ${PLUGIN_DATA_BOUNDARY_NM})
+set_tests_properties(plugin_data_boundary PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary=ok")
+add_test(NAME plugin_data_boundary_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
+set_tests_properties(plugin_data_boundary_self_test PROPERTIES PASS_REGULAR_EXPRESSION
+  "plugin_data_boundary self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
@@ -1751,6 +1867,8 @@ set(PROTEUS_SLOW_TESTS
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
 endif()
+# About 0.2-0.4 s each: they copy and check a temporary tree once per planted violation.
+list(APPEND PROTEUS_SLOW_TESTS plugin_stage_backend_self_test plugin_data_boundary_self_test)
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
@@ -1791,7 +1909,8 @@ if(PROTEUS_OPTIMIZE_TESTS)
       validate_boat_map_index validate_boat_outer_map validate_boat_voyage validate_boat_fleet
       ambient_bake
       boat_server
-      proteus_boat_net validate_boat_net validate_boat_net_enet)
+      proteus_boat_net validate_boat_net validate_boat_net_enet validate_boat_local
+      proteus_local_drive)
     target_compile_options(${target} PRIVATE
       $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:AppleClang,Clang,GNU>>:-O2>)
   endforeach()

@@ -1,6 +1,7 @@
 #ifndef WAKE_VELOCITY_MENU_H
 #define WAKE_VELOCITY_MENU_H
 #include "raylib.h"
+#include "wake_velocity_input.h"
 
 #include <stdbool.h>
 
@@ -33,6 +34,7 @@ typedef struct {
 
 void boat_menu_open(BoatMenu *menu);
 // Keyboard and pointer input for one frame; P/Escape stay with the caller.
-BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt);
+BoatMenuChoice boat_menu_update(
+    BoatMenu *menu, const BoatAppInput *input, Camera2D camera, float dt);
 void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, bool networked);
 #endif

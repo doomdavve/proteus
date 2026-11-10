@@ -274,8 +274,8 @@ BoatFleetStats boat_fleet_solve(Boat boats[BOAT_FLEET_SLOTS], const bool active[
  * 1. Tick-boundary operations: queued spawns in request order against all placed hulls.
  * 2. Advance the shared wake pool once to n+1; births through n stay, and the water every boat
  *    reads this tick is frozen (the fleet's world never takes the D3 trail).
- * 3. Integrate each active boat from S[n] with its input and the same frozen world; no boat
- *    reads another's partial state. The results form the candidate fleet.
+ * 3. Integrate each active boat from S[n] with its input, its slot's handling and the same frozen
+ *    world; no boat reads another's partial state. The results form the candidate fleet.
  * 4. Simultaneous pair contacts on the candidates (boat_fleet_solve), then held slots return
  *    to their plane position and heading with no planar motion.
  * 5. Commit, sample every wet stern from the committed fleet and the pre-emission pool, then
@@ -313,7 +313,8 @@ bool boat_fleet_step(BoatFleet *fleet, const BoatInput inputs[BOAT_FLEET_SLOTS])
             input.steering_rate = 0;
         if (!isfinite(input.throttle_rate))
             input.throttle_rate = 0;
-        boat_step(&boats[i], &fleet->world, now, input);
+        boat_step_handling(&boats[i], &fleet->world, now, input,
+            fleet->handling[i] ? fleet->handling[i] : &boat_handling_speedboat);
     }
     fleet->stats = boat_fleet_solve(boats, active, &fleet->world, now);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)

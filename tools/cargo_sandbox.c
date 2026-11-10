@@ -953,7 +953,7 @@ int main(int argc, char **argv)
                 "scene\n"
                 "  [--expect resumed|rejected] (test fixture, with a save file) fails unless the "
                 "save\n"
-                "  resumed or was set aside as .rejected\n"
+                "  resumed or was set aside as .rejected (a rejected fixture is then restored)\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, N next site,\n"
                 "C return an unhooked, unlashed crate to its source pad, P pause, R reset.\n");
@@ -1049,6 +1049,16 @@ int main(int argc, char **argv)
                 stderr, "--expect %s: the save did not match (load result %d)\n", expect, loaded);
             boat_world_resources_destroy(&resources);
             return 1;
+        }
+        if (loaded == 2) {
+            // Restore the fixture so the test can repeat (ctest --repeat skips its setup).
+            char aside[1200];
+            snprintf(aside, sizeof(aside), "%s.rejected", save.path);
+            if (rename(aside, save.path)) {
+                fprintf(stderr, "--expect rejected: could not restore %s\n", save.path);
+                boat_world_resources_destroy(&resources);
+                return 1;
+            }
         }
     }
     static HarbourView harbour;

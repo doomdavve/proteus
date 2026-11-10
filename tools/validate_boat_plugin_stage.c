@@ -25,7 +25,7 @@ static void fault(const char *value)
 #endif
 }
 
-static int worker(void)
+static int worker(int (*real)(void))
 {
     const char *mode = getenv("PROTEUS_STAGE_TEST_FAULT");
     if (mode && !strcmp(mode, "invalid")) {
@@ -40,7 +40,7 @@ static int worker(void)
     if (mode && !strcmp(mode, "stuck")) {
         for (;;) { }
     }
-    return boat_plugin_stage_worker();
+    return real();
 }
 
 static bool replace_once(
@@ -73,10 +73,21 @@ static int completed(BoatPluginStageJob *job, BoatPluginHost *host)
     return result;
 }
 
+static int answered(BoatPluginStageJob *job, char *text, size_t capacity, BoatPluginDiagnostic *d)
+{
+    // No wall-clock sleeps or simulated timeout. Process completion is an external event;
+    // CTest supplies the failure deadline. Deadline behavior itself uses a virtual clock below.
+    int result;
+    while (!(result = boat_plugin_query_poll(job, text, capacity, d, .25))) { }
+    return result;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
-        return worker();
+        return worker(boat_plugin_stage_worker);
+    if (argc == 2 && !strcmp(argv[1], "--plugin-query-worker"))
+        return worker(boat_plugin_query_worker);
     BoatPluginFiles *files = calloc(1, sizeof(*files));
     WakePlugin *plugin = calloc(1, sizeof(*plugin));
     WakePluginPreview *checkpoint = calloc(1, sizeof(*checkpoint));
@@ -146,6 +157,54 @@ int main(int argc, char **argv)
         boat_plugin_stage_close(job);
     }
     fault("");
+    // Console queries share the worker lifecycle: answer, syntax error, exact deadline, cancel,
+    // faults.
+    char text[BOAT_PLUGIN_QUERY_REPLY_MAX];
+    BoatPluginDiagnostic qd;
+    unsigned numbered = host->numbered;
+    static char long_expression[BOAT_PLUGIN_QUERY_MAX + 1];
+    job = boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+        files->source_size, "def.voyage.shelters[1].name", 0);
+    CHECK(job);
+    qd = (BoatPluginDiagnostic) { 0 };
+    CHECK(answered(job, text, sizeof(text), &qd) == 1 && text[0]);
+    boat_plugin_stage_close(job);
+    CHECK(host->numbered == numbered && boat_plugin_host_active(host)->number == active);
+    job = boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, "return !!!", 10,
+        "def.voyage.shelters[1].name", 0);
+    CHECK(job && answered(job, text, sizeof(text), &qd) == -1 && qd.status == BOAT_PLUGIN_SYNTAX);
+    boat_plugin_stage_close(job);
+    fault("stuck");
+    job = boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+        files->source_size, "def.voyage.shelters[1].name", 0);
+    CHECK(job);
+    CHECK(boat_plugin_query_poll(job, text, sizeof(text), &qd, 4.75) == 0);
+    qd = (BoatPluginDiagnostic) { 0 };
+    CHECK(boat_plugin_query_poll(job, text, sizeof(text), &qd, 5) == -1);
+    CHECK(!qd.message[0]); // Native reports no deadline message.
+    boat_plugin_stage_close(job);
+    job = boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+        files->source_size, "def.voyage.shelters[1].name", 0);
+    CHECK(job);
+    boat_plugin_stage_close(job);
+    fault("");
+    for (unsigned i = 0; i < 2; ++i) {
+        fault(i ? "oversized" : "invalid");
+        job = boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+            files->source_size, "def.voyage.shelters[1].name", 0);
+        CHECK(job && answered(job, text, sizeof(text), &qd) == -1);
+        boat_plugin_stage_close(job);
+    }
+    fault("");
+    memset(long_expression, 'x', BOAT_PLUGIN_QUERY_MAX);
+    long_expression[BOAT_PLUGIN_QUERY_MAX] = 0;
+    CHECK(!boat_plugin_query_start(NULL, files->manifest, files->manifest_size, files->source,
+        files->source_size, "def.voyage.shelters[1].name", 0));
+    CHECK(!boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+        files->source_size, "def.voyage.shelters[1].name", NAN));
+    CHECK(!boat_plugin_query_start(argv[0], files->manifest, files->manifest_size, files->source,
+        files->source_size, long_expression, 0));
+    CHECK(host->numbered == numbered);
     // Worker syntax errors retain committed state, source and native route.
     memcpy(files->source, "return !!!", 10);
     files->source_size = 10;
@@ -225,6 +284,6 @@ int main(int argc, char **argv)
     free(plugin);
     free(files);
     puts("isolated staging: checked data, live ticks, held apply, Undo, stale epochs, deadlines, "
-         "cancellation, worker faults OK");
+         "cancellation, worker faults, queries OK");
     return 0;
 }

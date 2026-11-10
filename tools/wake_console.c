@@ -3,43 +3,12 @@
 #include "boat_ui.h"
 #include "raylib.h"
 #include "wake_command.h"
+#include "wake_console_bridge.h"
 #include <limits.h>
 
 #include <stdio.h>
 #include <string.h>
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-EM_JS(void, browser_console_sync, (const char *latest, const char *transcript), {
-    Module.boatConsoleCopy = UTF8ToString(latest);
-    Module.boatConsoleTranscript = UTF8ToString(transcript);
-    Module.boatConsoleLines = Module.boatConsoleTranscript.split('\n').filter(Boolean).slice(-64);
-})
-EM_JS(int, browser_console_paste, (char *text, int capacity), {
-    const paste = Module.boatConsolePaste;
-    if (paste == undefined)
-        return 0;
-    delete Module.boatConsolePaste;
-    if (lengthBytesUTF8(paste) >= capacity)
-        return -1;
-    stringToUTF8(paste, text, capacity);
-    return 1;
-})
-EM_JS(void, browser_console_reset_input, (void), {
-    Module.boatConsoleTabs = [];
-    delete Module.boatConsolePaste;
-})
-EM_JS(int, browser_console_tab, (void), {
-    return Module.boatConsoleTabs && Module.boatConsoleTabs.length ? Module.boatConsoleTabs.shift()
-                                                                   : 0;
-})
-EM_JS(void, browser_console_notice, (char *text, int capacity), {
-    if (!Module.boatConsoleClipboardNotice)
-        return;
-    stringToUTF8(Module.boatConsoleClipboardNotice, text, capacity);
-    delete Module.boatConsoleClipboardNotice;
-})
-#endif
 
 // Use the small face's natural advances for prose; only the ASCII drawing uses six-pixel cells.
 // Nine-pixel rows leave room for descenders and a visible block cursor.
@@ -115,14 +84,7 @@ size_t wake_console_transcript(const WakeConsole *console, bool all, char *out, 
 
 static void sync_browser(const WakeConsole *console)
 {
-#ifdef __EMSCRIPTEN__
-    static char latest[WAKE_CONSOLE_TRANSCRIPT], transcript[WAKE_CONSOLE_TRANSCRIPT];
-    wake_console_transcript(console, false, latest, sizeof(latest));
-    wake_console_transcript(console, true, transcript, sizeof(transcript));
-    browser_console_sync(latest, transcript);
-#else
-    (void)console;
-#endif
+    wake_console_bridge_sync(console);
 }
 
 void wake_console_init(WakeConsole *console)
@@ -456,53 +418,24 @@ bool wake_console_update(WakeConsole *console, int width, int height, char *out,
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_F2)
         || (!shift && (IsKeyPressed(KEY_GRAVE) || IsKeyPressed(161)))) {
         console->open = false;
-#ifdef __EMSCRIPTEN__
-        browser_console_reset_input();
-#endif
+        wake_console_bridge_closed();
         while (GetCharPressed()) { }
         return false;
     }
-#ifndef __EMSCRIPTEN__
-    if (shortcut && IsKeyPressed(KEY_C)) {
-        static char text[WAKE_CONSOLE_TRANSCRIPT];
-        if (wake_console_transcript(console, shift, text, sizeof(text))) {
-            SetClipboardText(text);
-            snprintf(console->notice, sizeof(console->notice), "Copied %s",
-                shift ? "scrollback" : "latest output");
-        } else
-            snprintf(console->notice, sizeof(console->notice), "Nothing to copy yet");
-    }
-    if (shortcut && IsKeyPressed(KEY_V))
-        wake_console_paste(console, GetClipboardText());
-#else
-    char text[WAKE_CONSOLE_INPUT];
-    int paste = browser_console_paste(text, sizeof(text));
-    if (paste > 0)
-        wake_console_paste(console, text);
-    else if (paste < 0)
-        snprintf(console->notice, sizeof(console->notice), "Paste too long (max %d)",
-            WAKE_CONSOLE_INPUT - 1);
-    browser_console_notice(console->notice, sizeof(console->notice));
-#endif
+    wake_console_bridge_clipboard(console, shortcut, shift);
     int character;
     while ((character = GetCharPressed()))
         if (!shortcut)
             wake_console_input(console, 0, character, out, capacity);
-#ifdef __EMSCRIPTEN__
-    int tab;
-    while ((tab = browser_console_tab()))
-        wake_console_complete(console, tab < 0);
-#endif
+    wake_console_bridge_complete(console);
     const int keys[] = { KEY_ENTER, KEY_KP_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_LEFT, KEY_RIGHT,
         KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_PAGE_UP, KEY_PAGE_DOWN };
     // Queued press events preserve quick release/re-presses between frames. Repeats are a
     // separate raylib signal, so a held editing key repeats without submitting Enter again.
     int queued_key;
     while ((queued_key = GetKeyPressed())) {
-#ifndef __EMSCRIPTEN__
-        if (queued_key == KEY_TAB)
+        if (queued_key == KEY_TAB && wake_console_bridge_tab_key())
             wake_console_complete(console, shift);
-#endif
         for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
             if (queued_key == keys[i]) {
                 if (wake_console_input(console, queued_key, 0, out, capacity))

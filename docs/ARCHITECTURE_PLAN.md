@@ -1,15 +1,15 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-09:** AR0 complete at `1fb9950`. AR1 [design](ARCHITECTURE_AR1.md) reviewed;
-the user accepted [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) as recommended.
-The AR1 PR (`arch/ar1-design`) awaits approval. No production refactor started; nothing played
-or browser-tested.
-**Open:** AR1 PR approval; platform, browser and real-time qualification.
+**Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
+for the single AR2–AR6 milestone PR, unpushed: AR2a, AR3a–AR3d, AR3f, AR4, AR5 and the AR6 pilot
+reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented and reviewed (2026-11-10).
+Nothing played, browser-built or Windows-built.
+**Open:** manual native, browser and Windows checks per step; the menu-gated touch tap (AR7);
+untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
-directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
-(AR10).
-**Next:** AR2–AR6 in AR1's order, starting with AR2a (input value → commands), the only
-prerequisite of the AR6 pilot (L0); then AR6, AR3, AR5, with AR4 independent.
+directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
+**Next:** the user's review and manual checks of the milestone PR; then AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -314,6 +314,36 @@ window, canvas and low-resolution coordinate conversion explicit. Produce UI act
 gameplay commands for the AR1 client boundary; shared UI gains no new direct mutation of
 authoritative state. Keep predicted controls distinct from commits.
 
+**AR2a status (2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played).**
+Implemented: `BoatAppInput` and `boat_app_input_sample(poll_touch)` in
+`tools/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
+per frame at the start of the `study()` frame body and once per frame in `boat_title_run`. It
+carries pressed navigation (up/down/left/right, confirm, activate, back, pause, time-scale
+bracket and backslash keys), held Backspace, the pointer in
+window pixels (position, delta, pressed, held; the web touch tap replaces position and press when
+polled) and held helm keys (steer left/right, throttle up/down, precision). Consumers migrated:
+the pause menu (`boat_menu_update` takes the value and reads no raylib input; its per-frame gate
+is the pure `boat_menu_gate`, covered by `app_input`), the Escape/P menu toggle, the time-scale
+bracket/backslash keys, the Backspace reset hold, the title's
+navigation/pointer/turn reads, the game loop's keyboard steering, throttle, precision, native
+mouse-steering delta and the replay timeline pointer. Scene-coordinate conversion stays in each
+consumer. Deliberately unchanged: precedence and event consumption (the menu still runs only
+when open and focused; `GetCharPressed`/`GetKeyPressed` text queues, the console, F-keys, camera
+and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon reads in
+`wake_velocity_net.c` (Space held for the gun, E and Q presses for grenade and torpedo), the
+`GetCharPressed` time-key characters and the browser mobile/mouse bridges still read their
+sources directly; AR6 owns moving the pausing/time-scale/restart consequences behind host
+management). The web touch tap is consumed by `boat_app_input_poll_touch` only on frames where
+`boat_menu_gate` holds, because the bridge's `click()` drains it; browser behaviour is not
+verified. Open for AR7: touch drain depends on menu state (AR2b kept it; see its status). Not
+done: turning the value into per-tick commands (AR6's client) and the remaining consumers above.
+Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
+`ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
+`boat_menu_update` with synthetic values, and `boat_title_settings`); CPU captures
+`--renderer cpu --screenshot ... --time 3` for basin and `--location outer` are byte-identical to
+a build of the AR1 parent. Owed: manual native windowed menu, title, steering and replay
+timeline check; browser keyboard/mouse/touch check.
+
 **AR2b: capabilities and operations.** Express actual capabilities such as
 application-controlled fullscreen and pointer capture, distinguishing support from mutable state
 (capture active). Move platform bridge functions into CMake-selected implementations; keep
@@ -323,6 +353,67 @@ Done when migrated shared UI code has no platform branches, menus expose the sam
 keyboard, mouse, touch, focus loss and capture keep their behavior. Verify focused
 selection/row/input-consumption contracts, native windowed menus/console/steering/fullscreen,
 and browser keyboard/mouse/touch layouts, resizing and focus transitions.
+
+#### AR2b status
+
+2026-11-10, branch `arch/ar2-pilot`, three commits on `f1ed07b`; reviewed 2026-11-10; not merged,
+played or browser-built (emcc was not installed).
+
+Implemented: the 14 inline browser bridges left in `wake_velocity.c` moved, bodies unchanged,
+into CMake-selected backends behind C wrappers (`wake_js_*` imports, called only in their file):
+
+| Capability | Contract | Native | Browser |
+| --- | --- | --- | --- |
+| Viewport, `wake_app_viewport` (app service) | The logical frame size the page settled on, read at the top of each frame | False: the frame does not follow the window | `Module.boatViewportSize`; the common resize path reallocates targets when it changes |
+| Touch controls, `wake_touch_*` in `wake_velocity_controls.h` | Session start/stop; MENU press; held buttons (bits) and tilt target; button height; presentation state, whose bits keep fullscreen support (8) apart from fullscreen active (16); hit rectangles; status line; tap | None: 0, NAN, 26, empty | `Module.boatMobile` |
+| Pointer capture, `wake_mouse_*` | Toggle press; capture request returning active (1), released by the platform (2), denied or unsupported (4); steering movement | M; cursor disabled/enabled when the request changes, always granted; the frame's pointer delta | `Module.boatMouse`; movement also drains the scroll wheel |
+| Fullscreen key, `wake_fullscreen_key_pressed` | The application's fullscreen toggle key | F11 | False: the browser keeps F11 |
+
+`study()` now runs one code path for viewport resizing, the touch drawing and hit layout, the MENU
+button, steering inputs, capture fallback and its hint, and the cleanup; `draw_touch_controls`
+returns at once natively (state 0). Gameplay decisions (when controls drive, the keyboard
+fallback, opening the menu on a platform release) stay in `study()`. `wake_velocity_input.c`
+reads the tap through `wake_touch_tap`; `tools/boat_web_touch.h` is gone. The call order is the
+same on both builds: viewport, input sample, MENU button, the gated tap, toggle, touch sample,
+target and height, capture (and its second request), movement and scroll, touch drawing; the
+session starts before the first frame and the cleanup releases capture, then the session. Audio
+unlock and the first frame stay with the app service (AR3f).
+
+Enforcement: `platform_bridges` drops `wake_velocity.c` from the legacy list (14 → 0; the stage
+worker's 1 remains) and forbids it the page objects, the emscripten header, cursor capture and
+the F11/M key reads; `wake_velocity_input.c` may not use inline JavaScript or `Module`. A
+self-test case covers the cursor rule.
+
+Decisions: touch, mouse, viewport and F11 are capabilities over the existing values, not new
+`BoatAppInput` fields, since their reads are ordered within the frame (each page call consumes
+or samples state) and moving them to the frame-start sample would change that order. No
+speculative fields: native returns the values the old `#else` paths used. The tap stays drained
+only on `boat_menu_gate` frames: the page keeps a tap while the game is inactive and drops it on
+active touch-sample frames, so draining every frame would drop taps that today select a menu row
+after help closes or focus returns. That is a behaviour change for AR7 (the mode migration)
+or the user, not AR2b.
+Remaining `__EMSCRIPTEN__` branches in `study()` (the browser's room-leave row, its plugin
+controls, the native tool bridge and room host) select policy or native-only adapters, not
+bridges.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10): each of the three
+commits builds warning-clean and passes `platform_bridges` and its self-test; a script that extracts
+every `EM_JS(...)` from `f1ed07b:tools/wake_velocity.c` and from the new files finds all 14
+byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the app backend's
+existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check passes for every
+`*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin and outer CPU
+captures are byte-identical to an `f1ed07b` build; `ctest --preset full`: 508/508 passed (13
+disabled) in 40 s.
+
+Owed (manual). Native windowed: F11 toggles borderless fullscreen in a session; M toggles mouse
+steering, the cursor hides while captured and returns on the menu, on M again and on leaving;
+mouse steering still turns the boat. Desktop browser: resizing the window re-fits the frame;
+M and a canvas click capture the pointer, Escape releases it and opens the menu with mouse mode
+kept, a denied capture shows MOUSE UNAVAILABLE and falls back to the keyboard; scrolling does
+nothing; F11 is the browser's. Phone browser: the touch buttons draw and drive (forward, reverse,
+left, right), MENU opens the menu and a tap selects a row, tilt and recenter work, FULLSCREEN
+toggles and its label follows, the status line shows, rotation re-lays the buttons, and leaving
+then starting another session leaves no held control.
 
 ### AR3 — Extract application platform services
 
@@ -351,6 +442,121 @@ Done when migrated common code contains no platform bridge bodies and success, f
 cancellation and repeated-session cleanup stay defined and verified, including the existing
 objective-worker checks (descriptor staging tests do not cover the bridge).
 
+#### AR3 status
+
+2026-11-10, branch `arch/ar2-pilot`, not merged; nothing played; no browser build (emcc was not
+installed).
+
+Implemented (AR3a–AR3f; AR3e is the objective seam under Decisions). Each service is a header
+in `tools/` with a native `.c` and a browser `_web.c` that CMake selects for `wake_velocity`; no
+call waits, and state keeps its previous owner (free functions, rule 10):
+
+| Service | Contract | Native | Browser | Migrated consumers |
+| --- | --- | --- | --- | --- |
+| Server discovery, `wake_velocity_servers.h` | Start/stop once per process; refresh; poll each title frame; count, compatibility, entry text, status; LAN open/query/receive/close (the title keeps its hint text) | `boat_directory`'s background client; ENet LAN broadcast | `Module.boatServers` page fetch; LAN open returns NULL | Title directory and LAN calls; `main` start/stop |
+| Scenery acquisition, `wake_velocity_scenery.h` | Startup; request; poll: pending with progress, ready or failed. Release stays `boat_scenery_unload` after every view | Every pack read at startup; request/poll ready at once | `Module.boatScenery` fetch; the caller's loading frame yields between polls | `scenery_ready` (the loading screen stays common) and startup |
+| Browser plugin bridges, `wake_velocity_plugin_web.h` | Authoring panel owner, editing and actions; package export; reset/menu controls; objective evaluator start/status/read/close/shutdown/checkpoint | None: native evaluates synchronously and saves package directories | EM_JS bodies private to the backend, behind C wrappers | `wake_velocity_plugin.c`; console export and controls in `wake_velocity.c` |
+| Application lifecycle, `wake_velocity_app.h` | Process clock; window flags; title open/close; canvas scale and refit; session canvas; session open | `GetTime`; hidden, or resizable with vsync; nothing; resolution scale; nothing; nothing; `--no-vsync` clears vsync | `performance.now`; no flags (the page sizes the canvas); 60 fps and audio inside the Play gesture, audio closed after; mobile-aware scale and `boatFitCanvas`; grow a smaller canvas; 60 fps | Plugin clock, both `SetConfigFlags`, title start/stop; `study()` window open and the resize path's scale and refit |
+| Scenery deferral, `wake_scenery_deferred` (scenery service) | Whether acquisition waits for the window | False | True: the first CPU draw and its capture wait for `scenery_ready` | `study()` |
+| Console bridge, `wake_console_bridge.h` | Transcript sync; closed; clipboard step; queued completions; whether Tab completes; text-entry availability; page state | Nothing; nothing; Ctrl/Cmd+C/V through raylib; nothing; yes; yes; nothing | Page transcript; drop queued Tab and paste; page paste and clipboard notice; page Tab queue; no; physical keyboard only; `Module.boatConsole*` | `wake_console.c`; console availability and state in `study()` |
+
+Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
+lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
+(`wake_velocity.c` had 14 for AR2b touch, mouse and viewport capabilities, now 0 and delisted; the
+native stage worker `tools/boat_plugin_stage_worker.c` 1; AR4's merge brought
+`src/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
+not reach a service's backends directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN
+branches or in the native test targets the check allowlists with a reason
+(`validate_boat_plugin_stage_web`, which compiles the browser staging backend against a C model of
+its page bridges). The CMake parser reads only the top-level file and single-line `if(...)` forms.
+`platform_bridges_detects` is its negative control. The title validator now links the protocol, not
+the ENet transport.
+
+Decisions (technical, recorded here):
+
+- Only bridge bodies moved for the objective evaluator. Its request copy and pinned identity,
+  stale and `now >= deadline` checks, staged commit, BUSY, reset deferral, quarantine and the
+  T/T+1 gate are unchanged in `wake_velocity_plugin.c` under the browser selection.
+- AR3e (after the AR4 merge): the browser objective branches in `wake_velocity_plugin.c` are
+  selected by `WAKE_PLUGIN_ISOLATED_OBJECTIVE` (1 under `__EMSCRIPTEN__`, else 0) instead of
+  `__EMSCRIPTEN__`, so both builds compile exactly what they did. `validate_wake_plugin_objective`
+  compiles the file with it set natively over a C model of `wake_velocity_plugin_web.h` and
+  evaluates requests with `boat_plugin_eval_execute`. Its cases (`wake_plugin_objective.*`,
+  quick) check a reply first accepted exactly at its 5 s deadline (rejected, quarantined) and
+  just before it (accepted, staged at T and published at T+1), stale and failed receipts, BUSY
+  controls, reset closing the in-flight job (a late reply is never read) and close releasing
+  every job over repeated sessions. Page bridges other than the objective's stay
+  `__EMSCRIPTEN__`, and the model is not the page: `web/plugin_objective.js` stays untested here.
+  The test opens `plugins/shelter-tour` once with its file watch off, so no frame reads the
+  package directory. Open: the MIGRATE evaluation paths (begin, accept and commit, cancel
+  through page actions 2 or 8) compile under the seam but have no case, since starting one
+  needs a staged revision with a changed objective.
+- EM_JS imports are called only inside their backend file, through C wrappers. Game and tools
+  bridges are named `wake_js_*`; the plugin stage backend (`src/boat_plugin_stage_web.c`, AR4)
+  keeps its `browser_*` names, since renaming them would be churn.
+- AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
+  wait and the deferred first CPU draw; the console's paste and notice before typed text and its
+  queued Tab after it. Native now calls `IsWindowFocused()` for the console state call, which
+  does nothing there. The console shader's GLSL version line stays a renderer branch.
+- Review fixes (2026-11-10): exact legacy counts, wider bridge patterns, string-aware comment
+  stripping, the CMake check, one source for the LAN hint, `wake_js_` names, and the clock
+  comment (a direct native `--plugin` launch stamps its first request before `InitWindow`).
+- Browser row layout and text, the default `ws://` address, touch, mouse, viewport and keyboard
+  bridges and native F11 are capabilities (AR2b), not services; AR2b has since moved the
+  touch, mouse, viewport and F11 ones ([status](#ar2b-status)).
+
+Persistence placement (the AR0 persistence row), unchanged by AR3; L2/L3 move these writes behind
+authority storage requests:
+
+| Write | When | Adapter today |
+| --- | --- | --- |
+| Course best/last replays (`boat_session_flush`, `boat_replay_save`) | After the frame's ticks; at session end | Temporary file and rename in the data directory; browser `/saves` IDBFS with `autoPersist` (`web/runtime.js`) |
+| Work autosave and leave-time save (`wake_work_save_frame`, `wake_work_save_leave`) | After the frame; on quit or title return | `boat_work_save` over `boat_file_write_atomic` (native only) |
+| Title settings (`boat_title_save`) | Each title choice and at exit | Plain `fopen` write in the data directory |
+| Plugin package (`wake_plugin_save`) or browser export | Console `save` | Temporary file and rename; browser download |
+| Performance report (F4), screenshots | On request | `wake_performance_export`, `ExportImage` |
+
+Left outside AR3:
+
+- AR2b, not AR3: the per-frame viewport bridge, mobile session start/stop, touch and mouse
+  bridges and native F11 remained in `study()` (moved by AR2b since).
+- Native-only adapters keep their files (AR0): `--host` child process, `--plugin-bridge`,
+  `--serve`, worker entry points.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug):
+
+- `cmake --build build -j` warning-clean; `ctest --preset full`: see
+  [current evidence](#current-evidence-and-limitations).
+- CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
+  byte-identical to a build of the parent `37316a4`. The title capture needs a display and was
+  not run.
+- Browser sources (`*_web.c`, title, game and plugin glue) pass `cc -fsyntax-only -Wall -Wextra
+  -D__EMSCRIPTEN__` against a stub `emscripten.h` that drops the JavaScript (scratch harness,
+  not committed); a call with wrong arguments fails it. This is not an Emscripten build.
+- Every AR3 commit builds natively warning-clean and passes the syntax check and
+  `platform_bridges` (`git rebase -x` over the range).
+- After the AR4/AR5 merge (2026-11-10, same machine): `ctest --preset full` and again with
+  `-j8` each passed 508/508 (13 disabled); every first-parent commit after the merge builds
+  warning-clean and passes the lint, plugin staging, objective and save tests (the merge passes
+  `platform_bridges` since its resolution was rewritten to carry the legacy-entry removal and
+  the native-test allowlist; the trees after it are unchanged); basin and outer CPU captures
+  are byte-identical to the pre-merge `8b6be48` build; the stub syntax check passes for every
+  `*_web.c`, title, game, console, plugin glue and staging source.
+
+Owed to the user. Native: the title's MULTIPLAYER panel lists public servers (or the directory
+status) and finds a LAN room hosted from a second instance; joining both works; leaving and
+reopening the panel searches again. `--location outer` and the outer title entry load
+scenery; settings persist across launches; a plugin console `save` writes the package. Browser:
+the title plays music after Play; the outer location shows LOADING with progress, then plays;
+the public server row and join work; authoring STAGE/APPLY/UNDO, console export download and an
+objective package (HUD updates, BUSY while evaluating) behave as before; fullscreen and
+resizing unchanged. AR3f, native: in a plugin session, open the console (`` ` `` or F2); Tab
+completes and Shift+Tab reverses; Ctrl/Cmd+C copies the latest output (Shift: scrollback) and
+Ctrl/Cmd+V pastes; Esc closes; `--no-vsync` still paces at 60 Hz. AR3f, browser: on desktop the
+console opens, paste, Tab and the copy notice work, and closing drops queued input; on a
+touch-only phone no console opens; a high-resolution and a tall mobile session size the canvas
+as before; an outer session shows LOADING, then its first frame.
+
 ### AR4 — Separate plugin worker backends
 
 Extract browser, Windows and POSIX worker implementations from `boat_plugin_stage.c`. Keep
@@ -364,6 +570,26 @@ bridges, every close path releases backend resources, and stale/malformed/oversi
 results keep their rejection behavior. Verify staging/query validators, lifecycle cases with
 supplied time, browser worker checks, and Windows/POSIX builds and runtime paths; record
 unavailable platform coverage.
+
+**AR4 status, 2026-11-10 (branch `arch/ar4-plugin-workers`, for the AR2–AR6 milestone PR):**
+implemented; not played or browser-tested. `boat_plugin_stage.c` keeps framing, limits, deadlines
+and revision validity; `boat_plugin_stage_{posix,windows,web}.c` implement the private
+`boat_plugin_stage_backend.h` (launch, poll, byte transfer, termination), selected in CMake.
+Platform policy differences (5 s/15 s deadline, executable, browser launch receipt, solo-only
+kinds, browser query deadline message) are backend traits, not `#if` in common code. The public
+staging API, wire and limits are unchanged. Two browser fixes, in their own commit: close now
+releases every transport job (before, after two failed, unreadable or page-expired console
+queries the page refused all further staging and queries until a reload), and query replies
+are read into a buffer sized to the 160 KiB bridge limit (it was 12 KiB).
+Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
+477/477 (13 disabled), including the new `plugin_stage_backend` include check and query
+lifecycle cases in `boat_plugin_stage` (exact 5 s virtual deadline, cancel, faults), its
+self-test, `boat_plugin_stage_web` (browser backend against a C model of the page transport)
+and the Node `web_plugin_author` transport test.
+**Open:** Emscripten and Windows builds and the `tools/package_web.py` browser checks
+(`check_web_plugin_author.py`, `check_web_plugin_objective.py`, `check_web_wasm.py`) were not run
+(no emcc or Windows here); OS termination/reaping still blocks in close without bounded-cost
+evidence; manual native/browser reload, Undo and Harbor life default checks owed.
 
 ### AR5 — Narrow plugin data and execution dependencies
 
@@ -387,6 +613,40 @@ generic plugin values out of multiplayer.
 Done when data-only consumers do not require evaluation/workers, core/net stay independent of
 plugin execution, formats and transaction behavior are unchanged, and targets have no cycles.
 
+**AR5 status, 2026-11-10 (branch `arch/ar4-plugin-workers`, for the AR2–AR6 milestone PR):**
+implemented; not played or browser-tested. `proteus_plugin_data` (manifest parsing, decode and
+location checks, digests and classification in `boat_plugin.c`/`boat_plugin_race.c`, the stage
+wire codec, and the objective checkpoint codec and digest; core and JSON only) is split out of
+`proteus_plugins`, which keeps Lua evaluation (`boat_plugin_load.c` now holds the five
+`boat_plugin_load_*` calls), the host, objective transitions, package I/O and staging and links
+the data library publicly. Data headers `boat_plugin_decode.h`, `boat_plugin_revision.h` and
+`boat_plugin_objective.h`, plus the evaluation header `boat_plugin_load.h`, take declarations
+moved verbatim from the combined headers. The sandbox save and the bundled catalog link only
+plugin data; the work session, which steps objectives, links the host explicitly. The dependency
+chain is acyclic: data -> core/JSON; plugins -> data + Lua; catalog/sandbox save -> data.
+Enforcement: `plugin_data_boundary` (sources, CMake links and archive symbols), its slow-lane
+self-test, and the data-only consumer `validate_boat_plugin_data`. Net still includes no plugin
+header, and `BoatRoomObjective` stays in `tools/`.
+Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
+480/480 (13 disabled); under `git rebase -x` every commit built warning-free and passed the
+plugin, boundary and lint tests at `-j8`, except one unidentified failure on the final docs-only
+commit that did not recur in six reruns (the full preset on the same tree passed). Against the
+pre-AR5 build, the generated catalog source, `net-golden` output and every save fixture are
+byte-identical except `sandbox-save-tests/resume.sav` and `work-save-tests/work.sav`. Those
+differ between two runs of the same build (already on `main`) only in the wall-clock `saved_at`
+field (offset 103) and the checksums over it, so they are not a byte-equal gate until a pinned
+`saved_at` exists (open item owned by L3, whose byte-equal-save gate it blocks).
+`cargo_sandbox_save_rejected` failed under `ctest --repeat`: it set `stale.sav` aside as
+`.rejected` and the repeat skipped the fixture setup that writes it. The merge into
+`arch/ar2-pilot` fixes this: `--expect rejected` moves the file back after the check.
+Review follow-ups at the merge: `plugin_data_boundary` compares its file list with the
+`proteus_plugin_data` CMake sources, its self-test drives the `--nm` path through a stand-in nm,
+and it nm-checks the sandbox save and catalog archives as consumers.
+**Open:** browser game Wasm still links `proteus_plugins` (the host and worker bridge) and relies
+on the linker dropping Lua; `check_web_wasm.py`, the Emscripten build and Windows were not run.
+Header narrowing is limited to data-only consumers: `boat_plugin_host.h` still includes I/O and
+state headers for its callers. No physics trace comparison was run (no simulation code changed).
+
 ### AR6 — Local authority/client pilot
 
 After the seams AR1 selects, migrate private native free boating first unless the ledger
@@ -402,6 +662,104 @@ offline startup and no stale commands across session generations. A temporary ro
 support comparison; AR7 removes parallel production paths. Done when the pilot passes the
 reviewed temporal and behavior contracts. It does not qualify voyages, cargo, persistence or
 browser authority.
+
+#### AR6 status
+
+2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played.
+
+Implemented (ledger row L0):
+
+- `src/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
+  predicting `BoatNetClient` and an unimpaired memory transport in the game's thread. Start runs
+  the handshake in bounded service rounds (3 in practice, at most 8) at tick 0; a frame's grant
+  runs in chunks of at most 12 ticks ending on multiples of 12 (at most 9 per frame): the client
+  commands each tick, one batch is flushed, the authority runs the chunk, the client handles the
+  results. Restart recreates both endpoints with the next generation (the authority's epoch).
+- Private schedule: `boat_net_server_grant` runs exactly the granted ticks with no peer timeout,
+  catch-up or overload and refills the input and spawn buckets per granted tick;
+  `boat_net_client_command`/`flush`/`local_service` address commands to explicit ticks, derive
+  target rates from the predicted boat as solo does, and count stall resync (120 granted ticks
+  without a snapshot), wake-mismatch resync (120) and the prediction hold (12) in granted ticks,
+  with no peer timeout, snapshot-silence close or ping. Hosted service is unchanged.
+- Full-precision commands (D4): in-memory float rates on `BoatNetCommand`, carried by the
+  private range's PrivateInputBatch (`src/boat_net_private.[ch]`, type 0xC0, rejected by hosted
+  rooms). The v14 codec and golden bytes are unchanged.
+- Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
+- Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
+  or authoring (in practice basin free boating) start a local session; the solo accumulator's
+  ticks become the grant (at most 96 per frame; `boat_local_frame` refuses more and the glue
+  carries any excess in the accumulator); the client's prediction fills the game's `BoatSession`
+  boat, clock, presentation and arcade pool. Presentation steps per predicted tick against the
+  pool the boat read (the previous tick's pool advanced once, before the tick's emission), as
+  `boat_session_step` does. A restart recreates both endpoints; an endpoint failure returns to the
+  title with its reason (D10; free boating has no save). `--direct-session` (D8) is parsed only
+  inside `#ifndef NDEBUG`, so a release build rejects it as an unknown option.
+- Repeated failure is endpoint failure (§5): a private client that is still stalled (snapshot or
+  wake mismatch) when a fourth resync falls due, after `BOAT_NET_LOCAL_RESYNCS` = 3 resyncs with
+  no clean state between them, closes with its reason (about 480 granted ticks). The in-process
+  link is lossless, so one checkpoint repairs a stall; three allow for a checkpoint superseded by
+  a restart or a second mismatch. The authority serves a private resync once per 120 granted
+  ticks, the client's clock (elapsed time would refuse its retries at 8×). Hosted rooms keep
+  elapsed time and their clients are unchanged.
+
+Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
+
+- Handling class, current/crossing water, the wake pool recipe and the spawned boat reach both
+  endpoints as host-supplied creation config (`BoatNetPrivateSession`), not private-range
+  messages; a restart is endpoint recreation, so no message is needed for them. Only the
+  full-precision command uses the private range.
+- The player's boat is placed when the authority accepts the client, before the bootstrap
+  checkpoint, instead of by a spawn request after READY, so the first granted tick is commanded.
+- The resync rate limit counts granted ticks (one resync per 120) at both ends of a private
+  session, not elapsed time; hosted rooms keep elapsed time. The private client sends no ping.
+- A command batch dropped by a full unreliable queue is an endpoint failure (the host compares
+  the transport's dropped count around each flush), not a repeated command.
+- Outer: every shipped outer solo session is a voyage package, so L0 reaches the game on the
+  basin only; outer with current and crossing water is qualified in CTest, and outer play
+  migrates with L1.
+- Presentation is stepped while the client takes each predicted tick (the observer inside the
+  chunk), not at §2 stage 7 after the chunk's intake. It reads the same pool and boat as stage 7
+  would, so the result is identical; moving it would need a per-tick history of the prediction.
+- Not done: impaired memory delivery for private sessions (T1 selects none; hosted impairment
+  stays in `boat_net`), browser private sessions (L4), the objective-gated stop (no objective in
+  L0), real offline startup and the native windowed manual check.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no wall clock):
+
+- `boat_local` (17 quick cases, each under 100 ms on Debug) drives the game's own glue
+  (`proteus_local_drive`, the library `wake_velocity` links) and compares every predicted tick's
+  boat, `BoatPresentation` and pool digest, and every frame's authority tick, bit for bit with the
+  game's direct path (`timed_boat_step`): basin at ¼×, 1× and
+  8×; outer with waves, current and crossing at 1× and 8×; `G = 96` with 0.25 s stalls clamped at
+  8× (9 chunks, a partial first chunk); uneven frames (odd remainders, partial first chunks);
+  explorer handling; 30 s of pause; restart with stale old-generation traffic; 100 repeated
+  sessions; startup failure and release; queue saturation; the private range in a hosted room;
+  the 96-tick grant cap; an injected wake mismatch that one resync repairs, then one whose
+  checkpoints the client's transport loses, which fails the session after three served resyncs;
+  two quick mismatches at 8× with an advancing host clock, both repaired (fails if the authority
+  rate-limits on elapsed time).
+  Each drive has zero rate-limited, late, future or duplicate commands and every tick integrates
+  a received command. Negative checks during development: quantizing the commands at the
+  authority fails `basin_1x` and `outer_8x`; presenting against the session's stale pool fails
+  `basin_1x`'s per-tick presentation check. Presenting against the post-emission pool passes:
+  a newborn wake object contributes nothing at its birth tick (its birth envelope is zero).
+- Debug build warning-clean; `ctest --preset full`: see [current evidence](#current-evidence-and-limitations).
+- CPU captures (`--renderer cpu --screenshot ... --time 3`, basin and `--location outer`) are
+  byte-identical to an `e1b1175` build (main's tree): captures drive the direct scripted path
+  before the frame loop (L6 migrates them).
+- Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
+  outer with waves, current and crossing, through the game glue with presentation): 16-tick
+  frames at 8× mean 1.66 ms (worst 2.13 ms) against 1.40 ms (worst 1.84 ms) for the direct path
+  with presentation; `G = 96` frames mean 8.48 ms (worst 15.6 ms) against 6.95 ms (worst
+  12.2 ms) direct.
+- The Windows CI lane builds and runs `boat_local`; not yet run on CI (no push).
+- Hidden-window smoke run (`--renderer cpu --frames 240 --performance-report`): the local
+  session advanced 737 ticks in 280 chunks with no failure. Not a manual check.
+
+Owed to the user (native windowed): steering/throttle feel with keyboard, mouse and Shift; menu,
+help and focus-loss pause; time scale `[`/`]`/`\` up to 8×; Backspace reset and menu restart
+(repeatedly); skins (explorer, cabin, Grodan); quit to title. The browser keeps the direct path
+(L4), so a browser smoke check only confirms nothing changed there.
 
 ### AR7 — Migrate modes and retire separate production sessions
 
@@ -755,3 +1113,12 @@ and the accepted decisions; this plan keeps only the step status (header and
   browser, Windows/Linux, GPU or manual checks; documentation-only beyond the resync commit.
 - 2026-11-09: the user accepted AR1 product decisions D1–D10 as recommended. Product direction
   only: no implementation exists, and nothing was played or browser-tested.
+- AR6 verification, 2026-11-09, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
+  build warning-clean; `ctest --preset full` passed all 492 enabled tests (13 disabled), including
+  the 17 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
+  windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).
+- AR3 verification, 2026-11-10, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
+  build warning-clean; `ctest --preset full` passed all 494 enabled tests (13 disabled),
+  including the new `platform_bridges` and `platform_bridges_detects`; rerun after the review
+  fixes and AR3f, again 494 of 494. No windowed, browser,
+  Windows/Linux or GPU check. See the [AR3 status](#ar3-status).

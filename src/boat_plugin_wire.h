@@ -5,8 +5,8 @@
 // consumer come from one build, so the format needs no compatibility promise with older
 // releases, only with itself. Byte arrays, not structs, cross the boundary: padding and native
 // endianness never become content.
-#include "boat_plugin_host.h"
-#include "boat_plugin_lua.h"
+#include "boat_plugin_decode.h"
+#include "boat_plugin_revision.h"
 
 #define BOAT_PLUGIN_WIRE_VERSION 0x50535441u // PSTA: tours (ordered stops with captions).
 

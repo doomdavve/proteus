@@ -589,7 +589,8 @@ M2 stage replies may be 163,840 bytes, matching the Wasm host read buffer. A max
 with a full 64 KiB source measures 80,124 bytes; the native body cap remains source + 32 KiB. The browser worker deadline is 15 seconds. The bundled catalog is generated for
 Wasm by the same Node generator the native build runs through CMake's cross-compiling emulator;
 only the solo entries (basin and river free, time trial, Långedrag and Harbor life) are linked.
-The game Wasm links `proteus_plugins` for runtime package data, so `tools/check_web_wasm.py` tests
+The game Wasm links `proteus_plugins` (over the Lua-free `proteus_plugin_data`) for runtime
+package data and the host, so `tools/check_web_wasm.py` tests
 the linked output for Lua parser/VM strings and uses `plugin_stage.wasm` as the positive control.
 `web_plugin_wire` (CTest) prevents the browser author's wire magic from drifting from
 `BOAT_PLUGIN_WIRE_VERSION`. Normal sessions create no worker.

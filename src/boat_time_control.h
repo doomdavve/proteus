@@ -1,6 +1,8 @@
 #ifndef PROTEUS_BOAT_TIME_CONTROL_H
 #define PROTEUS_BOAT_TIME_CONTROL_H
 
+#include "boat_clock.h"
+
 #include <math.h>
 #include <stdbool.h>
 
@@ -34,6 +36,18 @@ static inline double boat_time_work_frame_seconds(double seconds, int index, boo
     if (!was_active || !isfinite(seconds) || seconds > 1.0)
         return 0;
     return boat_time_frame_seconds(seconds, index);
+}
+
+// The ticks a frame grants: whole ticks taken from ACCUMULATOR (seconds) by the solo tick loop's
+// repeated subtraction, at most LIMIT; anything beyond LIMIT stays for the next frame.
+static inline unsigned boat_time_grant(double *accumulator, unsigned limit)
+{
+    unsigned ticks = 0;
+    while (ticks < limit && *accumulator >= BOAT_TICK_SECONDS) {
+        *accumulator -= BOAT_TICK_SECONDS;
+        ++ticks;
+    }
+    return ticks;
 }
 
 #endif

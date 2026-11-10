@@ -8,6 +8,7 @@
 #include "boat_net_transport.h"
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_plugin_load.h"
 #include "boat_plugin_wire.h"
 #include "boat_room_package.h"
 #include "boat_test_cases.h"

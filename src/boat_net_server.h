@@ -3,6 +3,7 @@
 
 #include "boat_marks.h"
 #include "boat_match.h"
+#include "boat_net_private.h"
 #include "boat_net_transport.h"
 #include "boat_race.h"
 
@@ -57,6 +58,9 @@ typedef struct {
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
     BoatNetRules rules; // Zero for none.
+    // AR6: a private session's world and spawn; its host advances it with boat_net_server_grant()
+    // only. Disabled (zero) for every hosted room.
+    BoatNetPrivateSession local;
 } BoatNetServerConfig;
 
 typedef enum {
@@ -166,6 +170,12 @@ bool boat_net_server_init(
 // their cadence, stopping at tick_limit when set. False once the room is overloaded (500 ms
 // behind for a second).
 bool boat_net_server_service(BoatNetServer *server, double now);
+// AR6: a private session's service. Handle waiting messages (at most
+// BOAT_NET_MESSAGES_PER_SERVICE, private input batches included), then run exactly TICKS ticks
+// (the host's grant; zero while paused), refilling the input and spawn rate limits per tick. No
+// peer timeout, catch-up or overload: NOW only stamps operational deadlines (resync rate limit).
+// False for a hosted room.
+bool boat_net_server_grant(BoatNetServer *server, double now, unsigned ticks);
 // P5f: stage CANDIDATE (encoded bytes) as the room's next definition. It is validated as the
 // room's own definition is (decode, structure, scene) and must keep the running mode and
 // location; false with DIAGNOSTIC leaves the running revision and any waiting candidate alone. A
