@@ -418,7 +418,8 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
-  target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h)
+  target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h
+    tools/wake_velocity_servers.c tools/wake_velocity_servers.h)
   target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads proteus_json)
   add_executable(validate_boat_directory tools/validate_boat_directory.c tools/boat_directory.c)
   target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl
@@ -463,7 +464,8 @@ endif()
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c)
+  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c
+    tools/wake_velocity_servers_web.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
