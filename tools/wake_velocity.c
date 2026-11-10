@@ -34,6 +34,7 @@
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
+#include "wake_velocity_scenery.h"
 #include "wake_velocity_servers.h"
 #include "wake_velocity_work.h"
 #if !defined(__EMSCRIPTEN__)
@@ -128,12 +129,6 @@ EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
 })
 EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
-EM_JS(void, boat_web_scenery_start, (const char *name, const char *path),
-    { Module['boatScenery'].start(UTF8ToString(name), UTF8ToString(path)); })
-EM_JS(int, boat_web_scenery_state, (const char *name),
-    { return Module['boatScenery'].state(UTF8ToString(name)); })
-EM_JS(float, boat_web_scenery_progress, (const char *name),
-    { return Module['boatScenery'].progress(UTF8ToString(name)); })
 #endif
 
 #if defined(__EMSCRIPTEN__)
@@ -324,34 +319,22 @@ static void usage(void)
     puts("\nSee docs/COMMAND_LINE.md for examples, restrictions and defaults.");
 }
 
-// Native builds load every mapped location's scenery pack at start. The browser fetches the
-// outer pack when a session there needs it (scenery_ready); the river kit's layout pack is
-// bundled with the page.
-static bool load_scenery(const char *assets)
-{
-#if defined(__EMSCRIPTEN__)
-    (void)assets;
-    return true;
-#else
-    return boat_scenery_load_all(assets);
-#endif
-}
-
-// LOCATION's scenery, loaded now if it is not yet. The browser first fetches the pack, drawing
-// its progress until it arrives; false if it cannot be fetched or loaded.
+// LOCATION's scenery, loaded now if it is not yet. Acquisition (wake_velocity_scenery.h) is
+// immediate in native builds, which read every pack at start; the browser fetches the outer pack
+// when a session there first needs it, and this draws its progress until it arrives. The river
+// kit's layout pack is bundled with the page. False if it cannot be acquired or loaded.
 static bool scenery_ready(const BoatWorldDefinition *location, const char *assets)
 {
     if (!location->mapped || boat_scenery_of(location->map))
         return true;
-#if defined(__EMSCRIPTEN__)
-    char path[4096];
-    if (!boat_scenery_path(location, assets, path, sizeof(path)))
+    if (!wake_scenery_request(location, assets))
         return false;
-    boat_web_scenery_start(location->name, path);
-    while (boat_web_scenery_state(location->name) == 1 && !WindowShouldClose()) {
+    float progress = 0;
+    WakeSceneryStatus status;
+    while ((status = wake_scenery_poll(location, &progress)) == WAKE_SCENERY_PENDING
+        && !WindowShouldClose()) {
         char text[64];
-        snprintf(text, sizeof(text), "LOADING %s %d%%", location->title,
-            (int)(100 * boat_web_scenery_progress(location->name)));
+        snprintf(text, sizeof(text), "LOADING %s %d%%", location->title, (int)(100 * progress));
         int scale = GetScreenHeight() / 200 > 1 ? GetScreenHeight() / 200 : 1;
         BoatUiPalette palette = boat_ui_palette();
         BeginDrawing();
@@ -360,9 +343,8 @@ static bool scenery_ready(const BoatWorldDefinition *location, const char *asset
             GetScreenHeight() / 2 - 4 * scale, 8 * scale, palette.text);
         EndDrawing(); // Yields to the page, which receives the pack meanwhile.
     }
-    if (boat_web_scenery_state(location->name) != 2)
+    if (status != WAKE_SCENERY_READY)
         return false;
-#endif
     return boat_scenery_load_location(location, assets);
 }
 
@@ -1190,7 +1172,7 @@ static int study(int argc, char **argv)
     // The mapped locations' scenery packs, which every view draws (the core uses only their
     // compiled water). The browser fetches the outer pack the first time it is needed.
     char assets[4096];
-    if (!boat_asset_path(assets, sizeof(assets), "") || !load_scenery(assets)) {
+    if (!boat_asset_path(assets, sizeof(assets), "") || !wake_scenery_startup(assets)) {
         fprintf(stderr, "Cannot load the map scenery from %sgeometry/.\n", assets);
         for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
             boat_world_resources_destroy(&worlds[i]);
