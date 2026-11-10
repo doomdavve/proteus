@@ -4,7 +4,7 @@ Status, 2026-11-10: done locally; user accepted the final cloud/reflection treat
 Open implementation items: none. Broader platform qualification remains outside this track.
 Done: softer deck, deeper-blue Day sky and sparse three-tone reflections are implemented,
 natively verified and user-accepted. Current contract: [3D.md](3D.md#scene-lighting).
-Next: none in this track; publishing a PR still requires explicit user approval.
+Next: publish the PR authorized by the user on 2026-11-10.
 
 ## Scope and decision
 
@@ -174,4 +174,5 @@ The specification and test guide already describe the final implementation. The 
 implementation's native full suite passed all 510 enabled tests as recorded above; this
 closing update changes documentation only. Broader platform checks, cloud wind/geometry,
 water-glitter attenuation and other lighting-plan acceptance remain explicitly deferred.
-The branch remains local; no push or pull request is authorized by visual acceptance.
+Visual acceptance alone did not authorize publication; the user separately requested a PR
+on 2026-11-10. The branch is now authorized for push and PR creation.

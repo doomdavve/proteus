@@ -41,7 +41,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 The user accepted the softer cloud outlines, deeper-blue Day sky and sparser three-tone
 water reflections. The [cloud deck plan](CLOUD_DECK_PLAN.md) is closed locally;
 [3D.md](3D.md#scene-lighting) owns the current contract. Broader platform qualification
-and the existing lighting/graphics loops remain separate. No PR has been opened.
+and the existing lighting/graphics loops remain separate. The user authorized a PR.
 
 ## Specs
 
