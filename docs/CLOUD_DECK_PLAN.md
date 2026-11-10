@@ -1,10 +1,10 @@
 # Softer edges on the original cloud deck
 
-Status, 2026-11-10: sparser three-tone reflection candidate implemented; user review open.
-Open: user visual/motion acceptance, browser and other-platform review.
-Done when: the original shallow deck looks less blocky in Day, its shared CPU/GPU
-rendering passes verification, and the user accepts the result.
-Next: user review of cloud coverage and three-tone shading in the water reflection.
+Status, 2026-11-10: done locally; user accepted the final cloud/reflection treatment.
+Open implementation items: none. Broader platform qualification remains outside this track.
+Done: softer deck, deeper-blue Day sky and sparse three-tone reflections are implemented,
+natively verified and user-accepted. Current contract: [3D.md](3D.md#scene-lighting).
+Next: none in this track; publishing a PR still requires explicit user approval.
 
 ## Scope and decision
 
@@ -32,9 +32,11 @@ wind simulation, sprites or volumetric cumulus renderer is scheduled.
 3. **Reduce coverage and layer the reflected shading.** Implemented locally following
    user play feedback: fewer patches and three broad offset tones in the shared mask,
    CPU evaluator and GPU shader. Native evidence is recorded below.
-4. **User review and closing.** Pending: play in Day and judge whether the outlines keep
-   enough of the original character. Adjust only if needed; after acceptance confirm the
-   spec, retain explicit limits and close this plan. Automated checks do not imply acceptance.
+4. **User review and closing.** Done, 2026-11-10: the user accepted the final treatment
+   ("Yes, we nailed it finally!"). Confirmed the current contract in
+   [3D.md](3D.md#scene-lighting) and checks in [TESTING.md](TESTING.md#gpu-checks).
+   No implementation leftovers remain. Browser/Windows/Linux qualification and the
+   deferred weather/lighting work remain outside this completed track.
 
 ## Review commands
 
@@ -44,7 +46,7 @@ From `/private/tmp/proteus-cloud-deck`:
 ./build/wake_velocity --location outer --daylight day
 ./build/wake_velocity --location outer --daylight day --camera-height 4 \
   --camera-distance 48 --fixed-fov --resolution high --hdr off \
-  --screenshot build/cloud-after-high.png --time 3
+  --screenshot build/layers-review.png --time 3
 ```
 
 The low, wide camera and high resolution are capture options, not changed defaults.
@@ -161,3 +163,15 @@ through the full preset. Formatting, changed plan links/anchors and
 `ctest --preset full` passed all 510 enabled tests (38 GPU-labelled, 15 retired
 checks disabled) in 118.08 s without retries (`build/layers-full.log`).
 The existing play window must be restarted to load the revised static mask and shader.
+
+
+### Closing and user acceptance, 2026-11-10
+
+The user accepted the final sparser, three-tone reflected clouds with the deeper-blue Day
+sky: "Yes, we nailed it finally!" This closes the visual treatment requested in this
+conversation. No additional platform, audio or lighting-clock acceptance is inferred.
+The specification and test guide already describe the final implementation. The final
+implementation's native full suite passed all 510 enabled tests as recorded above; this
+closing update changes documentation only. Broader platform checks, cloud wind/geometry,
+water-glitter attenuation and other lighting-plan acceptance remain explicitly deferred.
+The branch remains local; no push or pull request is authorized by visual acceptance.

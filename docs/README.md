@@ -27,7 +27,6 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Multiplayer | M6, M7 and M8 acceptance: human play, platform/impairment/soak and browser qualification | 2026-10-26 | [M6](MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging), [browser](WEB_BUILD.md#webrtc-rooms) |
 | Deathmatch | Playtest steps not started (step 0 first); "cannot jump over a boat" re-reported | 2026-11-01 | [playtest plan](DEATHMATCH_PLAYTEST_PLAN.md) |
 | Race | List the improvements from the first human race; assess 63-71 s pacing | 2026-10-24 | [race plan](RACE_PLAN.md) |
-| Cloud deck | Deeper-blue Day playable; sparser three-tone cloud reflections pending review | 2026-11-10 | [cloud deck plan](CLOUD_DECK_PLAN.md) |
 | Graphics | Batch C review and the returned Windows report | 2026-11-04 | [graphics plan](GRAPHICS_OVERHAUL_PLAN.md) |
 | Gothenburg Harbour | Paused by the user; low-bridge duck and scrape score (GH8), then sights | 2026-11-04 | [harbour plan](GOTHENBURG_HARBOUR_PLAN.md) |
 | Sunset | Step 3 (transitions, controls, title phase) needs the user's decisions | 2026-11-03 | [sunset plan](SUNSET_PLAN.md) |
@@ -36,6 +35,13 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Living city | Step 06 people and cyclists; perched gulls | 2026-10-31 | [living city plan](LIVING_CITY_PLAN.md) |
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | Human input/audio and wider network review; Firefox deadline | 2026-11-01 | [releases](RELEASES.md#status-and-verification) |
+
+## Cloud deck — accepted locally, 2026-11-10
+
+The user accepted the softer cloud outlines, deeper-blue Day sky and sparser three-tone
+water reflections. The [cloud deck plan](CLOUD_DECK_PLAN.md) is closed locally;
+[3D.md](3D.md#scene-lighting) owns the current contract. Broader platform qualification
+and the existing lighting/graphics loops remain separate. No PR has been opened.
 
 ## Specs
 
