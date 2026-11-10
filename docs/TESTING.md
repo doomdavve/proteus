@@ -579,6 +579,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   controlled speed. It prints both times, the exposed seconds and any capsizes.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
+- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`: common plugin staging
+  (`boat_plugin_stage.c` and its headers) names no OS handles, process launch or JavaScript
+  bridge, each platform backend includes only its own headers, and the private backend header
+  stays private.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
 - `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
