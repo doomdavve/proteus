@@ -1292,6 +1292,15 @@ endif()
 add_test(NAME test_time COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_test_time.py --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(test_time PROPERTIES PASS_REGULAR_EXPRESSION "test_time=ok")
+# AR3: browser bridges live in CMake-selected *_web.c backends; migrated files use their services.
+add_test(NAME platform_bridges COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(platform_bridges PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "platform_bridges=ok")
+add_test(NAME platform_bridges_detects COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --self-test)
+set_tests_properties(platform_bridges_detects PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "platform_bridges_self_test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})

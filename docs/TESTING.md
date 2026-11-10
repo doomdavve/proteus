@@ -579,6 +579,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   controlled speed. It prints both times, the exposed seconds and any capsizes.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
+- `platform_bridges` runs `tools/check_platform_bridges.py`: inline JavaScript (`EM_JS`,
+  `EM_ASM`) lives only in CMake-selected `*_web.c` backends or in the listed legacy files, which
+  may not gain bridges, and files migrated onto an application service (title, game, plugin
+  glue) do not reach its backends directly. `platform_bridges_detects` is its negative control.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
 - `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
