@@ -551,9 +551,18 @@ header, and `BoatRoomObjective` stays in `tools/`.
 Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
 480/480 (13 disabled); under `git rebase -x` every commit built warning-free and passed the
 plugin, boundary and lint tests at `-j8`, except one unidentified failure on the final docs-only
-commit that did not recur in six reruns (the full preset on the same tree passed). Against the pre-AR5 build, the generated catalog source, `net-golden` output and
-every save fixture are byte-identical except `sandbox-save-tests/resume.sav` and
-`work-save-tests/work.sav`, which already differ between two runs of the same build.
+commit that did not recur in six reruns (the full preset on the same tree passed). Against the
+pre-AR5 build, the generated catalog source, `net-golden` output and every save fixture are
+byte-identical except `sandbox-save-tests/resume.sav` and `work-save-tests/work.sav`. Those
+differ between two runs of the same build (already on `main`) only in the wall-clock `saved_at`
+field (offset 103) and the checksums over it, so they are not a byte-equal gate until a pinned
+`saved_at` exists (open item owned by L3, whose byte-equal-save gate it blocks).
+`cargo_sandbox_save_rejected` failed under `ctest --repeat`: it set `stale.sav` aside as
+`.rejected` and the repeat skipped the fixture setup that writes it. The merge into
+`arch/ar2-pilot` fixes this: `--expect rejected` moves the file back after the check.
+Review follow-ups at the merge: `plugin_data_boundary` compares its file list with the
+`proteus_plugin_data` CMake sources, its self-test drives the `--nm` path through a stand-in nm,
+and it nm-checks the sandbox save and catalog archives as consumers.
 **Open:** browser game Wasm still links `proteus_plugins` (the host and worker bridge) and relies
 on the linker dropping Lua; `check_web_wasm.py`, the Emscripten build and Windows were not run.
 Header narrowing is limited to data-only consumers: `boat_plugin_host.h` still includes I/O and

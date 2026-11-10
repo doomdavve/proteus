@@ -1699,9 +1699,10 @@ uint64_t boat_sandbox_source_hash(const char *source, size_t size); // FNV-1a 64
 ```
 
 Site references are written as ids and mapped back to indexes on decode; an unknown id is
-`MALFORMED`. `proteus_sandbox_save` links `proteus_plugins` (and through it core). It holds
-byte buffers only, never files. It cannot join the core boundary list because it includes plugin
-headers; the no-file rule holds by review and because its validator links no I/O helper.
+`MALFORMED`. `proteus_sandbox_save` links only `proteus_plugin_data` (and through it core and
+JSON) since AR5. It holds byte buffers only, never files. It cannot join the core boundary list
+because it includes plugin headers; `plugin_data_boundary` enforces its no-file, no-Lua rule over
+its sources, CMake links and archive symbols.
 Register `validate_boat_sandbox_save` and the `boat_sandbox_save` test in `CMakeLists.txt` with
 the warning flags, labelled `cpu;quick`.
 
