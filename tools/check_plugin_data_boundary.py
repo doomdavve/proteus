@@ -5,9 +5,11 @@ proteus_plugin_data parses manifests, validates and decodes descriptors, compute
 reads the stage wire and objective checkpoint formats over caller-owned bytes. Its data-only
 consumers (saves, the compiled catalog and the data validator) must stay equally pure: no Lua
 evaluation, files, processes or browser bridges. Comments are stripped before include checks and
-comments plus string literals are blanked before identifier and call matching. With --nm and one
-or more --archive paths, the first archive's undefined symbols must be defined by the archives or
-allowed libc/libm/raylib symbols. --self-test plants violations in a temporary copy.
+comments plus string literals are blanked before identifier and call matching. The CMake source
+list of proteus_plugin_data must match DATA_FILES. With --nm and one or more --archive paths, the
+first archive's undefined symbols must be defined by the archives or allowed libc/libm/raylib
+symbols; each --consumer-archive is checked the same way against all the listed archives.
+--self-test plants violations in a temporary copy.
 """
 
 import argparse
@@ -55,6 +57,7 @@ TEST_CALLS = {"printf", "fprintf", "puts"}
 
 CMAKE_TARGETS = ("proteus_plugin_data", "proteus_sandbox_save", "proteus_plugin_catalog")
 CMAKE_FORBIDDEN = re.compile(r"\b(proteus_lua|proteus_plugins)\b")
+CMAKE_DATA_LIBRARY = re.compile(r"add_library\(\s*proteus_plugin_data\s+STATIC\b")
 
 LIBRARY_SYMBOLS = re.compile(
     r"(?:malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|memchr|"
@@ -78,6 +81,21 @@ SELF_TEST_APPENDS = (
 )
 
 SELF_TEST_ACCEPTED = ('// lua_State fopen\nstatic const char *s = "lua_State fopen(";')
+
+SELF_TEST_NM = """import sys
+
+path = sys.argv[-1]
+options = set(sys.argv[1:-1])
+for line in open(path, encoding="utf-8"):
+    parts = line.split()
+    if len(parts) != 2:
+        continue
+    kind, name = parts
+    if kind == "U" and "-u" in options:
+        print(f"                 U _{name}")
+    elif kind == "T" and "-u" not in options:
+        print(f"0000000000000000 T _{name}")
+"""
 
 
 def strip_comments(text):
@@ -181,6 +199,20 @@ def check_cmake(root):
         return ["CMakeLists.txt: missing build file"]
     cmake = path.read_text(encoding="utf-8")
     problems = []
+    library = CMAKE_DATA_LIBRARY.search(cmake)
+    if library is None:
+        problems.append("CMakeLists.txt: no add_library for proteus_plugin_data")
+    else:
+        end = cmake.find(")", library.end())
+        sources = cmake[library.end():] if end < 0 else cmake[library.end():end]
+        listed = sources.split()
+        for name in listed:
+            if name not in DATA_FILES:
+                problems.append(f"CMakeLists.txt: proteus_plugin_data lists {name} outside "
+                                "DATA_FILES")
+        for name in DATA_FILES:
+            if name not in listed:
+                problems.append(f"CMakeLists.txt: proteus_plugin_data does not list {name}")
     for target in CMAKE_TARGETS:
         blocks = list(target_blocks(cmake, target))
         if not blocks:
@@ -193,13 +225,14 @@ def check_cmake(root):
 
 
 def nm_symbols(nm, archive, options):
+    command = [nm] if isinstance(nm, str) else list(nm)
     try:
-        result = subprocess.run([nm, *options, str(archive)], check=False,
+        result = subprocess.run([*command, *options, str(archive)], check=False,
                                 capture_output=True, text=True)
     except OSError as error:
-        raise SystemExit(f"cannot run {nm}: {error}")
+        raise SystemExit(f"cannot run {' '.join(command)}: {error}")
     if result.returncode != 0:
-        raise SystemExit(f"{nm} failed for {archive}: {result.stderr.strip()}")
+        raise SystemExit(f"{' '.join(command)} failed for {archive}: {result.stderr.strip()}")
     for line in result.stdout.splitlines():
         line = line.rstrip()
         if not line or line.endswith(":"):
@@ -208,29 +241,36 @@ def nm_symbols(nm, archive, options):
         yield name[1:] if name.startswith("_") else name
 
 
-def check_archives(nm, archives):
-    defined = set()
-    for archive in archives:
-        defined |= set(nm_symbols(nm, archive, ("-g", "--defined-only")))
+def archive_problems(nm, archive, defined):
     problems = []
-    for name in sorted(set(nm_symbols(nm, archives[0], ("-u",)))):
+    for name in sorted(set(nm_symbols(nm, archive, ("-u",)))):
         if EXECUTION_SYMBOLS.search(name):
-            problems.append(f"{Path(archives[0]).name}: undefined {name} reaches Lua, files "
+            problems.append(f"{Path(archive).name}: undefined {name} reaches Lua, files "
                             "or browser bridges")
         elif name in defined or LIBRARY_SYMBOLS.fullmatch(name):
             continue
         elif RAYLIB_SYMBOLS.fullmatch(name):
             continue
         else:
-            problems.append(f"{Path(archives[0]).name}: undefined {name} is neither defined "
+            problems.append(f"{Path(archive).name}: undefined {name} is neither defined "
                             "by the allowed archives nor in the libc/libm allowlist")
     return problems
 
 
-def check(root, nm=None, archives=None):
+def check_archives(nm, archives, consumers=()):
+    defined = set()
+    for archive in list(archives) + list(consumers):
+        defined |= set(nm_symbols(nm, archive, ("-g", "--defined-only")))
+    problems = []
+    for archive in [archives[0], *consumers]:  # Core and JSON only supply definitions.
+        problems += archive_problems(nm, archive, defined)
+    return problems
+
+
+def check(root, nm=None, archives=None, consumers=()):
     problems = check_sources(root) + check_cmake(root)
     if nm and archives:
-        problems += check_archives(nm, archives)
+        problems += check_archives(nm, archives, consumers)
     return problems
 
 
@@ -274,12 +314,67 @@ def self_test(root):
                           destination / "CMakeLists.txt",
                           "target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)")))
 
+        def add_data_source(destination):
+            path = destination / "CMakeLists.txt"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text.replace("src/boat_plugin_wire.h)",
+                             "src/boat_plugin_wire.h src/boat_plugin_extra.c)", 1),
+                encoding="utf-8")
+
+        cases.append(("CMakeLists.txt adds an extra plugin data source", add_data_source))
+
         for index, (label, plant) in enumerate(cases):
             case = Path(temporary) / f"case{index}"
             shutil.copytree(base, case)
             plant(case)
             if not check(case):
                 print(f"plugin_data_boundary self-test failed: planted case not caught: {label}")
+                return 1
+
+        nm_script = Path(temporary) / "fake_nm.py"
+        nm_script.write_text(SELF_TEST_NM, encoding="utf-8")
+        nm = [sys.executable, str(nm_script)]
+        archive_dir = Path(temporary) / "archives"
+        archive_dir.mkdir()
+
+        def write_archive(name, lines):
+            path = archive_dir / name
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            return path
+
+        data = write_archive("data.a", ["U memcpy", "U boat_core_thing"])
+        core = write_archive("core.a", ["T boat_core_thing"])
+        problems = check(base, nm, [data, core])
+        if problems:
+            print("plugin_data_boundary self-test failed: clean archives are not clean",
+                  file=sys.stderr)
+            for problem in problems:
+                print(problem, file=sys.stderr)
+            return 1
+
+        helper = write_archive("helper.a", ["T sandbox_helper"])
+        consumer = write_archive("consumer.a", ["U sandbox_helper"])
+        problems = check(base, nm, [consumer, core], [helper])
+        if problems:
+            print("plugin_data_boundary self-test failed: consumer archive does not resolve "
+                  "against the listed archives", file=sys.stderr)
+            for problem in problems:
+                print(problem, file=sys.stderr)
+            return 1
+
+        archive_cases = (
+            ("data archive reaches Lua", ["U lua_pushnil"], ()),
+            ("data archive has an unknown symbol", ["U some_unknown_symbol"], ()),
+            ("consumer archive opens files", ["U boat_core_thing"], (["U fopen"],)),
+        )
+        for index, (label, undefined, consumer_lines) in enumerate(archive_cases):
+            data_archive = write_archive(f"data{index}.a", undefined)
+            consumer_archives = [write_archive(f"consumer{index}.a", lines)
+                                 for lines in consumer_lines]
+            if not check(base, nm, [data_archive, core], consumer_archives):
+                print(f"plugin_data_boundary self-test failed: planted archive case not "
+                      f"caught: {label}")
                 return 1
 
         accepted = Path(temporary) / "accepted"
@@ -303,12 +398,14 @@ def main():
     parser.add_argument("--nm", help="nm command for the archive symbol check")
     parser.add_argument("--archive", action="append", default=[],
                         help="archive to check; the first is the plugin data library")
+    parser.add_argument("--consumer-archive", action="append", default=[],
+                        help="data-only consumer archive whose undefined symbols must resolve")
     parser.add_argument("--self-test", action="store_true",
                         help="plant violations in a temporary copy and confirm they are caught")
     args = parser.parse_args()
     if args.self_test:
         return self_test(args.root)
-    problems = check(args.root, args.nm, args.archive)
+    problems = check(args.root, args.nm, args.archive, args.consumer_archive)
     if problems:
         for problem in problems:
             print(problem, file=sys.stderr)

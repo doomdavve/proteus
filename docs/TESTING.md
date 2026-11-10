@@ -886,8 +886,10 @@ The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-fr
 `plugin_data_boundary` (`tools/check_plugin_data_boundary.py`) checks that the data library and
 its data-only consumers (sandbox save, bundled catalog, `validate_boat_plugin_data`) include no
 evaluation, I/O or worker header and name no Lua, file, process or platform identifier, that
-their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and, with nm, that the data
-archive's undefined symbols resolve to core, JSON or allowlisted libc/libm/raymath symbols.
+their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and that the
+`proteus_plugin_data` source list matches the checker's files. With nm, the data archive's and
+each `--consumer-archive`'s undefined symbols must resolve to symbols defined by the listed
+archives or allowlisted libc/libm/raymath symbols.
 `plugin_data_boundary_self_test` (slow lane) plants each violation. `boat_plugin_data` runs
 `validate_boat_plugin_data`, which links only the catalog and plugin data, decodes every bundled
 entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or

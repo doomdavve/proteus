@@ -1353,7 +1353,9 @@ set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPR
 set(PLUGIN_DATA_BOUNDARY_NM)
 if(CMAKE_NM AND NOT MSVC)
   set(PLUGIN_DATA_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_plugin_data>
-    --archive $<TARGET_FILE:proteus_boat_core> --archive $<TARGET_FILE:proteus_json>)
+    --archive $<TARGET_FILE:proteus_boat_core> --archive $<TARGET_FILE:proteus_json>
+    --consumer-archive $<TARGET_FILE:proteus_sandbox_save>
+    --consumer-archive $<TARGET_FILE:proteus_plugin_catalog>)
 endif()
 add_test(NAME plugin_data_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
