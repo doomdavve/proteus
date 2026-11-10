@@ -117,11 +117,16 @@ static bool query_read(Wire *w, BoatPluginFiles *f, char *expression, size_t cap
 int boat_plugin_query_worker(void)
 {
     boat_plugin_worker_binary_stdio();
+    return boat_plugin_query_worker_streams(stdin, stdout);
+}
+
+int boat_plugin_query_worker_streams(FILE *input, FILE *output)
+{
     BoatPluginFiles *f = calloc(1, sizeof(*f));
     char *expression = calloc(1, BOAT_PLUGIN_QUERY_MAX);
     char *text = calloc(1, BOAT_PLUGIN_QUERY_REPLY_MAX);
     BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
-    Wire in = { stdin, true, true }, out = { stdout, false, true };
+    Wire in = { input, true, true }, out = { output, false, true };
     if (!f || !expression || !text || !query_read(&in, f, expression, BOAT_PLUGIN_QUERY_MAX))
         goto done;
     BoatPluginManifest manifest;
@@ -136,8 +141,8 @@ done:
     size_t size = d.status == BOAT_PLUGIN_OK ? strlen(text) : 0;
     integer(&out, size, 4);
     if (size)
-        out.ok &= fwrite(text, 1, size, stdout) == size;
-    if (fflush(stdout))
+        out.ok &= fwrite(text, 1, size, output) == size;
+    if (fflush(output))
         out.ok = false;
     free(text);
     free(expression);
@@ -148,12 +153,17 @@ done:
 int boat_plugin_stage_worker(void)
 {
     boat_plugin_worker_binary_stdio();
+    return boat_plugin_stage_worker_streams(stdin, stdout);
+}
+
+int boat_plugin_stage_worker_streams(FILE *input, FILE *output)
+{
     BoatPluginFiles *f = calloc(1, sizeof(*f));
     BoatPluginDecoded *decoded = calloc(1, sizeof(*decoded));
     BoatPluginRevision *revision = calloc(1, sizeof(*revision));
     BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
     BoatWorldResources resources = { 0 };
-    Wire in = { stdin, true, true }, out = { stdout, false, true };
+    Wire in = { input, true, true }, out = { output, false, true };
     if (!f || !decoded || !revision || !files_wire(&in, f))
         goto done;
     BoatPluginBundle bundle = boat_plugin_bundle(f);
@@ -276,7 +286,7 @@ done:
         unsigned char *bytes = size && size <= BOAT_PLUGIN_STAGE_RESPONSE_MAX ? malloc(size) : NULL;
         size_t written = 0;
         if (!bytes || !boat_plugin_wire_encode(decoded, bytes, size, &written) || written != size
-            || fwrite(bytes, 1, size, stdout) != size) {
+            || fwrite(bytes, 1, size, output) != size) {
             d.status = BOAT_PLUGIN_LIMIT;
             d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_LIMIT };
             snprintf(d.message, sizeof(d.message), "encoded definition exceeds the response limit");
@@ -284,7 +294,7 @@ done:
         }
         free(bytes);
     }
-    if (fflush(stdout))
+    if (fflush(output))
         out.ok = false;
     boat_world_resources_destroy(&resources);
     free(revision);

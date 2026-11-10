@@ -36,6 +36,10 @@ typedef struct BoatPluginWorker BoatPluginWorker;
 
 // Worker side: switch stdin/stdout to binary before reading a request.
 void boat_plugin_worker_binary_stdio(void);
+// The worker side over given streams; boat_plugin_stage_worker and boat_plugin_query_worker
+// pass stdin/stdout. A backend or validator may run a worker in process with these.
+int boat_plugin_stage_worker_streams(FILE *input, FILE *output);
+int boat_plugin_query_worker_streams(FILE *input, FILE *output);
 // Launch a disposable worker for the REQUEST_SIZE bytes in REQUEST, rewound to its start; the
 // reply is collected into RESPONSE. PIN is the browser's base revision and epoch (low, high).
 // The caller keeps owning both files and must not close them before boat_plugin_worker_close.
