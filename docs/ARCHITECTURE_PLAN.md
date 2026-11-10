@@ -3,10 +3,10 @@
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
 [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
 (not merged): AR2a input value, the [AR6 pilot](#ar6-status) (native basin free boating as a
-local authority and client, L0 gates passing in CTest) and [AR3a–AR3d](#ar3-status) platform
-services. Nothing played, browser-built or browser-tested.
-**Open:** manual input/pilot/service checks below; AR2b; AR3e/AR3f; impaired-delivery and
-browser qualification.
+local authority and client, L0 gates passing in CTest) and [AR3a–AR3d, AR3f](#ar3-status)
+platform services. Nothing played, browser-built or browser-tested.
+**Open:** manual input/pilot/service checks below; AR2b; AR3e; impaired-delivery and browser
+qualification.
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`
 (AR10).
@@ -387,22 +387,26 @@ objective-worker checks (descriptor staging tests do not cover the bridge).
 2026-11-10, branch `arch/ar2-pilot`, not merged; nothing played; no browser build (emcc was not
 installed).
 
-Implemented (AR3a–AR3d). Each service is a header in `tools/` with a native `.c` and a browser
+Implemented (AR3a–AR3d, AR3f). Each service is a header in `tools/` with a native `.c` and a browser
 `_web.c` that CMake selects for `wake_velocity`; no call waits, and state keeps its previous
 owner (free functions, rule 10):
 
 | Service | Contract | Native | Browser | Migrated consumers |
 | --- | --- | --- | --- | --- |
-| Server discovery, `wake_velocity_servers.h` | Start/stop once per process; refresh; poll each title frame; count, compatibility, entry text, status; LAN open/query/receive/close and the unavailable hint | `boat_directory`'s background client; ENet LAN broadcast | `Module.boatServers` page fetch; LAN open returns NULL | Title directory and LAN calls; `main` start/stop |
+| Server discovery, `wake_velocity_servers.h` | Start/stop once per process; refresh; poll each title frame; count, compatibility, entry text, status; LAN open/query/receive/close (the title keeps its hint text) | `boat_directory`'s background client; ENet LAN broadcast | `Module.boatServers` page fetch; LAN open returns NULL | Title directory and LAN calls; `main` start/stop |
 | Scenery acquisition, `wake_velocity_scenery.h` | Startup; request; poll: pending with progress, ready or failed. Release stays `boat_scenery_unload` after every view | Every pack read at startup; request/poll ready at once | `Module.boatScenery` fetch; the caller's loading frame yields between polls | `scenery_ready` (the loading screen stays common) and startup |
 | Browser plugin bridges, `wake_velocity_plugin_web.h` | Authoring panel owner, editing and actions; package export; reset/menu controls; objective evaluator start/status/read/close/shutdown/checkpoint | None: native evaluates synchronously and saves package directories | EM_JS bodies private to the backend, behind C wrappers | `wake_velocity_plugin.c`; console export and controls in `wake_velocity.c` |
-| Application lifecycle, `wake_velocity_app.h` | Process clock; window flags; title open/close | `GetTime`; hidden, or resizable with vsync; nothing | `performance.now`; no flags (the page sizes the canvas); 60 fps and audio inside the Play gesture, audio closed after | Plugin clock, both `SetConfigFlags`, title start/stop |
+| Application lifecycle, `wake_velocity_app.h` | Process clock; window flags; title open/close; canvas scale and refit; session canvas; session open | `GetTime`; hidden, or resizable with vsync; nothing; resolution scale; nothing; nothing; `--no-vsync` clears vsync | `performance.now`; no flags (the page sizes the canvas); 60 fps and audio inside the Play gesture, audio closed after; mobile-aware scale and `boatFitCanvas`; grow a smaller canvas; 60 fps | Plugin clock, both `SetConfigFlags`, title start/stop; `study()` window open and the resize path's scale and refit |
+| Scenery deferral, `wake_scenery_deferred` (scenery service) | Whether acquisition waits for the window | False | True: the first CPU draw and its capture wait for `scenery_ready` | `study()` |
+| Console bridge, `wake_console_bridge.h` | Transcript sync; closed; clipboard step; queued completions; whether Tab completes; text-entry availability; page state | Nothing; nothing; Ctrl/Cmd+C/V through raylib; nothing; yes; yes; nothing | Page transcript; drop queued Tab and paste; page paste and clipboard notice; page Tab queue; no; physical keyboard only; `Module.boatConsole*` | `wake_console.c`; console availability and state in `study()` |
 
 Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
-lives only in `*_web.c` backends or in listed legacy files with counts that may only fall
-(`wake_velocity.c` 17, AR2b capabilities; `wake_console.c` 5; the AR4 stage files 6). The title,
-game and plugin glue may not reach a service's backends directly. `platform_bridges_detects`
-is its negative control. The title validator now links the protocol, not the ENet transport.
+lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
+(`wake_velocity.c` 14, AR2b touch, mouse and viewport capabilities; the AR4 stage files 6, whose
+`src/boat_plugin_stage.c` entry goes when AR4 merges and brings it to 0). The title, game,
+console and plugin glue may not reach a service's backends directly, and `CMakeLists.txt` builds
+`*_web.c` only in EMSCRIPTEN branches. `platform_bridges_detects` is its negative control. The
+title validator now links the protocol, not the ENet transport.
 
 Decisions (technical, recorded here):
 
@@ -411,7 +415,15 @@ Decisions (technical, recorded here):
   T/T+1 gate are unchanged in `wake_velocity_plugin.c` under the browser selection. Compiling
   that policy natively behind a backend seam (needed for an exact-boundary virtual-time test)
   is AR3e, after AR4 merges here, so plugin glue is not restructured while AR4 is open.
-- EM_JS imports are called only inside their backend file, through C wrappers.
+- EM_JS imports are called only inside their backend file, through C wrappers, and are named
+  `wake_js_*`.
+- AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
+  wait and the deferred first CPU draw; the console's paste and notice before typed text and its
+  queued Tab after it. Native now calls `IsWindowFocused()` for the console state call, which
+  does nothing there. The console shader's GLSL version line stays a renderer branch.
+- Review fixes (2026-11-10): exact legacy counts, wider bridge patterns, string-aware comment
+  stripping, the CMake check, one source for the LAN hint, `wake_js_` names, and the clock
+  comment (a direct native `--plugin` launch stamps its first request before `InitWindow`).
 - Browser row layout and text, the default `ws://` address, touch, mouse, viewport and keyboard
   bridges and native F11 are capabilities (AR2b), not services, and stay where they are.
 
@@ -431,9 +443,8 @@ Remaining AR3 substeps:
 - **AR3e:** compile the browser objective policy natively behind the backend seam; virtual-time
   tests of a result first accepted exactly at its deadline, stale receipts, cancellation and
   repeated-session cleanup (`wake_plugin_close` resets the evaluator).
-- **AR3f:** the session window's remaining lifecycle branches in `study()`: browser canvas
-  sizing and fit, 60 fps with the deferred scenery wait and first CPU draw, per-frame viewport,
-  mobile session start/stop; the console bridge (`wake_console.c`: sync, paste, Tab, notices).
+- AR2b, not AR3: the per-frame viewport bridge, mobile session start/stop, touch and mouse
+  bridges and native F11 remain in `study()`.
 - Native-only adapters keep their files (AR0): `--host` child process, `--plugin-bridge`,
   `--serve`, worker entry points.
 
@@ -447,7 +458,8 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug):
 - Browser sources (`*_web.c`, title, game and plugin glue) pass `cc -fsyntax-only -Wall -Wextra
   -D__EMSCRIPTEN__` against a stub `emscripten.h` that drops the JavaScript (scratch harness,
   not committed); a call with wrong arguments fails it. This is not an Emscripten build.
-- Every AR3 commit builds (`git rebase -x 'cmake --build build -j'`).
+- Every AR3 commit builds natively warning-clean and passes the syntax check and
+  `platform_bridges` (`git rebase -x` over the range).
 
 Owed to the user. Native: the title's MULTIPLAYER panel lists public servers (or the directory
 status) and finds a LAN room hosted from a second instance; joining both works; leaving and
@@ -456,7 +468,12 @@ scenery; settings persist across launches; a plugin console `save` writes the pa
 the title plays music after Play; the outer location shows LOADING with progress, then plays;
 the public server row and join work; authoring STAGE/APPLY/UNDO, console export download and an
 objective package (HUD updates, BUSY while evaluating) behave as before; fullscreen and
-resizing unchanged.
+resizing unchanged. AR3f, native: in a plugin session, open the console (`` ` `` or F2); Tab
+completes and Shift+Tab reverses; Ctrl/Cmd+C copies the latest output (Shift: scrollback) and
+Ctrl/Cmd+V pastes; Esc closes; `--no-vsync` still paces at 60 Hz. AR3f, browser: on desktop the
+console opens, paste, Tab and the copy notice work, and closing drops queued input; on a
+touch-only phone no console opens; a high-resolution and a tall mobile session size the canvas
+as before; an outer session shows LOADING, then its first frame.
 
 ### AR4 — Separate plugin worker backends
 
@@ -966,5 +983,6 @@ and the accepted decisions; this plan keeps only the step status (header and
   windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).
 - AR3 verification, 2026-11-10, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
   build warning-clean; `ctest --preset full` passed all 494 enabled tests (13 disabled),
-  including the new `platform_bridges` and `platform_bridges_detects`. No windowed, browser,
+  including the new `platform_bridges` and `platform_bridges_detects`; rerun after the review
+  fixes and AR3f, again 494 of 494. No windowed, browser,
   Windows/Linux or GPU check. See the [AR3 status](#ar3-status).
