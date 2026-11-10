@@ -78,8 +78,8 @@ jobs:
           path: build-linux/*smoke.log
           if-no-files-found: ignore
 
-      - name: Upload routine CI test results
-        if: always() && env.PROTEUS_QUALIFY != 'true'
+      - name: Upload failing routine CI test results
+        if: failure() && env.PROTEUS_QUALIFY != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: linux-boat-ci-results

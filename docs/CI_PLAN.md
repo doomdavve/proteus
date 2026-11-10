@@ -83,3 +83,11 @@ same object. No production cargo behavior changes. Configuration took 66s versus
 the earlier run; use Ninja with the same MSVC compiler for routine checks to reduce setup/
 project overhead. Manual/release qualification retains its Visual Studio generator.
 Linux passed in 1m30s, macOS 1m12s and browser 1m36s on that revision.
+
+A deliberate cache deletion and Windows rerun (42893264938 attempt 2) proved cold compilation
+and all 107 checks passed, but the job reached cancellation during final upload/cleanup at
+3m03s. Installation took 84s, Ninja configuration 29s, compilation 36s and tests 11.63s.
+The budget is not raised. Upload JUnit artifacts only for failing runs, and correctly mark
+`race_room` (70 virtual seconds with clients) and `scene_contact_room` (track sampling plus
+a 25-second networked contact run) slow, like the existing impairment variants. These remain
+in full qualification. Final cold/warm measurements are repeated after these cuts.

@@ -109,8 +109,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload routine CI test results
-        if: always() && env.PROTEUS_QUALIFY != 'true'
+      - name: Upload failing routine CI test results
+        if: failure() && env.PROTEUS_QUALIFY != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: macos-boat-ci-results

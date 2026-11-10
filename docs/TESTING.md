@@ -155,7 +155,8 @@ requests covered by these filters.
 Routine native PR and `main` jobs have a **three-minute job timeout**, including checkout,
 dependency setup, configuration, compilation and tests. Browser authoring PR jobs have the
 same cap. GitHub queue/runner allocation time is outside the job timeout. Each native test
-step has a one-minute cap, fails on the first failure, and writes JUnit results. Older PR
+step has a one-minute cap, fails on the first failure, and writes JUnit results.
+JUnit artifacts are uploaded only on failures; passing runs retain their logs and timings. Older PR
 revisions are cancelled when a newer revision is pushed; release jobs are not cancelled.
 A timeout is a failing check, not permission to retry or increase the budget automatically.
 

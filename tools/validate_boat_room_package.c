@@ -759,11 +759,11 @@ static int scene_resync_contact_room(void)
 }
 
 static const TestCase cases[] = {
-    TEST_CASE(scene_contact_room),
+    SLOW_CASE(scene_contact_room),
     SLOW_CASE(scene_moving_contact_room),
     SLOW_CASE(scene_resync_contact_room),
     TEST_CASE(catalog_rooms),
-    TEST_CASE(race_room),
+    SLOW_CASE(race_room),
     SLOW_CASE(match_room),
     TEST_CASE(definition_size),
 };
