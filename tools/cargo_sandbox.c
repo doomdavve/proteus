@@ -78,7 +78,7 @@ static bool harbour_cpu(
 {
     WaterfrontLighting light = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     if (!waterfront_draw_boating(cpu, &h->scenery, pixels, WIDTH, HEIGHT, camera, true,
-            (WaterfrontSquall) { 0 }, &light))
+            (WaterfrontSquall) { 0 }, &light, boat_tick_seconds(e->tick)))
         return false;
     const Mesh3D *water = boat_water_surface_visible(&h->water, e->world.definition->map,
         e->world.water, boat_tick_seconds(e->tick), water_visible, cpu);

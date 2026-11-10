@@ -671,7 +671,10 @@ zero terrace values outside the underside footprint. Its exhaustive
 `--sky-check` mode is the separate slow `waterfront_lighting_sky` test: it compares the
 visible-sample draw with the full panorama (separate storage/traversal, shared texel recipe)
 across legacy/full hours, sizes, cameras and a squall, and uses `waterfront_sky_stats()` to
-prove fixed-light cache reuse and bounded work on alternating/seeking lights. The saved
+prove fixed-light/time cache reuse and bounded work on alternating/seeking lights.
+Explicit wind cases compare the timed reference and visible draw at forward, backward,
+wrapped and long-session times, require changed clouds at fixed light and byte-identical
+restoration after seeks, and check the bounded offset across the wrap. The saved
 parent captures remain the independent recipe baseline.
 `boat_world_isolation.cpu_basin_lighting` paints the full reference and is therefore slow; it
 checks the basin sky, hour wrap/direct/backward seeks and both the basin and mapped flat-water
@@ -713,9 +716,9 @@ suite, actual windowed 8× cycle, captures and platform limits.
 clipping: above-water scenery remains visible, submerged scenery cannot change the reflection,
 and clipping is reset before the main pass. It also compares the uniform-shaded GPU sky with
 the CPU panorama at selected legacy/hour values and low/high sizes, checks direct/backward
-seeks and independent scene recreation, and observes native GL texture calls across 24 hours
+seeks in lighting and cloud time (including the wind period), and independent scene recreation, and observes native GL texture calls across 24 hours
 plus a bounded 241-sample virtual cycle that crosses midnight and alternates the above-city and
-azimuth-seam views. A separate probe texture proves the upload spies work before the sky's
+azimuth-seam views, also advancing wind across its bounded period. A separate probe texture proves the upload spies work before the sky's
 zero-write measurement.
 The original target/overlay/squall/pass checks remain. This requires `PROTEUS_GPU_TESTS=ON`
 and a desktop graphics context; detailed evidence and limits live in the

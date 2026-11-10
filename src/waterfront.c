@@ -224,11 +224,11 @@ bool waterfront_draw_harbor(
 
 bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,
     int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall,
-    const WaterfrontLighting *lighting)
+    const WaterfrontLighting *lighting, double time)
 {
     if (!scenery->ready || !scenery->map)
         return false;
-    waterfront_sky_draw_squall(pixels, width, height, camera, squall, lighting);
+    waterfront_sky_draw_at(pixels, width, height, camera, squall, lighting, time);
     if (!renderer3d_begin(r, pixels, width, height, camera, lighting->sun_direction))
         return false;
     r->ambient = lighting->cpu_ambient;

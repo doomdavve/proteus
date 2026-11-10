@@ -670,6 +670,46 @@ static int check_view_clock(void)
     return 0;
 }
 
+// Wind follows explicit simulation time: changed time repaints visible samples, seeking
+// restores bytes, and the periodic field remains continuous across its bounded clock wrap.
+static int check_cloud_scroll(void)
+{
+    WaterfrontLighting light = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
+    View3D camera = { .position = { 0, 0, 0 },
+        .target = { 1, 1, -1 },
+        .up = { 0, 1, 0 },
+        .vertical_fov = 1,
+        .near_plane = .1f,
+        .far_plane = 10 };
+    enum { WIDTH = 97, HEIGHT = 61 };
+    Color baseline[WIDTH * HEIGHT], drawn[WIDTH * HEIGHT];
+    waterfront_sky_draw_at(baseline, WIDTH, HEIGHT, camera, (WaterfrontSquall) { 0 }, &light, 0);
+    const double times[] = { 240, -60, 19200, 1e12, 0 };
+    for (size_t i = 0; i < sizeof(times) / sizeof(*times); ++i) {
+        double time = times[i];
+        waterfront_sky_draw_at(
+            drawn, WIDTH, HEIGHT, camera, (WaterfrontSquall) { 0 }, &light, time);
+        Image reference = waterfront_sky_image_at(&light, time);
+        for (int y = 0; y < HEIGHT; ++y)
+            for (int x = 0; x < WIDTH; ++x)
+                CHECK(ColorIsEqual(drawn[y * WIDTH + x],
+                    reference_sky_sample(reference, camera, WIDTH, HEIGHT, x, y)));
+        if (time == 240)
+            CHECK(memcmp(baseline, drawn, sizeof(drawn)) != 0);
+        if (time == 0 || time == 19200)
+            CHECK(memcmp(baseline, drawn, sizeof(drawn)) == 0);
+        WaterfrontSkyStats before = waterfront_sky_stats();
+        waterfront_sky_draw_at(
+            drawn, WIDTH, HEIGHT, camera, (WaterfrontSquall) { 0 }, &light, time);
+        CHECK(waterfront_sky_stats().draw_samples == before.draw_samples);
+    }
+    Vector2 before = waterfront_cloud_offset(19199.999), after = waterfront_cloud_offset(19200.001);
+    CHECK(fabsf(remainderf(before.x - after.x, 32)) < .0001f);
+    CHECK(fabsf(remainderf(before.y - after.y, 32)) < .0001f);
+    CHECK(waterfront_cloud_offset(INFINITY).x == 0);
+    return 0;
+}
+
 // Begin restores the daytime flat shading whatever the previous frame set.
 static int check_renderer(void)
 {
@@ -698,7 +738,7 @@ int main(int argc, char **argv)
 {
     // The exhaustive visible-sample sky comparison is registered as a separate slow CTest.
     if (argc == 2 && strcmp(argv[1], "--sky-check") == 0) {
-        int failed = check_sky_draw();
+        int failed = check_sky_draw() || check_cloud_scroll();
         if (!failed)
             printf("Waterfront sky drawing checks passed.\n");
         return failed;

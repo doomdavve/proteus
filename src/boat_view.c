@@ -833,14 +833,14 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     if (world->definition->mapped) {
         if (!waterfront_scenery_bind(&cpu->scenery, world->definition->map)
             || !waterfront_draw_boating(renderer, &cpu->scenery, pixels, width, height, camera,
-                boat_world_displaced(world), boat_view_squall(world, time), &lighting))
+                boat_world_displaced(world), boat_view_squall(world, time), &lighting, time))
             return false;
     } else {
         // The basin shares the mapped scene's sky, sun direction and CPU light. Its flat water
         // applies the frame water light once with the ordinary CPU shading, exactly as the
         // mapped flat-water path does; displaced water keeps its emissive water-tint path.
-        waterfront_sky_draw_squall(
-            pixels, width, height, camera, boat_view_squall(world, time), &lighting);
+        waterfront_sky_draw_at(
+            pixels, width, height, camera, boat_view_squall(world, time), &lighting, time);
         if (!renderer3d_begin(renderer, pixels, width, height, camera, lighting.sun_direction))
             return false;
         renderer->ambient = lighting.cpu_ambient;

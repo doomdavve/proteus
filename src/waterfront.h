@@ -11,7 +11,7 @@
 // unready or basin scenery.
 bool waterfront_draw_boating(Renderer3D *renderer, const WaterfrontScenery *scenery, Color *pixels,
     int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall,
-    const WaterfrontLighting *lighting);
+    const WaterfrontLighting *lighting, double time);
 
 void waterfront_draw_traffic(Renderer3D *renderer, const WaterfrontTrafficFrame *frame);
 bool waterfront_draw_harbor(

@@ -1,8 +1,9 @@
 #version 330
 
 in vec2 fragTexCoord;
-// Static mask at panorama texel centres: R underside, G rim, B three tonal terraces.
+// Static repeating world-plane field: R/G footprint, B three tonal terraces.
 uniform sampler2D skyMask;
+uniform vec2 cloudOffset;
 uniform vec3 skyForward;
 uniform vec3 skyRight;
 uniform vec3 skyUp;
@@ -120,7 +121,13 @@ void main()
     color = skyMix(color, sunHalo, haloStrength * (1.0 - clamp(sunDistance / haloRadius, 0.0, 1.0)));
     color = skyMix(color, sunDisc, discStrength * clamp((0.047 - sunDistance) / 0.004, 0.0, 1.0));
     if (elevation > 0.075) {
-        vec4 flags = texelFetch(skyMask, ivec2(sx, sy), 0);
+        float horizontal = sqrt(1.0 - elevation * elevation) / elevation;
+        vec2 plane = vec2(sin(azimuth), cos(azimuth)) * horizontal;
+        ivec2 fieldSize = textureSize(skyMask, 0);
+        ivec2 base = ivec2(floor(fract((plane - cloudOffset + 16.0) / 32.0) * vec2(fieldSize)));
+        ivec2 rimSample = ivec2(floor(fract((plane * 1.035 - cloudOffset + 16.0) / 32.0) * vec2(fieldSize)));
+        vec4 flags = texelFetch(skyMask, base, 0);
+        flags.g = texelFetch(skyMask, rimSample, 0).r;
         bool underside = flags.r > 0.5, rim = flags.g > 0.5;
         if (underside || rim) {
             vec3 cloud = cloudRim * 0.92;
