@@ -588,15 +588,19 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
         send_message(s, peer, &pong);
         break;
     }
-    case BOAT_NET_RESYNC_REQUEST:
-        if (now - p->last_resync < 1) {
+    case BOAT_NET_RESYNC_REQUEST: {
+        // One resync per second: elapsed time in hosted rooms, granted ticks in a private session
+        // (its client asks on the same clock; elapsed time would refuse it at 8x).
+        double clock = s->config.local.enabled ? boat_tick_seconds(s->fleet.state.tick) : now;
+        if (clock - p->last_resync < 1) {
             ++s->stats.rate_limited;
             break;
         }
-        p->last_resync = now;
+        p->last_resync = clock;
         ++s->stats.resyncs;
         send_checkpoint(s, peer);
         break;
+    }
     case BOAT_NET_DISCONNECT:
         drop_peer(s, peer, true);
         break;
