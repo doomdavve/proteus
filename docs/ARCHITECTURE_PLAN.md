@@ -468,7 +468,9 @@ Implemented (ledger row L0):
   wake mismatch) when a fourth resync falls due, after `BOAT_NET_LOCAL_RESYNCS` = 3 resyncs with
   no clean state between them, closes with its reason (about 480 granted ticks). The in-process
   link is lossless, so one checkpoint repairs a stall; three allow for a checkpoint superseded by
-  a restart or a second mismatch. Hosted clients are unchanged.
+  a restart or a second mismatch. The authority serves a private resync once per 120 granted
+  ticks, the client's clock (elapsed time would refuse its retries at 8×). Hosted rooms keep
+  elapsed time and their clients are unchanged.
 
 Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
 
@@ -478,8 +480,8 @@ Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
   full-precision command uses the private range.
 - The player's boat is placed when the authority accepts the client, before the bootstrap
   checkpoint, instead of by a spawn request after READY, so the first granted tick is commanded.
-- The client's resync rate limit also counts granted ticks (one resync per 120), not elapsed
-  time, and the private client sends no ping.
+- The resync rate limit counts granted ticks (one resync per 120) at both ends of a private
+  session, not elapsed time; hosted rooms keep elapsed time. The private client sends no ping.
 - A command batch dropped by a full unreliable queue is an endpoint failure (the host compares
   the transport's dropped count around each flush), not a repeated command.
 - Outer: every shipped outer solo session is a voyage package, so L0 reaches the game on the
@@ -494,7 +496,7 @@ Deviations from the [AR1 design](ARCHITECTURE_AR1.md):
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no wall clock):
 
-- `boat_local` (16 quick cases, each under 100 ms on Debug) drives the game's own glue
+- `boat_local` (17 quick cases, each under 100 ms on Debug) drives the game's own glue
   (`proteus_local_drive`, the library `wake_velocity` links) and compares every predicted tick's
   boat, `BoatPresentation` and pool digest, and every frame's authority tick, bit for bit with the
   game's direct path (`timed_boat_step`): basin at ¼×, 1× and
@@ -502,8 +504,10 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no
   8× (9 chunks, a partial first chunk); uneven frames (odd remainders, partial first chunks);
   explorer handling; 30 s of pause; restart with stale old-generation traffic; 100 repeated
   sessions; startup failure and release; queue saturation; the private range in a hosted room;
-  the 96-tick grant cap; an injected wake mismatch that one resync repairs, then one the authority
-  never repairs, which fails the session after three resyncs.
+  the 96-tick grant cap; an injected wake mismatch that one resync repairs, then one whose
+  checkpoints the client's transport loses, which fails the session after three served resyncs;
+  two quick mismatches at 8× with an advancing host clock, both repaired (fails if the authority
+  rate-limits on elapsed time).
   Each drive has zero rate-limited, late, future or duplicate commands and every tick integrates
   a received command. Negative checks during development: quantizing the commands at the
   authority fails `basin_1x` and `outer_8x`; presenting against the session's stale pool fails
@@ -515,8 +519,9 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0; virtual frame times, no
   before the frame loop (L6 migrates them).
 - Cost, Release `validate_boat_local --bench` (processor time via `clock()`, 1,200 frames each,
   outer with waves, current and crossing, through the game glue with presentation): 16-tick
-  frames at 8× mean 1.66 ms (worst 2.10–2.19 ms) against 1.40 ms for the direct path with
-  presentation; `G = 96` frames mean 8.45 ms (worst 13.9–14.1 ms).
+  frames at 8× mean 1.66 ms (worst 2.13 ms) against 1.40 ms (worst 1.84 ms) for the direct path
+  with presentation; `G = 96` frames mean 8.48 ms (worst 15.6 ms) against 6.95 ms (worst
+  12.2 ms) direct.
 - The Windows CI lane builds and runs `boat_local`; not yet run on CI (no push).
 - Hidden-window smoke run (`--renderer cpu --frames 240 --performance-report`): the local
   session advanced 737 ticks in 280 chunks with no failure. Not a manual check.
@@ -879,6 +884,6 @@ and the accepted decisions; this plan keeps only the step status (header and
 - 2026-11-09: the user accepted AR1 product decisions D1–D10 as recommended. Product direction
   only: no implementation exists, and nothing was played or browser-tested.
 - AR6 verification, 2026-11-09, `arch/ar2-pilot`, arm64/macOS 26.6.2, AppleClang 21.0.0: Debug
-  build warning-clean; `ctest --preset full` passed all 491 enabled tests (13 disabled), including
-  the 16 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
+  build warning-clean; `ctest --preset full` passed all 492 enabled tests (13 disabled), including
+  the 17 `boat_local` cases and the unchanged `boat_net` golden-byte and regression cases. No
   windowed, browser, Windows/Linux or GPU check. See the [AR6 status](#ar6-status).

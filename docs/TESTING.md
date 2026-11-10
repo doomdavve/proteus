@@ -741,14 +741,16 @@ old-generation command batch and READY are counted stale and change nothing); `r
 (100 restarts); `startup_failure` (invalid configuration and a refused water recipe release
 everything); `queue_saturation` (an unreliable or reliable queue overflow stops the session
 instead of dropping a command batch silently); `resync_escalation` (an injected wake mismatch that
-one resync repairs, then one left unrepaired, which fails the session after three resyncs); and
+one resync repairs, then one whose checkpoints are lost, which fails the session after three
+served resyncs); `resync_8x` (two quick mismatches at 8x with an advancing host clock are both
+repaired: the authority rate-limits private resyncs in granted ticks); and
 `private_range` (the private codec round-trips
 full precision; a hosted room counts the private type as malformed and rejects the sender). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
 processor time per frame through the glue (with presentation) at 8x on `outer` for 16-tick frames
-and 96-tick grants, and the direct path with presentation for comparison.
+and 96-tick grants, and the direct path with presentation for both.
 
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
 a few seconds. It covers:
