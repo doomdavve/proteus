@@ -365,6 +365,24 @@ results keep their rejection behavior. Verify staging/query validators, lifecycl
 supplied time, browser worker checks, and Windows/POSIX builds and runtime paths; record
 unavailable platform coverage.
 
+**AR4 status, 2026-11-10 (branch `arch/ar4-plugin-workers`, for the AR2–AR6 milestone PR):**
+implemented; not played or browser-tested. `boat_plugin_stage.c` keeps framing, limits, deadlines
+and revision validity; `boat_plugin_stage_{posix,windows,web}.c` implement the private
+`boat_plugin_stage_backend.h` (launch, poll, byte transfer, termination), selected in CMake.
+Platform policy differences (5 s/15 s deadline, executable, browser launch receipt, solo-only
+kinds, browser query deadline message) are backend traits, not `#if` in common code. The public
+staging API, wire and limits are unchanged. Two browser fixes: close now releases every transport
+job, including failed queries that used to stay in the page's two-job table, and query replies
+are read into a buffer sized to the bridge limit (it was 12 KiB against a 160 KiB copy).
+Evidence (macOS arm64, AppleClang, Debug): warning-free build; `ctest --preset full` passed
+475/475 (13 disabled), including the new `plugin_stage_backend` include check and query
+lifecycle cases in `boat_plugin_stage` (exact 5 s virtual deadline, cancel, faults) and the Node
+`web_plugin_author` transport test.
+**Open:** Emscripten and Windows builds and the `tools/package_web.py` browser checks
+(`check_web_plugin_author.py`, `check_web_plugin_objective.py`, `check_web_wasm.py`) were not run
+(no emcc or Windows here); OS termination/reaping still blocks in close without bounded-cost
+evidence; manual native/browser reload, Undo and Harbor life default checks owed.
+
 ### AR5 — Narrow plugin data and execution dependencies
 
 Using AR0's graph, establish these provisional responsibilities:

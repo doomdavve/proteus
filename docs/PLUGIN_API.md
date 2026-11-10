@@ -1051,7 +1051,10 @@ submits the same lines through the same state.
 ## Native interface
 
 `src/boat_plugin.h` works on immutable bytes and does no I/O. `src/boat_plugin_io.h` acquires package files;
-`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport.
+`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport: request and
+reply framing, limits, deadlines and revision validity. One CMake-selected backend behind the
+private `src/boat_plugin_stage_backend.h` launches, polls, transfers bytes and terminates the
+worker: `boat_plugin_stage_posix.c`, `boat_plugin_stage_windows.c` or `boat_plugin_stage_web.c`.
 
 ```c
 BoatPluginFiles *files = malloc(sizeof(*files)); // About 68 KiB of bounded buffers.
