@@ -28,6 +28,7 @@
 #include "cli_usage.h"
 #include "wake_command.h"
 #include "wake_console.h"
+#include "wake_console_bridge.h"
 #include "wake_velocity_app.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_input.h"
@@ -112,18 +113,6 @@ EM_JS(void, boat_web_mobile_layout, (const float *rects), {
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
-// clang-format would split JavaScript's === into == =.
-// clang-format off
-EM_JS(int, boat_web_physical_keyboard, (void), {
-    return (window.matchMedia && window.matchMedia('(pointer: fine)').matches)
-        || (navigator.maxTouchPoints || 0) === 0;
-})
-// clang-format on
-EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
-    Module.boatConsoleOpen = !!open;
-    Module.boatConsoleAvailable = !!available;
-    Module.boatConsoleFocused = !!focused;
-})
 EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
 #endif
@@ -1649,15 +1638,11 @@ static int study(int argc, char **argv)
         bool console_just_opened = false;
         console_was_open = console.open;
         bool console_available = false;
-#if defined(__EMSCRIPTEN__)
         // Desktop browsers with a physical keyboard get the same console; touch-only phones do
         // not, because the panel would cover the game and has no text-entry affordance.
         console_available = plugin_active && !networked && !demo && !screenshot
-            && !session.runs.playing && !menu.open && !help_visible && boat_web_physical_keyboard();
-#else
-        console_available = plugin_active && !networked && !demo && !screenshot
-            && !session.runs.playing && !menu.open && !help_visible;
-#endif
+            && !session.runs.playing && !menu.open && !help_visible
+            && wake_console_bridge_text_entry();
         bool console_open_key
             = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F2) || IsKeyPressed(161);
         if (console_available && !console.open && console_open_key && IsWindowFocused()) {
@@ -1666,9 +1651,7 @@ static int study(int argc, char **argv)
             console_just_opened = true;
             plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
         }
-#if defined(__EMSCRIPTEN__)
-        boat_web_console_state(console.open, console_available, IsWindowFocused());
-#endif
+        wake_console_bridge_state(console.open, console_available, IsWindowFocused());
         if (console.open && !console_just_opened
             && wake_console_update(&console, width, height, console_line, sizeof(console_line))) {
             wake_console_begin_command(&console, console_line);
