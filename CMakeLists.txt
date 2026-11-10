@@ -994,6 +994,15 @@ if(NOT EMSCRIPTEN)
   add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
   set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
+  # AR4: the browser backend and common staging, compiled natively against a C model of the
+  # page transport; the archive's own staging objects are not pulled in.
+  add_executable(validate_boat_plugin_stage_web tools/validate_boat_plugin_stage_web.c
+    src/boat_plugin_stage.c src/boat_plugin_stage_web.c)
+  target_link_libraries(validate_boat_plugin_stage_web PRIVATE proteus_plugins)
+  target_compile_options(validate_boat_plugin_stage_web PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_plugin_stage_web COMMAND validate_boat_plugin_stage_web)
+  set_tests_properties(boat_plugin_stage_web PROPERTIES LABELS "cpu;quick"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 10)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
   add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
     tools/wake_velocity_plugin.c tools/wake_command.c)
