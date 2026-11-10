@@ -1,18 +1,15 @@
 # Architecture restructuring plan
 
 **Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
-[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`,
-implemented and reviewed, not pushed: AR2a, [AR3a–AR3f](#ar3-status),
-[AR4](#ar4--separate-plugin-worker-backends),
-[AR5](#ar5--narrow-plugin-data-and-execution-dependencies) and the
-[AR6 pilot](#ar6-status), for the single AR2–AR6 milestone PR, which awaits the user; AR2b
-([status](#ar2b-status)) is implemented on top, not yet reviewed. Nothing played,
-browser-built or Windows-built.
-**Open:** browser, Windows and manual native checks listed per step; the menu-gated touch tap
-(AR6); impaired-delivery qualification; a pinned `saved_at` for L3's byte-equal saves.
+[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). On `arch/ar2-pilot`
+for the single AR2–AR6 milestone PR, unpushed: AR2a, AR3a–AR3d, AR3f, AR4, AR5 and the AR6 pilot
+reviewed; [AR3e](#ar3-status) and [AR2b](#ar2b-status) implemented, review pending. Nothing
+played, browser-built or Windows-built.
+**Open:** manual native, browser and Windows checks per step; the menu-gated touch tap (AR7);
+untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** review of AR2b; the user's review and manual checks of the milestone PR; then AR7.
+**Next:** final review of AR2b and AR3e; the user's review and manual checks; then AR7.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -338,7 +335,7 @@ and replay keys, `M`, the work glue (`wake_velocity_work.c`), the net weapon rea
 sources directly; AR6 owns moving the pausing/time-scale/restart consequences behind host
 management). The web touch tap is consumed by `boat_app_input_poll_touch` only on frames where
 `boat_menu_gate` holds, because the bridge's `click()` drains it; browser behaviour is not
-verified. Open for AR6: touch drain depends on menu state (AR2b kept it; see its status). Not
+verified. Open for AR7: touch drain depends on menu state (AR2b kept it; see its status). Not
 done: turning the value into per-tick commands (AR6's client) and the remaining consumers above.
 Verification (macOS arm64 Debug, 2026-11-09): `cmake --build build -j` warning-clean;
 `ctest --preset full` 475 passed, 0 failed (includes the new quick `app_input`, which drives
@@ -359,8 +356,8 @@ and browser keyboard/mouse/touch layouts, resizing and focus transitions.
 
 #### AR2b status
 
-2026-11-10, branch `arch/ar2-pilot`, three commits on `895c7d0`; not reviewed, merged, played or
-browser-built (emcc was not installed).
+2026-11-10, branch `arch/ar2-pilot`, three commits on `f1ed07b`; review pending; not merged, played
+or browser-built (emcc was not installed).
 
 Implemented: the 14 inline browser bridges left in `wake_velocity.c` moved, bodies unchanged,
 into CMake-selected backends behind C wrappers (`wake_js_*` imports, called only in their file):
@@ -393,19 +390,20 @@ or samples state) and moving them to the frame-start sample would change that or
 speculative fields: native returns the values the old `#else` paths used. The tap stays drained
 only on `boat_menu_gate` frames: the page keeps a tap while the game is inactive and drops it on
 active touch-sample frames, so draining every frame would drop taps that today select a menu row
-after help closes or focus returns. That is a behaviour change for AR6 or the user, not AR2b.
+after help closes or focus returns. That is a behaviour change for AR7 (the mode migration)
+or the user, not AR2b.
 Remaining `__EMSCRIPTEN__` branches in `study()` (the browser's room-leave row, its plugin
 controls, the native tool bridge and room host) select policy or native-only adapters, not
 bridges.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10): each of the three
-commits builds warning-clean and passes `platform_bridges` and its self-test; a script that
-extracts every `EM_JS(...)` from `895c7d0:tools/wake_velocity.c` and from the new files finds
-all 14 byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the
-app backend's existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check
-passes for every `*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin
-and outer CPU captures are byte-identical to a `895c7d0` build; `ctest --preset full`: 508/508
-passed (13 disabled) in 40 s.
+commits builds warning-clean and passes `platform_bridges` and its self-test; a script that extracts
+every `EM_JS(...)` from `f1ed07b:tools/wake_velocity.c` and from the new files finds all 14
+byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the app backend's
+existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check passes for every
+`*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin and outer CPU
+captures are byte-identical to an `f1ed07b` build; `ctest --preset full`: 508/508 passed (13
+disabled) in 40 s.
 
 Owed (manual). Native windowed: F11 toggles borderless fullscreen in a session; M toggles mouse
 steering, the cursor hides while captured and returns on the menu, on M again and on leaving;
@@ -489,8 +487,13 @@ Decisions (technical, recorded here):
   controls, reset closing the in-flight job (a late reply is never read) and close releasing
   every job over repeated sessions. Page bridges other than the objective's stay
   `__EMSCRIPTEN__`, and the model is not the page: `web/plugin_objective.js` stays untested here.
-- EM_JS imports are called only inside their backend file, through C wrappers, and are named
-  `wake_js_*`.
+  The test opens `plugins/shelter-tour` once with its file watch off, so no frame reads the
+  package directory. Open: the MIGRATE evaluation paths (begin, accept and commit, cancel
+  through page actions 2 or 8) compile under the seam but have no case, since starting one
+  needs a staged revision with a changed objective.
+- EM_JS imports are called only inside their backend file, through C wrappers. Game and tools
+  bridges are named `wake_js_*`; the plugin stage backend (`src/boat_plugin_stage_web.c`, AR4)
+  keeps its `browser_*` names, since renaming them would be churn.
 - AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
   wait and the deferred first CPU draw; the console's paste and notice before typed text and its
   queued Tab after it. Native now calls `IsWindowFocused()` for the console state call, which
@@ -534,11 +537,11 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug):
   `platform_bridges` (`git rebase -x` over the range).
 - After the AR4/AR5 merge (2026-11-10, same machine): `ctest --preset full` and again with
   `-j8` each passed 508/508 (13 disabled); every first-parent commit after the merge builds
-  warning-clean and passes the lint, plugin staging, objective and save tests, except the merge
-  commit itself, whose `platform_bridges` fails until the next commit allowlists AR4's native
-  browser-staging validator; basin and outer CPU captures are byte-identical to the pre-merge
-  `8b6be48` build; the stub syntax check passes for every `*_web.c`, title, game, console,
-  plugin glue and staging source.
+  warning-clean and passes the lint, plugin staging, objective and save tests (the merge passes
+  `platform_bridges` since its resolution was rewritten to carry the legacy-entry removal and
+  the native-test allowlist; the trees after it are unchanged); basin and outer CPU captures
+  are byte-identical to the pre-merge `8b6be48` build; the stub syntax check passes for every
+  `*_web.c`, title, game, console, plugin glue and staging source.
 
 Owed to the user. Native: the title's MULTIPLAYER panel lists public servers (or the directory
 status) and finds a LAN room hosted from a second instance; joining both works; leaving and
