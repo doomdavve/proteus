@@ -45,9 +45,9 @@ on windows-2022 with Visual Studio 2022. It runs on pushes and can also be
 started manually from the Actions tab after the workflow exists on the default branch.
 No Windows development tools are needed on your Mac or the test machine.
 
-CI restores the pinned Lua tarball before CMake configuration, avoiding repeated lua.org
-downloads on a matching cache. CMake still checks the published SHA-256. A cold cache still
-needs the upstream download; see [CI dependency caching](TESTING.md#ci-dependency-download-cache).
+The checkout ships the pinned Lua archive, so even a cold CI build extracts it locally
+without contacting lua.org. CMake still checks the published SHA-256; see
+[Lua source availability](TESTING.md#lua-source-availability).
 
 ## HUD/control qualification, 2026-10-24
 

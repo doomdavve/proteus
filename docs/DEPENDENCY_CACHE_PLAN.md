@@ -1,32 +1,33 @@
-# Cache the pinned Lua download in CI
+# Reliable Lua source availability
 
-Status, 2026-11-10: local implementation and verification complete; hosted cache checks pending.
-Open items: hosted cache miss/save/hit evidence after publication.
-Done when: restored archives configure without upstream access, pins invalidate the cache,
-and the shared CMake declaration retains SHA-256 verification.
-Next: inspect hosted cache miss/save/hit on CI; PR publication authorized 2026-11-10.
+Status, 2026-11-10: vendored archive implemented and locally verified; updated CI pending.
+Open items: updated native/browser CI, especially Windows cold configuration.
+Done when: fresh builds extract the checksum-verified archive without lua.org or a cache.
+Next: updated #182 CI, then merge before rebasing #180.
 
-## Scope
+## Scope and revised decision
 
-PR #180's Windows run failed before compilation because lua.org was unreachable during
-Lua download. Cache the original pinned archive across the five native/browser workflows.
-Keep the pin and explicit download directory in `cmake/LuaSource.cmake`; each cache key
-hashes that file. The browser authoring path filter also includes the new declaration.
+PR #182's cache-only Windows run failed during its first Lua download, while Linux, macOS
+and browser checks passed. Caching cannot bootstrap when the upstream endpoint is
+unreachable. The user requested a way out of the repeated failures. Ship the unmodified
+373,429-byte Lua 5.4.9 archive, whose hash already matches the published pin, in
+`third_party/lua`. Extract it locally with the same SHA-256 check. Remove the now-unnecessary
+Lua cache actions; retain the shared declaration and broaden the browser dependency filter.
+The current contract is in [testing](TESTING.md#lua-source-availability); the archive's
+provenance, license and upgrade procedure are in [the vendor guide](../third_party/lua/README.md).
 
-Checked the Open loops board in [the index](README.md#open-loops). This infrastructure
-track defers the existing plugin P5, lighting/user acceptance, platform/human play and
-other gameplay/graphics loops. It does not change dependency versions, add mirrors,
-vendor third-party sources or cache compiled outputs. The contract is in
-[testing](TESTING.md#ci-dependency-download-cache).
+Checked the Open loops board in [the index](README.md#open-loops). Existing plugin P5,
+lighting/user acceptance, platform/human play and gameplay/graphics loops remain deferred.
+No dependency version, VM behaviour, compiled-output cache or network mirror is added.
 
 ## Steps
 
-1. Implement the shared download location and native/browser workflow caches: done locally.
-2. Verify archive reuse offline, workflow syntax, native build and full suite: done locally.
-3. Close the local implementation: done; contract in the testing spec and evidence below.
-   Hosted Actions cache behavior remains a follow-up after publication.
+1. Cache-only implementation and local verification: completed, superseded after hosted failure.
+2. Vendor the original verified archive and remove cache-only scaffolding: implemented locally.
+3. Verify a fresh uncached extraction with upstream blocked, build/full suite and workflows;
+   close into the testing/plugin specs: done locally; publication to #182 authorized.
 
-## Verification
+## Superseded cache-only verification
 
 2026-11-10, Apple Silicon/macOS: seeded a fresh build's download directory with the original
 Lua archive from an existing build, then configured with HTTP/HTTPS/ALL proxy variables set
@@ -44,3 +45,21 @@ remain unverified locally.
 
 The user authorized opening the PR on 2026-11-10. Main remains at `75375b3`, the
 verified base; this publication update changes documentation only.
+
+## Vendored archive verification
+
+2026-11-10, Apple Silicon/macOS, Debug: a fresh minimal FetchContent project extracted
+Lua with HTTP/HTTPS/ALL proxies pointed at the closed loopback port 9, with no cache,
+source override or prior Lua extraction (`build/vendor-offline.log`). A second fresh
+project using an intentionally wrong SHA-256 failed before extraction
+(`build/vendor-bad-hash.log`). The vendored archive matches the original pinned hash.
+The full project configured with the same blocked proxies using only existing raylib/ENet
+source overrides (`build/vendor-configure.log`); Lua used the local original archive.
+
+Native build passed warning-clean (`build/vendor-build.log`); all 544 enabled full-preset
+tests passed (15 retired checks disabled) in 103.09 seconds without retries
+(`build/vendor-full.log`), with GPU/socket access. Actionlint 1.7.12 passed for the changed
+browser workflow (shellcheck disabled/unavailable); the other four workflows were restored
+to main because they no longer need cache steps. Changed documentation targets and
+`git diff --check` passed. No audiovisual behavior changed, so no new playback review.
+Updated Windows/browser CI remains pending; no updated hosted success is claimed yet.

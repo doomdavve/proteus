@@ -150,22 +150,19 @@ Windows release builds remain available regardless of these filters. GitHub does
 successful check for a skipped workflow; do not require these checks for documentation-only pull
 requests covered by these filters.
 
-### CI dependency download cache
+### Lua source availability
 
-The native Linux/macOS/Windows and browser build workflows restore the pinned Lua source
-archive in `<build>/downloads/lua` before configuring. `cmake/LuaSource.cmake` owns the URL,
-SHA-256 and download directory; its content hash and runner OS form the Actions cache key.
-Changing the Lua pin automatically selects a new cache. Only the downloaded archive is
-cached; CMake checks its SHA-256 before extracting sources into a fresh build tree.
-Compiled objects, source overrides and CMake cache files are not restored.
+The checkout includes the unmodified Lua source archive in `third_party/lua`. The shared
+`cmake/LuaSource.cmake` declaration extracts that local archive with the published SHA-256
+check, including in fresh native and browser builds. Lua requires neither lua.org access
+nor an Actions cache. Existing `FETCHCONTENT_SOURCE_DIR_LUA` overrides remain available.
+The archive's provenance, license and upgrade procedure are in
+[the vendor guide](../third_party/lua/README.md).
 
-A matching cache avoids contacting lua.org for Lua. A cache miss (including a new pin,
-branch scope or eviction) uses CMake's normal verified download, and a successful job saves
-the archive for subsequent runs. Therefore cold builds still need upstream availability.
-Raylib/ENet Git fetches, libcurl, SDKs and compiler caches remain separate. Local builds use
-the same download directory and need no new options. Workflow changes only affect builds
-using the new source declaration; building older release tags retains their original fetch.
-Implementation/evidence: [dependency cache plan](DEPENDENCY_CACHE_PLAN.md).
+Raylib/ENet Git fetches, libcurl and SDKs still require their existing setup/network access.
+Older release tags retain their original Lua fetching behaviour. The browser authoring path
+filter includes both the Lua declaration and archive so dependency updates trigger its build.
+Implementation/evidence: [dependency availability plan](DEPENDENCY_CACHE_PLAN.md).
 
 2026-11-03 workflow filter follow-up: PR #135 included `tools/windows/README.txt` and therefore
 started all three native builds under the former Markdown-only filter. The push/PR filters now

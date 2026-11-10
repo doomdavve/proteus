@@ -27,12 +27,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Cache pinned Lua download
-        uses: actions/cache@v6
-        with:
-          path: build-mac/downloads/lua
-          key: ${{ runner.os }}-lua-download-v1-${{ hashFiles('cmake/LuaSource.cmake') }}
-
       - name: Check release publisher without network
         run: python3 tools/test_publish_release.py
 
