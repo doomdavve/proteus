@@ -322,6 +322,7 @@ add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
   tools/wake_velocity_menu.c
   tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
   tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
+  tools/wake_velocity_controls.h
   tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
@@ -332,10 +333,11 @@ target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu prote
 if(EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c
     tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c
-    tools/wake_console_bridge_web.c)
+    tools/wake_console_bridge_web.c tools/wake_velocity_controls_web.c)
 else()
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
-    tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c)
+    tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c
+    tools/wake_velocity_controls.c)
   target_link_libraries(wake_velocity PRIVATE proteus_work_session)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -499,7 +501,7 @@ endif()
 set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
 file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
 add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c
-  tools/wake_velocity_input.c)
+  tools/wake_velocity_input.c tools/wake_velocity_controls.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # The title reaches discovery only through wake_velocity_servers.h (stubbed here), so it links
 # the pure protocol for LAN room lists and no transport.

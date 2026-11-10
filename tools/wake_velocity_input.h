@@ -37,10 +37,10 @@ typedef struct BoatAppInput {
 // where a UI consumer would have consumed the touch tap; native builds ignore it.
 BoatAppInput boat_app_input_sample(void);
 
-// On the web, consume a pending touch tap (boat_web_touch_click from "boat_web_touch.h") exactly
+// On the web, consume a pending touch tap (wake_touch_tap from "wake_velocity_controls.h") exactly
 // as the existing menu code does, overwriting pointer position and pointer_pressed. That call
 // consumes the tap, so callers invoke this only on frames where a UI consumer would have called
-// it before. Native builds do nothing.
+// it before. Native builds do nothing (wake_touch_tap returns 0).
 void boat_app_input_poll_touch(BoatAppInput *input);
 
 // The pause menu's per-frame gate: the menu updates only if it was already open before this

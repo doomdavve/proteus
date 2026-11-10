@@ -30,6 +30,7 @@
 #include "wake_console.h"
 #include "wake_console_bridge.h"
 #include "wake_velocity_app.h"
+#include "wake_velocity_controls.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_input.h"
 #include "wake_velocity_lighting_review.h"
@@ -52,7 +53,6 @@
 #endif
 #include "boat_screen.h"
 #include "boat_title.h"
-#include "boat_web_touch.h"
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
@@ -67,34 +67,6 @@
 #if defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
 #include <emscripten/emscripten.h>
-EM_JS(int, boat_web_touch_click, (float *position), {
-    const tap = Module['boatMobile']['click']();
-    if (Object.is(tap, null))
-        return 0;
-    if (Object.is(tap, false))
-        return -1;
-    HEAPF32[position >> 2] = tap.x;
-    HEAPF32[(position >> 2) + 1] = tap.y;
-    return 1;
-})
-EM_JS(void, boat_web_mobile_session, (int enabled), { Module['boatMobile']['session'](enabled); })
-EM_JS(int, boat_web_mobile_menu, (void), { return Module['boatMobile']['menu'](); })
-EM_JS(int, boat_web_mobile_sample, (int active), { return Module['boatMobile']['sample'](active); })
-EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['target'](); })
-EM_JS(int, boat_web_mobile_state, (void), { return Module['boatMobile']['state'](); })
-EM_JS(int, boat_web_mobile_size, (int width), {
-    return Math.max(26, Math.ceil(48 * width / Module['canvas'].getBoundingClientRect().width));
-})
-EM_JS(void, boat_web_mobile_status, (char *text, int capacity),
-    { stringToUTF8(Module['boatMobile']['status'](), text, capacity); })
-EM_JS(void, boat_web_mobile_layout, (const float *rects), {
-    const regions = [];
-    for (let i = 0; i < 8; ++i) {
-        const offset = (rects >> 2) + i * 4;
-        regions.push(Array.from(HEAPF32.subarray(offset, offset + 4)));
-    }
-    Module['boatMobile']['layout'](regions);
-})
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
@@ -102,13 +74,12 @@ EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['move
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
 #endif
 
-#if defined(__EMSCRIPTEN__)
 // Draw into the game's low-resolution frame. Publish these exact hit rectangles to the
 // browser, which captures each finger and delivers ordinary pedal/steering inputs to C.
 static void draw_touch_controls(
     int width, int height, Rectangle destination, bool enabled, int buttons, int button_height)
 {
-    int state = boat_web_mobile_state();
+    int state = wake_touch_state();
     if (!(state & 1))
         return;
     int steering_width = button_height > 30 ? button_height : 30;
@@ -150,12 +121,11 @@ static void draw_touch_controls(
         boat_ui_text(labels[i], (int)(box.x + (box.width - boat_ui_width(labels[i], 10)) / 2),
             (int)box.y + (button_height - 10) / 2, 10, text);
     }
-    boat_web_mobile_layout(&regions[0][0]);
+    wake_touch_layout(&regions[0][0]);
     char status[128];
-    boat_web_mobile_status(status, sizeof(status));
+    wake_touch_status(status, sizeof(status));
     boat_ui_text(status, 4, button_height + 7, 10, palette.text);
 }
-#endif
 
 static void usage(void)
 {
@@ -1502,8 +1472,8 @@ static int study(int argc, char **argv)
     float mouse_wheel = session.boat.wheel;
 #if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
-    boat_web_mobile_session(1);
 #endif
+    wake_touch_session(true);
     SetExitKey(KEY_NULL);
     Profiler profiler = { 0 };
     BoatProfile boat_profile = { 0 };
@@ -1647,9 +1617,7 @@ static int study(int argc, char **argv)
         if (IsKeyPressed(KEY_F11))
             ToggleBorderlessWindowed();
 #endif
-#if defined(__EMSCRIPTEN__)
-        menu_pressed |= boat_web_mobile_menu() != 0;
-#endif
+        menu_pressed |= wake_touch_menu_pressed();
         if (menu_pressed) {
             if (help_visible)
                 help_visible = false;
@@ -1721,11 +1689,9 @@ static int study(int argc, char **argv)
         float mobile_target = NAN;
         int mobile_buttons = 0;
         int mobile_button_height = 26;
-#if defined(__EMSCRIPTEN__)
-        mobile_buttons = boat_web_mobile_sample(active && !demo && !session.runs.playing);
-        mobile_target = boat_web_mobile_target();
-        mobile_button_height = boat_web_mobile_size(width);
-#endif
+        mobile_buttons = wake_touch_buttons(active && !demo && !session.runs.playing);
+        mobile_target = wake_touch_target();
+        mobile_button_height = wake_touch_button_height(width);
         bool keyboard_steering = app_input.helm_right || app_input.helm_left;
         bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
         bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
@@ -2301,10 +2267,8 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
-#if defined(__EMSCRIPTEN__)
         draw_touch_controls(width, height, destination, active && !demo && !session.runs.playing,
             mobile_buttons, mobile_button_height);
-#endif
         if (hud_overlay)
             boat_screen_end_overlay();
         EndTextureMode();
@@ -2637,7 +2601,7 @@ cleanup:
         boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
         boat_web_mouse_state(0, 0);
-        boat_web_mobile_session(0);
+        wake_touch_session(false);
 #else
         if (mouse_captured)
             EnableCursor();

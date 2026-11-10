@@ -37,7 +37,7 @@ NATIVE_WEB_TESTS = {
 
 # File -> (bridges allowed, owner of their extraction).
 LEGACY = {
-    "tools/wake_velocity.c": (13, "AR2b: touch and mouse capabilities"),
+    "tools/wake_velocity.c": (4, "AR2b: mouse capture capabilities"),
     "tools/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
 }
 
@@ -53,7 +53,10 @@ MIGRATED = {
         r"boatScenery", r"boatServers", r"boatPlugin", r"\bemscripten_get_now\s*\(",
         r"\bboat_scenery_load_all\s*\(", r"\bboat_directory_\w+\s*\(", r"boatFitCanvas",
         r"boatConsole", r"matchMedia", r"\bSetTargetFPS\s*\(", r"\bInitAudioDevice\s*\(",
-        r"boatViewportSize",
+        r"boatViewportSize", r"boatMobile",
+    ],
+    "tools/wake_velocity_input.c": [
+        r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", BRIDGE.pattern,
     ],
     "tools/wake_console.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", r"\bSetClipboardText\s*\(",

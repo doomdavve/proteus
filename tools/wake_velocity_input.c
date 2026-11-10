@@ -1,5 +1,5 @@
 #include "wake_velocity_input.h"
-#include "boat_web_touch.h"
+#include "wake_velocity_controls.h"
 
 BoatAppInput boat_app_input_sample(void)
 {
@@ -30,11 +30,7 @@ BoatAppInput boat_app_input_sample(void)
 
 void boat_app_input_poll_touch(BoatAppInput *input)
 {
-#if defined(__EMSCRIPTEN__)
-    int touch_click = boat_web_touch_click(&input->pointer.x);
+    int touch_click = wake_touch_tap(&input->pointer.x);
     if (touch_click)
         input->pointer_pressed = touch_click > 0;
-#else
-    (void)input;
-#endif
 }
