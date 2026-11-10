@@ -21,6 +21,9 @@ typedef struct {
     unsigned location; // BoatLocationId
     const BoatSceneDefinition *scene; // Copied into the room definition; NULL keeps the defaults.
     BoatNetPrivateSession world; // Water, handling, wake pool and the spawned boat.
+    // L2: the authority's rules adapter (application code, e.g. the time trial's); zero for none.
+    // Its private state reaches the client after each chunk (boat_local_state).
+    BoatNetRules rules;
 } BoatLocalConfig;
 
 // Called after each predicted tick of a chunk's intake: VIEW is the client's prediction at TICK
@@ -87,5 +90,8 @@ bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
 const BoatFleet *boat_local_view(const BoatLocal *local);
 // The player's slot in the view.
 unsigned boat_local_slot(const BoatLocal *local);
+// L2: the newest private state the client received (NULL before the first), with its size and
+// the authority tick it describes.
+const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *tick);
 
 #endif

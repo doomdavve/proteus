@@ -67,6 +67,7 @@ bool boat_local_start(
         .max_players = 1,
         .room = room,
         .resources = resources,
+        .rules = config->rules,
         .local = world };
     BoatNetTransport client_transport;
     unsigned peer;
@@ -202,3 +203,11 @@ bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
 const BoatFleet *boat_local_view(const BoatLocal *local) { return &local->client.prediction.fleet; }
 
 unsigned boat_local_slot(const BoatLocal *local) { return local->client.slot; }
+
+const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *tick)
+{
+    const BoatNetClient *c = &local->client;
+    *size = c->private_state_size;
+    *tick = c->private_state_tick;
+    return c->private_state_size ? c->private_state : NULL;
+}

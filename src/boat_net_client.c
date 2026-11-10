@@ -797,6 +797,29 @@ static void command(
 }
 
 // Handle at most BOAT_NET_MESSAGES_PER_SERVICE events. False once rejected or closed.
+// L2: a private session's rules state, kept as the newest of this session's epoch.
+static void private_state(BoatNetClient *c, const BoatNetEvent *event, double now)
+{
+    BoatNetHeader header;
+    uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t size;
+    if (event->channel != BOAT_NET_CONTROL
+        || boat_net_private_decode_state(event->data, event->size, &header, state, &size)
+            != BOAT_NET_OK) {
+        ++c->stats.decode_errors;
+        return;
+    }
+    if (c->phase < BOAT_NET_CLIENT_BOOTSTRAP || header.epoch != c->epoch) {
+        ++c->stats.stale_packets;
+        return;
+    }
+    c->heard_at = now;
+    memcpy(c->private_state, state, size);
+    c->private_state_size = size;
+    c->private_state_tick = header.tick;
+    ++c->stats.private_states;
+}
+
 static bool handle_events(BoatNetClient *c, double now)
 {
     BoatNetEvent event;
@@ -815,6 +838,9 @@ static bool handle_events(BoatNetClient *c, double now)
         } else if (event.kind == BOAT_NET_EVENT_DISCONNECT) {
             if (c->phase != BOAT_NET_CLIENT_REJECTED)
                 c->phase = BOAT_NET_CLIENT_CLOSED;
+        } else if (event.kind == BOAT_NET_EVENT_MESSAGE && c->local.enabled
+            && boat_net_private_message(event.data, event.size)) {
+            private_state(c, &event, now);
         } else if (event.kind == BOAT_NET_EVENT_MESSAGE) {
             message(c, &event, now);
         }

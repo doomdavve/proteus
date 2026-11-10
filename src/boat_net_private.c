@@ -163,3 +163,55 @@ BoatNetError boat_net_private_decode_input(
     *batch = b;
     return BOAT_NET_OK;
 }
+
+size_t boat_net_private_encode_state(const BoatNetHeader *header, const uint8_t *state, size_t size,
+    uint8_t out[BOAT_NET_MAX_MESSAGE])
+{
+    if (!state || size < 1 || size > BOAT_NET_PRIVATE_STATE_BYTES)
+        return 0;
+    uint8_t *p = out;
+    put32(&p, BOAT_NET_MAGIC);
+    put16(&p, BOAT_NET_VERSION);
+    put8(&p, BOAT_NET_PRIVATE_STATE);
+    put8(&p, 0);
+    put32(&p, header->epoch);
+    put32(&p, header->sequence);
+    put64(&p, header->tick);
+    put16(&p, (uint16_t)size);
+    put16(&p, 0);
+    put32(&p, 0);
+    memcpy(p, state, size);
+    return (size_t)(p - out) + size;
+}
+
+BoatNetError boat_net_private_decode_state(const uint8_t *data, size_t size, BoatNetHeader *header,
+    uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES], size_t *state_size)
+{
+    if (!data || size < BOAT_NET_HEADER_BYTES)
+        return BOAT_NET_TRUNCATED;
+    const uint8_t *p = data;
+    if (get32(&p) != BOAT_NET_MAGIC)
+        return BOAT_NET_BAD_MAGIC;
+    if (get16(&p) != BOAT_NET_VERSION)
+        return BOAT_NET_BAD_VERSION;
+    BoatNetHeader h = { 0 };
+    h.type = get8(&p);
+    h.flags = get8(&p);
+    h.epoch = get32(&p);
+    h.sequence = get32(&p);
+    h.tick = get64(&p);
+    h.payload = get16(&p);
+    uint16_t reserved16 = get16(&p);
+    uint32_t reserved32 = get32(&p);
+    if (h.flags || reserved16 || reserved32)
+        return BOAT_NET_BAD_HEADER;
+    if (h.type != BOAT_NET_PRIVATE_STATE)
+        return BOAT_NET_BAD_TYPE;
+    if (size != BOAT_NET_HEADER_BYTES + (size_t)h.payload || h.payload < 1
+        || h.payload > BOAT_NET_PRIVATE_STATE_BYTES)
+        return BOAT_NET_BAD_LENGTH;
+    memcpy(state, p, h.payload);
+    *state_size = h.payload;
+    *header = h;
+    return BOAT_NET_OK;
+}
