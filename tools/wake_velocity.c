@@ -67,21 +67,10 @@
 #if defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
 #include <emscripten/emscripten.h>
-// The canvas buffer's multiple of the logical frame: 3, or the high scene's own scale, which
-// shrinks for tall mobile frames so the buffer holds no more pixels than the scene.
-static int web_window_scale(BoatResolution resolution, int width, int height)
-{
-    int scale = boat_resolution_window_scale(resolution);
-    return resolution == BOAT_RESOLUTION_LOW
-        ? scale
-        : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
-}
-
 EM_JS(int, boat_web_viewport_size, (int axis), {
     const size = Module['boatViewportSize']();
     return axis ? size.height : size.width;
 })
-EM_JS(void, boat_web_fit_canvas, (void), { Module['boatFitCanvas'](); })
 EM_JS(int, boat_web_touch_click, (float *position), {
     const tap = Module['boatMobile']['click']();
     if (Object.is(tap, null))
@@ -1372,24 +1361,21 @@ static int study(int argc, char **argv)
         ghost_view_flag = &ghost_cloth;
         ghost_opacity = .5f;
     }
-#if defined(__EMSCRIPTEN__)
     // The browser's mapped scenery registry is filled by scenery_ready() below, after the
-    // window exists. Defer the initial CPU draw and its screenshot export until then.
-    bool initial_cpu_draw_pending = !gpu_enabled;
-#else
-    if (!gpu_enabled
+    // window exists (wake_scenery_deferred). Defer the initial CPU draw and its screenshot
+    // export until then.
+    bool scenery_deferred = wake_scenery_deferred();
+    bool initial_cpu_draw_pending = !gpu_enabled && scenery_deferred;
+    if (!gpu_enabled && !scenery_deferred
         && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
-#endif
     Image image = { pixels, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
-#if !defined(__EMSCRIPTEN__)
-    if (screenshot && !gpu_enabled) {
+    if (screenshot && !gpu_enabled && !scenery_deferred) {
         result = ExportImage(image, screenshot) ? 0 : 1;
         goto cleanup;
     }
-#endif
 
     if (!IsWindowReady()) {
         SetConfigFlags(wake_app_window_flags(screenshot || performance_report));
@@ -1401,30 +1387,14 @@ static int study(int argc, char **argv)
         SetWindowMinSize(width, height);
     }
     window_ready = true;
-#if defined(__EMSCRIPTEN__)
-    // The canvas keeps the size the title or a previous session left; high resolution draws
-    // into a buffer of its own scale (CSS still fits the page).
-    {
-        int window_scale = web_window_scale(resolution, width, height);
-        if (GetScreenWidth() < width * window_scale) {
-            SetWindowSize(width * window_scale, height * window_scale);
-            boat_web_fit_canvas();
-        }
-    }
-#endif
+    wake_app_session_canvas(resolution, width, height);
     if (!boat_ui_load())
         goto cleanup;
-#if defined(__EMSCRIPTEN__)
-    SetTargetFPS(60);
-    if (!scenery_ready(location, assets)) {
+    wake_app_session_open(vsync);
+    if (scenery_deferred && !scenery_ready(location, assets)) {
         fprintf(stderr, "Cannot load the %s scenery.\n", location->name);
         goto cleanup;
     }
-#else
-    if (!vsync)
-        ClearWindowState(FLAG_VSYNC_HINT);
-#endif
-#if defined(__EMSCRIPTEN__)
     if (initial_cpu_draw_pending) {
         if (!boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
                 view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
@@ -1435,7 +1405,6 @@ static int study(int argc, char **argv)
             goto cleanup;
         }
     }
-#endif
     FramePacer pacer;
     frame_pacer_init_window(&pacer);
     if (gpu_enabled) {
@@ -1600,7 +1569,7 @@ static int study(int argc, char **argv)
         int next_height = boat_web_viewport_size(1);
         if (gpu_enabled && (next_width != width || next_height != height)) {
             RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
-            int window_scale = web_window_scale(resolution, next_width, next_height);
+            int window_scale = wake_app_canvas_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
                 next_width * window_scale, next_height * window_scale);
             if (!IsRenderTextureValid(next_frame) || !apply_screen_layout(&gpu, next_layout)) {
@@ -1617,7 +1586,7 @@ static int study(int argc, char **argv)
             texture = gpu.target.texture;
             size = (VirtualSize) { width, height };
             SetWindowSize(width * window_scale, height * window_scale);
-            boat_web_fit_canvas();
+            wake_app_canvas_fit();
         }
 #endif
         double current_frame_started_at = boat_profile_time(true);

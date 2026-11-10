@@ -25,7 +25,7 @@ WEB_SOURCE = re.compile(r"[\w/.-]+_web\.c\b")
 
 # File -> (bridges allowed, owner of their extraction).
 LEGACY = {
-    "tools/wake_velocity.c": (15, "AR2b: viewport, canvas, touch, mouse and keyboard capabilities"),
+    "tools/wake_velocity.c": (14, "AR2b: viewport, canvas, touch, mouse and keyboard capabilities"),
     "tools/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
     "src/boat_plugin_stage.c": (5, "AR4: plugin worker backends"),
 }
@@ -40,7 +40,8 @@ MIGRATED = {
     ],
     "tools/wake_velocity.c": [
         r"boatScenery", r"boatServers", r"boatPlugin", r"\bemscripten_get_now\s*\(",
-        r"\bboat_scenery_load_all\s*\(", r"\bboat_directory_\w+\s*\(",
+        r"\bboat_scenery_load_all\s*\(", r"\bboat_directory_\w+\s*\(", r"boatFitCanvas",
+        r"boatConsole", r"matchMedia", r"\bSetTargetFPS\s*\(", r"\bInitAudioDevice\s*\(",
     ],
     "tools/wake_console.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", r"\bSetClipboardText\s*\(",
