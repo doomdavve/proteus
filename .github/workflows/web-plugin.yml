@@ -5,6 +5,7 @@ on:
     paths:
       - 'web/**'
       - 'cmake/Web.cmake'
+      - 'cmake/LuaSource.cmake'
       - 'src/boat_plugin*'
       - 'tools/*plugin*'
       - 'tools/package_web.py'
@@ -28,6 +29,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Cache pinned Lua download
+        uses: actions/cache@v6
+        with:
+          path: build-web/downloads/lua
+          key: ${{ runner.os }}-lua-download-v1-${{ hashFiles('cmake/LuaSource.cmake') }}
       - name: Check browser authoring contracts
         run: node tools/test_web_plugin_author.cjs
       - name: Check out official Emscripten SDK

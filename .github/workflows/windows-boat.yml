@@ -30,6 +30,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Cache pinned Lua download
+        uses: actions/cache@v6
+        with:
+          path: build-win/downloads/lua
+          key: ${{ runner.os }}-lua-download-v1-${{ hashFiles('cmake/LuaSource.cmake') }}
+
       - name: Install static libcurl
         run: vcpkg install "curl[ssl]:x64-windows-static"
 

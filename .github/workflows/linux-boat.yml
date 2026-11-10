@@ -23,6 +23,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Cache pinned Lua download
+        uses: actions/cache@v6
+        with:
+          path: build-linux/downloads/lua
+          key: ${{ runner.os }}-lua-download-v1-${{ hashFiles('cmake/LuaSource.cmake') }}
       - name: Install desktop build and virtual display dependencies
         run: |
           sudo apt-get update

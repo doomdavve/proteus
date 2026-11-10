@@ -41,6 +41,12 @@ jobs:
           ref: ${{ inputs.release_ref || github.ref }}
           persist-credentials: false
 
+      - name: Cache pinned Lua download
+        uses: actions/cache@v6
+        with:
+          path: build-web/downloads/lua
+          key: ${{ runner.os }}-lua-download-v1-${{ hashFiles('cmake/LuaSource.cmake') }}
+
       - name: Check browser input and network event contracts
         run: |
           node tools/test_web_mouse_controls.cjs

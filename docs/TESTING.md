@@ -150,6 +150,23 @@ Windows release builds remain available regardless of these filters. GitHub does
 successful check for a skipped workflow; do not require these checks for documentation-only pull
 requests covered by these filters.
 
+### CI dependency download cache
+
+The native Linux/macOS/Windows and browser build workflows restore the pinned Lua source
+archive in `<build>/downloads/lua` before configuring. `cmake/LuaSource.cmake` owns the URL,
+SHA-256 and download directory; its content hash and runner OS form the Actions cache key.
+Changing the Lua pin automatically selects a new cache. Only the downloaded archive is
+cached; CMake checks its SHA-256 before extracting sources into a fresh build tree.
+Compiled objects, source overrides and CMake cache files are not restored.
+
+A matching cache avoids contacting lua.org for Lua. A cache miss (including a new pin,
+branch scope or eviction) uses CMake's normal verified download, and a successful job saves
+the archive for subsequent runs. Therefore cold builds still need upstream availability.
+Raylib/ENet Git fetches, libcurl, SDKs and compiler caches remain separate. Local builds use
+the same download directory and need no new options. Workflow changes only affect builds
+using the new source declaration; building older release tags retains their original fetch.
+Implementation/evidence: [dependency cache plan](DEPENDENCY_CACHE_PLAN.md).
+
 2026-11-03 workflow filter follow-up: PR #135 included `tools/windows/README.txt` and therefore
 started all three native builds under the former Markdown-only filter. The push/PR filters now
 exclude plain-text READMEs too. Completed: aligned Linux/macOS/Windows filters; release, manual

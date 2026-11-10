@@ -43,6 +43,13 @@ water reflections. The [cloud deck plan](CLOUD_DECK_PLAN.md) is closed locally;
 [3D.md](3D.md#scene-lighting) owns the current contract. Broader platform qualification
 and the existing lighting/graphics loops remain separate. The user authorized a PR.
 
+## CI dependency downloads
+
+The [dependency cache plan](DEPENDENCY_CACHE_PLAN.md) tracks caching the pinned Lua archive
+across native/browser builds; [testing](TESTING.md#ci-dependency-download-cache) owns the
+cache contract. Local offline reuse, workflow lint and the full suite passed; GitHub cache
+hits remain unverified until publication.
+
 ## Specs
 
 Plans describe work to do; a spec describes the system as it is, in the present tense and
