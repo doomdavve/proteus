@@ -339,6 +339,34 @@ unit does not enable `--lockdown`, so [lockdown](#in-process-lockdown) is not ye
 Winterfell. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/`. Not run: human
 input, a Release-build `--fortify` check of the deployed binary, and a relay join from outside the LAN.
 
+## Status and verification — 2026-11-11
+
+The release command deployed **v0.0.27** at source
+`47b203dbaf037c175831a952107b332d73911840`, through hosting pin `928147b` and fixes
+`80dcec3` / `ae09189`, all pushed to the private baseline. The first attempt stopped on
+old header paths before service replacement. The second failed linking the C++ WebRTC runtime.
+The role detects the new module headers while retaining old-layout support and supplies
+`-DCMAKE_C_STANDARD_LIBRARIES=-lstdc++` for native builds. Both changes passed Ansible
+syntax-check; the third deployment passed `ok=45 changed=8 unreachable=0 failed=0 skipped=1`.
+No source/tag was changed. A further deployment repeat was not run.
+
+Room and relay are active on the exact tagged commit; both hosted browser sites report
+v0.0.27. Public directory compatibility is protocol **14 / physics 9**. The hosted and Pages
+Chrome/SwiftShader directory checks passed named joining and driving without page errors.
+Their driving captures were inspected; they show warmup and a STALE indicator at capture time,
+so they do not establish sustained snapshot liveness or hardware rendering. The matching
+native bot shared a two-player room, received 91 snapshots, repaired six mismatches and
+finished consistent with zero decode errors and zero resyncs (`received_ratio=0.784`,
+RTT 5.73 ms, travelled 54.8 m).
+
+Evidence: `/private/tmp/proteus-release-v0.0.27/build/releases/v0.0.27/verification.json`,
+`deployment.log`, `hosted.log`, `pages.log`, `native.log`, browser capture directories and
+preserved failed-attempt logs. Human input/audio, hardware-browser, physical-device and
+wider-network review remain open. The source follow-up is to enable C++ before entering
+app subdirectories when WebRTC is selected: a minimal CMake reproduction confirmed that
+late enablement generates a C link driver without the required runtime. The hosting flag is
+a workaround for this immutable release, not a source fix.
+
 ## Status and verification — 2026-11-09
 
 The [release command](RELEASES.md#release-command) published and deployed **v0.0.26** through

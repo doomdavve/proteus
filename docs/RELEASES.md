@@ -291,6 +291,42 @@ and the Release-build `check_binary_hardening.py --fortify` check on the Winterf
 deployment succeeding, not by a dedicated check. Evidence:
 `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/` (`verification.json`, stage logs).
 
+### v0.0.27 — 2026-11-11
+
+Current release: **[v0.0.27](https://github.com/doomdavve/proteus/releases/tag/v0.0.27)**
+is published at `47b203dbaf037c175831a952107b332d73911840`. Both the
+[native release](https://github.com/doomdavve/proteus/actions/runs/43070117941) and
+[Pages](https://github.com/doomdavve/proteus/actions/runs/43070117762) workflows passed;
+the macOS job initially waited for a hosted runner. This collects the cloud deck/drift,
+architecture and module layout, data-driven voyage and authoring changes since v0.0.26.
+Compatibility remains protocol 14 / physics 9.
+
+On Apple Silicon/macOS, Debug configure/build and all **537 enabled CPU CTests** passed
+(`ctest --preset full`, GPU tests off; 13 retired wake-field cases disabled), including
+full repeats during release retries. The initial build reported raylib's bundled stb_vorbis
+warning. CPU basin/outer and GPU outer captures were inspected, and a 240-frame windowed
+outer GPU demo completed. Both native downloads passed SHA-256, ZIP integrity and embedded
+version/commit checks. The downloaded Mac app reports `Uncommitted changes: False`, passes
+strict signature verification and completed a 240-frame outer GPU demo outside the repository;
+its GPU capture was inspected. Human input/audio, local Windows execution, physical-device
+acceptance and three-engine browser qualification were not performed for this release.
+
+Winterfell publication and required hosted cutover are complete through hosting pin `928147b`
+and deployment fixes `80dcec3` / `ae09189`. Attempt 1 found the hosting role's obsolete header
+paths; attempt 2 exposed the module split's missing C++ runtime at the native WebRTC link.
+The role now detects old/new header layouts and explicitly links `stdc++` for native builds.
+Ansible syntax-check passed for both changes. Attempt 3 passed with `ok=45 changed=8
+unreachable=0 failed=0 skipped=1`; a further full deployment repeat was not run. The immutable
+source/tag was unchanged. Both services run the exact tagged source; both live browser clients
+passed named joining/driving in Chrome/SwiftShader, and the matching native bot finished
+consistent with zero decode errors/resyncs. See [hosting evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-11).
+
+Evidence: `/private/tmp/proteus-release-v0.0.27/build/releases/v0.0.27/`, including
+`verification.json`, package checks, captures, stage logs and preserved attempt-1/attempt-2
+logs/evidence; orchestration log `/private/tmp/proteus-release-v0.0.27.log`.
+Next: fix optional WebRTC CMake language enablement before app subdirectories and qualify
+that build in CI; continue human input/audio, hardware-browser and wider network review.
+
 ### v0.0.26 — 2026-11-09
 
 Current release: **[v0.0.26](https://github.com/doomdavve/proteus/releases/tag/v0.0.26)**
