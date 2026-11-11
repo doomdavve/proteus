@@ -46,7 +46,7 @@ Solo launch, from the repository root on main or in the study worktree:
 
 ```sh
 ./build/wake_velocity --location outer --mouse-steering --gpu-aa
-./build/wake_velocity --location basin --wake-objects-crossing --mouse-steering
+./build/wake_study --location basin --wake-objects-crossing --mouse-steering
 ./build/wake_velocity --location basin --wake-height 1.8 --mouse-steering
 ```
 

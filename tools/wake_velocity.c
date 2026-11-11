@@ -121,6 +121,23 @@ static void draw_touch_controls(
     boat_ui_text(status, 4, button_height + 7, 10, palette.text);
 }
 
+// D6 (ledger L8): developer studies run on the direct path in their own executable, wake_study,
+// built from this file; the game names it instead of running them.
+static bool study_option(const char *argument)
+{
+#ifdef WAKE_VELOCITY_STUDY
+    (void)argument;
+    return false;
+#else
+    static const char *const study_options[]
+        = { "--wake-field", "--player-wake", "--no-player-wake", "--wake-objects-crossing" };
+    for (size_t i = 0; i < sizeof(study_options) / sizeof(study_options[0]); ++i)
+        if (!strcmp(argument, study_options[i]))
+            return true;
+    return false;
+#endif
+}
+
 static void usage(void)
 {
     puts("Usage: wake_velocity [MODE] [OPTIONS]\n"
@@ -162,13 +179,16 @@ static void usage(void)
     cli_usage_line(stdout, "--wake-objects", "Rideable arcade wakes (default in free boating)");
     cli_usage_line(stdout, "--wake-height M", "Crest scale 0.1..3 (default 1.2)");
     cli_usage_line(stdout, "--wake-life-ticks N", "Lifetime at 120 Hz, 240..1920 (default 1920)");
+    cli_usage_line(stdout, "--current", "Authored current, not measured local conditions");
+    cli_usage_line(stdout, "--crossing-wake", "Scripted passing boat and physical wake");
+#ifdef WAKE_VELOCITY_STUDY
+    cli_usage_section(stdout, "DEVELOPER STUDIES (wake_study only)");
     cli_usage_line(
         stdout, "--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
     cli_usage_line(stdout, "--no-player-wake", "Visual-only player trail");
-    cli_usage_line(stdout, "--current", "Authored current, not measured local conditions");
-    cli_usage_line(stdout, "--crossing-wake", "Scripted passing boat and physical wake");
     cli_usage_line(stdout, "--player-wake", "Legacy D3 trail (research)");
     cli_usage_line(stdout, "--wake-field", "Coherent CPU field, native basin only (research)");
+#endif
 
     cli_usage_section(stdout, "CAMERA AND DISPLAY");
     cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; outer 12)");
@@ -686,6 +706,12 @@ static int study(int argc, char **argv)
             performance_capture = false;
         } else if (strcmp(argv[i], "--no-vsync") == 0) {
             vsync = false;
+        } else if (study_option(argv[i])) {
+            fprintf(stderr,
+                "%s is a developer study: run it with wake_study, built beside wake_velocity "
+                "(./build/wake_study %s).\n",
+                argv[i], argv[i]);
+            return 1;
         } else if (strcmp(argv[i], "--wake-field") == 0) {
             wake_field = true;
         } else if (strcmp(argv[i], "--wake-objects") == 0) {
@@ -1082,7 +1108,7 @@ static int study(int argc, char **argv)
 #ifndef NDEBUG
         fprintf(stderr,
             "Wake field: this is a slow Debug build. For play review, build RelWithDebInfo "
-            "in build/review and run ./build/review/wake_velocity --wake-field --profiler.\n");
+            "in build/review and run ./build/review/wake_study --wake-field --profiler.\n");
 #endif
         if (gpu_aa)
             fprintf(stderr,
@@ -2033,6 +2059,18 @@ static int study(int argc, char **argv)
                 fprintf(stderr, "%s\n", study_failure);
                 result = 1;
                 break;
+            } else if (!local.active && LOCAL_ELIGIBLE()) {
+                // L7: a session that started by viewing a replay (--replay) runs no authority;
+                // its restart is the first live run, which starts the local session.
+                local_plugin(&local, &plugin, plugin_active);
+                wake_plugin_attach(&plugin, &plugin_authority);
+                if (!wake_local_open(&local, &session, objects, worlds, GetTime())) {
+                    snprintf(study_failure, sizeof(study_failure),
+                        "Single player could not start: %s.", local.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
             }
 #endif
             demo_tick = 0;

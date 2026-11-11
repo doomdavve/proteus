@@ -890,6 +890,12 @@ scripted value, never wall time. `./build/validate_boat_local --bench` (not a te
 processor time per frame through the glue (with presentation) at 8x on `outer` for 16-tick frames
 and 96-tick grants, and the direct path with presentation for both.
 
+Developer studies (ledger L8, decision D6) run in `wake_study`, the game's sources built with
+`WAKE_VELOCITY_STUDY`: `boat_player_wake_screenshot` (and its GPU variants), the
+`wake_objects_*_rejected` and `wake_candidate_*_rejected` checks drive it, and
+`wake_velocity_study_rejected.<option>` (quick) requires the game to refuse `--wake-field`,
+`--player-wake`, `--no-player-wake` and `--wake-objects-crossing` and name `wake_study`.
+
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
 a few seconds. It covers:
 
