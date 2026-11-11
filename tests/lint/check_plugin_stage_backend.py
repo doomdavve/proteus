@@ -179,14 +179,19 @@ def target_blocks(cmake):
         yield cmake[match.end():] if end < 0 else cmake[match.end():end]
 
 
+CMAKE_FILE = "src/plugins/CMakeLists.txt"  # Names its own sources relative to src/plugins.
+
+
 def check_cmake(root):
-    cmake = (root / "CMakeLists.txt").read_text(encoding="utf-8")
+    cmake = (root / CMAKE_FILE).read_text(encoding="utf-8")
     problems = []
     blocks = list(target_blocks(cmake))
     for name in BACKEND_FILES:
-        count = sum(block.count(name) for block in blocks)
+        local = name.rsplit("/", 1)[-1]
+        count = sum(len(re.findall(r"(?<![\w/.-])" + re.escape(local) + r"(?![\w.])", block))
+                    for block in blocks)
         if count != 1:
-            problems.append(f"CMakeLists.txt: names {name} {count} times, expected exactly once")
+            problems.append(f"{CMAKE_FILE}: names {local} {count} times, expected exactly once")
     return problems
 
 
@@ -204,7 +209,7 @@ def append_text(path, snippet):
 
 def copy_tree(root, destination):
     # Only the files the checks read or allow; planted cases add any other includer.
-    names = set(COMMON_FILES) | set(BACKEND_FILES) | PRIVATE_HEADER_ALLOWED | {"CMakeLists.txt"}
+    names = set(COMMON_FILES) | set(BACKEND_FILES) | PRIVATE_HEADER_ALLOWED | {CMAKE_FILE}
     for name in sorted(names):
         source = root / name
         if not source.is_file():
@@ -236,9 +241,8 @@ def self_test(root):
                               '#include "boat_plugin_stage_backend.h"\n', encoding="utf-8"))))
         cases.append(("CMakeLists.txt duplicates the posix backend",
                       lambda destination: append_text(
-                          destination / "CMakeLists.txt",
-                          "target_sources(proteus_plugins PRIVATE "
-                          "src/plugins/boat_plugin_stage_posix.c)")))
+                          destination / CMAKE_FILE,
+                          "target_sources(proteus_plugins PRIVATE boat_plugin_stage_posix.c)")))
 
         for index, (label, plant) in enumerate(cases):
             case = Path(temporary) / f"case{index}"

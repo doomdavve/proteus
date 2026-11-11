@@ -13,7 +13,8 @@ files. Two checks over src/ and tools/:
    a native test target listed in NATIVE_WEB_TESTS (which compiles a backend against a C model
    of its page bridges).
 
-The CMake parser is deliberately small: it reads only the top-level CMakeLists.txt, follows
+The CMake parser is deliberately small: it reads each build file on its own (the root, module
+CMakeLists.txt files, tests/**/*.cmake and cmake/*.cmake), follows
 if/elseif/else/endif only when each sits on a single line, and tracks the target of
 add_executable/add_library/target_sources across continuation lines by parenthesis depth.
 
@@ -92,6 +93,15 @@ def strip_comments(text):
             out.append(c)
             i += 1
     return "".join(out)
+
+
+def cmake_files(root):
+    """The project's build files: the root, each module's CMakeLists.txt and the test lists."""
+    found = [root / "CMakeLists.txt"]
+    for directory in ("src", "apps", "tools"):
+        found += sorted((root / directory).rglob("CMakeLists.txt"))
+    found += sorted((root / "tests").rglob("*.cmake")) + sorted((root / "cmake").glob("*.cmake"))
+    return [path for path in found if path.is_file()]
 
 
 def check_cmake(text, path="CMakeLists.txt"):
@@ -214,13 +224,16 @@ def main():
             print(f"platform_bridges: {path} is listed but missing; update the lists")
             return 1
     problems = check(files)
-    cmake = args.root / "CMakeLists.txt"
-    cmake_text = cmake.read_text()
-    problems += check_cmake(cmake_text, "CMakeLists.txt")
+    cmake_text = ""
+    for cmake in cmake_files(args.root):
+        name = cmake.relative_to(args.root).as_posix()
+        text = cmake.read_text()
+        problems += check_cmake(text, name)
+        cmake_text += text + "\n"
     for target in NATIVE_WEB_TESTS:
         if not re.search(r"add_executable\s*\(\s*" + re.escape(target) + r"\s", cmake_text):
-            problems.append(f"CMakeLists.txt: NATIVE_WEB_TESTS lists {target}, which it does not "
-                            "build; update the list")
+            problems.append(f"CMake: NATIVE_WEB_TESTS lists {target}, which no build file "
+                            "builds; update the list")
     for problem in problems:
         print(problem)
     if problems:

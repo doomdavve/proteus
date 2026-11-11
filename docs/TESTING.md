@@ -371,6 +371,12 @@ joins the named room without typing and can simulate a failed list with manual f
 
 ## Lanes, cases and timing
 
+**Where tests are registered.** Each `tests/<module>/` directory registers its own validators
+and tests in `tests.cmake`. `tests/tests.cmake` includes them from the project root rather than
+adding subdirectories, so every test stays in the root's directory scope: the lane loop, the CI
+selection, `PROTEUS_SLOW_TESTS` and working directories cover all of them at once. Libraries,
+applications and tools are real subdirectories with their own `CMakeLists.txt`.
+
 Every test carries exactly one lane label. `quick` tests take under about 100 ms on their own;
 `slow` holds everything heavier: long sweeps, soaks, the process smoke and every GPU test.
 Use the quick lane while editing and the full suite before handing off:
@@ -389,7 +395,7 @@ beside them. CTest also runs the fixture setups a selected test requires, so a q
 include a slow setup such as `boat_replay`.
 
 **Case tests.** The heavy validators are tables of small cases (`tests/support/boat_test_cases.h`).
-`proteus_add_case_tests(prefix target LABELS ...)` in `CMakeLists.txt` lists a target's cases
+`proteus_add_case_tests(prefix target LABELS ...)` in a `tests/<module>/tests.cmake` lists a target's cases
 after each build (`target --list`) and registers each as its own test, `prefix.case`, so cases
 run in parallel and a failure names the case. A case table entry is `TEST_CASE(fn)` or
 `SLOW_CASE(fn)`, where `fn` returns 0 on success. The binaries keep their old command line:
@@ -651,7 +657,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `EM_ASM`, `emscripten_*run_script*`) lives only in CMake-selected `*_web.c` backends or in the
   listed legacy files, each at exactly its recorded count; files migrated onto an application
   service (title, game, input, console, plugin glue) do not reach its backends directly; and
-  `CMakeLists.txt` names `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
+  the build files name `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
   native test targets (`validate_boat_plugin_stage_web`). `platform_bridges_detects` is its
   negative control.
 - `plugin_stage_backend` runs `tests/lint/check_plugin_stage_backend.py`. With comments and string
@@ -1037,10 +1043,11 @@ a self-test that each rule rejects a known violation:
 python3 tests/lint/check_core_boundary.py --self-test
 ```
 
-Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `CMakeLists.txt`.
+Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `src/core/CMakeLists.txt`.
 Presentation, GPU, session/replay and the wake_velocity drive/profile code live in the
 `proteus_render`, `proteus_gpu`, `proteus_boat_session` and `proteus_boat_drive` libraries.
-Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES` and
+Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES`
+(`src/net/CMakeLists.txt`) and
 obey the same rules (`boat_net_boundary`); only `src/net/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 

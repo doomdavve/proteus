@@ -36,7 +36,8 @@ playground for iterating on effects, timing, audio, and presentation.
   `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
   compiled water in `water.h`. Collision and the server need the compiled water and maps; room
   definitions supply the course, rules and optional scene as data.
-- Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
+- Boating code builds as static libraries, each defined in its module's `CMakeLists.txt`
+  (`src/<module>/`); tests register in `tests/<module>/tests.cmake`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
   windows or audio, or touch files; `tests/lint/check_core_boundary.py` enforces this in CTest.
   `tests/support/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for

@@ -60,7 +60,7 @@ def words(path):
         return ''
 
 # Removed symbols are absent from every core/session source and every production target source.
-sources = list((root / 'src').glob('*.[ch]'))
+sources = sorted((root / 'src').rglob('*.[ch]'))
 sources += [root / name for name in PRODUCTION_SOURCES]
 for path in sources:
     text = words(path)
@@ -75,7 +75,11 @@ for path in [root / name for name in PRODUCTION_SOURCES]:
         failures.append(f'{path.relative_to(root)}: production source uses boat fixtures')
 
 # No production target links the fixture library, in either native or web CMake files.
-for cmake in [root / 'CMakeLists.txt', *sorted((root / 'cmake').glob('*.cmake'))]:
+build_files = [root / 'CMakeLists.txt']
+for directory in ('src', 'apps', 'tools'):
+    build_files += sorted((root / directory).rglob('CMakeLists.txt'))
+build_files += sorted((root / 'tests').rglob('*.cmake')) + sorted((root / 'cmake').glob('*.cmake'))
+for cmake in build_files:
     text = words(cmake)
     for target in PRODUCTION_TARGETS:
         for match in re.finditer(

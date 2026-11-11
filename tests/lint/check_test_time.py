@@ -50,8 +50,17 @@ def scan_lines(path, text, pattern, comment):
     return problems
 
 
+def build_text(root):
+    """Every build file: tests register in tests/**/*.cmake, modules in their CMakeLists.txt."""
+    files = [root / "CMakeLists.txt"]
+    for directory in ("src", "apps", "tools"):
+        files += sorted((root / directory).rglob("CMakeLists.txt"))
+    files += sorted((root / "tests").rglob("*.cmake")) + sorted((root / "cmake").glob("*.cmake"))
+    return "\n".join(path.read_text() for path in files if path.is_file())
+
+
 def check(root):
-    cmake = (root / "CMakeLists.txt").read_text()
+    cmake = build_text(root)
     problems = []
     sources = sorted(root.glob("tests/**/*.c")) + sorted(root.glob("tests/**/*.h"))
     for path in sources:
@@ -68,7 +77,7 @@ def check(root):
         # *_rejected tests check that an invalid command line exits before running.
         if TEST_ARGS.search(command) and name not in ALLOWED_TESTS and not name.endswith(
                 "_rejected"):
-            problems.append(f"CMakeLists.txt: test {name} runs for wall-clock time: "
+            problems.append(f"CMake: test {name} runs for wall-clock time: "
                             f"{' '.join(command.split())}")
     return problems
 

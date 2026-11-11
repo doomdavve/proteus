@@ -58,6 +58,7 @@ TEST_CALLS = {"printf", "fprintf", "puts"}
 
 CMAKE_TARGETS = ("proteus_plugin_data", "proteus_sandbox_save", "proteus_plugin_catalog")
 CMAKE_FORBIDDEN = re.compile(r"\b(proteus_lua|proteus_plugins)\b")
+CMAKE_FILES = ("CMakeLists.txt", "src/plugins/CMakeLists.txt", "src/session/CMakeLists.txt")
 CMAKE_DATA_LIBRARY = re.compile(r"add_library\(\s*proteus_plugin_data\s+STATIC\b")
 
 LIBRARY_SYMBOLS = re.compile(
@@ -195,18 +196,23 @@ def target_blocks(cmake, target):
 
 
 def check_cmake(root):
-    path = root / "CMakeLists.txt"
-    if not path.is_file():
-        return ["CMakeLists.txt: missing build file"]
-    cmake = path.read_text(encoding="utf-8")
+    # The data library and its consumers are defined in their modules' CMakeLists.txt files.
+    paths = [path for path in CMAKE_FILES if (root / path).is_file()]
+    if not paths:
+        return ["CMakeLists.txt: missing build files"]
+    texts = {path: (root / path).read_text(encoding="utf-8") for path in paths}
+    cmake = "\n".join(texts.values())
     problems = []
-    library = CMAKE_DATA_LIBRARY.search(cmake)
-    if library is None:
+    defining = [path for path, text in texts.items() if CMAKE_DATA_LIBRARY.search(text)]
+    if not defining:
         problems.append("CMakeLists.txt: no add_library for proteus_plugin_data")
     else:
-        end = cmake.find(")", library.end())
-        sources = cmake[library.end():] if end < 0 else cmake[library.end():end]
-        listed = sources.split()
+        text = texts[defining[0]]
+        library = CMAKE_DATA_LIBRARY.search(text)
+        end = text.find(")", library.end())
+        sources = text[library.end():] if end < 0 else text[library.end():end]
+        prefix = defining[0].rsplit("/", 1)[0] + "/" if "/" in defining[0] else ""
+        listed = [name if "/" in name else prefix + name for name in sources.split()]
         for name in listed:
             if name not in DATA_FILES:
                 problems.append(f"CMakeLists.txt: proteus_plugin_data lists {name} outside "
@@ -285,7 +291,7 @@ def append_text(path, snippet):
 
 def copy_tree(root, destination):
     # Only the files the checks read; planted cases add any other includer.
-    names = set(FILES) | {"CMakeLists.txt"}
+    names = set(FILES) | set(CMAKE_FILES)
     for name in sorted(names):
         source = root / name
         if not source.is_file():
@@ -323,15 +329,14 @@ def run_self_test(root):
                  for name, snippet in SELF_TEST_APPENDS]
         cases.append(("CMakeLists.txt links the plugin host",
                       lambda destination: append_text(
-                          destination / "CMakeLists.txt",
+                          destination / "src" / "session" / "CMakeLists.txt",
                           "target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)")))
 
         def add_data_source(destination):
-            path = destination / "CMakeLists.txt"
+            path = destination / "src" / "plugins" / "CMakeLists.txt"
             text = path.read_text(encoding="utf-8")
             path.write_text(
-                text.replace("src/plugins/boat_plugin_wire.h)",
-                             "src/plugins/boat_plugin_wire.h src/boat_plugin_extra.c)", 1),
+                text.replace("boat_plugin_wire.h)", "boat_plugin_wire.h boat_plugin_extra.c)", 1),
                 encoding="utf-8")
 
         cases.append(("CMakeLists.txt adds an extra plugin data source", add_data_source))
