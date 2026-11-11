@@ -65,7 +65,7 @@ set_tests_properties(plugin_data_boundary_self_test PROPERTIES PASS_REGULAR_EXPR
   "plugin_data_boundary self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
-  ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_FILES})
+  ${BOAT_CORE_BOUNDARY_NM} --module core)
 set_tests_properties(boat_core_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
 # The net library (codec, sessions, memory transport) obeys the same rules, with no sockets.
 set(BOAT_NET_BOUNDARY_NM)
@@ -75,7 +75,7 @@ if(CMAKE_NM AND NOT MSVC)
 endif()
 add_test(NAME boat_net_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
-  ${BOAT_NET_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_FILES} ${PROTEUS_BOAT_NET_FILES})
+  ${BOAT_NET_BOUNDARY_NM} --module core --module net)
 set_tests_properties(boat_net_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
 # Neither boundary library may link Lua or the plugin host (docs/PLUGIN_PLAN.md).
 foreach(target proteus_boat_core proteus_boat_net)
@@ -84,3 +84,9 @@ foreach(target proteus_boat_core proteus_boat_net)
     message(FATAL_ERROR "${target} must not link Lua or the plugin host")
   endif()
 endforeach()
+
+add_test(NAME module_includes COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_module_includes.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME module_includes_self_test COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_module_includes.py --self-test)
+set_tests_properties(module_includes module_includes_self_test PROPERTIES LABELS "cpu;quick")

@@ -1483,8 +1483,9 @@ includes preserve vector type declaration order after include sorting.
 Native Debug build passes; full CTest with socket/process access passes 537/537 enabled tests
 (13 disabled), including the two pending step-9 module guards. Basin and outer CPU captures
 match a fresh build of `7f56188` byte for byte; catalog data matches apart from the include.
-Browser game/worker build and Wasm Lua check pass. Step 9 boundary enforcement and step 10
-closing documentation are next. No new manual playback or user acceptance is claimed.
+Browser game/worker build and Wasm Lua check pass. Step 9 now adds the module graph guard
+and recursive core/net source discovery; negative controls cover forbidden, flat and relative
+includes and unregistered nested source files. Step 10 closing documentation is next. No new manual playback or user acceptance is claimed.
 
 Step 7 deviations: `proteus_audio` and `proteus_room` are deferred. Their sources are compiled
 by executables with different definitions (including server WebRTC selection); merging them

@@ -58,7 +58,3 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(proteus_boat_net_enet PUBLIC proteus_boat_net PRIVATE proteus_enet)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
 endif()
-
-# The boundary tests (tests/lint) check these files by their repository paths.
-list(TRANSFORM PROTEUS_BOAT_NET_SOURCES PREPEND src/net/ OUTPUT_VARIABLE PROTEUS_BOAT_NET_FILES)
-set(PROTEUS_BOAT_NET_FILES ${PROTEUS_BOAT_NET_FILES} PARENT_SCOPE)

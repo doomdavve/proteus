@@ -15,6 +15,7 @@ import argparse
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ALLOWED_QUOTED = {"raylib.h", "raymath.h"}
@@ -85,6 +86,15 @@ def check_source(name, text, core_headers):
             if match.group(1) in FORBIDDEN_IDENTIFIERS:
                 problems.append(f"{name}:{number}: uses {match.group(1)}")
     return problems
+
+
+def module_files(root, module):
+    excluded = {"boat_net_enet.c", "boat_net_enet.h", "boat_net_rtc.c", "boat_net_rtc.h",
+                "boat_net_web.c", "boat_net_web.h"} if module == "net" else set()
+    directory = root / "src" / module
+    return [p.relative_to(root).as_posix() for p in sorted(directory.rglob("*"))
+            if p.suffix in {".c", ".h"}
+            and p.relative_to(directory).as_posix() not in excluded]
 
 
 def check_sources(root, files):
@@ -167,6 +177,22 @@ def self_test():
             or not symbol_allowed("memchr", set()) or not symbol_allowed("strchr", set()):
         print("self-test: symbol allowlist is wrong")
         return False
+    # New and nested files are covered without changing a CMake source list.
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for module in ("core", "net"):
+            path = root / "src" / module / "new" / "extra.h"
+            path.parent.mkdir(parents=True)
+            path.write_text("#include <stdio.h>\n")
+            assert check_sources(root, module_files(root, module))
+            path.write_text("#include <stdint.h>\n")
+            assert not check_sources(root, module_files(root, module))
+        transport = root / "src/net/boat_net_enet.c"
+        transport.write_text("#include <stdio.h>\n")
+        assert not check_sources(root, module_files(root, "net"))
+        nested = root / "src/net/new/boat_net_enet.c"
+        nested.write_text("#include <stdio.h>\n")
+        assert check_sources(root, module_files(root, "net"))
     print(f"self-test: {len(violations)} violations rejected; clean source accepted")
     return True
 
@@ -174,6 +200,7 @@ def self_test():
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument("--module", action="append", default=[])
     parser.add_argument("--nm")
     parser.add_argument("--archive", action="append", default=[])
     parser.add_argument("--self-test", action="store_true")
@@ -183,6 +210,8 @@ def main():
         return 1
     if args.self_test:
         return 0
+    for module in args.module:
+        args.files += module_files(args.root, module)
     if not args.files:
         parser.error("no core sources given")
     problems = check_sources(args.root, args.files)

@@ -1028,6 +1028,22 @@ prediction replay through GO matches the authority; discovery uses the complete 
 None of these tests impairs a real network interface, and none replaces the
 [planned matrix](MULTIPLAYER_PLAN.md#verification-matrix-and-telemetry).
 
+## Module include ownership
+
+Project headers use qualified paths from `src/`, `apps/` and `tests/`, including within their
+own module (`"core/boat.h"`, `"wake_velocity/wake_velocity_local.h"`,
+`"support/boat_test_world.h"`). Libraries publish their include roots; test/tool roots stay
+private to their consumers. Each module defines its targets in its own `CMakeLists.txt`;
+`tests/<module>/tests.cmake` owns test registration.
+
+`module_includes` recursively checks C sources and headers in `src`, `apps`, `tests` and
+`tools`. It rejects flat project includes, relative aliases and forbidden module dependencies.
+`tests/lint/check_module_includes.py` owns the allowed graph and closes it transitively.
+Applications, tests and tools may consume any module; source modules may consume only their
+own headers and that closure. `module_includes_self_test` plants violations in a newly added,
+nested source. Existing plugin data and backend checks enforce narrower private interfaces
+within the plugin module, including qualified header paths.
+
 ## Core boundary gate
 
 `proteus_boat_core` holds physics, pose, locations, world and shoreline queries, water queries,
@@ -1042,6 +1058,11 @@ a self-test that each rule rejects a known violation:
 ```sh
 python3 tests/lint/check_core_boundary.py --self-test
 ```
+
+The source gates discover every C source and header recursively in `src/core/` and `src/net/`,
+independently of CMake registration. Net excludes only the named ENet, RTC and web transport
+pairs at its module root; nested files are still checked. The checker self-test plants an
+unregistered nested header violation and a nested transport-name violation.
 
 Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `src/core/CMakeLists.txt`.
 Presentation, GPU, session/replay and the wake_velocity drive/profile code live in the

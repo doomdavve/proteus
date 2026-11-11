@@ -28,7 +28,3 @@ target_include_directories(proteus_boat_core PUBLIC ${PROJECT_SOURCE_DIR}/src)
 # Types and raymath only; Debug builds resolve raymath's out-of-line definitions from raylib.
 target_link_libraries(proteus_boat_core PUBLIC raylib)
 target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
-
-# The boundary tests (tests/lint) check these files by their repository paths.
-list(TRANSFORM PROTEUS_BOAT_CORE_SOURCES PREPEND src/core/ OUTPUT_VARIABLE PROTEUS_BOAT_CORE_FILES)
-set(PROTEUS_BOAT_CORE_FILES ${PROTEUS_BOAT_CORE_FILES} PARENT_SCOPE)
