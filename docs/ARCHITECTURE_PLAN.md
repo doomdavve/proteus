@@ -12,10 +12,10 @@ tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualifica
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
 L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
 ([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
-([L7/L8](#l7-l8-status), [L3](#l3-status)). The user defers windowed checks until every L* row
-is done.
-**Next:** L4 (browser) on `arch/ar7-rest`; L5 waits for the user's decision
-[L5-1](#l5-decision).
+([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
+until every L* row is done.
+**Next:** L4b (browser objectives and authoring on the authority); L5 waits for the user's
+decision [L5-1](#l5-decision).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1125,6 +1125,37 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
 Not verified: the window loop (no display was available to this session, even outside the
 sandbox): keys, crane and helm feel, autosave while playing, RESTART JOB and RETURN CRATE from
 the menu, pause and focus loss. Browser: working harbour stays native-only (D7).
+
+<a id="l4-status"></a>L4a (browser private sessions without objectives), implemented 2026-11-11
+on `arch/ar7-rest`:
+
+- The browser game links `proteus_local_drive` and runs plain free boating, the time trial and
+  voyages and tours without an objective on the same in-process local authority and client as
+  native (`LOCAL_ELIGIBLE` in `tools/wake_velocity.c`). Course bests keep the existing storage
+  (IndexedDB in the browser).
+- Objectives and authoring stay on the browser's direct path with its isolated worker gate. A
+  package with an objective, or one opened for authoring, never starts a local session. When the
+  console's first edit or `/save` promotes a running package to authoring, play restarts on the
+  direct path before any staged revision can reach the authority.
+- `wake_velocity_voyage.c`'s objective calls are inert in the browser (the authority never gets a
+  revision with an objective there); `strnlen` became `memchr` for the browser's strict C17.
+
+Evidence (macOS 26.6.2, Apple M1 Max, emcc 6.0.12 MinSizeRel and AppleClang 21.0.0 Debug,
+2026-11-11; headless Chromium 156 through Playwright 1.64.1 with SwiftShader):
+
+- `ctest --preset full -j8`: 536/536 (13 disabled). `tools/check_web_wasm.py`: no Lua in the game.
+- `tools/check_web_plugin_author.py --browser chromium` and `tools/check_web_scenery.py` pass.
+- A scratch drive of the default Langedrag voyage printed `Local session: generation 1, 301 ticks
+  in 93 chunks` on leaving, with no page errors; a console edit during it restarted play at the
+  dock and continued on the direct path.
+- `tools/check_web_controls.py` and `tools/check_web_title.py` fail identically on a web build of
+  `main` at `aaafd8d`: the first treats the plugin status line on stderr as a console error, the
+  second's console edit `def.scene.marina.berths[1].x = 15` stages a syntax error. Neither comes
+  from L4a.
+
+Not verified: Firefox and WebKit, mobile touch, a time trial in the browser, and any manual play.
+Open (L4b): objectives and authoring on the browser's authority through the worker gate, which
+removes the restart on promotion.
 
 <a id="l5-decision"></a>L5 (hosted rooms), decision needed, 2026-11-11. AR1's ledger names no
 missing commands or state and an unchanged topology; its removal point is "`net_study` glue
