@@ -14,7 +14,8 @@ L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
 ([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
 ([L7/L8](#l7-l8-status), [L3](#l3-status)). The user defers windowed checks until every L* row
 is done.
-**Next:** L5 (hosted rooms join the common client), then L4 (browser), on `arch/ar7-rest`.
+**Next:** L4 (browser) on `arch/ar7-rest`; L5 waits for the user's decision
+[L5-1](#l5-decision).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1124,6 +1125,20 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
 Not verified: the window loop (no display was available to this session, even outside the
 sandbox): keys, crane and helm feel, autosave while playing, RESTART JOB and RETURN CRATE from
 the menu, pause and focus loss. Browser: working harbour stays native-only (D7).
+
+<a id="l5-decision"></a>L5 (hosted rooms), decision needed, 2026-11-11. AR1's ledger names no
+missing commands or state and an unchanged topology; its removal point is "`net_study` glue
+merges into the common client". Hosted rooms already run as authority/client: the game is a
+`BoatNetClient` of `boat_server` (or its `--host` child), and private sessions run the same
+fleet server rules in process. What the two client glues share is small: `wake_velocity_local.c`
+presents the own boat from prediction, tick by tick, with no remote boats; `wake_velocity_net.c`
+(`NetStudy`) presents remote boats from delayed snapshots, blends corrections and proximity,
+and owns the combat, match, race, roster and objective HUDs, on elapsed time. No common client
+was ever specified.
+
+| ID | Question | Options | Recommendation |
+| --- | --- | --- | --- |
+| L5-1 | What L5 changes | (a) close L5 by evidence: rooms already share the authority and client libraries; rename `NetStudy` to a room client (`WakeRoom`), and record that the two glues differ by design (prediction-only private view against remote interpolation); (b) extract one shared view step (own boat, tick and presentation from a `BoatNetClient`) used by both glues, the rest stays room-only; (c) one client composition for every mode, a private or remote transport behind it, with mode adapters | (a): no behaviour or wire change, nothing to re-qualify in rooms; (b) touches multiplayer feel and needs human play to accept; (c) is a redesign |
 
 ### AR8 — Move files into owning directories
 
