@@ -555,7 +555,7 @@ Human review: collect the first Windows baseline when the user has the machine a
 at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
 before that hardware run; Windows performance remains unqualified until actual reports return.
 
-**Read first:** `src/render/profiler.[ch]`, `src/session/boat_profile.[ch]`, `tools/wake_velocity.c`,
+**Read first:** `src/render/profiler.[ch]`, `src/session/boat_profile.[ch]`, `apps/wake_velocity/wake_velocity.c`,
 `tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
 `CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
 `tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),
@@ -672,8 +672,8 @@ claim Windows qualification. Final integrated acceptance retains the Windows ret
 - Commit(s): `854d90b` (bounded capture, async GPU identity, F4/`--performance-report`, portable
   bundle), `60c1713` (Windows collection launcher, Mac analyzer, fixture tests, CI packaging).
 - Interfaces/owners: `src/platform/boat_capture.[ch]` samples and summarizes only, with no I/O or GL;
-  `tools/wake_velocity_performance.[ch]` owns file/GL metadata and bundle writing in the app;
-  `tools/boat_gpu_timer.h` owns asynchronous queries; `boat_capture` and `performance_analyzer`
+  `apps/wake_velocity/wake_velocity_performance.[ch]` owns file/GL metadata and bundle writing in the app;
+  `apps/wake_velocity/boat_gpu_timer.h` owns asynchronous queries; `boat_capture` and `performance_analyzer`
   CTest cases cover the contract. Core/net are unchanged and still pass their boundary checks.
 - Verification, commands and evidence: `boat_capture` covers ring ordering/eviction, segment
   separation, percentile convention and missing GPU samples. `performance_analyzer` covers
@@ -1377,7 +1377,7 @@ Any seams at the atlas edge or around the boat's wave patch?
 Stage coverage: G5 parts 1–2. **Depends on:** G4 and Batch B verdict resolved.
 Human review: Batch C after G5c.
 
-**Read first:** `src/render/boat_gpu.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/wake_velocity.c`,
+**Read first:** `src/render/boat_gpu.[ch]`, `src/render/renderer_gpu.[ch]`, `apps/wake_velocity/wake_velocity.c`,
 `assets/shaders/`, `cmake/Web.cmake`, [3D](3D.md), [web](WEB_BUILD.md), [boating](BOATING_PLAN.md).
 
 **Tasks, in order:**

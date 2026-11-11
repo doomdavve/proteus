@@ -105,7 +105,7 @@ Every pattern is four bars and lasts 7.68 seconds.
 The generator is deterministic. Running it again overwrites `starter.xm` and the
 five generated WAV files, so keep the evolving composition under another name,
 for example `proteus-theme.xm`. To select it for the dance study, update that tool's
-`starter.xm` load/seek paths in `tools/dance_study.c` and ensure CMake bundles the file.
+`starter.xm` load/seek paths in `apps/dance_study/dance_study.c` and ensure CMake bundles the file.
 
 ## Making new samples without a sample library
 

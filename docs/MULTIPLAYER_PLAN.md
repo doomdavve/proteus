@@ -139,7 +139,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 
 | Source / symbols inspected | Reuse and consequence |
 | --- | --- |
-| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`tools/wake_velocity.c`](../tools/wake_velocity.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `wake_velocity`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
+| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`apps/wake_velocity/wake_velocity.c`](../apps/wake_velocity/wake_velocity.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `wake_velocity`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
 | [`src/core/boat.h`](../src/core/boat.h): `Boat`, `BOAT_STEP`; [`src/core/boat.c`](../src/core/boat.c): `boat_step`, `buoyancy_step`, `motion_step`, `boat_wake_stern` | Reuse the 120 Hz force recipe, steering/throttle **rates**, engine response, six support points, air yaw, landing and inversion timers. `Boat` also owns flag, particles, camera, course, location, water copies and borrowed wake pointers. It is not a packet or prediction checkpoint. |
 | `boat_collide_pair`, `hull_vertical_bounds`, `resolve_hull_contact`, `resolve_traffic` in `boat.c` | Reuse OBB/SAT geometry, mutual planar/yaw impulses and mass-weighted separation. Vertical intervals reject clear jumps. This is not a full 3D solver: no vertical boat-on-boat impulse or deck landing, and pair response does not itself perform a final shoreline check. Sequential pair mutation is insufficient as the fleet scheduler. M2 (2026-10-23): `boat_collide_pair` now composes pure `boat_pair_contact`/`_speed`/`_impulse`/`_apply` helpers with unchanged arithmetic; `boat_fleet_solve` uses them simultaneously and holds separations at the shore. |
 | [`src/core/boat_water.c`](../src/core/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
@@ -732,7 +732,7 @@ layout is in [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md).
 ### M4 — first playable: two people collide and jump each other's wakes
 
 Depends on M3. Likely `boat_net_client`, new `boat_prediction.[ch]`, `boat_world`,
-`boat_wake_objects`, `tools/wake_velocity.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
+`boat_wake_objects`, `apps/wake_velocity/wake_velocity.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
 `renderer_gpu.c` and corresponding CPU path. Deliver in small steps: checkpoint/input replay;
 wake births/repair and provisional-own reconciliation; remote interpolation/proximity view;
 ordinary fleet rendering and safe reset UI. Use two player colors, ordinary opaque hulls with
@@ -1801,13 +1801,13 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
 
 **Behaviour.**
 - `boat_server.c`'s entry point is now `boat_server_main` (`src/room/boat_server.h`).
-  `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `wake_velocity --serve ARGS`
+  `boat_server` is a two-line wrapper (`apps/boat_server/boat_server_main.c`). `wake_velocity --serve ARGS`
   runs the same command line before any window, audio or asset work.
 - `boat_server --exit-with-stdin` closes the room gracefully once its standard input ends.
   POSIX polls `poll`/`read` on stdin. Windows uses `PeekNamedPipe`, which fails once the
   writer has gone. The hosting game holds the only write end, so the room closes when the game
   leaves or dies.
-- `tools/wake_velocity_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
+- `apps/wake_velocity/wake_velocity_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
   [--location L] [--waves] --exit-with-stdin`. POSIX uses `posix_spawn` and finds its own path
   through `_NSGetExecutablePath` or `/proc/self/exe`. Windows uses `CreateProcess` with
   `CREATE_NO_WINDOW` and `GetModuleFileName`. The room's merged stdout/stderr come back
@@ -1967,7 +1967,7 @@ P2. It freezes the current feel and supplies honest cost/state evidence before c
 Coding-agent brief:
 
 > Implement only foundations P2a. Read AGENTS.md, the P2a contract and the current
-> `tools/wake_velocity.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
+> `apps/wake_velocity/wake_velocity.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
 > existing arcade one-boat driver without changing update order or float time. Emit bounded
 > JSON/CSV and named-field state evidence. Keep existing app behavior and every current
 > mode compiling. Add the small CTest contracts described there, build and run CTest,

@@ -1129,7 +1129,7 @@ rebinds every borrower at once; a slot is reused only by a later stage, after th
 been rebound away from it. A commit is refused if the revision it was staged against is no
 longer active. `BoatPluginWatch` is the save poller's state machine; the application passes
 the time (`GetTime()` in the game, a virtual clock in tests) and keys each read with
-`boat_plugin_read_key`. The game's glue is `tools/wake_velocity_plugin.[ch]`.
+`boat_plugin_read_key`. The game's glue is `apps/wake_velocity/wake_velocity_plugin.[ch]`.
 
 ### Limits
 

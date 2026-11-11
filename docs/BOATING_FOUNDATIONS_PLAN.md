@@ -143,8 +143,8 @@ The default P3 wake fixture is now arcade objects (128 total slots, 32 per emitt
 ### P2a — first multiplayer prerequisite task
 
 Add a **simulation-only** `tools/boat_benchmark.c` target and a small tools-only shared driver
-helper (proposed `tools/wake_velocity_drive.[ch]`). Read `demo_step`, `timed_boat_step`,
-`object_study_reset`/`object_track` in `tools/wake_velocity.c`, `boat_profile_time`, and
+helper (proposed `apps/wake_velocity/wake_velocity_drive.[ch]`). Read `demo_step`, `timed_boat_step`,
+`object_study_reset`/`object_track` in `apps/wake_velocity/wake_velocity.c`, `boat_profile_time`, and
 `tools/wake_objects_review.c` before editing. Share the actual default one-boat arcade
 input/step path; preserve advance → boat step → stern track, float clock arithmetic,
 expressions and emission sequence. Keep the rival and optional wake modes compiling with
@@ -222,7 +222,7 @@ define emission visibility between ticks; introducing `BoatWorld` alone does not
 
 ### P1 — frame/tick records and timing boundaries
 
-Read/edit: `src/render/profiler.[ch]`, `tools/wake_velocity.c`; add `src/session/boat_profile.[ch]` for boating-specific
+Read/edit: `src/render/profiler.[ch]`, `apps/wake_velocity/wake_velocity.c`; add `src/session/boat_profile.[ch]` for boating-specific
 records/reporting so the main demo's existing profiler output remains compatible.
 
 1. Add a bounded metrics record. Store completed-frame wall time, simulation-loop total, physics
@@ -247,7 +247,7 @@ a test that merely duplicates timer calls.
 
 ### P2 — benchmark tool, counts, and report contract
 
-Read/edit: `tools/boat_water_review.c`, `tools/wake_velocity.c`, `src/render/boat_gpu.[ch]`,
+Read/edit: `tools/boat_water_review.c`, `apps/wake_velocity/wake_velocity.c`, `src/render/boat_gpu.[ch]`,
 `src/render/renderer_gpu.[ch]`, `src/session/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
 
 1. Share the existing scripted controls/routes in a small tools-only fixture helper. Preserve
@@ -334,7 +334,7 @@ Proposed commands, available only after P2 (not current repository commands):
 ### C1 — authoritative ticks, precise seconds, compatibility
 
 Read/edit: `src/core/boat.[ch]`, `src/core/boat_course.[ch]`, `src/session/boat_replay.[ch]`,
-`tools/wake_velocity.c`, fixture/validator callers. Add a small `src/core/boat_clock.h`.
+`apps/wake_velocity/wake_velocity.c`, fixture/validator callers. Add a small `src/core/boat_clock.h`.
 
 1. Define `BOAT_TICK_HZ = 120`, retain float `BOAT_STEP` for the existing force integrator, and
    define exact double tick duration `1.0 / BOAT_TICK_HZ` for the accumulator/course timestamps.
@@ -541,7 +541,7 @@ do not claim different wall-clock keyboard sampling is automatically identical.
 ### S3 — session rules, replay views, and finish persistence
 
 Read/edit: `src/session/boat_session.[ch]`, `src/core/boat_course.[ch]`, `src/session/boat_replay.[ch]`,
-`src/audio/boat_audio.[ch]`, `tools/wake_velocity.c` and benchmark fixtures.
+`src/audio/boat_audio.[ch]`, `apps/wake_velocity/wake_velocity.c` and benchmark fixtures.
 
 1. Move course state and run/replay orchestration into `BoatSession`; physics returns previous/
    current pose for swept gate checks and consumes only `BoatInput`, environment, and explicit
@@ -1161,7 +1161,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
     the waterfront scene/corner/drawing modules.
   - `proteus_gpu`: `boat_gpu` and `renderer_gpu`.
   - `proteus_boat_session`: `boat_session` and `boat_replay`.
-  - `proteus_boat_drive`: `tools/wake_velocity_drive.c`, `tools/wake_velocity_state.c` and
+  - `proteus_boat_drive`: `apps/wake_velocity/wake_velocity_drive.c`, `apps/wake_velocity/wake_velocity_state.c` and
     `boat_profile`.
   - Audio, music, profiler and asset paths stay as executable sources. `cmake/Web.cmake`
     applies its `-Os` and POSIX definition to the executable and each library.

@@ -53,7 +53,7 @@ user play/acceptance and browser/Windows/Linux rendering remain open.
 
 ## Shared driver extraction — 2026-10-23
 
-`tools/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
+`apps/wake_velocity/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
 It preserves advance → boat step → stern track, float time arithmetic, optional D3/field
 paths and the rival's existing route/contact/reset sequence. There is no fleet scheduler.
 `tools/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.

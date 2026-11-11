@@ -37,16 +37,16 @@ core/net.
 
 | Mode | Today | Authority owns | Client owns | Storage adapter | Platform adapters |
 | --- | --- | --- | --- | --- | --- |
-| Free boating (basin/outer, standard and harbor-life packages, skins) | `BoatSession` stepped in the frame loop (`tools/wake_velocity.c:2062-2111`); the title adds `--current --crossing-wake` (`:2735-2736`); skins pick a handling class (`:1283-1290`); reset restarts tick, water and wakes (`:2036-2039`). | Fleet room (one slot) with handling class, current and crossing water, wake objects, scene traffic contacts; restart generation. | Input, prediction view, camera, presentation (spray, flag), HUD, audio. | None (no saves). | Input/capability (AR2), lifecycle (AR3). |
-| Voyage / canal tour / Grodan tour / imported voyages | Session voyage observed per tick (`src/session/boat_session.c:151-154`); recover to shelter (`tools/wake_velocity.c:2030-2035`); objective in `wake_plugin_after_tick` (`tools/wake_velocity_plugin.c:361-415`). | Route, shelters, exposure/weather, voyage events, objective transaction and timers, revision commit. | Voyage/objective HUD from state messages; notices. | Plugin source/import (existing plugin I/O, not authority). | Objective evaluator bridge (browser, AR3); plugin staging workers (AR4). |
-| Time trial (basin course, course packages) | Course swept per tick; runs recorded per tick and flushed after the frame (`src/session/boat_session.c:150-160`, `tools/wake_velocity.c:2120-2126`); practice latch on altered time or console use (`:1695`, `:2074`). | Course state, elapsed/splits/finish, practice latch, run recording, best selection request. | Course HUD, ghost/replay playback, replay transport controls. | Best and last replay files (atomic replace, digest-named best). | Native data directory / browser IndexedDB. |
+| Free boating (basin/outer, standard and harbor-life packages, skins) | `BoatSession` stepped in the frame loop (`apps/wake_velocity/wake_velocity.c:2062-2111`); the title adds `--current --crossing-wake` (`:2735-2736`); skins pick a handling class (`:1283-1290`); reset restarts tick, water and wakes (`:2036-2039`). | Fleet room (one slot) with handling class, current and crossing water, wake objects, scene traffic contacts; restart generation. | Input, prediction view, camera, presentation (spray, flag), HUD, audio. | None (no saves). | Input/capability (AR2), lifecycle (AR3). |
+| Voyage / canal tour / Grodan tour / imported voyages | Session voyage observed per tick (`src/session/boat_session.c:151-154`); recover to shelter (`apps/wake_velocity/wake_velocity.c:2030-2035`); objective in `wake_plugin_after_tick` (`apps/wake_velocity/wake_velocity_plugin.c:361-415`). | Route, shelters, exposure/weather, voyage events, objective transaction and timers, revision commit. | Voyage/objective HUD from state messages; notices. | Plugin source/import (existing plugin I/O, not authority). | Objective evaluator bridge (browser, AR3); plugin staging workers (AR4). |
+| Time trial (basin course, course packages) | Course swept per tick; runs recorded per tick and flushed after the frame (`src/session/boat_session.c:150-160`, `apps/wake_velocity/wake_velocity.c:2120-2126`); practice latch on altered time or console use (`:1695`, `:2074`). | Course state, elapsed/splits/finish, practice latch, run recording, best selection request. | Course HUD, ghost/replay playback, replay transport controls. | Best and last replay files (atomic replace, digest-named best). | Native data directory / browser IndexedDB. |
 | Race (hosted) | `boat_server` race room; client mirror/prediction. | Unchanged server race rules. | Unchanged. | None. | ENet / WebRTC transport. |
-| Working harbour (native only) | `BoatWorkSession` ticked by the game (`tools/wake_velocity.c:2079-2094`); autosave after the frame (`:2122-2125`); browser stubs (`tools/wake_velocity_work_web.c:7-9`, `CMakeLists.txt:309-316`). | Work session: boat, cranes, crate, sites, job host and its 12-tick update, lighting clock, autosave watch, checkpoint capture. | Crane view, HUD, notices, SAVED mark, menus. | `cargo-<package>.sav` with `.bak` and `.rejected` (`src/session/boat_work_save.h:1-7`). | Files (native); none in browser. |
-| Hosted free / deathmatch / shelter hunt | `boat_server` (dedicated or the `--host` child process, `tools/wake_velocity_host.c:142-185`, `:254-305`); the game is a client (`tools/wake_velocity_net.c:172-272`). | Unchanged: fleet, match, marks, `BoatRoomObjective`, revisions. | Unchanged; joins the common client composition. | None. | ENet / WebRTC, host process. |
-| Scripted demos and captures (`--demo`, `--screenshot --time`, work scripts) | `--demo` steps `demo_step` inside the frame loop (`tools/wake_velocity.c:2095-2096`); `--screenshot` drives and work scripts run outside it (`:1367-1390`). | The same private authority as the mode, fed by a scripted command source. | Capture rendering. | `--save-now` through the work storage adapter. | Headless CPU renderer. |
-| Replay and ghost viewing (L/B, `--replay`, `--ghost`) | Pose samples played in recorded water; no simulation (`tools/wake_velocity.c:2060-2064`). | None: viewing runs no authority. A ghost race reads a file beside a live time-trial authority. | Playback, seek, pause, speed, ghost drawing. | Read-only replay files. | — |
-| Plugin authoring (console, bridge, F5–F7) | Staging/commit in `wake_plugin_*` and the bridge (`tools/wake_velocity.c:1968-1977`). | Commit of a staged revision at a tick boundary, as for rooms. | Editors, console, diagnostics. | Package files/bundles (plugin I/O). | Staging workers (AR4), browser bridge (AR3). |
-| Developer studies (`--wake-field`, `--player-wake`, object tuning, scripted crossing boat) | Flags on free boating (`tools/wake_velocity.c:1104-1124`); the crossing boat steps its own fleet (`tools/wake_velocity_drive.c:82-99`). | Decision D6. | — | — | — |
+| Working harbour (native only) | `BoatWorkSession` ticked by the game (`apps/wake_velocity/wake_velocity.c:2079-2094`); autosave after the frame (`:2122-2125`); browser stubs (`apps/wake_velocity/wake_velocity_work_web.c:7-9`, `CMakeLists.txt:309-316`). | Work session: boat, cranes, crate, sites, job host and its 12-tick update, lighting clock, autosave watch, checkpoint capture. | Crane view, HUD, notices, SAVED mark, menus. | `cargo-<package>.sav` with `.bak` and `.rejected` (`src/session/boat_work_save.h:1-7`). | Files (native); none in browser. |
+| Hosted free / deathmatch / shelter hunt | `boat_server` (dedicated or the `--host` child process, `apps/wake_velocity/wake_velocity_host.c:142-185`, `:254-305`); the game is a client (`apps/wake_velocity/wake_velocity_net.c:172-272`). | Unchanged: fleet, match, marks, `BoatRoomObjective`, revisions. | Unchanged; joins the common client composition. | None. | ENet / WebRTC, host process. |
+| Scripted demos and captures (`--demo`, `--screenshot --time`, work scripts) | `--demo` steps `demo_step` inside the frame loop (`apps/wake_velocity/wake_velocity.c:2095-2096`); `--screenshot` drives and work scripts run outside it (`:1367-1390`). | The same private authority as the mode, fed by a scripted command source. | Capture rendering. | `--save-now` through the work storage adapter. | Headless CPU renderer. |
+| Replay and ghost viewing (L/B, `--replay`, `--ghost`) | Pose samples played in recorded water; no simulation (`apps/wake_velocity/wake_velocity.c:2060-2064`). | None: viewing runs no authority. A ghost race reads a file beside a live time-trial authority. | Playback, seek, pause, speed, ghost drawing. | Read-only replay files. | — |
+| Plugin authoring (console, bridge, F5–F7) | Staging/commit in `wake_plugin_*` and the bridge (`apps/wake_velocity/wake_velocity.c:1968-1977`). | Commit of a staged revision at a tick boundary, as for rooms. | Editors, console, diagnostics. | Package files/bundles (plugin I/O). | Staging workers (AR4), browser bridge (AR3). |
+| Developer studies (`--wake-field`, `--player-wake`, object tuning, scripted crossing boat) | Flags on free boating (`apps/wake_velocity/wake_velocity.c:1104-1124`); the crossing boat steps its own fleet (`apps/wake_velocity/wake_velocity_drive.c:82-99`). | Decision D6. | — | — | — |
 
 Offline validators, benchmarks and review tools keep calling core directly; they are not a
 production gameplay path.
@@ -85,7 +85,7 @@ stage calls the opposite endpoint, so delivery is never reentrant.
       objective cadence, emission (AR0 tick order). The authoritative tick is must-complete.
       An objective dispatched at the chunk's last tick T in the browser stops the grant there
       and the remainder is discarded, as the frame loop does today
-      (`tools/wake_velocity.c:2107-2110`). No command past T was sent, so none has to be
+      (`apps/wake_velocity/wake_velocity.c:2107-2110`). No command past T was sent, so none has to be
       withdrawn (received commands are immutable, `src/net/boat_net_server.c:421-424`).
    3. **Client service:** handle at most 128 messages: snapshots/state, births, objective and
       private state; reconcile prediction once. This advances the mirror so the next chunk's
@@ -121,7 +121,7 @@ version stay v14. Candidates, each tied to its ledger row:
 | Need | Why v14 lacks it |
 | --- | --- |
 | Handling class per slot | Fleet steps every slot with `boat_step` (`src/core/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/session/boat_session.c:148-149`). |
-| Current and crossing water | Rooms use calm water without them (`tools/wake_velocity.c:365-371`). |
+| Current and crossing water | Rooms use calm water without them (`apps/wake_velocity/wake_velocity.c:365-371`). |
 | Restart session (new generation) | SpawnRequest respawns one boat; solo reset sets the tick back to 0 (`src/session/boat_session.c:20`) and restarts water and wakes. See [restart](#restart-and-session-generations). |
 | Full-precision commands | v14 rates are `int8` ×127 (`src/net/boat_net_protocol.h:141`, `src/net/boat_net_protocol.c:1109-1121`); see D4 and the hosted-path risk below. |
 | Voyage state and recover | Route, shelter, exposure, weather and voyage events are session-only. |
@@ -155,7 +155,7 @@ within the restart frame, so the player sees what solo shows today (the accepted
 restart). If the gates show it needs more than one frame, how that frame looks joins D10.
 
 What crosses a restart follows today's `boat_session_restart` (`src/session/boat_session.c:60-75`), the
-caller's reset branch (`tools/wake_velocity.c:2036-2058`) and `boat_session_init`
+caller's reset branch (`apps/wake_velocity/wake_velocity.c:2036-2058`) and `boat_session_init`
 (`src/session/boat_session.c:30-37`):
 
 | Carried into the new endpoints | Reset |
@@ -177,7 +177,7 @@ Work mode does not use the fleet representation: its authority is `BoatWorkSessi
 endpoint using the same transport, framing and frame order. In T1 its state message is
 emitted once at the end of each service, so the client presents tick `N` without prediction.
 Because the helm rates are derived per tick from the boat's wheel and throttle
-(`tools/wake_velocity.c:2085-2090`), the work client sends **targets**, not rates: the steering
+(`apps/wake_velocity/wake_velocity.c:2085-2090`), the work client sends **targets**, not rates: the steering
 target or keyboard rate, the thrust target, and the frame's crane axes. The work authority
 derives the per-tick rates from its own state with today's expressions, so its trace matches
 solo without client prediction.
@@ -278,7 +278,7 @@ browser cannot host rooms today.
 
 | Option | For | Against |
 | --- | --- | --- |
-| **B1 authority in the main Wasm, evaluator as its service** | Net and authority adapters are Lua-free; reuses the firm 5 s evaluator contract, pinned identities, staged commit and quarantine; the gate moves from the client tick loop (`tools/wake_velocity.c:2026-2028`, `tools/wake_velocity_plugin.c:201-302`) to the authority's grant, so T/T+1 behaviour is preserved, not reinvented. | Objective cadence still gates simulation on worker round trips; at high speed the requested rate may not be reached (as today). |
+| **B1 authority in the main Wasm, evaluator as its service** | Net and authority adapters are Lua-free; reuses the firm 5 s evaluator contract, pinned identities, staged commit and quarantine; the gate moves from the client tick loop (`apps/wake_velocity/wake_velocity.c:2026-2028`, `apps/wake_velocity/wake_velocity_plugin.c:201-302`) to the authority's grant, so T/T+1 behaviour is preserved, not reinvented. | Objective cadence still gates simulation on worker round trips; at high speed the requested rate may not be reached (as today). |
 | B2 authority Worker/Wasm with Lua | Synchronous objectives like native. | Second simulation Wasm with duplicated world resources, cross-thread grants, snapshot hops, worker lifecycle and failure cases; Lua beside authoritative state in the browser. |
 
 **Selected: B1.** Under the accepted D7, browser private modes stay those shipped today: free

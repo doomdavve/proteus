@@ -42,27 +42,27 @@ LEGACY = {
 
 # File -> forbidden patterns: the backends its services own.
 MIGRATED = {
-    "tools/boat_title.c": [
+    "apps/wake_velocity/boat_title.c": [
         r"#\s*include\s*[<\"]emscripten", r"#\s*include\s*\"boat_directory\.h\"",
         r"#\s*include\s*\"boat_net_enet\.h\"", r"\bboat_directory_\w+\s*\(",
         r"\bboat_net_enet_\w+\s*\(", r"\bboat_net_lan_(search|query|receive|close)\s*\(",
         r"boatServers",
     ],
-    "tools/wake_velocity.c": [
+    "apps/wake_velocity/wake_velocity.c": [
         r"boatScenery", r"boatServers", r"boatPlugin", r"\bemscripten_get_now\s*\(",
         r"\bboat_scenery_load_all\s*\(", r"\bboat_directory_\w+\s*\(", r"boatFitCanvas",
         r"boatConsole", r"matchMedia", r"\bSetTargetFPS\s*\(", r"\bInitAudioDevice\s*\(",
         r"boatViewportSize", r"boatMobile", r"boatMouse", r"#\s*include\s*[<\"]emscripten",
         r"\b(Disable|Enable)Cursor\s*\(", r"\bKEY_F11\b", r"\bKEY_M\b",
     ],
-    "tools/wake_velocity_input.c": [
+    "apps/wake_velocity/wake_velocity_input.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", BRIDGE.pattern,
     ],
-    "tools/wake_console.c": [
+    "apps/wake_velocity/wake_console.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", r"\bSetClipboardText\s*\(",
         r"\bGetClipboardText\s*\(",
     ],
-    "tools/wake_velocity_plugin.c": [
+    "apps/wake_velocity/wake_velocity_plugin.c": [
         r"#\s*include\s*[<\"]emscripten", r"\bModule\s*[.\[]", BRIDGE.pattern,
     ],
 }
@@ -163,9 +163,9 @@ def self_test():
         ({"tools/new_feature.c": 'const char *a = "WS://";\n' + bridge}, "", "put them in"),
         ({legacy: ""}, "", "lower LEGACY to 0"),
         ({legacy: bridge + bridge}, "", "put new bridges"),
-        ({"tools/boat_title.c": '#include "boat_directory.h"\n'}, "", "boat_directory"),
-        ({"tools/wake_velocity_plugin.c": "void f(void) { Module.x = 1; }\n"}, "", "Module"),
-        ({"tools/wake_velocity.c": "void f(void) { DisableCursor(); }\n"}, "", "Cursor"),
+        ({"apps/wake_velocity/boat_title.c": '#include "boat_directory.h"\n'}, "", "boat_directory"),
+        ({"apps/wake_velocity/wake_velocity_plugin.c": "void f(void) { Module.x = 1; }\n"}, "", "Module"),
+        ({"apps/wake_velocity/wake_velocity.c": "void f(void) { DisableCursor(); }\n"}, "", "Cursor"),
         ({}, "add_executable(x tools/x_web.c)\n", "outside an EMSCRIPTEN branch"),
         ({}, "if(NOT EMSCRIPTEN)\n  target_sources(x PRIVATE tools/x_web.c)\nendif()\n",
          "outside an EMSCRIPTEN branch"),
@@ -182,7 +182,7 @@ def self_test():
         if not any(expected in problem for problem in problems):
             failed.append(f"case {number} missed: {expected} ({problems})")
     clean = check({"tools/new_web.c": bridge, legacy: bridge,
-                   "tools/boat_title.c": 'const char *h = "WS://"; // boat_directory_refresh()\n'})
+                   "apps/wake_velocity/boat_title.c": 'const char *h = "WS://"; // boat_directory_refresh()\n'})
     clean += check_cmake("if(EMSCRIPTEN)\n  target_sources(x PRIVATE tools/x_web.c) # a_web.c\n"
                          "else()\n  target_sources(x PRIVATE tools/x.c)\nendif()\n"
                          "# Comments may name tools/x_web.c.\n"

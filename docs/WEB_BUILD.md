@@ -172,7 +172,7 @@ entry point where needed and no longer depend on the removed fullscreen checkbox
 
 `web/river.png` is a real 1920×1200 GPU capture with the Sweden boat, replacing the previous
 960×600 enlarged low-resolution image. It retains the river/bridge area with a closer chase
-composition. Capture recipe in `tools/wake_velocity.c`: temporarily insert
+composition. Capture recipe in `apps/wake_velocity/wake_velocity.c`: temporarily insert
 `if (screenshot && !boat_gpu_resize(&gpu, 1920, 1200)) goto cleanup;` immediately before
 `texture = gpu.target.texture;`, and replace `live_view.skin = skin;` with
 `live_view.skin = screenshot ? BOAT_SKIN_SWEDEN : skin;`. Build `wake_velocity`, then run

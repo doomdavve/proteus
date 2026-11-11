@@ -33,7 +33,7 @@ typedef struct {
 } BoatPresentation;
 
 // One tick of the camera follow toward HEADING. Pure and header-only: the presentation steps it,
-// and the time trial's authority recorder (tools/wake_velocity_course.c) keeps its own copy of
+// and the time trial's authority recorder (apps/wake_velocity/wake_velocity_course.c) keeps its own copy of
 // the value without linking presentation code (L2), so replay bytes match.
 static inline float boat_camera_follow(float camera_heading, float heading)
 {

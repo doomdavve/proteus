@@ -813,7 +813,7 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 `boat_local` (AR6 ledger rows L0, L6, L2 and L1, labels `core;cpu`; quick except the slow-lane
 scripted drives, time trials and voyages) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
-glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
+glue, `apps/wake_velocity/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
 with the arcade wake pool) beside a private local session (`src/net/boat_local.c`: one authority and
 one predicting client over the memory transport, driven by host grants) fed the same scripted
@@ -899,7 +899,7 @@ one changes nothing and its ready reply is inert; an unanswered one fails at the
 a tick granted during one fails it as an overrun, the objective running on),
 `isolated_failed_reply` (a worker that reports failure, or a truncated reply, quarantines with
 its own text and closes the job) and
-`isolated_authoring` (slow; the game's own host, `tools/wake_velocity_plugin.c`, on the isolated
+`isolated_authoring` (slow; the game's own host, `apps/wake_velocity/wake_velocity_plugin.c`, on the isolated
 authority beside the same host on the native one: controls answer busy while an update is in
 flight; F7 on a migration holds the clock until the worker answers and then commits the host's
 table; a rename applies at once; the page's cancel closes a migration in flight; Undo restarts

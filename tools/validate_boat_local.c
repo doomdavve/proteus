@@ -56,7 +56,7 @@ typedef struct {
 } World;
 
 // A free-boating session as the game holds it: the direct path steps it with timed_boat_step;
-// the local path is the game's own glue (tools/wake_velocity_local.c) filling it from the client.
+// the local path is the game's own glue (apps/wake_velocity/wake_velocity_local.c) filling it from the client.
 typedef struct {
     BoatSession session;
     ObjectStudy objects;
@@ -1710,7 +1710,7 @@ static int objective_commits(void)
     return failed;
 }
 
-// L1b authoring through the game's own glue (tools/wake_velocity_plugin.c): the hooks the game
+// L1b authoring through the game's own glue (apps/wake_velocity/wake_velocity_plugin.c): the hooks the game
 // gives a host whose objective and commits run on the local authority.
 static bool authoring_commit(void *context, BoatSession *session,
     const BoatPluginRevision *revision, BoatPluginChange change, bool moved)
@@ -2439,7 +2439,7 @@ static int isolated_migrate(void)
     return 0;
 }
 
-// L4b authoring on the isolated authority: the game's own host (tools/wake_velocity_plugin.c) on
+// L4b authoring on the isolated authority: the game's own host (apps/wake_velocity/wake_velocity_plugin.c) on
 // the isolated session, beside the same host on the native authority.
 static WakePluginAuthority isolated_authority;
 

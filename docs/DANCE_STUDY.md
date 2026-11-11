@@ -166,8 +166,8 @@ audible accents. Missing music/audio devices are reported and playback continues
 
 ## Implementation and checks
 
-`src/choreography.c` parses and expands the small text score. `src/dance.c` evaluates the
-score's moves, solves the skeleton and renders it. `tools/dance_study.c` handles playback
+`apps/dance_study/choreography.c` parses and expands the small text score. `apps/dance_study/dance.c` evaluates the
+score's moves, solves the skeleton and renders it. `apps/dance_study/dance_study.c` handles playback
 and reloads. Evaluation depends only on time and the score; seeking requires no simulation
 history. The original authored pose table is retained for `--classic`.
 

@@ -183,7 +183,7 @@ physics and wire layouts retain their signed rate semantics. The multiplayer cli
 optional target service, generating ordinary rates from its predicted boat each tick; callers
 using the original rate service retain their behavior.
 
-`tools/wake_velocity.c` owns a 320x200 `frame_target`, including allocation validation,
+`apps/wake_velocity/wake_velocity.c` owns a 320x200 `frame_target`, including allocation validation,
 nearest filtering and cleanup. Each frame, it draws the scene texture into this target
 with the existing CPU/GPU orientation normalization, then calls `boat_hud_draw` with the
 displayed local player's velocity magnitude, throttle and wheel. It presents the combined
@@ -222,7 +222,7 @@ Manual keyboard play, connected native sessions and user acceptance remain pendi
 
 Completed task (user request): holding Up/W or Down/S repeats one thrust detent every 0.5 s
 (`boat_throttle_hold` in `src/core/boat_throttle.h`), with each new press stepping at once and
-restarting the wait. Scroll direction is flipped in `tools/wake_velocity.c` for native and browser
+restarting the wait. Scroll direction is flipped in `apps/wake_velocity/wake_velocity.c` for native and browser
 input alike: scrolling down opens the throttle. The title's new SETTINGS panel (NAME, BOAT,
 STEERING, BACK) holds a persistent `mouse_steering=on|off` in `title.txt`; title sessions pass
 `--mouse-steering` when it is on. NAME and BOAT moved from the main menu into that panel.

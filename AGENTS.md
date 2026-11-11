@@ -23,7 +23,7 @@ playground for iterating on effects, timing, audio, and presentation.
 
 ## Layout
 
-- `tools/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
+- `apps/wake_velocity/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
 - `src/render/waterfront_scene.[ch]`, `src/render/waterfront.c`: river scenery, sky, gulls and street actors
   evaluated into a frame shared by the CPU (`renderer3d`) and GPU (`renderer_gpu`) renderers.
 - `src/core/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
@@ -52,12 +52,12 @@ playground for iterating on effects, timing, audio, and presentation.
   `src/session/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
   `src/session/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
   client mirror for the game (ledger L3).
-- `tools/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
+- `apps/wake_velocity/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.
 - `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
   over a pinned Lua 5.4.9 in `proteus_lua`; P1 revisions, reload policies and Undo in
   `boat_plugin_host`) and reference packages; core and net never link it. The game's native
-  `--plugin` glue is `tools/wake_velocity_plugin.[ch]`.
+  `--plugin` glue is `apps/wake_velocity/wake_velocity_plugin.[ch]`.
   `docs/PLUGIN_API.md` owns the contract and `docs/PLUGIN_PLAN.md` the roadmap.
 - `src/render/profiler.c`: rolling frame statistics and the F3 overlay.
 - `src/audio/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.

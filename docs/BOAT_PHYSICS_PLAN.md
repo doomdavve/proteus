@@ -217,7 +217,7 @@ Likely entry points (verify against the current tree):
 - `src/core/boat.c`, `src/core/boat.h`: fixed-step simulation, CPU boat rendering, shared GPU player snapshot.
 - `src/core/boat_map.c`: navigable water and shoreline boundaries.
 - `src/render/boat_gpu.c`, `src/render/renderer_gpu.c`, `src/render/waterfront_scene.h`: GPU integration.
-- `tools/wake_velocity.c`: input, HUD, deterministic preview and capture options.
+- `apps/wake_velocity/wake_velocity.c`: input, HUD, deterministic preview and capture options.
 - `tools/validate_boat.c`: handling regression tests; `CMakeLists.txt`: test registration.
 - `README.md`: public controls and launch commands.
 
@@ -778,7 +778,7 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   use it, so GPU reflection/shadow passes inherit the same pose. The camera stays independent.
   Planing blends wake spread/size/lifetime and adds symmetric spray; slip-driven turning spray
   remains. Foam stays on the water while spray originates at a hull attachment.
-  `tools/wake_velocity.c` now holds straight cruise before turning at 3s and lowering thrust at 4s;
+  `apps/wake_velocity/wake_velocity.c` now holds straight cruise before turning at 3s and lowering thrust at 4s;
   README and boating notes document the visual approximation and revised preview.
   `tools/validate_boat.c` covers transition rise/cruise settling, smooth return to rest/reset,
   attachment alignment through 16 headings (including Euler singularities), planing spray,

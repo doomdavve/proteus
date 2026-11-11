@@ -508,7 +508,7 @@ in plugin packages, and keep only the gameplay mechanics in native code. S0 comp
 work-site value into C: the deck bounds, berth capture box and mooring limits are `#define`s
 in `src/core/boat_cargo.h`; the crane base and crate pad are constants in `src/core/boat_cargo.c`; the
 mooring position and survey are fixed in `tools/cargo_sandbox_site.h`; the platform is a custom
-box mesh; and the workboat hull/handling are fixed in `tools/cargo_sandbox.c`. The sandbox loads
+box mesh; and the workboat hull/handling are fixed in `apps/cargo_sandbox/cargo_sandbox.c`. The sandbox loads
 no package. Adding a second site that way would duplicate those constants, so S1 moves content
 into data first.
 
@@ -1001,10 +1001,10 @@ approved. This replaces the "one worktree/PR per step" wording above for this se
 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
-| F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/core/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Implemented 2026-11-07 (local) |
-| F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
-| F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
-| F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
+| F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`apps/cargo_sandbox/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/core/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Implemented 2026-11-07 (local) |
+| F2: basin reference as a package | The compiled basin site `{id="basin"}` (`apps/cargo_sandbox/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
+| F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`apps/cargo_sandbox/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
+| F4: review scenarios keyed on package ids | About 20 named review scenarios (`apps/cargo_sandbox/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
 | SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1i merged in #169 (2026-11-07); play check of SV1g+SV1h done; HUD help text removed |
 
 ##### F1 result, 2026-11-07
@@ -1012,7 +1012,7 @@ approved. This replaces the "one worktree/PR per step" wording above for this se
 `scene.work.boat` (optional, default and only value `flat_deck`) selects a native workboat preset
 (`BoatCargoWorkboat`, `src/core/boat_cargo.c`): hull, thrust, deck rectangle and mooring capture
 box. The sandbox takes its handling and deck/berth numbers from the selected preset instead of
-file-scope constants in `tools/cargo_sandbox.c` and the `BOAT_CARGO_DECK_*`/`BERTH_*` macros
+file-scope constants in `apps/cargo_sandbox/cargo_sandbox.c` and the `BOAT_CARGO_DECK_*`/`BERTH_*` macros
 (kept as the flat-deck values). Decisions: one preset per scene, not per site; mooring
 speed/angle stay macros; the default leaves scene digests unchanged. `proteus.outer-work`
 names `flat_deck`. Verified on macOS arm64, Debug: full build warning-clean, quick and cargo,
@@ -1040,14 +1040,14 @@ Decision: the job's feedback lines are static scene data, `scene.work.notices`
 native cargo event shows them on the tick it happens, with no Lua round trip, and packages without
 a job (the basin fixture) can still word them. Absent keys keep the native defaults, which
 `proteus.outer-work` now states explicitly; "Crate delivered..." (delivery), "{site} built.",
-"Supplies used..." and "Crate returned..." were the four in `tools/cargo_sandbox.c`. Key-binding
+"Supplies used..." and "Crate returned..." were the four in `apps/cargo_sandbox/cargo_sandbox.c`. Key-binding
 prompts stay native. Verified on macOS arm64, Debug: warning-clean build, the full CTest preset
 passed 396 tests, `validate_boat_plugin` checks the decoded texts, four rejections and the digest,
 and all 34 CPU review captures are byte-identical to the baseline taken at F1.
 
 ##### F4 result, 2026-11-07
 
-The review scenarios in `tools/cargo_sandbox.c` find their sites by the package's ids
+The review scenarios in `apps/cargo_sandbox/cargo_sandbox.c` find their sites by the package's ids
 (`landing`, `landing_quay`, `jetty`) with `find_site`, instead of the first `RECEIVING_PLATFORM`
 or the first hidden site of a preset; the supply-notice check expands the package's own
 `supplied` template rather than comparing the literal "LANDING QUAY" text. A package without
@@ -1180,7 +1180,7 @@ CTest preset passed 415 tests (13 disabled wake experiments not run) with a warn
 apart from the existing `stb_vorbis` warning. No GPU frames, windowed run or hands-on play.
 
 **SV1f result (2026-11-07, macOS arm64, Debug; CPU captures only).** `wake_velocity --work`
-(`tools/wake_velocity_work.[ch]`, native and web builds link it) opens the location's bundled work
+(`apps/wake_velocity/wake_velocity_work.[ch]`, native and web builds link it) opens the location's bundled work
 package (`boat_plugin_catalog_work_default`), runs its `BoatWorkSession` in place of the
 free-ride boat step, and each tick copies the work boat, clock and world into the game's
 `BoatSession` (the session borrows the game's `BoatWorldResources` now; `BoatWorkSession.resources`
@@ -1225,7 +1225,7 @@ PROGRESS IS SAVED AUTOMATICALLY`; reasons are `DAMAGED`, `NEWER FORMAT`, `PACKAG
 `PROGRESS FORMAT CHANGED`, `PHYSICS CHANGED` and `PACKAGE NOT INSTALLED`. Code: new
 `src/session/boat_work_menu.[ch]` in `proteus_work_save` (raylib-free) holds the bounded discovery (reads
 only the first 512 bytes of each file, never writes or deletes), the time formatting and the
-SAVE row's state machine; `tools/boat_title.[ch]` draws and drives it; `tools/wake_velocity_work.c`
+SAVE row's state machine; `apps/wake_velocity/boat_title.[ch]` draws and drives it; `apps/wake_velocity/wake_velocity_work.c`
 supplies the title's scan, delete and set-aside; `title_single` launches `--location outer --work
 [--new]` (never `--waves`, `--skin` or `--package`, which `--work` refuses). `--title-start
 outer-working-harbour` opens it; `--title --screenshot FILE` takes `--content NAME`, `--solo`,
@@ -1362,7 +1362,7 @@ storage, rooms, payouts and several slots come later.
 
 Grounding (code as of `8fec4cb`; `Experiment` is `BoatWorkSession` in `src/session/boat_work_session.h` since SV1e):
 
-- All session state is in `Experiment` (`tools/cargo_sandbox.c`, about lines 46-73) and
+- All session state is in `Experiment` (`apps/cargo_sandbox/cargo_sandbox.c`, about lines 46-73) and
   `BoatCargoSandbox` (`src/core/boat_cargo.h`).
 - The core queues cargo events. Every tick, `job_tick` moves them into `Experiment.events`
   (up to 64), where they stay unacknowledged until the next 12-tick update commits. The sandbox
@@ -1373,7 +1373,7 @@ Grounding (code as of `8fec4cb`; `Experiment` is `BoatWorkSession` in `src/sessi
 - The sandbox has no live reload or Undo. A capsize is final until R.
 - `cargo_sandbox` is a separate tool with its own renderer, input and HUD.
 - `wake_velocity --plugin` refuses a free package with a job. The game runs no work sites
-  (`tools/wake_velocity_plugin.c`).
+  (`apps/wake_velocity/wake_velocity_plugin.c`).
 
 ##### What is saved
 
@@ -1514,7 +1514,7 @@ Single Player panel with `WORKING HARBOUR` selected:
 Cost, which is the largest part of SV1: three steps (SV1e-SV1g) before the menu step itself.
 
 - **SV1e** moves the `Experiment` simulation, job host, save/resume and autosave out of
-  `tools/cargo_sandbox.c` into a shared module, and the work-site/crate/crane model building
+  `apps/cargo_sandbox/cargo_sandbox.c` into a shared module, and the work-site/crate/crane model building
   into `src/render/boat_cargo_view.c`. That is roughly 900 moved lines and no behaviour change.
 - **SV1f** draws that session in `wake_velocity`'s CPU and GPU frames and drives it from
   scripted captures. The session replaces the free ride boat step, keeps the game's camera,
@@ -1533,7 +1533,7 @@ Cost, which is the largest part of SV1: three steps (SV1e-SV1g) before the menu 
     save key at all.
 
   That is roughly 300-400 lines plus `docs/BOAT_HUD.md`.
-- **SV1h**, the menu, is roughly 250 lines in `tools/boat_title.c` plus discovery glue.
+- **SV1h**, the menu, is roughly 250 lines in `apps/wake_velocity/boat_title.c` plus discovery glue.
 
 ##### Compatibility
 
@@ -1588,12 +1588,12 @@ menu flow is playable.
 | --- | --- | --- | --- | --- |
 | SV1a: cargo snapshot in core | The core records each load's last stable support. It can take and restore a pointer-free snapshot of the cargo session with the resume rules above | `src/core/boat_cargo.[ch]` (`proteus_boat_core`); `tools/validate_boat_cargo.c` | `boat_cargo` (existing): each cargo state's snapshot; mid-lift and loose-on-deck return to the last support with the hook released; floating returns to source, keeping `delivered`/`receivers`; capsized and mooring boats resume moored; restore refuses out-of-range or hidden sites and leaves the sandbox unchanged; snapshot → restore → snapshot is equal; the same snapshot restored into two sandboxes gives identical cargo events and poses over 1200 scripted ticks; a delivered load restored on its receiver never re-delivers | `boat_cargo` and `boat_core_boundary` pass; no file I/O in core |
 | SV1b: save format | The work digest, the byte codecs for the objective checkpoint and the save record with its summary header, header-only parsing for discovery, and the compatibility verdict. No files yet | `src/core/boat_scene_definition.[ch]` (`boat_scene_work_digest`, core); `src/plugins/boat_plugin_state.[ch]` (objective codec, `proteus_plugins`); new `src/session/boat_sandbox_save.[ch]` in a new `proteus_sandbox_save` library; `CMakeLists.txt`; new `tools/validate_boat_sandbox_save.c` | New `boat_sandbox_save` (labels `cpu;quick`): encode → decode → encode is byte-identical; header parse needs only the first 512 bytes; every truncation length is refused; header bytes and every 97th body byte flipped are refused; bounds are refused (64 events, 8 HUD rows, 16 timers, 16 KiB state, unknown site ids); each verdict holds; a notice-only edit keeps the work digest and a moved site changes it | New test under 100 ms; warning-clean |
-| SV1c: resume and autosave policy in memory | `cargo_sandbox` converts its `Experiment` to and from a save record. Pure `BoatAutosave` logic decides when to write. Still no files | `tools/cargo_sandbox.c`; `src/session/boat_sandbox_save.[ch]` (`BoatAutosave`); `CMakeLists.txt` | `boat_sandbox_save` gains autosave cases: a milestone writes that frame; several milestones in one frame make one write; periodic every 3600 dirty ticks; none while clean or paused; leaving writes only when dirty; a failure keeps dirty and retries. New `--resume-check SCENARIO` CTests `cargo_sandbox_resume_<scenario>` (slow lane) for `swing` (mid-lift), `departure` (lashed), `crossing`, `delivered`, `landing-built`, `build-blocked` (waiting), `quay-pickup`, `jetty-delivered` and a new `capsized` fixture. Each compares 1200 continued ticks of the live and decoded copies. `delivered` also saves between the core delivery and the objective update, and requires exactly one counted delivery and one built quay | The 34 existing CPU captures stay byte-identical; all resume checks pass |
-| SV1d: files and automatic saving in the harness | Atomic write with backup, header-prefix reads, bounded directory listing and the data-directory slot. `cargo_sandbox` gains `--save`/`--data-dir`/`--new`, automatic saving (milestone, periodic, pause, quit), `.bak` fallback, `.rejected` set-aside and the `SAVED` mark | New `src/platform/boat_file.[ch]` in a new `proteus_file` library (`boat_replay_data_directory` becomes a wrapper); `tools/cargo_sandbox.c`; `CMakeLists.txt`; `docs/PLUGIN_API.md` (work-site job: saves) | New `boat_file` (`validate_boat_file`, labels `cpu;quick`, a build-tree directory): write; replace keeps `.bak`; a failed write keeps the old file; `.bak` fallback; missing directory created; listing ignores other names and stops at 16. CTest fixture `cargo_sandbox_save_write` (`--save-now`) → `cargo_sandbox_save_resume` (captures the resumed `landing-built` frame with the quay and HUD rows). `cargo_sandbox_save_rejected`: a changed work digest sets the file aside and starts fresh. `boat_replay` still passes | Full preset passes; resumed capture inspected on CPU and GPU. No hands-on check required here; the user may try it in the harness |
-| SV1e: shared work session | The session moves out of the tool: simulation, job host, save/resume and autosave in a new module; work-site, crate and crane model building in the cargo view. `cargo_sandbox` becomes a thin harness over them | New `src/session/boat_work_session.[ch]` in a new `proteus_work_session` library (links `proteus_sandbox_save`, `proteus_plugins`; no raylib, no files); `src/render/boat_cargo_view.[ch]` (`proteus_render`); `tools/cargo_sandbox.c`; `CMakeLists.txt` | All existing cargo tests, resume and save checks; `boat_core_boundary` | The 34 CPU captures are byte-identical; no behaviour change |
-| SV1f: work session in the game, scripted | `wake_velocity --location outer --work` runs the bundled outer work package's session in place of the free ride boat step. It draws the sites, crate, crane and job HUD in CPU and GPU frames. Scripted `--time` captures work; there are no controls yet. `--plugin` still refuses a job package (no live reload) | `tools/wake_velocity.c`; a new `tools/wake_velocity_work.[ch]` glue; `CMakeLists.txt` | `wake_velocity_work_cpu_screenshot` (and a GPU twin in the GPU lane) at the Eriksberg berth and after a scripted landing delivery; the standard free ride captures are unchanged | CPU and GPU captures inspected next to `cargo_sandbox` captures of the same moments |
-| SV1g: playable work session in the game | Helm/crane controls with the key map above; job HUD rows and notices; the pause menu gains `RETURN CRATE` and `RESTART JOB`; automatic saving per the cadence, including focus loss, pause, return to title and quit; the `SAVED` and `SAVE FAILED` marks | `tools/wake_velocity.c`, `tools/wake_velocity_work.[ch]`, `tools/wake_velocity_menu.[ch]`; `docs/BOAT_HUD.md` | `wake_velocity_work_save` fixture: `--work --save PATH --save-now` after a scripted delivery, then `--work --save PATH` resumes and captures the quay; a windowed `--demo --frames` smoke run with autosave into a build-tree `--data-dir` | Full preset passes; inspected captures; a developer windowed demo |
-| SV1h: menu and discovery | The `WORKING HARBOUR` content, the `SAVE` row (Continue default, New with confirmation, Delete with confirmation), the hint summary, unavailable reasons, and `.rejected` on New over an unavailable save | `tools/boat_title.[ch]`; `tools/wake_velocity_work.[ch]` (discovery: list → header → verdict); `tools/wake_velocity.c` (`--title-start outer-working-harbour`); `docs/TITLE_SCREEN_PLAN.md` | `boat_sandbox_discovery` (in `validate_boat_sandbox_save`, a build-tree directory): available, damaged header, newer format, changed digest, uninstalled package, ignored names, 16-file bound, missing directory, a fixed `saved_at` formatted with a fixed UTC offset. Title captures `--title --screenshot` of the panel with an available and an unavailable save (via `--data-dir`) | **The user's hands-on play check:** start Working Harbour from the menu; play part of the job; quit mid-crossing without saving; Continue from the menu; finish both outings; capsize and resume; return to the title and Continue; try New and Delete. Confirm no duplicated crate or count and that saving was never something to think about |
+| SV1c: resume and autosave policy in memory | `cargo_sandbox` converts its `Experiment` to and from a save record. Pure `BoatAutosave` logic decides when to write. Still no files | `apps/cargo_sandbox/cargo_sandbox.c`; `src/session/boat_sandbox_save.[ch]` (`BoatAutosave`); `CMakeLists.txt` | `boat_sandbox_save` gains autosave cases: a milestone writes that frame; several milestones in one frame make one write; periodic every 3600 dirty ticks; none while clean or paused; leaving writes only when dirty; a failure keeps dirty and retries. New `--resume-check SCENARIO` CTests `cargo_sandbox_resume_<scenario>` (slow lane) for `swing` (mid-lift), `departure` (lashed), `crossing`, `delivered`, `landing-built`, `build-blocked` (waiting), `quay-pickup`, `jetty-delivered` and a new `capsized` fixture. Each compares 1200 continued ticks of the live and decoded copies. `delivered` also saves between the core delivery and the objective update, and requires exactly one counted delivery and one built quay | The 34 existing CPU captures stay byte-identical; all resume checks pass |
+| SV1d: files and automatic saving in the harness | Atomic write with backup, header-prefix reads, bounded directory listing and the data-directory slot. `cargo_sandbox` gains `--save`/`--data-dir`/`--new`, automatic saving (milestone, periodic, pause, quit), `.bak` fallback, `.rejected` set-aside and the `SAVED` mark | New `src/platform/boat_file.[ch]` in a new `proteus_file` library (`boat_replay_data_directory` becomes a wrapper); `apps/cargo_sandbox/cargo_sandbox.c`; `CMakeLists.txt`; `docs/PLUGIN_API.md` (work-site job: saves) | New `boat_file` (`validate_boat_file`, labels `cpu;quick`, a build-tree directory): write; replace keeps `.bak`; a failed write keeps the old file; `.bak` fallback; missing directory created; listing ignores other names and stops at 16. CTest fixture `cargo_sandbox_save_write` (`--save-now`) → `cargo_sandbox_save_resume` (captures the resumed `landing-built` frame with the quay and HUD rows). `cargo_sandbox_save_rejected`: a changed work digest sets the file aside and starts fresh. `boat_replay` still passes | Full preset passes; resumed capture inspected on CPU and GPU. No hands-on check required here; the user may try it in the harness |
+| SV1e: shared work session | The session moves out of the tool: simulation, job host, save/resume and autosave in a new module; work-site, crate and crane model building in the cargo view. `cargo_sandbox` becomes a thin harness over them | New `src/session/boat_work_session.[ch]` in a new `proteus_work_session` library (links `proteus_sandbox_save`, `proteus_plugins`; no raylib, no files); `src/render/boat_cargo_view.[ch]` (`proteus_render`); `apps/cargo_sandbox/cargo_sandbox.c`; `CMakeLists.txt` | All existing cargo tests, resume and save checks; `boat_core_boundary` | The 34 CPU captures are byte-identical; no behaviour change |
+| SV1f: work session in the game, scripted | `wake_velocity --location outer --work` runs the bundled outer work package's session in place of the free ride boat step. It draws the sites, crate, crane and job HUD in CPU and GPU frames. Scripted `--time` captures work; there are no controls yet. `--plugin` still refuses a job package (no live reload) | `apps/wake_velocity/wake_velocity.c`; a new `apps/wake_velocity/wake_velocity_work.[ch]` glue; `CMakeLists.txt` | `wake_velocity_work_cpu_screenshot` (and a GPU twin in the GPU lane) at the Eriksberg berth and after a scripted landing delivery; the standard free ride captures are unchanged | CPU and GPU captures inspected next to `cargo_sandbox` captures of the same moments |
+| SV1g: playable work session in the game | Helm/crane controls with the key map above; job HUD rows and notices; the pause menu gains `RETURN CRATE` and `RESTART JOB`; automatic saving per the cadence, including focus loss, pause, return to title and quit; the `SAVED` and `SAVE FAILED` marks | `apps/wake_velocity/wake_velocity.c`, `apps/wake_velocity/wake_velocity_work.[ch]`, `apps/wake_velocity/wake_velocity_menu.[ch]`; `docs/BOAT_HUD.md` | `wake_velocity_work_save` fixture: `--work --save PATH --save-now` after a scripted delivery, then `--work --save PATH` resumes and captures the quay; a windowed `--demo --frames` smoke run with autosave into a build-tree `--data-dir` | Full preset passes; inspected captures; a developer windowed demo |
+| SV1h: menu and discovery | The `WORKING HARBOUR` content, the `SAVE` row (Continue default, New with confirmation, Delete with confirmation), the hint summary, unavailable reasons, and `.rejected` on New over an unavailable save | `apps/wake_velocity/boat_title.[ch]`; `apps/wake_velocity/wake_velocity_work.[ch]` (discovery: list → header → verdict); `apps/wake_velocity/wake_velocity.c` (`--title-start outer-working-harbour`); `docs/TITLE_SCREEN_PLAN.md` | `boat_sandbox_discovery` (in `validate_boat_sandbox_save`, a build-tree directory): available, damaged header, newer format, changed digest, uninstalled package, ignored names, 16-file bound, missing directory, a fixed `saved_at` formatted with a fixed UTC offset. Title captures `--title --screenshot` of the panel with an available and an unavailable save (via `--data-dir`) | **The user's hands-on play check:** start Working Harbour from the menu; play part of the job; quit mid-crossing without saving; Continue from the menu; finish both outings; capsize and resume; return to the title and Continue; try New and Delete. Confirm no duplicated crate or count and that saving was never something to think about |
 | SV1i: objective migration at load | A free work-site job may return `migrate`. A save whose `state_version` changed migrates instead of becoming unavailable | `src/plugins/boat_plugin.[ch]` (`BoatPluginFree.migrates`, decode and catalog probe); `src/session/boat_sandbox_save.c`; `src/session/boat_work_session.c`; `docs/PLUGIN_API.md`; `docs/PLUGIN_PLAN.md` | `boat_plugin` (a free job with `migrate` decodes; a non-function is rejected); `boat_sandbox_save` (success keeps queued events unacknowledged and takes a fresh generation; failure leaves the file unavailable and untouched) | Full preset passes; contract rows updated |
 
 Implementation detail for each step:
@@ -1706,7 +1706,7 @@ its sources, CMake links and archive symbols.
 Register `validate_boat_sandbox_save` and the `boat_sandbox_save` test in `CMakeLists.txt` with
 the warning flags, labelled `cpu;quick`.
 
-**SV1c.** In `tools/cargo_sandbox.c`, split `job_tick` into `job_queue_events(Experiment *)`
+**SV1c.** In `apps/cargo_sandbox/cargo_sandbox.c`, split `job_tick` into `job_queue_events(Experiment *)`
 (which drains core events into `events`) and the update. Add
 `static void experiment_save(Experiment *, BoatSandboxSave *)`: it calls `job_queue_events`,
 then `boat_cargo_snapshot`, and copies the objective, events, sequence, generation, guide,
@@ -1744,15 +1744,15 @@ capsized). The `cargo_sandbox_resume_<scenario>` CTests join the slow lane.
 - `bool boat_file_set_aside(const char *path, const char *suffix)`.
 - `bool boat_file_remove_save(const char *path)`: removes the path and its `.bak`.
 - `unsigned boat_file_list(const char *directory, const char *prefix, const char *suffix, char names[][128], unsigned capacity)`:
-  `opendir`, or `FindFirstFileA` on Windows, as `tools/wake_velocity_plugin.c` already does.
+  `opendir`, or `FindFirstFileA` on Windows, as `apps/wake_velocity/wake_velocity_plugin.c` already does.
 
 `cargo_sandbox` drives `BoatAutosave` after its tick loop, on `P`, on focus loss and after
 `WindowShouldClose`. It loads at startup (the file, then `.bak`), sets rejected files aside and
 draws the marks. `--save-now` (with `--scenario` and `--save PATH`) writes once after staging,
 for the fixture. Update the usage text, this plan's review commands and `docs/PLUGIN_API.md`.
 
-**SV1e-SV1h.** Each step's row names its files. Keep `tools/wake_velocity_work.[ch]` as the only
-game-side owner of the session, its drawing calls, discovery and save paths. `tools/boat_title.c`
+**SV1e-SV1h.** Each step's row names its files. Keep `apps/wake_velocity/wake_velocity_work.[ch]` as the only
+game-side owner of the session, its drawing calls, discovery and save paths. `apps/wake_velocity/boat_title.c`
 receives an already-built list of discovered entries (place, label, hint, available, reason)
 rather than scanning files itself. `boat_title_outer_package` gains the `working-harbour` entry.
 

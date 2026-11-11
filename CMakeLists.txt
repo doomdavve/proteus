@@ -64,7 +64,11 @@ set(PROTEUS_TRANSITION_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins
   ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
   ${CMAKE_CURRENT_SOURCE_DIR}/src/session
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/room)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/room
+  ${CMAKE_CURRENT_SOURCE_DIR}/apps/wake_velocity
+  ${CMAKE_CURRENT_SOURCE_DIR}/apps/boat_server
+  ${CMAKE_CURRENT_SOURCE_DIR}/apps/cargo_sandbox
+  ${CMAKE_CURRENT_SOURCE_DIR}/apps/dance_study)
 include_directories(${PROTEUS_TRANSITION_INCLUDES})
 
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -181,8 +185,8 @@ else()
 endif()
 
 # The voyage objective transaction shared by the direct path and the local authority (L1b).
-add_library(proteus_wake_objective STATIC tools/wake_velocity_objective.c
-  tools/wake_velocity_objective.h)
+add_library(proteus_wake_objective STATIC apps/wake_velocity/wake_velocity_objective.c
+  apps/wake_velocity/wake_velocity_objective.h)
 target_include_directories(proteus_wake_objective PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 target_link_libraries(proteus_wake_objective PUBLIC proteus_plugins)
 target_compile_options(proteus_wake_objective PRIVATE ${PROTEUS_WARNINGS})
@@ -298,7 +302,7 @@ target_compile_options(proteus_boat_session PRIVATE ${PROTEUS_WARNINGS})
 # Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
 # validators; executable-specific audio, music and asset paths stay with their consumers.
 add_library(proteus_boat_drive STATIC
-  tools/wake_velocity_drive.c tools/wake_velocity_state.c src/session/boat_profile.c)
+  apps/wake_velocity/wake_velocity_drive.c apps/wake_velocity/wake_velocity_state.c src/session/boat_profile.c)
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
@@ -313,7 +317,7 @@ target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME frame_pacer COMMAND validate_frame_pacer)
 
 add_executable(validate_boat_capture tools/validate_boat_capture.c
-  tools/wake_velocity_performance.c src/platform/boat_capture.c)
+  apps/wake_velocity/wake_velocity_performance.c src/platform/boat_capture.c)
 target_include_directories(validate_boat_capture PRIVATE ${raylib_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(validate_boat_capture PRIVATE raylib)
@@ -339,26 +343,26 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
-  tools/wake_velocity_menu.c
-  tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
-  tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
-  tools/wake_velocity_controls.h
-  tools/boat_title.c
-  src/platform/cli_usage.c tools/wake_velocity_performance.c src/render/profiler.c src/audio/boat_audio.c
+add_executable(wake_velocity apps/wake_velocity/wake_velocity.c apps/wake_velocity/wake_velocity_input.c
+  apps/wake_velocity/wake_velocity_menu.c
+  apps/wake_velocity/wake_velocity_lighting_review.c apps/wake_velocity/wake_velocity_lighting_review.h
+  apps/wake_velocity/wake_velocity_work.h apps/wake_velocity/wake_velocity_scenery.h apps/wake_velocity/wake_velocity_app.h
+  apps/wake_velocity/wake_velocity_controls.h
+  apps/wake_velocity/boat_title.c
+  src/platform/cli_usage.c apps/wake_velocity/wake_velocity_performance.c src/render/profiler.c src/audio/boat_audio.c
   src/audio/xm_audio.c src/platform/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
   proteus_work_save)
 # WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
 # (tools/check_web_wasm.py proves it carries no Lua).
 if(EMSCRIPTEN)
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c
-    tools/wake_velocity_scenery_web.c tools/wake_velocity_app_web.c
-    tools/wake_console_bridge_web.c tools/wake_velocity_controls_web.c)
+  target_sources(wake_velocity PRIVATE apps/wake_velocity/wake_velocity_work_web.c
+    apps/wake_velocity/wake_velocity_scenery_web.c apps/wake_velocity/wake_velocity_app_web.c
+    apps/wake_velocity/wake_console_bridge_web.c apps/wake_velocity/wake_velocity_controls_web.c)
 else()
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
-    tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c
-    tools/wake_velocity_controls.c)
+  target_sources(wake_velocity PRIVATE apps/wake_velocity/wake_velocity_work.c
+    apps/wake_velocity/wake_velocity_scenery.c apps/wake_velocity/wake_velocity_app.c apps/wake_velocity/wake_console_bridge.c
+    apps/wake_velocity/wake_velocity_controls.c)
   target_link_libraries(wake_velocity PRIVATE proteus_work_session proteus_work_local)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -409,9 +413,9 @@ target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
 
 # AR6 (L0): private single player as a local authority and client, native and (L4a) browser. The
 # glue is a library so validate_boat_local drives the game's own code.
-add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
-  tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
-  tools/wake_velocity_voyage.h)
+add_library(proteus_local_drive STATIC apps/wake_velocity/wake_velocity_local.c apps/wake_velocity/wake_velocity_local.h
+  apps/wake_velocity/wake_velocity_course.c apps/wake_velocity/wake_velocity_course.h apps/wake_velocity/wake_velocity_voyage.c
+  apps/wake_velocity/wake_velocity_voyage.h)
 target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
   proteus_wake_objective)
@@ -468,29 +472,29 @@ if(NOT EMSCRIPTEN)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
-  target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h
-    tools/wake_velocity_servers.c tools/wake_velocity_servers.h)
+  target_sources(wake_velocity PRIVATE apps/wake_velocity/boat_directory.c apps/wake_velocity/boat_directory.h
+    apps/wake_velocity/wake_velocity_servers.c apps/wake_velocity/wake_velocity_servers.h)
   target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads proteus_json)
-  add_executable(validate_boat_directory tools/validate_boat_directory.c tools/boat_directory.c)
+  add_executable(validate_boat_directory tools/validate_boat_directory.c apps/wake_velocity/boat_directory.c)
   target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl
     Threads::Threads proteus_json)
   target_compile_options(validate_boat_directory PRIVATE ${PROTEUS_WARNINGS})
   add_test(NAME boat_directory COMMAND validate_boat_directory)
   set_tests_properties(boat_directory PROPERTIES LABELS "cpu;quick")
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
-    tools/wake_velocity_host.c tools/wake_velocity_host.h src/room/boat_server.c src/room/boat_server.h
+  target_sources(wake_velocity PRIVATE apps/wake_velocity/wake_velocity_net.c apps/wake_velocity/wake_velocity_net.h
+    apps/wake_velocity/wake_velocity_host.c apps/wake_velocity/wake_velocity_host.h src/room/boat_server.c src/room/boat_server.h
     src/room/boat_room_package.c src/room/boat_room_package.h
     src/room/boat_room_objective.c src/room/boat_room_objective.h)
 endif()
 
 if(NOT EMSCRIPTEN)
-  add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/audio/boat_audio.c)
+  add_executable(boat_combat_review tools/boat_combat_review.c apps/wake_velocity/wake_velocity_net.c src/audio/boat_audio.c)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
   # P5d: a CPU capture of the hunt's marks, objective panel and minimap marks (build/hunt.png).
-  add_executable(boat_hunt_review tools/boat_hunt_review.c tools/wake_velocity_net.c)
+  add_executable(boat_hunt_review tools/boat_hunt_review.c apps/wake_velocity/wake_velocity_net.c)
   target_link_libraries(boat_hunt_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_hunt_review PRIVATE ${PROTEUS_WARNINGS})
@@ -504,19 +508,19 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
-target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
-  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h
-  tools/wake_console_bridge.h)
+target_sources(wake_velocity PRIVATE apps/wake_velocity/wake_velocity_plugin.c apps/wake_velocity/wake_velocity_plugin.h
+  apps/wake_velocity/wake_command.c apps/wake_velocity/wake_command.h apps/wake_velocity/wake_console.c apps/wake_velocity/wake_console.h
+  apps/wake_velocity/wake_console_bridge.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog)
 if(NOT EMSCRIPTEN)
-  target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
+  target_sources(wake_velocity PRIVATE apps/wake_velocity/wake_velocity_bridge.c apps/wake_velocity/wake_velocity_bridge.h)
 endif()
 
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  target_sources(wake_velocity PRIVATE src/net/boat_net_web.c tools/wake_velocity_net.c
-    tools/wake_velocity_servers_web.c tools/wake_velocity_plugin_web.c)
+  target_sources(wake_velocity PRIVATE src/net/boat_net_web.c apps/wake_velocity/wake_velocity_net.c
+    apps/wake_velocity/wake_velocity_servers_web.c apps/wake_velocity/wake_velocity_plugin_web.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
@@ -525,8 +529,8 @@ endif()
 # build-tree data directory keeps the player's settings out of the test.
 set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
 file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
-add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c
-  tools/wake_velocity_input.c tools/wake_velocity_controls.c)
+add_executable(validate_boat_title tools/validate_boat_title.c apps/wake_velocity/boat_title.c
+  apps/wake_velocity/wake_velocity_input.c apps/wake_velocity/wake_velocity_controls.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # The title reaches discovery only through wake_velocity_servers.h (stubbed here), so it links
 # the pure protocol for LAN room lists and no transport.
@@ -576,7 +580,7 @@ include(cmake/CaseTests.cmake)
 if(NOT EMSCRIPTEN)
   # The room command line wake_velocity --host passes to its --serve child.
   add_executable(validate_wake_velocity_host tools/validate_wake_velocity_host.c
-    tools/wake_velocity_host.c)
+    apps/wake_velocity/wake_velocity_host.c)
   target_include_directories(validate_wake_velocity_host PRIVATE tools)
   target_compile_options(validate_wake_velocity_host PRIVATE ${PROTEUS_WARNINGS})
   proteus_add_case_tests(wake_velocity_host validate_wake_velocity_host LABELS cpu quick)
@@ -673,7 +677,7 @@ add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BIN
 set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
 # The pause menu's input handling, driven by synthetic BoatAppInput values (no window or raylib
 # input reads).
-add_executable(validate_app_input tools/validate_app_input.c tools/wake_velocity_menu.c)
+add_executable(validate_app_input tools/validate_app_input.c apps/wake_velocity/wake_velocity_menu.c)
 target_link_libraries(validate_app_input PRIVATE proteus_render)
 target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME app_input COMMAND validate_app_input)
@@ -691,7 +695,7 @@ target_compile_options(validate_boat_work_clock PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_clock COMMAND validate_boat_work_clock)
 set_tests_properties(boat_work_clock PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
-  add_executable(cargo_sandbox tools/cargo_sandbox.c)
+  add_executable(cargo_sandbox apps/cargo_sandbox/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
   target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_work_session
     proteus_work_save proteus_sandbox_save proteus_file)
@@ -1026,7 +1030,7 @@ proteus_add_case_tests(boat_plugin_state validate_boat_plugin_state LABELS core 
 # on a virtual clock, and tick-for-tick parity with the compiled voyage.
 # Its game_controls case drives wake_velocity's --plugin glue on files in a scratch directory.
 add_executable(validate_boat_plugin_session tools/validate_boat_plugin_session.c
-  tools/wake_velocity_plugin.c)
+  apps/wake_velocity/wake_velocity_plugin.c)
 target_link_libraries(validate_boat_plugin_session PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_plugin_session PRIVATE ${PROTEUS_WARNINGS})
 set(BOAT_PLUGIN_SESSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-session-test")
@@ -1063,12 +1067,12 @@ if(NOT EMSCRIPTEN)
   endif()
 endif()
 # P3.3b display-free objective inspection and native checkpoint/seek review.
-add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
+add_executable(boat_plugin_review tools/boat_plugin_review.c apps/wake_velocity/wake_velocity_plugin.c)
 target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
 # P4 native isolated authoring validator; intentionally absent from the browser runtime.
 if(NOT EMSCRIPTEN)
-  add_executable(boat_plugin_worker tools/boat_plugin_worker.c tools/wake_velocity_plugin.c)
+  add_executable(boat_plugin_worker apps/wake_velocity/boat_plugin_worker.c apps/wake_velocity/wake_velocity_plugin.c)
   target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
   add_executable(validate_boat_plugin_eval tools/validate_boat_plugin_eval.c)
@@ -1077,7 +1081,7 @@ if(NOT EMSCRIPTEN)
   add_test(NAME boat_plugin_eval COMMAND validate_boat_plugin_eval)
   set_tests_properties(boat_plugin_eval PROPERTIES LABELS "cpu;quick" TIMEOUT 10)
   add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
-    tools/wake_velocity_plugin.c)
+    apps/wake_velocity/wake_velocity_plugin.c)
   target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_boat_plugin_stage PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
@@ -1096,8 +1100,8 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_plugin_stage_web PROPERTIES LABELS "cpu;quick"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 10)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
-  add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
-    tools/wake_velocity_plugin.c tools/wake_command.c)
+  add_executable(validate_wake_bridge tools/validate_wake_bridge.c apps/wake_velocity/wake_velocity_bridge.c
+    apps/wake_velocity/wake_velocity_plugin.c apps/wake_velocity/wake_command.c)
   target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_wake_bridge PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-bridge-test")
@@ -1109,8 +1113,8 @@ if(NOT EMSCRIPTEN)
   # PC: the command layer, console input/scrollback and live scene application, headless under a
   # virtual clock and through the real isolated worker.
   add_executable(validate_wake_command tools/validate_wake_command.c
-    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c
-    tools/wake_console_bridge.c)
+    apps/wake_velocity/wake_velocity_plugin.c apps/wake_velocity/wake_command.c apps/wake_velocity/wake_console.c
+    apps/wake_velocity/wake_console_bridge.c)
   target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog
     proteus_boat_session)
   target_compile_options(validate_wake_command PRIVATE ${PROTEUS_WARNINGS})
@@ -1216,7 +1220,7 @@ add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
-add_executable(boat_server tools/boat_server_main.c src/room/boat_server.c src/platform/cli_usage.c
+add_executable(boat_server apps/boat_server/boat_server_main.c src/room/boat_server.c src/platform/cli_usage.c
   src/room/boat_room_package.c src/room/boat_room_objective.c)
 add_executable(boat_bot tools/boat_bot.c src/platform/cli_usage.c)
 foreach(target boat_server boat_bot)
@@ -1233,7 +1237,7 @@ target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 # AR6 (L0): the private local session against the game's direct free-boating path.
-add_executable(validate_boat_local tools/validate_boat_local.c tools/wake_velocity_plugin.c)
+add_executable(validate_boat_local tools/validate_boat_local.c apps/wake_velocity/wake_velocity_plugin.c)
 target_link_libraries(validate_boat_local PRIVATE proteus_local_drive proteus_boat_fixtures
   proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
@@ -1630,7 +1634,7 @@ add_test(NAME boat_server_river_location_retired COMMAND boat_server --location 
 set_tests_properties(boat_river_location_retired boat_server_river_location_retired PROPERTIES
   PASS_REGULAR_EXPRESSION "location is retired; --location outer")
 
-add_executable(dance_study tools/dance_study.c src/dance.c src/choreography.c src/audio/xm_audio.c)
+add_executable(dance_study apps/dance_study/dance_study.c apps/dance_study/dance.c apps/dance_study/choreography.c src/audio/xm_audio.c)
 target_link_libraries(dance_study PRIVATE proteus_render)
 target_compile_definitions(dance_study PRIVATE
   PROTEUS_ASSET_DIR="$<TARGET_FILE_DIR:dance_study>/assets"
@@ -1640,7 +1644,7 @@ target_compile_options(dance_study PRIVATE
 )
 add_dependencies(dance_study proteus_assets)
 
-add_executable(validate_dance tools/validate_dance.c src/dance.c src/choreography.c)
+add_executable(validate_dance tools/validate_dance.c apps/dance_study/dance.c apps/dance_study/choreography.c)
 target_link_libraries(validate_dance PRIVATE proteus_render)
 target_compile_options(validate_dance PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
@@ -1648,8 +1652,8 @@ target_compile_options(validate_dance PRIVATE
 add_test(NAME dance_constraints COMMAND validate_dance)
 add_test(NAME house_dance_constraints COMMAND validate_dance ${CMAKE_CURRENT_SOURCE_DIR}/assets/dance/house.dance)
 add_test(NAME house_groove_constraints COMMAND validate_dance ${CMAKE_CURRENT_SOURCE_DIR}/assets/dance/house-groove.dance)
-add_executable(validate_choreography tools/validate_choreography.c src/choreography.c
-  src/dance.c)
+add_executable(validate_choreography tools/validate_choreography.c apps/dance_study/choreography.c
+  apps/dance_study/dance.c)
 target_link_libraries(validate_choreography PRIVATE proteus_render)
 target_compile_options(validate_choreography PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>

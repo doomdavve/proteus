@@ -215,7 +215,7 @@ session from a catalog entry compiled at build time, with no Lua VM started. The
 exactly as they do now. Rooms and the browser
 still use compiled content. A temporary `--no-plugins` restores the compiled path for parity.
 
-Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/boat_title.[ch]`,
+Read first: `apps/wake_velocity/wake_velocity_plugin.[ch]`, `apps/wake_velocity/wake_velocity.c`, `apps/wake_velocity/boat_title.[ch]`,
 `src/plugins/boat_plugin.[ch]`, `src/plugins/boat_plugin_host.[ch]`, `src/plugins/boat_plugin_stage.c`,
 `src/core/boat_course.[ch]`, `src/render/boat_course_view.c`, `src/session/boat_replay.c`,
 `tools/boat_race_plugin.[ch]`.
@@ -227,7 +227,7 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
    `--plugin DIR`, including its fail-fast exit on a bad package. Do not fix this at open for the
    whole session: PC must be able to move a running session from runtime to authoring, so keep
    revision 1's source available and make the transition one-way rather than a launch-time mode.
-   In `tools/wake_velocity.c`, replace the `plugin_path` gates with separate "plugin active" and
+   In `apps/wake_velocity/wake_velocity.c`, replace the `plugin_path` gates with separate "plugin active" and
    "authoring" conditions. The F5–F7 help line, `wake_plugin_draw` and the browser control calls
    depend on authoring only. Static storage and the 1 MiB owner assertion stay.
 2. **Add the generator and catalog.**
@@ -267,7 +267,7 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
    bound into `BoatCourse`/the session, used by `boat_course_step` and `boat_course_view.c`. Keep
    the gate count and the `PROTEUS_RUN` format.
    - When the course digest equals the compiled course's, the best-run path stays exactly
-     `course-%s-physics%d.run` (`tools/wake_velocity.c:852`), so existing bests remain valid.
+     `course-%s-physics%d.run` (`apps/wake_velocity/wake_velocity.c:852`), so existing bests remain valid.
    - Any other course adds its digest to the filename.
    - Allow `--replay` and `--ghost` with the bundled course. Refuse them with an explicit message
      for other courses (`--plugin` keeps refusing as now).
@@ -379,14 +379,14 @@ as a package. The tool bridge gets the same commands, which gives the later [P6]
 agent its tool surface.
 
 Today's blocker is reload policy, not the console. Most useful edits restart: any scene layout change
-is `BOAT_PLUGIN_RESTART_SESSION`, returning the boat to the spawn (`tools/wake_velocity_plugin.c`,
+is `BOAT_PLUGIN_RESTART_SESSION`, returning the boat to the spawn (`apps/wake_velocity/wake_velocity_plugin.c`,
 `commit`), and voyage route changes return it to the start shelter. Only renames and gull cues keep
 progress. So this PR's core is a new live-apply policy, which also improves `--plugin` saves and F5.
 
 Read first: [hot reload](PLUGIN_PLAN.md#hot-reload-is-the-normal-development-path), the
 [replacement rules](PLUGIN_API.md#replacement-restart-and-owner-lifetime), the
 [live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent),
-`tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity_bridge.c`, `src/plugins/boat_plugin_host.c`,
+`apps/wake_velocity/wake_velocity_plugin.[ch]`, `apps/wake_velocity/wake_velocity_bridge.c`, `src/plugins/boat_plugin_host.c`,
 `src/plugins/boat_plugin_stage.c`, `src/session/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
 consumers in `src/core/boat.c`, `src/core/boat_combat.c`, `src/waterfront_*.c`, `src/render/boat_view.c`, `src/render/boat_gpu.c`.
 
@@ -418,7 +418,7 @@ the console says so if asked for something with no capability instead of pretend
 
 ### Tasks
 
-1. **Add the command layer.** New `tools/wake_command.[ch]`, with no raylib or file access: parse a line,
+1. **Add the command layer.** New `apps/wake_velocity/wake_command.[ch]`, with no raylib or file access: parse a line,
    submit it to `WakePlugin`, and append bounded result lines to a caller-owned buffer. Results are
    asynchronous, so it tracks pending work and reports completion. Route the bridge's existing `stage`,
    `apply`, `undo`, `discard` and `inspect` operations through the same functions, keeping their
@@ -470,7 +470,7 @@ the console says so if asked for something with no capability instead of pretend
    retired revisions alive under the existing lifetime rule. Update the API's replacement rules, and the
    `harbor-life` README and tests that describe layout edits as restarts: this is a deliberate contract
    change, so replace those tests with stronger ones rather than deleting coverage.
-7. **Build the console UI.** New `tools/wake_console.[ch]` for input, history and bounded scrollback, with
+7. **Build the console UI.** New `apps/wake_velocity/wake_console.[ch]` for input, history and bounded scrollback, with
    drawing separated from logic so tests stay headless. Draw a low-resolution drop-down overlay with the
    game's bitmap fonts and integer scaling. Input comes from `GetCharPressed`; suspend driving input as
    the existing `active`/`wake_plugin_editing` logic does, and do not pause simulation.
@@ -510,7 +510,7 @@ whether live edits read as continuous, and whether held edits are understandable
 
 ### PC result, 2026-10-31
 
-**Implemented.** `tools/wake_command.[ch]` is the one command layer for the console and the tool
+**Implemented.** `apps/wake_velocity/wake_command.[ch]` is the one command layer for the console and the tool
 bridge. It parses edits, `=` queries and `/` commands, composes every accepted edit onto the
 package's unchanged entry as one immutable file, submits it through the isolated staging worker,
 and appends bounded result lines. The first edit promotes a bundled session to authoring with the
@@ -529,7 +529,7 @@ by ID and falls back to the start when it is removed. `boat_scene_clear` is the 
 query. Exposure/weather changes and course edits still hold for F7 and restart; objective
 migrations and restarts are unchanged.
 
-`tools/wake_console.[ch]` owns input, history and bounded scrollback; drawing is separate. The key
+`apps/wake_velocity/wake_console.[ch]` owns input, history and bounded scrollback; drawing is separate. The key
 is `` ` ``, `F2` or 161 (GLFW world-1, `§` on some macOS ISO keyboards). The console is available in
 native solo free boating and voyages, including release builds; it is unavailable in rooms,
 replays, `--demo` and screenshots. While it is open, driving input is suspended but the simulation
@@ -626,11 +626,11 @@ join and predict it bit for bit. Protocol v9. Scenes remain compiled until PD3.
 
 Read first: [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md) (handshake, world checkpoint, version
 rules), `src/net/boat_net_protocol.[ch]`, `src/net/boat_net_server.[ch]`, `src/net/boat_net_client.[ch]`,
-`src/net/boat_prediction.[ch]`, `src/room/boat_server.c`, `tools/boat_bot.c`, `tools/wake_velocity_net.c`,
-`tools/wake_velocity_host.c`, and [ROOM_CONTENT_PLAN.md](ROOM_CONTENT_PLAN.md).
+`src/net/boat_prediction.[ch]`, `src/room/boat_server.c`, `tools/boat_bot.c`, `apps/wake_velocity/wake_velocity_net.c`,
+`apps/wake_velocity/wake_velocity_host.c`, and [ROOM_CONTENT_PLAN.md](ROOM_CONTENT_PLAN.md).
 
 Compiled content used by rooms today: `boat_net_server.c:30`, `src/room/boat_server.c:421` and `:699`,
-`boat_net_race_bind` (`src/net/boat_net_protocol.c:1494`), `tools/wake_velocity_net.c:574`,
+`boat_net_race_bind` (`src/net/boat_net_protocol.c:1494`), `apps/wake_velocity/wake_velocity_net.c:574`,
 `src/render/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
 `src/net/boat_net_protocol.c:1086`.
 
@@ -686,7 +686,7 @@ name is shown only after joining.
    version rules. v8 clients are rejected explicitly.
 5. **Install on the client.** `BoatNetClient` owns the validated definition for the connection and
    holds READY until it is installed; a failure closes with a clear reason and never enters the
-   world. Bind it in `boat_net_race_bind`, prediction, `tools/wake_velocity_net.c`, the course view
+   world. Bind it in `boat_net_race_bind`, prediction, `apps/wake_velocity/wake_velocity_net.c`, the course view
    and `boat_bot`. Display the package name in the existing room UI. Resync and late join reuse the
    installed definition; reconnect receives it again. Offer the console's read-only `/status` in
    rooms, as PC originally specified, showing the package and its digest. It is the last and smallest
@@ -944,7 +944,7 @@ and desktop browsers get the console. Imported voyages may carry scenes. Normal 
 
 Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 [browser source bundles](PLUGIN_API.md#browser-source-bundles-p43), `web/plugin_author.js`,
-`web/plugin_worker.js`, `src/plugins/boat_plugin_stage.c`, `tools/wake_velocity_plugin.c`, `cmake/Web.cmake`,
+`web/plugin_worker.js`, `src/plugins/boat_plugin_stage.c`, `apps/wake_velocity/wake_velocity_plugin.c`, `cmake/Web.cmake`,
 `tools/package_web.py`, `tools/check_web_plugin_author.py`.
 
 ### Settled from the source and a trial, 2026-10-31
@@ -1128,7 +1128,7 @@ kind of stale key sequence that joined production on 2026-10-31.
 
 **Saved bests depend on the compiled course.** `boat_replay_best_path` (`src/session/boat_replay.c:363`) keeps the plain
 `course-calm-physicsN.run` name only when the digest equals `boat_course_compiled_digest()`, and
-`tools/wake_velocity.c:953` uses the same value to gate `--replay` and `--ghost`. Deleting the compiled course
+`apps/wake_velocity/wake_velocity.c:953` uses the same value to gate `--replay` and `--ghost`. Deleting the compiled course
 without a pinned value would orphan every player's best, which is a stop rule. The value is
 `0xa27ccadf8bd7a754`. It was computed outside the code from the digest's definition, so the first test that uses
 it must confirm it.
@@ -1152,8 +1152,8 @@ Other findings:
   - `boat_combat.c:74`
   - `boat_location.c:40`
   - `boat_replay.c:363`
-  - `tools/wake_velocity.c:953`
-  - `tools/wake_velocity_plugin.c:412`, `:495` and `:747-751`, which compare with or restore `definition->voyage`
+  - `apps/wake_velocity/wake_velocity.c:953`
+  - `apps/wake_velocity/wake_velocity_plugin.c:412`, `:495` and `:747-751`, which compare with or restore `definition->voyage`
     and a NULL course
   - `src/room/boat_server.c:218` and `:700`, the `--scripted` path
 - **Dev tools to move:** `boat_hud_review`, `boat_race_trial`, `boat_combat_review` and `boat_fleet_review`.
@@ -1216,7 +1216,7 @@ hits a stop rule.
 
    After task 6, recapture with the same commands and require identical bytes. Keep the capture script out of the
    repo; a CTest pin was ruled out above.
-5. **Remove the switch.** Delete `--no-plugins`, `PROTEUS_BOAT_PLUGINS` (17 sites in `tools/wake_velocity.c`, one
+5. **Remove the switch.** Delete `--no-plugins`, `PROTEUS_BOAT_PLUGINS` (17 sites in `apps/wake_velocity/wake_velocity.c`, one
    in `CMakeLists.txt`) and the paths it guards, including the unconditional-branch leftovers and the stale "rooms
    use compiled content" message. Delete `plugin_default_parity` and its script, and replace its session coverage
    as in task 6.

@@ -616,9 +616,9 @@ acceptance of plugin authoring.
 without rebuilding C. Preserve existing C arrival/recovery/exposure behavior.
 
 1. Add the explicit route override/lifetime seam in [`boat_session.[ch]`](../src/session/boat_session.h)
-   and the application water setup in [`wake_velocity.c`](../tools/wake_velocity.c). Keep
+   and the application water setup in [`wake_velocity.c`](../apps/wake_velocity/wake_velocity.c). Keep
    `boat_location`'s compiled default untouched. Use the drive's shared tick boundary
-   ([`wake_velocity_drive.h`](../tools/wake_velocity_drive.h)) so screenshots and the windowed
+   ([`wake_velocity_drive.h`](../apps/wake_velocity/wake_velocity_drive.h)) so screenshots and the windowed
    application activate definitions in the same order. Preserve source/wake ordering.
 2. Add the shipped example directory and opt-in launch/reload selection. Flag/key names are
    implementation choices, not commands available today. Start with Reload, then add the
@@ -668,7 +668,7 @@ keys and policy table are in [the plugin API](PLUGIN_API.md#playing-and-live-aut
   `weather_range` restart the session on F7, through the game's existing full-restart path. A
   different id/kind/location/API is refused. Every restart begins at shelter 0, so no old index
   survives a changed route.
-- **Game:** `--plugin DIR` (native only), implemented in `tools/wake_velocity_plugin.[ch]`. It
+- **Game:** `--plugin DIR` (native only), implemented in `apps/wake_velocity/wake_velocity_plugin.[ch]`. It
   selects the manifest's location and is refused with rooms, `--course`, `--replay` and
   `--ghost`. Saves are polled every 0.25 s and staged once they have been unchanged for 0.3 s.
   The keys are F5 reload, F6 undo/discard and F7 apply. A bottom-left panel shows the revision
@@ -1757,7 +1757,7 @@ its own acceptance gate. Seamless mid-round source swaps are not required for th
 
 The [live console step](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) of the
 plugins-by-default plan supplies this milestone's command layer and live-apply policy. PC's
-`tools/wake_command.[ch]` is now the dispatcher: the agent submits the same edit and `/` command
+`apps/wake_velocity/wake_command.[ch]` is now the dispatcher: the agent submits the same edit and `/` command
 lines as a player, appears in the console, is undone the same way and cannot move the boat.
 
 **Deliverable:** an optional in-game conversation can use the proven P4 authoring tools to
@@ -1917,7 +1917,7 @@ actual owners and document any necessary deviation before implementation:
 | --- | --- | --- |
 | L1.1 — freeze the first contract | Inspect `boat_plugin.[ch]`, `boat_plugin_host.[ch]`, `boat_session.h`, `waterfront_scene.[ch]`, `waterfront_harbor.[ch]`, `waterfront_traffic.[ch]` and their CMake library membership. Add the proposed schema, subsystem replacement semantics, ID/recipe registry, numeric/resource limits and ownership/lifetime diagram to the API as explicitly planned. List every draw, contact, camera, gull-avoidance and wake consumer that needs the accepted definition. Select two existing berth recipes and one outer-map approach using compiled water and scenery queries; record coordinates and a camera bookmark, not guessed safe positions. | A reviewer can trace compiled/default → candidate → accepted → Undo → release for all consumers. Record why the proposed capacities fit existing arrays. This PR is contract/fixture planning only; no new grant is advertised as supported. |
 | L1.2 — typed definition and strict decoding | Add a small plain C scene definition (proposed `src/core/boat_scene_definition.[ch]`) and extend `boat_plugin.[ch]`/the Lua decoder. Initially permit only a versioned scene envelope with no authorable subsystem; accept omitted scene as before. Add stable ID/recipe helpers and checked counts; no Lua pointers survive evaluation. Update `tools/plugin_schema.py` and validator fixtures with the planned fields, gated from live support until L1.3. | Old voyage/race/objective fixtures remain identical. Test omitted/empty envelope, missing grant, wrong location, unknown subsystem, duplicate IDs, invalid numbers and capacity+1. Test manifest grant ordering alongside optional objective grants. No live scene installation in this task. |
-| L1.3 — revision lifecycle and application binding | Extend host candidate/active/Undo ownership, content identity, inspection and `tools/wake_velocity_plugin.[ch]` binding using L1.1's diagram. Install between ticks, invalidate dependent view caches, and restore compiled defaults on disable/session exit. Keep unsupported subsystem edits rejected. Reuse existing pins, restart policy and retirement rules. | Headless session tests cover valid Apply, stale Apply, invalid candidate, allocation/staging failure, Undo, disable, repeated enter/leave and independent sessions. No dangling borrower after retiring a revision; defaults render identically with an omitted scene. An envelope-only `scene.define` may now be reported with its exact supported subset. |
+| L1.3 — revision lifecycle and application binding | Extend host candidate/active/Undo ownership, content identity, inspection and `apps/wake_velocity/wake_velocity_plugin.[ch]` binding using L1.1's diagram. Install between ticks, invalidate dependent view caches, and restore compiled defaults on disable/session exit. Keep unsupported subsystem edits rejected. Reuse existing pins, restart policy and retirement rules. | Headless session tests cover valid Apply, stale Apply, invalid candidate, allocation/staging failure, Undo, disable, repeated enter/leave and independent sessions. No dangling borrower after retiring a revision; defaults render identically with an omitted scene. An envelope-only `scene.define` may now be reported with its exact supported subset. |
 | L1.4 — close tooling and unsupported paths | Thread scene identity through isolated worker/stage serialization, preview, inspection and CPU capture; extend `tools/plugin_author.py`, `tools/plugin_schema.py` and relevant Python/C validators. Validate worker wire versions/lengths before using new payloads. Explicitly reject scene grants in browser imports, room startup and unsupported replay/recording paths, including objective-bearing packages. | Tool output reports supported subsystems, limits and rejected targets truthfully. Test worker round trip, malformed/truncated payload, pinned capture and browser rejection. Existing browser voyage/objective cases still pass. Update packaged tool metadata/guides where discovery changes; no new browser scene evaluator. |
 
 #### L1.1 result, 2026-10-30

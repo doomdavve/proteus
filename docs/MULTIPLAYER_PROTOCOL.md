@@ -471,10 +471,10 @@ authority applies the same acceptance rules as InputBatch.
 `0xC1` PrivateState (channel 0, server to client): 1–256 opaque bytes, the private rules adapter's
 state after a grant (header tick: the authority's tick). The authority sends it at the end of a
 grant only when it differs from the last one sent; the client keeps the newest of its epoch. Its
-bytes belong to the adapter's own codec: the time trial's (`tools/wake_velocity_course.c`) is
+bytes belong to the adapter's own codec: the time trial's (`apps/wake_velocity/wake_velocity_course.c`) is
 `u8` next gate, `u8` flags (1 practice, 2 finished, 4 recording stopped), then `f64` elapsed,
 four `f64` splits and four `f64` crossings (74 bytes).
-The voyage's (`tools/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
+The voyage's (`apps/wake_velocity/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
 4 too fast, 8 observed, 16 weather begun), `u8` latest event, `u8` its shelter, `u32` recoveries,
 then `f64` weather start, start, arrival and latest event time (40 bytes, big-endian like the
 course's). The client derives the storm its water carries from these bytes and the route, which

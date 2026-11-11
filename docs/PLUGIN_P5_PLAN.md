@@ -57,7 +57,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 
 - **Objectives.** `BoatPluginObjective` and `boat_plugin_objective_step`
   (`src/plugins/boat_plugin_state.h:80`) run `init`/`update` as a P3 transaction with a 12-tick cadence;
-  the solo glue turns voyage notices into events (`tools/wake_velocity_plugin.c:371`).
+  the solo glue turns voyage notices into events (`apps/wake_velocity/wake_velocity_plugin.c:371`).
 - **Free packages** have no objective grant unless they author work sites
   ([free schema](PLUGIN_API.md#free-schema)).
 - **Rooms.** `BoatRoomDefinition` (`src/core/boat_room_definition.h:32`) carries mode, location, course,
@@ -245,7 +245,7 @@ exercised the `boat_bot` print, and the game draws nothing until P5d.
 
 The game draws marks (world markers, minimap) and the objective HUD in rooms; SHELTER HUNT in the
 host panel and `--host hunt`.
-Files: `tools/wake_velocity.c`, `tools/wake_velocity_host.[ch]`, `tools/boat_title.c`,
+Files: `apps/wake_velocity/wake_velocity.c`, `apps/wake_velocity/wake_velocity_host.[ch]`, `apps/wake_velocity/boat_title.c`,
 the minimap, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`, `docs/BOAT_HUD.md`.
 Tests: `boat_net_process.py` hunt case (server + two bots, ENet, event-driven); title menu
 validator for the new row; a CPU capture of marks and HUD (validator frame dump, since

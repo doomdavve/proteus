@@ -50,7 +50,7 @@ Source audit at `7d5fd48`, with a clean starting worktree:
 | `src/session/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
 | `tools/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
 | `tools/validate_boat_environment.c`, `tools/validate_boat_replay.c`, `tools/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
-| `tools/wake_velocity.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |
+| `apps/wake_velocity/wake_velocity.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |
 
 Within T1–T5, use C17/raylib and the existing tick rate. Preserve steering response, propulsion, drag,
 grip, yaw inertia, camera settings, course rules, controls and audio. Do not introduce

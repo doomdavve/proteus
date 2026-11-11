@@ -422,7 +422,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
   `boat_map_legacy_water_contact()` and `boat_map_legacy_destroy()`. They lazily prepare one
   process-global `BoatMap` of the river through the same functions. Callers by file (call count):
   - Runtime: `src/core/boat.c` (1, hull contact) and `src/render/boat_view.c` (4, particle/spray
-    filtering). Also `tools/wake_velocity.c` (2: spawn check and shutdown) and
+    filtering). Also `apps/wake_velocity/wake_velocity.c` (2: spawn check and shutdown) and
     `tools/boat_water_review.c` (11).
   - Validators: `validate_boat` (8), `validate_traffic` (7), `validate_harbor` (5),
     `validate_boat_race` (5), `boat_race_trial` (4), `validate_boat_core` (4),

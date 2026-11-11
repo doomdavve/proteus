@@ -116,7 +116,7 @@ GH5 plays without GH2, but the tour shows the city properly only once the bridge
 
 ## GH1: rename to Gothenburg Harbour
 
-Read `tools/boat_title.c`, `tools/wake_velocity.c` and `plugins/outer-free/plugin.json`.
+Read `apps/wake_velocity/boat_title.c`, `apps/wake_velocity/wake_velocity.c` and `plugins/outer-free/plugin.json`.
 
 - Replace OUTER RIVER in the title's PLACE row (`boat_title.c`), its hints ("THE STANDARD OUTER
   RIVER", "RIVER RACES ALWAYS RUN ON THE OUTER RIVER") and the in-game location label

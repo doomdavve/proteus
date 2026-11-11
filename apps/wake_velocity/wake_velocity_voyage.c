@@ -190,7 +190,7 @@ static bool recover(void *context, uint64_t tick, unsigned slot, Boat *boat)
 }
 
 // The host's commit of a held revision, as the direct path's commit applies it to the session and
-// objective (tools/wake_velocity_plugin.c). A failed migration keeps everything and reports why.
+// objective (apps/wake_velocity/wake_velocity_plugin.c). A failed migration keeps everything and reports why.
 static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t number, uint8_t change,
     BoatNetCommitResult *result)
 {

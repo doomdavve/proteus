@@ -316,7 +316,7 @@ authoritative state. Keep predicted controls distinct from commits.
 
 **AR2a status (2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played).**
 Implemented: `BoatAppInput` and `boat_app_input_sample(poll_touch)` in
-`tools/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
+`apps/wake_velocity/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
 per frame at the start of the `study()` frame body and once per frame in `boat_title_run`. It
 carries pressed navigation (up/down/left/right, confirm, activate, back, pause, time-scale
 bracket and backslash keys), held Backspace, the pointer in
@@ -398,7 +398,7 @@ bridges.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10): each of the three
 commits builds warning-clean and passes `platform_bridges` and its self-test; a script that extracts
-every `EM_JS(...)` from `f1ed07b:tools/wake_velocity.c` and from the new files finds all 14
+every `EM_JS(...)` from `f1ed07b:apps/wake_velocity/wake_velocity.c` and from the new files finds all 14
 byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the app backend's
 existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check passes for every
 `*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin and outer CPU
@@ -689,7 +689,7 @@ Implemented (ledger row L0):
   private range's PrivateInputBatch (`src/net/boat_net_private.[ch]`, type 0xC0, rejected by hosted
   rooms). The v14 codec and golden bytes are unchanged.
 - Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
-- Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
+- Game (`apps/wake_velocity/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
   or authoring (in practice basin free boating) start a local session; the solo accumulator's
   ticks become the grant (at most 96 per frame; `boat_local_frame` refuses more and the glue
   carries any excess in the accumulator); the client's prediction fills the game's `BoatSession`
@@ -796,7 +796,7 @@ L6 (scripted demos and captures) and L0's removal point, implemented:
 
 - Scripted command source: `boat_local_frame_scripted` (`src/net/boat_local.[ch]`) takes each tick's
   helm from a `BoatLocalScript` callback given the predicted boat the authority will step; its
-  rates are sent as they are. `demo_input` (`tools/wake_velocity_drive.[ch]`) is the scripted
+  rates are sent as they are. `demo_input` (`apps/wake_velocity/wake_velocity_drive.[ch]`) is the scripted
   drive's helm, shared by `demo_step` and the glue's `wake_local_scripted_frame` (`--demo` in
   the frame loop) and `wake_local_scripted_drive` (a capture's drive before the window, in grants
   of at most 96 on virtual time from 0).
@@ -843,7 +843,7 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
   onto a line with one loop fewer, at a lower mean speed (9.15 → 8.81 m/s). With the pool present
   but empty the lap stays 57.80 s; a full-throttle pilot is slower on the pool (30.5 → 32.4 s).
   The local path equals the direct path, and the drop already appears at `b76cace`.
-- Authority adapter: `tools/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
+- Authority adapter: `apps/wake_velocity/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
   replays, which `proteus_boat_net` may not) is the local authority's `BoatNetRules`. Two new
   optional callbacks, used only by private servers: `committed` (the fleet after each tick,
   read-only) and `private_state` (bytes for the client after each grant). The adapter steps the
@@ -910,7 +910,7 @@ console has promoted can run one, and authoring stayed on the direct path.
 
 L1a (voyage state, events, weather and recover), implemented 2026-11-11:
 
-- Authority adapter: `tools/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
+- Authority adapter: `apps/wake_velocity/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
   authority's `BoatNetRules` for a session with a voyage route. `committed` steps the voyage from
   the committed boat as `boat_session_step` does. Two new optional private-only callbacks:
   `weather` (the storm the world's water carries from the next tick; the server writes it into
@@ -1011,7 +1011,7 @@ L1b (authoring and objectives on the authority), design 2026-11-11; the user acc
 | L1-4 | Branch and PR | (a) L1a and L1b in one PR (the milestone); (b) open the L1a PR now and L1b as the next milestone | (a), after your windowed L1a check |
 
 <a id="l1b-status"></a>L1b implemented 2026-11-11 (steps: objective transaction extracted to
-`tools/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
+`apps/wake_velocity/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
 PrivateInspect/Inspection, then the game's wiring):
 
 - The objective transaction (`WakeObjective`: checkpoint, event queue, sequence, staged batch,
@@ -1023,7 +1023,7 @@ PrivateInspect/Inspection, then the game's wiring):
   The voyage adapter handles rebind, live, migrate (two-phase, L1-1) and restart voyage; the
   course adapter rebinds an unchanged or renamed course. Session restarts stay new local
   generations.
-- The game (`tools/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
+- The game (`apps/wake_velocity/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
   (`wake_plugin_attach`) forwards every host commit; a migration holds staging, Undo and F7 with
   `busy` until its result arrives (L1-3), then commits or reports `migration_failed`.
   `wake_plugin_inspect` and the bridge's `inspect` take the objective's lines from the
@@ -1102,7 +1102,7 @@ designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), wo
   the unchanged `BoatWorkSave`. RETURN CRATE travels as an action with the next frame; a paused
   frame still sends its actions with a zero grant. An endpoint failure returns to the title
   after the leave-time save (D10).
-- The game's direct work tick loop is removed (`tools/wake_velocity.c`); `cargo_sandbox` stays a
+- The game's direct work tick loop is removed (`apps/wake_velocity/wake_velocity.c`); `cargo_sandbox` stays a
   direct developer tool.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
@@ -1125,7 +1125,7 @@ on `arch/ar7-rest`:
 
 - The browser game links `proteus_local_drive` and runs plain free boating, the time trial and
   voyages and tours without an objective on the same in-process local authority and client as
-  native (`LOCAL_ELIGIBLE` in `tools/wake_velocity.c`). Course bests keep the existing storage
+  native (`LOCAL_ELIGIBLE` in `apps/wake_velocity/wake_velocity.c`). Course bests keep the existing storage
   (IndexedDB in the browser).
 - Objectives and authoring stay on the browser's direct path with its isolated worker gate. A
   package with an objective, or one opened for authoring, never starts a local session. When the
@@ -1241,7 +1241,7 @@ held candidate, panel, console) stays in `WakePlugin`, unchanged.
   the local session in the browser too, and a console promotion keeps playing.
 - **Retirement.** Once every step is in, the direct path's isolated evaluation
   (`WAKE_PLUGIN_ISOLATED_OBJECTIVE`, `begin_evaluation`/`poll_evaluation` in
-  `tools/wake_velocity_plugin.c`) and its validator `validate_wake_plugin_objective` (AR3e) are
+  `apps/wake_velocity/wake_velocity_plugin.c`) and its validator `validate_wake_plugin_objective` (AR3e) are
   deleted. The browser's direct path (only replay viewing, which has no objective) quarantines
   an objective with "no isolated objective evaluator" instead of evaluating it.
 - **Tests** (native, virtual time, the C model of the worker in `validate_boat_local`): a
@@ -1318,7 +1318,7 @@ was ever specified.
 | L5-1 | What L5 changes | (a) close L5 by evidence: rooms already share the authority and client libraries; rename `NetStudy` to a room client (`WakeRoom`), and record that the two glues differ by design (prediction-only private view against remote interpolation); (b) extract one shared view step (own boat, tick and presentation from a `BoatNetClient`) used by both glues, the rest stays room-only; (c) one client composition for every mode, a private or remote transport behind it, with mode adapters | (a): no behaviour or wire change, nothing to re-qualify in rooms; (b) touches multiplayer feel and needs human play to accept; (c) is a redesign |
 
 L5 closed by evidence, 2026-11-11 on `arch/ar7-rest`: `NetStudy` and its `net_study_*` calls
-are now the room client `WakeRoom` and `wake_room_*` (`tools/wake_velocity_net.[ch]`, whose
+are now the room client `WakeRoom` and `wake_room_*` (`apps/wake_velocity/wake_velocity_net.[ch]`, whose
 header records why it stays separate from `wake_velocity_local.c`). No behaviour, wire or test
 change; the `boat_net_study_*` test names stay. Evidence (macOS 26.6.2, AppleClang Debug,
 2026-11-11): the 91 net, room, host, connect, combat and hunt tests pass; the browser game target

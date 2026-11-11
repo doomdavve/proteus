@@ -33,13 +33,13 @@ PRODUCTION_TARGETS = (
     'plugin_stage',
 )
 PRODUCTION_SOURCES = (
-    'tools/wake_velocity.c',
-    'tools/wake_velocity_plugin.c',
-    'tools/wake_velocity_net.c',
-    'tools/wake_velocity_host.c',
+    'apps/wake_velocity/wake_velocity.c',
+    'apps/wake_velocity/wake_velocity_plugin.c',
+    'apps/wake_velocity/wake_velocity_net.c',
+    'apps/wake_velocity/wake_velocity_host.c',
     'src/room/boat_server.c',
     'tools/boat_bot.c',
-    'tools/boat_plugin_worker.c',
+    'apps/wake_velocity/boat_plugin_worker.c',
     'src/plugins/boat_plugin_catalog_gen.c',
     'src/plugins/boat_plugin_stage_worker.c',
 )

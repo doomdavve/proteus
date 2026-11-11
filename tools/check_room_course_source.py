@@ -11,7 +11,7 @@ FILES = (
     "src/net/boat_net_protocol.c",
     "src/net/boat_prediction.c",
     "src/render/boat_view.c",
-    "tools/wake_velocity_net.c",
+    "apps/wake_velocity/wake_velocity_net.c",
     "tools/boat_bot.c",
 )
 NEEDLE = "boat_race_river_course"
