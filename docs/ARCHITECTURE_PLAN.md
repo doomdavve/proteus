@@ -10,10 +10,13 @@ browser-built or Windows-built.
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-L1a (voyages and tours) and L1b (authoring and objectives on the authority, L9 folded in) are
-implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); the user approved the L1 PR on
-2026-11-11 and defers windowed checks until every L* row is done.
-**Next:** the remaining AR7 rows (L3, L4, L5, L7, L8); the user's manual checks follow them.
+L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
+([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
+([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
+until every L* row is done.
+L5 closed by evidence ([L5](#l5-decision)); L4b objectives implemented ([L4b](#l4b-status)).
+The user accepted [L4-1, L4-2](#l4b-decision) and [L5-1](#l5-decision) on 2026-11-11.
+**Next:** L4b authoring (L4-2 (b)): browser staging, migration and Undo on the authority.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1060,6 +1063,168 @@ save that stages a migration and F7 (MIGRATION IN PROGRESS for one frame, then a
 failing migration, F6 Undo, a live route edit and a live marina layout edit, the console
 promoting a running bundled voyage to authoring, and `plugin_author.py live-inspect` against a
 running game; plus L1a's owed voyage and tour checks.
+
+<a id="l7-l8-status"></a>L7 and L8, implemented 2026-11-11 on `arch/ar7-rest` (from `main` after
+PR #184):
+
+- L7 (replay and ghost viewing): viewing runs no authority, as designed; the replay branch of
+  the frame loop grants nothing. One gap closed: a session launched with `--replay FILE` never
+  opened the local session, so its first restart drove the course on the direct path. Its
+  restart now opens the local session when the session is eligible.
+- L8 (developer studies, [D6](ARCHITECTURE_AR1.md#product-decisions) (b)): `--wake-field`,
+  `--player-wake`, `--no-player-wake` and `--wake-objects-crossing` run in `wake_study`, the
+  game's own sources and target settings built with `WAKE_VELOCITY_STUDY` (native only, never
+  packaged). `wake_velocity` (native and browser) rejects them and names `wake_study`, so its
+  native free boating, time trial, voyages and authoring always have the wake pool and the local
+  authority. `--wake-height` and `--wake-life-ticks` stay in the game: they were already private
+  world options.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11): `wake_study`
+captures byte-identical to `main`'s `wake_velocity` (`aaafd8d`) for `--player-wake`,
+`--no-player-wake`, `--wake-objects-crossing`, `--player-wake --current --waves` (all
+`--time 9`), `--wake-field --time 3` and outer `--no-player-wake --time 5`; the game's basin
+capture unchanged; new
+`wake_velocity_study_rejected.<option>` tests; `ctest --preset full -j8` passed 531/531 (13
+disabled). Not verified: the `--replay` restart in a window (no scripted restart exists), any
+browser or Windows build.
+
+<a id="l3-status"></a>L3 (working harbour), implemented 2026-11-11 on `arch/ar7-rest`, as AR1
+designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), work mode):
+
+- Endpoint: `src/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
+  part of `proteus_boat_net`). The authority owns a `BoatWorkSession`; the client owns a mirror
+  filled only from its messages over the memory transport, with no prediction. The client sends
+  each frame's actions, helm targets and crane axes (`0xC6`); the authority applies them before
+  the frame's first tick and derives each tick's helm from its own boat
+  (`boat_work_apply_frame`, `boat_work_helm`: the game's former expressions, moved). It sends each
+  committed tick's motion with the trail segments the tick appended (`0xC7`), the job's HUD,
+  notice and waiting text after a chunk when they changed (`0xC8`), and on every (re)start a
+  checkpoint with the whole trail (`0xC9`)
+  ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)). Presentation steps
+  per applied tick from the mirror. Grants and chunks follow L0 (at most 96 ticks, chunks of 12).
+- Host management, as L2's course take: resume, the fixture scripts (`--screenshot` drive,
+  `--work-review-pose`, `--save-now`) prepare the session before the endpoints start; the menu's
+  RESTART JOB resets the authority's session and starts a new generation; autosave, the
+  leave-time save and `--save-now` capture from the authority's session between frames through
+  the unchanged `BoatWorkSave`. RETURN CRATE travels as an action with the next frame; a paused
+  frame still sends its actions with a zero grant. An endpoint failure returns to the title
+  after the leave-time save (D10).
+- The game's direct work tick loop is removed (`tools/wake_velocity.c`); `cargo_sandbox` stays a
+  direct developer tool.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_work_local` cases `codec`, `failures` (quick), `trace`, `restart`, `resume` (slow)
+  ([cases](TESTING.md#network-checks)). Negative check: dropping trail segments from the motion
+  fails `trace`.
+- Captures byte-identical to a build of `main` at `aaafd8d`: `--location outer --work` at
+  `--time` 3, 12, 14, 30 and 60, the `swing`, `deck` and `approach` review poses, and basin
+  `--work` at 3 and with `swing`. The plain outer capture is unchanged too.
+- The 69 work, cargo, sandbox and title-start tests pass, including `--save-now`, resume and
+  set-aside.
+
+Not verified: the window loop (no display was available to this session, even outside the
+sandbox): keys, crane and helm feel, autosave while playing, RESTART JOB and RETURN CRATE from
+the menu, pause and focus loss. Browser: working harbour stays native-only (D7).
+
+<a id="l4-status"></a>L4a (browser private sessions without objectives), implemented 2026-11-11
+on `arch/ar7-rest`:
+
+- The browser game links `proteus_local_drive` and runs plain free boating, the time trial and
+  voyages and tours without an objective on the same in-process local authority and client as
+  native (`LOCAL_ELIGIBLE` in `tools/wake_velocity.c`). Course bests keep the existing storage
+  (IndexedDB in the browser).
+- Objectives and authoring stay on the browser's direct path with its isolated worker gate. A
+  package with an objective, or one opened for authoring, never starts a local session. When the
+  console's first edit or `/save` promotes a running package to authoring, play restarts on the
+  direct path before any staged revision can reach the authority.
+- `wake_velocity_voyage.c`'s objective calls are inert in the browser (the authority never gets a
+  revision with an objective there); `strnlen` became `memchr` for the browser's strict C17.
+
+Evidence (macOS 26.6.2, Apple M1 Max, emcc 6.0.12 MinSizeRel and AppleClang 21.0.0 Debug,
+2026-11-11; headless Chromium 156 through Playwright 1.64.1 with SwiftShader):
+
+- `ctest --preset full -j8`: 536/536 (13 disabled). `tools/check_web_wasm.py`: no Lua in the game.
+- `tools/check_web_plugin_author.py --browser chromium` and `tools/check_web_scenery.py` pass.
+- A scratch drive of the default Langedrag voyage printed `Local session: generation 1, 301 ticks
+  in 93 chunks` on leaving, with no page errors; a console edit during it restarted play at the
+  dock and continued on the direct path.
+- `tools/check_web_controls.py` and `tools/check_web_title.py` fail identically on a web build of
+  `main` at `aaafd8d`: the first treats the plugin status line on stderr as a console error, the
+  second's console edit `def.scene.marina.berths[1].x = 15` stages a syntax error. Neither comes
+  from L4a.
+
+Not verified: Firefox and WebKit, mobile touch, a time trial in the browser, and any manual play.
+
+<a id="l4b-decision"></a>L4b (browser objectives and authoring on the authority), decisions
+2026-11-11; the user accepted L4-1 (a) and L4-2 (b) as recommended on 2026-11-11. AR1's B1 moves the worker gate "to the authority's grant". In the local
+session the client predicts each tick before the authority runs it, so the authority cannot
+simply refuse ticks: the host must stop granting at the evaluated boundary, and something must
+poll the worker while no ticks run. Today `boat_local_frame` with a zero grant does nothing on
+the authority (commit and recover requests wait for the next tick).
+
+| ID | Question | Options | Recommendation |
+| --- | --- | --- | --- |
+| L4-1 | Where the gate lives | (a) the host ends each grant at the objective cadence's next boundary and grants nothing while the client's objective view reports a pending evaluation; the authority services its evaluator (and pending requests) on zero-grant frames, a change to `boat_local`'s L0 path; the result is seen one frame later than today; (b) the host polls the authority's adapter between frames as host management (as L3's persistence capture), same latency as today, but the gate decision reads authority state | (a): keeps rule 2; one frame (about 17 ms) per update against a worker round trip of 35–100 ms |
+| L4-2 | Browser authoring | (a) stays on the direct path with L4a's restart on promotion, the one remaining direct path; (b) moves too: the worker's migrate runs for the authority and its result commits frames later (L1-1's two-phase commit, asynchronous), staging and Apply wait as L1-3 | (b), as a step after the objectives, since "done when" needs every shipped mode on the authority; it needs Chromium, Firefox and WebKit qualification |
+
+<a id="l4b-status"></a>L4b objectives (L4-1 (a)), implemented 2026-11-11 on `arch/ar7-rest`:
+
+- The voyage adapter evaluates through a `WakeObjectiveWorker` when the host gives it one (the
+  browser's `wake_web_objective_*`; NULL natively, which evaluates at once as before). INIT and
+  every boundary's UPDATE start a job (`wake_objective_begin`); a new `service` rules hook, called
+  by every grant after its messages and before its ticks, collects the reply
+  (`wake_objective_poll`): INIT becomes the objective, an UPDATE is staged for the tick after its
+  boundary, with the native path's trace; a failed callback, an invalid or stale reply or the
+  5 s elapsed-time deadline quarantines. A tick committed while a job is open quarantines as an
+  overrun. The private state's objective tail gains a pending byte (19 bytes before the text).
+- `boat_local_frame` with zero ticks now still services the authority and the client. With a
+  worker and an objective, `wake_local_frame` ends each grant at the next 12-tick boundary and
+  grants nothing (emptying the accumulator, as the direct path's gate does) while the client's
+  view is not yet valid or reports a pending job (`wake_local_waiting`); the game also holds a
+  reset then. The rule-2 boundary holds: the host reads only the client's view.
+- The browser's `LOCAL_PLATFORM_ELIGIBLE` no longer excludes objectives, only authoring.
+  `wake_plugin_attach` closes the direct path's INIT job, and a restart that leaves the local
+  session detaches before the direct path starts its own objective.
+- Reach: the browser catalog (basin-free, time-trial, langedrag, harbor-life, grodan) has no
+  objective voyage, and imported packages always open as authoring, so shipped browser play
+  reaches this path only once authoring moves too (the next step).
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang Debug and emcc MinSizeRel, 2026-11-11; headless
+Chromium 156 through Playwright 1.64.1 with SwiftShader):
+
+- `ctest --preset full -j8`: 539/539, including `boat_local.isolated_objective`,
+  `isolated_quarantine` and `isolated_deadline` (see [TESTING](TESTING.md)). A mutation that
+  never stages a worker UPDATE fails `isolated_objective`.
+- Browser game builds clean; `tools/check_web_wasm.py`: no Lua in the game.
+  `tools/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
+  (22 normal callbacks, deadline across freeze, restart). A scratch drive of the default Langedrag
+  voyage ran 309 ticks on the local authority with no page errors.
+
+Not verified: Firefox and WebKit, an objective voyage on the browser's authority (unreachable in
+shipped play until authoring moves), any manual play.
+
+<a id="l5-decision"></a>L5 (hosted rooms), decision 2026-11-11; the user accepted L5-1 (a) as
+recommended on 2026-11-11. AR1's ledger names no
+missing commands or state and an unchanged topology; its removal point is "`net_study` glue
+merges into the common client". Hosted rooms already run as authority/client: the game is a
+`BoatNetClient` of `boat_server` (or its `--host` child), and private sessions run the same
+fleet server rules in process. What the two client glues share is small: `wake_velocity_local.c`
+presents the own boat from prediction, tick by tick, with no remote boats; `wake_velocity_net.c`
+(`NetStudy`) presents remote boats from delayed snapshots, blends corrections and proximity,
+and owns the combat, match, race, roster and objective HUDs, on elapsed time. No common client
+was ever specified.
+
+| ID | Question | Options | Recommendation |
+| --- | --- | --- | --- |
+| L5-1 | What L5 changes | (a) close L5 by evidence: rooms already share the authority and client libraries; rename `NetStudy` to a room client (`WakeRoom`), and record that the two glues differ by design (prediction-only private view against remote interpolation); (b) extract one shared view step (own boat, tick and presentation from a `BoatNetClient`) used by both glues, the rest stays room-only; (c) one client composition for every mode, a private or remote transport behind it, with mode adapters | (a): no behaviour or wire change, nothing to re-qualify in rooms; (b) touches multiplayer feel and needs human play to accept; (c) is a redesign |
+
+L5 closed by evidence, 2026-11-11 on `arch/ar7-rest`: `NetStudy` and its `net_study_*` calls
+are now the room client `WakeRoom` and `wake_room_*` (`tools/wake_velocity_net.[ch]`, whose
+header records why it stays separate from `wake_velocity_local.c`). No behaviour, wire or test
+change; the `boat_net_study_*` test names stay. Evidence (macOS 26.6.2, AppleClang Debug,
+2026-11-11): the 91 net, room, host, connect, combat and hunt tests pass; the browser game target
+builds clean. Hosted-room play is not re-qualified, as nothing it runs changed.
 
 ### AR8 — Move files into owning directories
 

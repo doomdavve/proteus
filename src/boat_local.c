@@ -117,6 +117,26 @@ unsigned boat_local_chunk(uint64_t tick, unsigned remaining)
     return remaining < boundary ? remaining : boundary;
 }
 
+// The client handles what the authority sent; the weather reader sees a new private state.
+static bool receive(BoatLocal *local, double now)
+{
+    BoatNetClient *client = &local->client;
+    if (!boat_net_client_local_service(client, now)) {
+        fail(local, boat_net_client_failure(client));
+        local->running = false;
+        return false;
+    }
+    uint64_t states = client->stats.private_states;
+    if (local->config.weather && states != local->weather_states) {
+        local->weather_states = states;
+        BoatStorm storm;
+        if (local->config.weather(local->config.weather_context, client->private_state,
+                client->private_state_size, &storm))
+            boat_net_client_private_storm(client, storm);
+    }
+    return true;
+}
+
 static bool run_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
     float thrust_target, float steering_target, const BoatLocalScript *script,
     const BoatLocalObserver *observer)
@@ -169,21 +189,17 @@ static bool run_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
         }
         boat_net_server_grant(&local->server, now, count);
         local->tick += count;
-        if (!boat_net_client_local_service(client, now)) {
-            fail(local, boat_net_client_failure(client));
-            local->running = false;
+        if (!receive(local, now))
             return false;
-        }
-        uint64_t states = client->stats.private_states;
-        if (local->config.weather && states != local->weather_states) {
-            local->weather_states = states;
-            BoatStorm storm;
-            if (local->config.weather(local->config.weather_context, client->private_state,
-                    client->private_state_size, &storm))
-                boat_net_client_private_storm(client, storm);
-        }
         remaining -= count;
         ++chunks;
+    }
+    // L4b: a frame without ticks still services the authority, so its requests apply and an
+    // asynchronous evaluation can complete while the host holds the clock.
+    if (!grant) {
+        boat_net_server_grant(&local->server, now, 0);
+        if (!receive(local, now))
+            return false;
     }
     local->stats.chunks += chunks;
     local->stats.ticks += grant;

@@ -50,6 +50,8 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
   and resume, autosave watch) shared by `cargo_sandbox` and the game; no drawing, input or files.
   `src/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
+  `src/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
+  client mirror for the game (ledger L3).
 - `tools/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.
 - `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors

@@ -230,6 +230,12 @@ target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_p
   proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
+# L3: the working harbour's private local endpoint (authority session, client mirror, memory
+# transport). It links the work session's Lua; proteus_boat_net never links it.
+add_library(proteus_work_local STATIC src/boat_work_local.c src/boat_work_local.h)
+target_link_libraries(proteus_work_local PUBLIC proteus_work_session proteus_boat_net)
+target_compile_options(proteus_work_local PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
   src/boat_work_menu.c src/boat_work_menu.h)
 target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
@@ -340,7 +346,7 @@ else()
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
     tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c
     tools/wake_velocity_controls.c)
-  target_link_libraries(wake_velocity PRIVATE proteus_work_session)
+  target_link_libraries(wake_velocity PRIVATE proteus_work_session proteus_work_local)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
@@ -387,6 +393,17 @@ set(PROTEUS_BOAT_NET_SOURCES
 add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
 target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
 target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
+
+# AR6 (L0): private single player as a local authority and client, native and (L4a) browser. The
+# glue is a library so validate_boat_local drives the game's own code.
+add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
+  tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
+  tools/wake_velocity_voyage.h)
+target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
+  proteus_wake_objective)
+target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
+target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
 
 if(NOT EMSCRIPTEN)
   # ENet v1.3.18 (MIT, LICENSE in its source tree), pinned to the tag's commit. Its sources are
@@ -436,16 +453,6 @@ if(NOT EMSCRIPTEN)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  # AR6 (L0): private free boating as a local authority and client (native only for now). The
-  # glue is a library so validate_boat_local drives the game's own code.
-  add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
-    tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
-    tools/wake_velocity_voyage.h)
-  target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
-  target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
-    proteus_wake_objective)
-  target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
-  target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
   target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h
@@ -658,6 +665,12 @@ target_link_libraries(validate_app_input PRIVATE proteus_render)
 target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME app_input COMMAND validate_app_input)
 set_tests_properties(app_input PROPERTIES LABELS "cpu;quick")
+# L3: the working harbour on its private local endpoint against the direct session.
+add_executable(validate_boat_work_local tools/validate_boat_work_local.c)
+target_link_libraries(validate_boat_work_local PRIVATE proteus_work_local proteus_render
+  proteus_plugin_catalog)
+target_compile_options(validate_boat_work_local PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_work_local validate_boat_work_local LABELS core cpu)
 # The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
 add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
 target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
@@ -743,6 +756,22 @@ target_compile_options(validate_boat_audio PRIVATE
 add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 
 add_dependencies(wake_velocity proteus_assets)
+# D6 (ledger L8): developer studies (--wake-field, --player-wake, --no-player-wake,
+# --wake-objects-crossing) run on the direct path in wake_study, the game's own sources and
+# settings with WAKE_VELOCITY_STUDY. The game rejects those options and names this tool. It is a
+# developer build only: no package or release carries it.
+if(NOT EMSCRIPTEN)
+  get_target_property(WAKE_STUDY_SOURCES wake_velocity SOURCES)
+  add_executable(wake_study ${WAKE_STUDY_SOURCES})
+  foreach(property LINK_LIBRARIES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS COMPILE_OPTIONS)
+    get_target_property(value wake_velocity ${property})
+    if(value)
+      set_property(TARGET wake_study PROPERTY ${property} "${value}")
+    endif()
+  endforeach()
+  target_compile_definitions(wake_study PRIVATE WAKE_VELOCITY_STUDY=1)
+  add_dependencies(wake_study proteus_assets)
+endif()
 add_dependencies(title_backdrop proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
 add_test(NAME boat_race_plugin_preview COMMAND boat_race_trial
@@ -832,8 +861,8 @@ if(PROTEUS_GPU_TESTS)
     LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 120)
 endif()
 # Time trials ride the wake pool; only the scripted crossing boat stays free-boating only.
-add_test(NAME wake_objects_course_rejected COMMAND wake_velocity --wake-objects-crossing --course)
-add_test(NAME wake_objects_mixed_rejected COMMAND wake_velocity --wake-objects --wake-field)
+add_test(NAME wake_objects_course_rejected COMMAND wake_study --wake-objects-crossing --course)
+add_test(NAME wake_objects_mixed_rejected COMMAND wake_study --wake-objects --wake-field)
 add_test(NAME wake_objects_lifetime_rejected COMMAND wake_velocity --wake-objects --wake-life-ticks 1921)
 set_tests_properties(wake_objects_course_rejected wake_objects_mixed_rejected
   wake_objects_lifetime_rejected PROPERTIES WILL_FAIL TRUE)
@@ -846,9 +875,9 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(wake_candidate_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 180)
 endif()
-add_test(NAME wake_candidate_course_rejected COMMAND wake_velocity --wake-field --course)
-add_test(NAME wake_candidate_map_rejected COMMAND wake_velocity --wake-field --location outer)
-add_test(NAME wake_candidate_current_rejected COMMAND wake_velocity --wake-field --current)
+add_test(NAME wake_candidate_course_rejected COMMAND wake_study --wake-field --course)
+add_test(NAME wake_candidate_map_rejected COMMAND wake_study --wake-field --location outer)
+add_test(NAME wake_candidate_current_rejected COMMAND wake_study --wake-field --current)
 set_tests_properties(wake_candidate_course_rejected wake_candidate_map_rejected
   wake_candidate_current_rejected PROPERTIES WILL_FAIL TRUE)
 add_executable(validate_boat tools/validate_boat.c)
@@ -1438,10 +1467,16 @@ set_tests_properties(wake_velocity_plugin_location_rejected wake_velocity_plugin
 set_tests_properties(wake_velocity_plugin_screenshot wake_velocity_plugin_location_rejected
   wake_velocity_plugin_course_rejected wake_velocity_plugin_room_rejected
   wake_velocity_plugin_missing_rejected PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME boat_player_wake_screenshot COMMAND wake_velocity --renderer cpu --player-wake --time 9
+add_test(NAME boat_player_wake_screenshot COMMAND wake_study --renderer cpu --player-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake.png)
-add_test(NAME boat_player_wake_course_rejected COMMAND wake_velocity --player-wake --course)
+add_test(NAME boat_player_wake_course_rejected COMMAND wake_study --player-wake --course)
 set_tests_properties(boat_player_wake_course_rejected PROPERTIES WILL_FAIL TRUE)
+# D6 (L8): the game names wake_study for each developer study instead of running it.
+foreach(study wake-field player-wake no-player-wake wake-objects-crossing)
+  add_test(NAME wake_velocity_study_rejected.${study} COMMAND wake_velocity --${study})
+  set_tests_properties(wake_velocity_study_rejected.${study} PROPERTIES
+    PASS_REGULAR_EXPRESSION "--${study} is a developer study: run it with wake_study" LABELS quick)
+endforeach()
 add_test(NAME boat_current_screenshot COMMAND wake_velocity --renderer cpu --current --time 5
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-current.png)
 add_test(NAME boat_crossing_wake_screenshot COMMAND wake_velocity --renderer cpu --crossing-wake --time 9
@@ -1710,9 +1745,9 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME harbor_gpu_screenshot COMMAND harbor_review --renderer gpu --view marina
     --waves --time 2 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/harbor-marina-gpu.png)
   set_tests_properties(harbor_gpu_screenshot PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
-  add_test(NAME boat_player_wake_gpu_screenshot COMMAND wake_velocity --player-wake --time 9
+  add_test(NAME boat_player_wake_gpu_screenshot COMMAND wake_study --player-wake --time 9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu.png)
-  add_test(NAME boat_player_wake_gpu_aa_screenshot COMMAND wake_velocity --player-wake --current --waves
+  add_test(NAME boat_player_wake_gpu_aa_screenshot COMMAND wake_study --player-wake --current --waves
     --gpu-aa --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu-aa.png)
   set_tests_properties(boat_player_wake_gpu_screenshot boat_player_wake_gpu_aa_screenshot
     PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)

@@ -28,7 +28,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "boat_hunt_review: cannot load the outer map\n");
         return 1;
     }
-    static NetStudy net;
+    static WakeRoom net;
     BoatMarkSet *marks = &net.client.room.marks;
     net.client.room_valid = true;
     *marks = (BoatMarkSet) { .count = 2,
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     BoatPresentation presentation = { 0 };
     boat_presentation_step(&presentation, &boat, &world, 3);
     BoatViewState view = { .boat = boat, .time = 3 };
-    net_study_marks_view(&net, &view);
+    wake_room_marks_view(&net, &view);
     Renderer3D cpu = { 0 };
     BoatCpuView cpu_view = { .hour = 14, .hour_set = true };
     static Color pixels[WIDTH * HEIGHT];
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     Rectangle bounds = boat_minimap_bounds(&minimap, BOAT_MINIMAP_CORNER, WIDTH, HEIGHT);
     Texture2D chart_texture = LoadTextureFromImage(*chart);
     DrawTexture(chart_texture, (int)bounds.x, (int)bounds.y, WHITE);
-    net_study_draw_objective(&net, WIDTH - 12, (int)(bounds.y + bounds.height) + 6);
+    wake_room_draw_objective(&net, WIDTH - 12, (int)(bounds.y + bounds.height) + 6);
     // The labelled chart, for judging the marks' circles and names.
     chart = boat_minimap_compose(&minimap, BOAT_MINIMAP_CHART, NULL, boat.position, boat.heading);
     Rectangle large = boat_minimap_bounds(&minimap, BOAT_MINIMAP_CHART, WIDTH, HEIGHT);

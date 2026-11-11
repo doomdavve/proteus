@@ -1209,6 +1209,10 @@ bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
     if (!s->config.local.enabled)
         return false;
     handle_events(s, now);
+    if (s->config.rules.service) {
+        s->config.rules.service(s->config.rules.context, now);
+        objective_poll(s);
+    }
     for (unsigned n = 0; n < ticks; ++n) {
         // The hosted buckets refill 120 input and 2 spawn tokens per elapsed second: per granted
         // tick here, so 8x is not rate limited and a pause refills nothing.

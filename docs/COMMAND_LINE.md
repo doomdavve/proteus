@@ -222,17 +222,31 @@ compatibility.
 | `--wake-objects` | Rideable arcade wakes; default in free boating and time trials |
 | `--wake-height 0.1..3` | Arcade crest scale in metres; default 1.2 |
 | `--wake-life-ticks 240..1920` | Arcade wake lifetime at 120 Hz; default 1920 (16 seconds) |
-| `--wake-objects-crossing` | Basin rival sharing wake and hull contacts |
-| `--no-player-wake` | Visual-only player trail |
 | `--current` | Authored current, not measured local conditions |
 | `--crossing-wake` | Separate scripted passing boat and physical wake |
 
-Current, scripted crossing-wake and `--wake-objects-crossing` options reject
-courses/replays/ghosts. Courses ride the arcade wake pool and reject explicit player-wake modes. A deliberate
-reset clears player wakes and restarts scripted passages. The title's Gothenburg Harbour outing
+Current and scripted crossing-wake options reject courses/replays/ghosts. Courses ride the arcade
+wake pool. A deliberate reset clears player wakes and restarts scripted passages. The title's Gothenburg Harbour outing
 includes current, crossing wake and gentle waves; explicit launches use their supplied options.
 
-Legacy `--player-wake` and native basin-only `--wake-field` remain research options.
+### Developer studies (`wake_study`)
+
+`wake_study` is a developer build of the game's own sources (native only; no package or release
+carries it). It accepts every game option plus the wake studies below, which run on the direct
+solo path rather than the local authority. `wake_velocity` rejects these options and names
+`wake_study` (architecture decision D6).
+
+| Option | Behavior |
+| --- | --- |
+| `--wake-objects-crossing` | Basin rival sharing wake and hull contacts; free boating only |
+| `--no-player-wake` | Visual-only player trail |
+| `--player-wake` | Legacy D3 trail (research); free boating only |
+| `--wake-field` | Coherent CPU field, still-water basin free boating only (research) |
+
+```sh
+./build/wake_study --renderer cpu --player-wake --time 9 --screenshot build/player-wake.png
+```
+
 Their historical behavior, restrictions and measurements live in the
 [wake rewrite plan](WAKE_REWRITE_PLAN.md), [field results](WAKE_CANDIDATE_RESULTS.md)
 and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable in browsers.

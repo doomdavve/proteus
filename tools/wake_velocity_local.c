@@ -44,6 +44,7 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
     local->objective = (WakeObjectiveView) { 0 };
     if (local->voyage_active) {
         wake_voyage_init(&local->voyage, session, 0);
+        local->voyage.worker = local->worker;
         wake_voyage_revision(&local->voyage, local->revision, local->generation, session->tick,
             local->resolve, local->resolve_context);
         config.rules = wake_voyage_rules(&local->voyage);
@@ -150,11 +151,40 @@ static bool run(WakeLocal *local, BoatSession *session, ObjectStudy *objects, un
     return ok;
 }
 
+// L4b: an objective the authority evaluates on its isolated worker.
+static bool isolated(const WakeLocal *local)
+{
+    return local->worker && local->voyage_active && local->revision
+        && local->revision->voyage.manifest.objective;
+}
+
+bool wake_local_waiting(const WakeLocal *local)
+{
+    return local->active && isolated(local)
+        && (!local->objective.valid || local->objective.pending);
+}
+
+// The frame's grant from ACCUMULATOR; see wake_local_frame.
+static unsigned frame_grant(const WakeLocal *local, double *accumulator)
+{
+    if (wake_local_waiting(local)) {
+        *accumulator = 0;
+        return 0;
+    }
+    unsigned most = BOAT_LOCAL_MAX_GRANT;
+    if (isolated(local)) {
+        unsigned left
+            = WAKE_OBJECTIVE_CADENCE - (unsigned)(local->local.tick % WAKE_OBJECTIVE_CADENCE);
+        most = left < most ? left : most;
+    }
+    return boat_time_grant(accumulator, most);
+}
+
 bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
     BoatFrameMetrics *metrics)
 {
-    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
+    unsigned grant = frame_grant(local, accumulator);
     return run(
         local, session, objects, grant, input, thrust_target, steering_target, false, now, metrics);
 }
@@ -162,7 +192,7 @@ bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objec
 bool wake_local_scripted_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     double *accumulator, double now, BoatFrameMetrics *metrics)
 {
-    unsigned grant = boat_time_grant(accumulator, BOAT_LOCAL_MAX_GRANT);
+    unsigned grant = frame_grant(local, accumulator);
     return run(local, session, objects, grant, (BoatInput) { 0 }, NAN, NAN, true, now, metrics);
 }
 
@@ -241,6 +271,7 @@ void wake_local_close(WakeLocal *local)
 {
     boat_local_stop(&local->local);
     wake_course_destroy(&local->course);
+    wake_voyage_close(&local->voyage);
     local->active = local->course_active = local->voyage_active = false;
     local->voyage.objective.trace_count = 0; // The session's inspection history ends with it.
 }

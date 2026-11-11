@@ -8,12 +8,14 @@
  * recorder beside the local authority's course adapter, with equal course state, runs, bests,
  * notices and save requests after every frame. The L1 cases run a voyage or tour: the direct
  * session's own voyage beside the authority's voyage adapter, with equal voyage state, weather
- * and boats through a recovery.
- * Frame time is a scripted value, never wall time. `--bench` reports per-frame cost (not a test).
+ * and boats through a recovery. The L4b isolated cases run the authority's objective on a C model
+ * of the browser's worker beside the native authority, tick for tick. Frame time is a scripted
+ * value, never wall time. `--bench` reports per-frame cost (not a test).
  */
 #include "boat_fixtures.h"
 #include "boat_helm.h"
 #include "boat_local.h"
+#include "boat_plugin_eval.h"
 #include "boat_test_cases.h"
 #include "boat_test_world.h"
 #include "boat_time_control.h"
@@ -2006,6 +2008,284 @@ static int bench(void)
     return 0;
 }
 
+// L4b: the browser's isolated objective evaluator as a C model. Jobs answer only when a case
+// replies, through boat_plugin_eval_execute (the worker's own evaluation).
+enum { MODEL_JOBS = 4 };
+static struct {
+    unsigned id[MODEL_JOBS], next;
+    unsigned char *request[MODEL_JOBS];
+    unsigned request_size[MODEL_JOBS];
+    int status[MODEL_JOBS];
+    unsigned char *reply[MODEL_JOBS];
+    unsigned reply_size[MODEL_JOBS];
+    unsigned started, closed;
+} model;
+
+static int model_slot(unsigned job)
+{
+    for (int i = 0; i < MODEL_JOBS; ++i)
+        if (job && model.id[i] == job)
+            return i;
+    return -1;
+}
+
+static unsigned model_start(const unsigned char *bytes, unsigned size)
+{
+    int i = 0;
+    for (; i < MODEL_JOBS && model.id[i]; ++i)
+        ;
+    if (i == MODEL_JOBS)
+        return 0;
+    static unsigned char requests[MODEL_JOBS][BOAT_PLUGIN_EVAL_REQUEST_MAX];
+    static unsigned char replies[MODEL_JOBS][BOAT_PLUGIN_EVAL_REPLY_MAX];
+    model.id[i] = ++model.next;
+    model.request[i] = requests[i];
+    model.reply[i] = replies[i];
+    memcpy(requests[i], bytes, size);
+    model.request_size[i] = size;
+    model.status[i] = 0;
+    ++model.started;
+    return model.id[i];
+}
+
+static int model_status(unsigned job)
+{
+    int i = model_slot(job);
+    return i < 0 ? -1 : model.status[i];
+}
+
+static int model_read(unsigned job, unsigned char *bytes)
+{
+    int i = model_slot(job);
+    if (i < 0 || model.status[i] != 1)
+        return -1;
+    memcpy(bytes, model.reply[i], model.reply_size[i]);
+    return (int)model.reply_size[i];
+}
+
+static void model_close(unsigned job)
+{
+    int i = model_slot(job);
+    if (i >= 0) {
+        model.id[i] = 0;
+        ++model.closed;
+    }
+}
+
+static const WakeObjectiveWorker model_worker
+    = { model_start, model_status, model_read, model_close };
+
+static unsigned model_open(void)
+{
+    unsigned open = 0;
+    for (unsigned i = 0; i < MODEL_JOBS; ++i)
+        open += model.id[i] != 0;
+    return open;
+}
+
+// Answer every open job.
+static void model_reply_all(void)
+{
+    for (unsigned i = 0; i < MODEL_JOBS; ++i)
+        if (model.id[i] && !model.status[i]) {
+            size_t size = boat_plugin_eval_execute(model.request[i], model.request_size[i],
+                model.reply[i], BOAT_PLUGIN_EVAL_REPLY_MAX);
+            model.reply_size[i] = (unsigned)size;
+            model.status[i] = size ? 1 : -1;
+        }
+}
+
+// The isolated session beside GAME (the native authority): the same revision and route, each
+// tick's helm from the same script, so both reach every tick in the same state however their
+// frames divide it.
+static WakeLocal isolated_game;
+static Play isolated_play;
+
+static BoatInput full_ahead(void *context, const Boat *predicted, uint64_t tick)
+{
+    (void)context, (void)tick;
+    return boat_helm_input(predicted, (BoatInput) { 0 }, 1, NAN);
+}
+
+static const BoatLocalScript full_ahead_script = { NULL, full_ahead };
+
+static int open_isolated(bool failing)
+{
+    objective_revision = objective_test(failing);
+    if (open_voyage(OUTER, false))
+        return 1;
+    memset(&model, 0, sizeof(model));
+    game.script = &full_ahead_script;
+    wake_local_close(&isolated_game);
+    voyage_open(&isolated_play);
+    isolated_game.revision = objective_revision;
+    isolated_game.generation = 1;
+    isolated_game.worker = &model_worker;
+    isolated_game.script = &full_ahead_script;
+    CHECK(wake_local_open(
+        &isolated_game, &isolated_play.session, &isolated_play.objects, worlds(), now));
+    // INIT is in flight, and the host holds the clock until the client has seen its result.
+    CHECK(model_open() == 1 && wake_local_waiting(&isolated_game));
+    return 0;
+}
+
+// The native session's scripted frames up to the isolated one's tick.
+static int catch_up(void)
+{
+    while (lp->tick < isolated_game.local.tick) {
+        uint64_t left = isolated_game.local.tick - lp->tick;
+        double seconds = (double)(left < BOAT_LOCAL_MAX_GRANT ? left : BOAT_LOCAL_MAX_GRANT)
+                * BOAT_TICK_SECONDS
+            + BOAT_TICK_SECONDS / 2;
+        CHECK(wake_local_scripted_frame(&game, &play.session, &play.objects, &seconds, now, NULL));
+    }
+    CHECK(lp->tick == isolated_game.local.tick);
+    return 0;
+}
+
+// Both authorities' boats, voyages and objectives agree (an isolated evaluation in flight has no
+// result to compare yet).
+static bool same_isolated(void)
+{
+    const WakeObjective *a = &game.voyage.objective, *b = &isolated_game.voyage.objective;
+    if (memcmp(&lp->server.fleet.state.slots[0].boat,
+            &isolated_game.local.server.fleet.state.slots[0].boat, sizeof(Boat))
+        || memcmp(&play.session.voyage, &isolated_play.session.voyage, sizeof(BoatVoyage)))
+        return false;
+    if (isolated_game.voyage.job.job)
+        return true;
+    return boat_plugin_objective_digest(&a->objective)
+        == boat_plugin_objective_digest(&b->objective)
+        && a->objective.quarantined == b->objective.quarantined
+        && a->objective_pending == b->objective_pending
+        && (!a->objective_pending
+            || boat_plugin_objective_digest(&a->staged_objective)
+                == boat_plugin_objective_digest(&b->staged_objective))
+        && a->event_count == b->event_count && same_trace(a, b)
+        && !strcmp(a->objective_diagnostic.message, b->objective_diagnostic.message);
+}
+
+// FRAMES isolated frames at SPEED; the model answers each job LAG frames after it started.
+static int isolated_drive(unsigned frames, int speed, unsigned lag, unsigned *held)
+{
+    unsigned waited = 0;
+    for (unsigned n = 0; n < frames; ++n) {
+        uint64_t tick = isolated_game.local.tick;
+        bool waiting = wake_local_waiting(&isolated_game);
+        isolated_play.accumulator += boat_time_frame_seconds(1.0 / 60, speed);
+        now += 1.0 / 60;
+        CHECK(wake_local_scripted_frame(&isolated_game, &isolated_play.session,
+            &isolated_play.objects, &isolated_play.accumulator, now, NULL));
+        if (waiting) {
+            // A held frame grants nothing; a grant never crosses an update boundary.
+            CHECK(isolated_game.local.tick == tick && isolated_play.accumulator == 0);
+            ++*held;
+        }
+        CHECK(isolated_game.local.tick / 12 - tick / 12 <= 1
+            && (isolated_game.local.tick % 12 == 0 || isolated_game.local.tick / 12 == tick / 12));
+        CHECK(!strstr(isolated_game.voyage.objective.objective_diagnostic.message, "overrun"));
+        if (model_open() && ++waited > lag) {
+            model_reply_all();
+            waited = 0;
+        }
+        if (catch_up())
+            return 1;
+        CHECK(same_isolated());
+    }
+    return 0;
+}
+
+static void close_isolated(void)
+{
+    wake_local_close(&isolated_game);
+    objective_revision = NULL;
+    game.revision = NULL;
+    game.script = NULL;
+}
+
+// L4b: the authority evaluates the objective on the isolated worker and stays equal to the native
+// authority tick for tick; the host holds the clock at each boundary until the result arrives, and
+// the client's HUD follows.
+static int isolated_objective(void)
+{
+    unsigned held = 0;
+    int failed = open_isolated(false) || isolated_drive(240, BOAT_TIME_NORMAL, 0, &held)
+        || isolated_drive(200, BOAT_TIME_NORMAL, 3, &held)
+        || isolated_drive(300, BOAT_TIME_MAX_INDEX, 1, &held);
+    if (!failed) {
+        const WakeObjective *b = &isolated_game.voyage.objective;
+        CHECK(held > 40 && model.started > 20 && !b->objective.quarantined);
+        CHECK(isolated_game.objective.valid && isolated_game.objective.hud_count == 3);
+        CHECK(isolated_game.objective.hud[0].value >= 1);
+        printf("isolated: %u jobs, %u held frames, tick %llu, reached %lld\n", model.started, held,
+            (unsigned long long)isolated_game.local.tick,
+            (long long)isolated_game.objective.hud[0].value);
+        // A restart is a new generation: the job in flight closes and INIT starts again.
+        uint64_t closed = model.closed;
+        isolated_drive(1, BOAT_TIME_NORMAL, 100, &held);
+        play_restart(&isolated_play);
+        CHECK(wake_local_restart(
+            &isolated_game, &isolated_play.session, &isolated_play.objects, now));
+        CHECK(model_open() == 1 && wake_local_waiting(&isolated_game) && model.closed >= closed);
+        wake_local_close(&isolated_game);
+        CHECK(model_open() == 0);
+    }
+    close_isolated();
+    return failed;
+}
+
+// L4b: a failing callback on the worker quarantines the objective at the same boundary as the
+// native authority, with the same text, and the voyage continues ungated.
+static int isolated_quarantine(void)
+{
+    unsigned held = 0;
+    int failed = open_isolated(true) || isolated_drive(600, BOAT_TIME_MAX_INDEX, 1, &held);
+    if (!failed) {
+        CHECK(isolated_game.voyage.objective.objective.quarantined);
+        CHECK(isolated_game.objective.suspended && !wake_local_waiting(&isolated_game));
+        CHECK(strstr(isolated_game.objective.message, "storm in the objective"));
+    }
+    close_isolated();
+    return failed;
+}
+
+// L4b: a worker that never answers quarantines the objective after the deadline (elapsed time,
+// virtual here), and play resumes; a tick granted past a pending boundary is an overrun.
+static int isolated_deadline(void)
+{
+    if (open_isolated(false))
+        return 1;
+    unsigned held = 0;
+    for (unsigned n = 0; n < 400 && wake_local_waiting(&isolated_game); ++n) {
+        isolated_play.accumulator += 1.0 / 60;
+        now += 1.0 / 60;
+        CHECK(wake_local_scripted_frame(&isolated_game, &isolated_play.session,
+            &isolated_play.objects, &isolated_play.accumulator, now, NULL));
+        ++held;
+    }
+    CHECK(isolated_game.local.tick == 0 && held > 280 && held < 320);
+    CHECK(isolated_game.objective.suspended && model_open() == 0);
+    CHECK(strstr(isolated_game.objective.message, "isolated objective deadline"));
+    isolated_play.accumulator = 0.1;
+    CHECK(wake_local_scripted_frame(&isolated_game, &isolated_play.session, &isolated_play.objects,
+              &isolated_play.accumulator, now, NULL)
+        && isolated_game.local.tick > 0);
+    // Overrun: a fresh session answered INIT, then the host grants past a pending boundary.
+    if (open_isolated(false))
+        return 1;
+    model_reply_all();
+    isolated_play.accumulator = 0;
+    CHECK(wake_local_scripted_frame(&isolated_game, &isolated_play.session, &isolated_play.objects,
+        &isolated_play.accumulator, now, NULL));
+    CHECK(!wake_local_waiting(&isolated_game));
+    CHECK(boat_local_frame_scripted(&isolated_game.local, now, 24, &full_ahead_script, NULL));
+    CHECK(isolated_game.voyage.objective.objective.quarantined && model_open() == 0);
+    CHECK(strstr(isolated_game.voyage.objective.objective_diagnostic.message,
+        "objective evaluation overrun"));
+    close_isolated();
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--bench")) {
@@ -2050,6 +2330,9 @@ int main(int argc, char **argv)
         SLOW_CASE(authoring_trace),
         TEST_CASE(voyage_state),
         TEST_CASE(recover_ignored),
+        SLOW_CASE(isolated_objective),
+        SLOW_CASE(isolated_quarantine),
+        TEST_CASE(isolated_deadline),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     boat_local_stop(lp);

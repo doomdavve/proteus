@@ -54,6 +54,17 @@ typedef struct {
 #define BOAT_NET_PRIVATE_INSPECTION_CHUNK 1024
 #define BOAT_NET_PRIVATE_INSPECTION_BYTES 32768
 
+// L3: the working harbour's private endpoint (src/boat_work_local.h). Its payloads are opaque to
+// the protocol; the work endpoint's own codec reads them. All four travel on the reliable control
+// channel. C->S: the frame's actions, helm targets and crane axes, applied before its first tick.
+#define BOAT_NET_PRIVATE_WORK_FRAME 0xc6
+// S->C: one committed tick's motion (boat, crate, cranes, clock, trail segments); HEADER.tick.
+#define BOAT_NET_PRIVATE_WORK_MOTION 0xc7
+// S->C: the job's HUD, notice and waiting text after a chunk, when they changed.
+#define BOAT_NET_PRIVATE_WORK_STATUS 0xc8
+// S->C: a page of the wake trail, sent with every (re)start's checkpoint.
+#define BOAT_NET_PRIVATE_WORK_TRAIL 0xc9
+
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
 // The InputBatch BATCH with each command's float rates (BoatNetCommand.steering_rate and
@@ -101,5 +112,14 @@ size_t boat_net_private_encode_commit(const BoatNetHeader *header, uint32_t revi
 // Decode a private commit request. Never writes the destinations on failure.
 BoatNetError boat_net_private_decode_commit(
     const uint8_t *data, size_t size, BoatNetHeader *header, uint32_t *revision, uint8_t *change);
+
+// L3: a private message of TYPE carrying SIZE (at most BOAT_NET_MAX_PAYLOAD) opaque bytes;
+// HEADER's type is ignored. Zero for an invalid size or a type outside the private range.
+size_t boat_net_private_encode_payload(const BoatNetHeader *header, uint8_t type,
+    const uint8_t *payload, size_t size, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode a private message of TYPE into PAYLOAD (BOAT_NET_MAX_PAYLOAD bytes) and *SIZE. Never
+// writes them on failure.
+BoatNetError boat_net_private_decode_payload(const uint8_t *data, size_t size, uint8_t type,
+    BoatNetHeader *header, uint8_t payload[BOAT_NET_MAX_PAYLOAD], size_t *payload_size);
 
 #endif

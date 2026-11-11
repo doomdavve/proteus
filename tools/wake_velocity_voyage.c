@@ -1,9 +1,56 @@
 #include "wake_velocity_voyage.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 enum { EXPOSED = 1, ARRIVED = 2, TOO_FAST = 4, OBSERVED = 8, WEATHER = 16 };
+
+#ifdef __EMSCRIPTEN__
+// The browser evaluates objectives only through its isolated worker (L4b): the game always gives
+// the adapter one, and a migration (authoring) does not reach the browser's authority yet.
+static bool wake_objective_migrate(WakeObjective *run, const BoatPluginRevision *candidate,
+    unsigned active, uint64_t tick, BoatPluginObjective *migrated)
+{
+    (void)candidate, (void)active, (void)tick, (void)migrated;
+    snprintf(run->objective_diagnostic.message, sizeof(run->objective_diagnostic.message),
+        "the browser's local authority runs no migration");
+    return false;
+}
+#endif
+
+// INIT of REVISION's objective at TICK: on the isolated worker when the adapter has one (the
+// result arrives in a later service), otherwise at once.
+static void init_objective(
+    WakeVoyageAuthority *v, const BoatPluginRevision *revision, uint64_t tick)
+{
+    if (v->worker) {
+        wake_objective_begin(&v->objective, &v->job, v->worker, BOAT_PLUGIN_OBJECTIVE_INIT,
+            revision, v->objective.generation, tick, v->now);
+        return;
+    }
+#ifdef __EMSCRIPTEN__
+    v->objective.objective.quarantined = true;
+    v->objective.objective_diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
+    snprintf(v->objective.objective_diagnostic.message,
+        sizeof(v->objective.objective_diagnostic.message), "no isolated objective evaluator");
+#else
+    wake_objective_init(&v->objective, revision, tick);
+#endif
+}
+
+// The update at boundary TICK, as init_objective runs INIT.
+static void update_objective(WakeVoyageAuthority *v, uint64_t tick)
+{
+    if (v->worker) {
+        wake_objective_begin(&v->objective, &v->job, v->worker, BOAT_PLUGIN_OBJECTIVE_UPDATE,
+            v->revision, v->objective.generation, tick, v->now);
+        return;
+    }
+#ifndef __EMSCRIPTEN__
+    wake_objective_update(&v->objective, v->revision, tick);
+#endif
+}
 
 void wake_voyage_init(WakeVoyageAuthority *voyage, const BoatSession *session, unsigned slot)
 {
@@ -12,7 +59,11 @@ void wake_voyage_init(WakeVoyageAuthority *voyage, const BoatSession *session, u
     static WakePluginTrace trace[WAKE_PLUGIN_TRACE];
     unsigned trace_count = voyage->objective.trace_count;
     memcpy(trace, voyage->objective.trace, sizeof(trace));
+    wake_objective_cancel(&voyage->job, voyage->worker); // A new generation answers nothing old.
+    const WakeObjectiveWorker *worker = voyage->worker;
     memset(voyage, 0, sizeof(*voyage));
+    voyage->worker = worker;
+    voyage->now = NAN; // The first service's; a job's deadline counts from it.
     memcpy(voyage->objective.trace, trace, sizeof(trace));
     voyage->objective.trace_count = trace_count;
     voyage->slot = slot;
@@ -30,7 +81,12 @@ void wake_voyage_revision(WakeVoyageAuthority *voyage, const BoatPluginRevision 
         return;
     voyage->objective.generation = generation - 1; // Clearing advances it to GENERATION.
     if (wake_objective_clear(&voyage->objective, revision, tick))
-        wake_objective_init(&voyage->objective, revision, tick);
+        init_objective(voyage, revision, tick);
+}
+
+void wake_voyage_close(WakeVoyageAuthority *voyage)
+{
+    wake_objective_cancel(&voyage->job, voyage->worker);
 }
 
 // The voyage's events of TICK into the objective, and the update when TICK is a boundary.
@@ -38,7 +94,7 @@ static void observe(WakeVoyageAuthority *v, uint64_t tick)
 {
     if (v->revision && v->objective.objective.initialized
         && wake_objective_queue(&v->objective, v->revision, tick, &v->events))
-        wake_objective_update(&v->objective, v->revision, tick);
+        update_objective(v, tick);
 }
 
 // Run on the authority after each committed tick, as boat_session_step observes the voyage. The
@@ -47,6 +103,16 @@ static void observe(WakeVoyageAuthority *v, uint64_t tick)
 static void committed(void *context, uint64_t tick, const BoatFleet *fleet)
 {
     WakeVoyageAuthority *v = context;
+    if (v->job.job) {
+        // The host granted a tick past an unanswered boundary (L4-1 forbids it): the batch for
+        // this tick never arrived, so the objective cannot continue.
+        wake_objective_cancel(&v->job, v->worker);
+        v->objective.objective.quarantined = true;
+        v->objective.objective_pending = false;
+        v->objective.objective_diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
+        snprintf(v->objective.objective_diagnostic.message,
+            sizeof(v->objective.objective_diagnostic.message), "objective evaluation overrun");
+    }
     if (v->revision)
         wake_objective_before_tick(&v->objective);
     const Boat *boat = &fleet->state.slots[v->slot].boat;
@@ -158,8 +224,9 @@ static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t number,
             result->moved = true;
         }
         v->revision = next;
+        wake_objective_cancel(&v->job, v->worker);
         if (wake_objective_clear(&v->objective, next, tick))
-            wake_objective_init(&v->objective, next, tick);
+            init_objective(v, next, tick);
         return true;
     }
     v->revision = next;
@@ -228,11 +295,13 @@ static size_t private_state(void *context, uint8_t *out)
     put32(&p, v->commit);
     put32(&p, v->commits);
     *p++ = (uint8_t)v->commit_status;
+    *p++ = v->job.job != 0;
     const char *message = v->objective.objective.quarantined
         ? v->objective.objective_diagnostic.message
         : v->commit_status == WAKE_COMMIT_FAILED ? v->commit_message
                                                  : "";
-    size_t length = strnlen(message, sizeof(v->commit_message) - 1);
+    const char *end = memchr(message, 0, sizeof(v->commit_message) - 1);
+    size_t length = end ? (size_t)(end - message) : sizeof(v->commit_message) - 1;
     *p++ = (uint8_t)length;
     memcpy(p, message, length);
     return size + WAKE_VOYAGE_OBJECTIVE_BYTES + length;
@@ -248,6 +317,15 @@ static size_t inspect(void *context, char *out, size_t capacity)
     return wake_objective_inspect(&v->objective, v->revision->number, out, capacity, &first);
 }
 
+// L4b: collect the isolated evaluation's reply, if it arrived; the server reads the HUD next.
+static void service(void *context, double now)
+{
+    WakeVoyageAuthority *v = context;
+    v->now = now;
+    if (v->job.job)
+        wake_objective_poll(&v->objective, &v->job, v->worker, now);
+}
+
 BoatNetRules wake_voyage_rules(WakeVoyageAuthority *voyage)
 {
     return (BoatNetRules) { .context = voyage,
@@ -257,7 +335,8 @@ BoatNetRules wake_voyage_rules(WakeVoyageAuthority *voyage)
         .commit = commit,
         .inspect = inspect,
         .weather = weather,
-        .recover = recover };
+        .recover = recover,
+        .service = service };
 }
 
 // The voyage's bytes alone, or followed by a well-formed objective tail.
@@ -274,7 +353,8 @@ bool wake_voyage_objective_view(
 {
     size_t tail = WAKE_VOYAGE_STATE_BYTES + WAKE_VOYAGE_OBJECTIVE_BYTES;
     if (!state || size < tail || !voyage_size(state, size)
-        || state[tail - 1] >= sizeof(view->message) || state[tail - 2] > WAKE_COMMIT_FAILED)
+        || state[tail - 1] >= sizeof(view->message) || state[tail - 2] > 1
+        || state[tail - 3] > WAKE_COMMIT_FAILED)
         return false;
     const uint8_t *p = state + WAKE_VOYAGE_STATE_BYTES;
     WakeObjectiveView next = { .valid = true };
@@ -283,6 +363,7 @@ bool wake_voyage_objective_view(
     next.commit = get32(&p);
     next.commits = get32(&p);
     next.commit_status = (WakeCommitStatus)*p++;
+    next.pending = *p++ != 0;
     size_t length = *p++;
     memcpy(next.message, p, length);
     next.message[length] = 0;

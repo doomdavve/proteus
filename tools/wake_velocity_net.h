@@ -9,7 +9,10 @@
 #include "boat_session.h"
 #include "boat_view.h"
 
-// wake_velocity --connect (multiplayer M4 in progress): the session's boat, clock and water show
+// The room client of wake_velocity --connect and --host: a BoatNetClient of a hosted authority.
+// Private sessions use the same client library through wake_velocity_local.c, which presents only
+// the own boat from prediction; a room also presents remote boats and the room's HUDs, so the two
+// glues stay separate by design (architecture plan L5-1). The session's boat, clock and water show
 // the client's predicted fleet, so the own boat answers the keys at once. Corrections move the
 // physical state immediately; the drawn poses blend small ones away over about 120 ms. Every
 // other boat is drawn from authoritative snapshots about 100 ms behind the estimated server
@@ -38,54 +41,54 @@ typedef struct {
     BoatRemoteProximity proximity[BOAT_FLEET_SLOTS];
     uint64_t samples[BOAT_REMOTE_HELD + 1], near_frames, frames; // Other-boat diagnostics.
     char failure[200]; // Why connecting failed or the connection ended (also printed).
-} NetStudy;
+} WakeRoom;
 
 // Connect, handshake and install the world (blocking, at most ten seconds). On failure print
 // the reason and return false.
 // WORLDS holds BOAT_LOCATION_COUNT owners indexed by location; the room picks one, which
-// SESSION and the client borrow until net_study_close().
-bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
+// SESSION and the client borrow until wake_room_close().
+bool wake_room_connect(WakeRoom *net, const char *endpoint, const char *name, const char *token,
     const BoatWorldResources *worlds, BoatSession *session);
 // Finish joining once the window, renderer and audio are ready. A windowed client holds its
 // READY until here so the authority does not queue reliable spawn traffic during startup.
-bool net_study_ready(NetStudy *net);
+bool wake_room_ready(WakeRoom *net);
 // One displayed frame: service the network with this frame's controls and update the view.
 // False when the connection ended (the reason was printed).
-bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float thrust_target,
+bool wake_room_frame(WakeRoom *net, BoatSession *session, BoatInput input, float thrust_target,
     float steering_target, bool active, bool reset);
 // The other boats as rival views at TIME, each with its slot's skin.
-void net_study_rivals(const NetStudy *net, double time, BoatRivals *rivals);
+void wake_room_rivals(const WakeRoom *net, double time, BoatRivals *rivals);
 // A slot's skin: the same on every client.
-unsigned net_study_skin(unsigned slot);
+unsigned wake_room_skin(unsigned slot);
 // The own boat's reset, spawn or (in a deathmatch) capsize notice (NULL when there is none), and
 // the opacity of the short fade from dark that hides the camera cut to a new life.
-const char *net_study_notice(const NetStudy *net);
-float net_study_fade(const NetStudy *net);
+const char *wake_room_notice(const WakeRoom *net);
+float wake_room_fade(const WakeRoom *net);
 // One HUD line: slot, players, round trip and staleness.
-const char *net_study_status(const NetStudy *net);
+const char *wake_room_status(const WakeRoom *net);
 // The room's players, one right-aligned line each; returns the y below the last line.
-int net_study_draw_roster(const NetStudy *net, int right, int top);
+int wake_room_draw_roster(const WakeRoom *net, int right, int top);
 // A deathmatch room (docs/DEATHMATCH_PLAN.md) has sent its scoreboard.
-bool net_study_deathmatch(const NetStudy *net);
+bool wake_room_deathmatch(const WakeRoom *net);
 // A race room (docs/RACE_PLAN.md) has sent its state.
-bool net_study_race(const NetStudy *net);
+bool wake_room_race(const WakeRoom *net);
 // Fill VIEW's race markers: the course lines and the own next gate.
-void net_study_race_view(const NetStudy *net, BoatViewState *view);
+void wake_room_race_view(const WakeRoom *net, BoatViewState *view);
 // Point VIEW at the room's objective marks (none when the room has none).
-void net_study_marks_view(const NetStudy *net, BoatViewState *view);
+void wake_room_marks_view(const WakeRoom *net, BoatViewState *view);
 // P5d: the room objective's rows as "LABEL value" lines in a panel whose right edge is RIGHT and
 // whose top is TOP, at window resolution. Draws nothing without an ObjectiveState; a suspended
 // objective shows OBJECTIVE SUSPENDED. Returns the y below the panel (TOP when nothing is drawn).
-int net_study_draw_objective(const NetStudy *net, int right, int top);
-void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
+int wake_room_draw_objective(const WakeRoom *net, int right, int top);
+void wake_room_combat_hud(const WakeRoom *net, int width, int height, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera);
 // Deathmatch HUD at window resolution: round clock and own score at HEADER_TOP, a kill feed
 // below FEED_TOP at the right, and the scoreboard while SCOREBOARD is held or between rounds.
-void net_study_draw_match(
-    const NetStudy *net, int width, int height, int header_top, int feed_top, bool scoreboard);
+void wake_room_draw_match(
+    const WakeRoom *net, int width, int height, int header_top, int feed_top, bool scoreboard);
 // Race HUD at window resolution: phase, clock, live position and next gate at the top centre,
 // a large countdown, finishes and retirements below FEED_TOP at the right, and the standings
 // while BOARD is held or during results.
-void net_study_draw_race(const NetStudy *net, int width, int height, int feed_top, bool board);
-void net_study_close(NetStudy *net);
+void wake_room_draw_race(const WakeRoom *net, int width, int height, int feed_top, bool board);
+void wake_room_close(WakeRoom *net);
 #endif

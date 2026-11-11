@@ -47,8 +47,8 @@
 #include "boat_server.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_host.h"
-#include "wake_velocity_local.h"
 #endif
+#include "wake_velocity_local.h"
 #include "wake_velocity_net.h"
 #endif
 #include "boat_screen.h"
@@ -121,6 +121,23 @@ static void draw_touch_controls(
     boat_ui_text(status, 4, button_height + 7, 10, palette.text);
 }
 
+// D6 (ledger L8): developer studies run on the direct path in their own executable, wake_study,
+// built from this file; the game names it instead of running them.
+static bool study_option(const char *argument)
+{
+#ifdef WAKE_VELOCITY_STUDY
+    (void)argument;
+    return false;
+#else
+    static const char *const study_options[]
+        = { "--wake-field", "--player-wake", "--no-player-wake", "--wake-objects-crossing" };
+    for (size_t i = 0; i < sizeof(study_options) / sizeof(study_options[0]); ++i)
+        if (!strcmp(argument, study_options[i]))
+            return true;
+    return false;
+#endif
+}
+
 static void usage(void)
 {
     puts("Usage: wake_velocity [MODE] [OPTIONS]\n"
@@ -162,13 +179,16 @@ static void usage(void)
     cli_usage_line(stdout, "--wake-objects", "Rideable arcade wakes (default in free boating)");
     cli_usage_line(stdout, "--wake-height M", "Crest scale 0.1..3 (default 1.2)");
     cli_usage_line(stdout, "--wake-life-ticks N", "Lifetime at 120 Hz, 240..1920 (default 1920)");
+    cli_usage_line(stdout, "--current", "Authored current, not measured local conditions");
+    cli_usage_line(stdout, "--crossing-wake", "Scripted passing boat and physical wake");
+#ifdef WAKE_VELOCITY_STUDY
+    cli_usage_section(stdout, "DEVELOPER STUDIES (wake_study only)");
     cli_usage_line(
         stdout, "--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
     cli_usage_line(stdout, "--no-player-wake", "Visual-only player trail");
-    cli_usage_line(stdout, "--current", "Authored current, not measured local conditions");
-    cli_usage_line(stdout, "--crossing-wake", "Scripted passing boat and physical wake");
     cli_usage_line(stdout, "--player-wake", "Legacy D3 trail (research)");
     cli_usage_line(stdout, "--wake-field", "Coherent CPU field, native basin only (research)");
+#endif
 
     cli_usage_section(stdout, "CAMERA AND DISPLAY");
     cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; outer 12)");
@@ -400,7 +420,7 @@ static void course_runs_hud(
 }
 
 #ifdef PROTEUS_BOAT_NET
-static NetStudy net_study; // Outlives a session so the title can show why it ended.
+static WakeRoom wake_room; // Outlives a session so the title can show why it ended.
 #if !defined(__EMSCRIPTEN__)
 static NetHost net_host; // The room this session started with --host, if any.
 #endif
@@ -520,7 +540,7 @@ static bool apply_screen_layout(BoatGpu *gpu, BoatScreenLayout layout)
             &gpu->scene, layout.reflection_width, layout.reflection_height);
 }
 
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#ifdef PROTEUS_BOAT_NET
 // L1b: the plugin's local authority. The host commits revisions and asks for inspections through
 // these; the authority resolves revisions in the host's table.
 typedef struct {
@@ -621,7 +641,7 @@ static int study(int argc, char **argv)
     const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
     const char *work_review_pose_name = NULL; // --work-review-pose: developer bounded fixture.
 #ifdef PROTEUS_BOAT_NET
-    NetStudy *net = NULL;
+    WakeRoom *net = NULL;
 #endif
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--help") == 0) {
@@ -686,6 +706,12 @@ static int study(int argc, char **argv)
             performance_capture = false;
         } else if (strcmp(argv[i], "--no-vsync") == 0) {
             vsync = false;
+        } else if (study_option(argv[i])) {
+            fprintf(stderr,
+                "%s is a developer study: run it with wake_study, built beside wake_velocity "
+                "(./build/wake_study %s).\n",
+                argv[i], argv[i]);
+            return 1;
         } else if (strcmp(argv[i], "--wake-field") == 0) {
             wake_field = true;
         } else if (strcmp(argv[i], "--wake-objects") == 0) {
@@ -1082,7 +1108,7 @@ static int study(int argc, char **argv)
 #ifndef NDEBUG
         fprintf(stderr,
             "Wake field: this is a slow Debug build. For play review, build RelWithDebInfo "
-            "in build/review and run ./build/review/wake_velocity --wake-field --profiler.\n");
+            "in build/review and run ./build/review/wake_study --wake-field --profiler.\n");
 #endif
         if (gpu_aa)
             fprintf(stderr,
@@ -1250,18 +1276,18 @@ static int study(int argc, char **argv)
 #if !defined(__EMSCRIPTEN__)
     if (host_mode
         && !net_host_start(
-            &net_host, &host_options, net_study.failure, sizeof(net_study.failure))) {
-        fprintf(stderr, "%s\n", net_study.failure);
+            &net_host, &host_options, wake_room.failure, sizeof(wake_room.failure))) {
+        fprintf(stderr, "%s\n", wake_room.failure);
         goto cleanup;
     }
 #endif
     if (connect_to) {
-        if (!net_study_connect(&net_study, connect_to, net_name, net_token, worlds, &session))
+        if (!wake_room_connect(&wake_room, connect_to, net_name, net_token, worlds, &session))
             goto cleanup;
-        net = &net_study;
+        net = &wake_room;
         networked = true;
         location = session.world.definition;
-        waves = net_study.client.accept.waves;
+        waves = wake_room.client.accept.waves;
         camera_default.distance = location->camera_distance;
         camera_default.height = location->camera_height;
         if (!camera_distance_set)
@@ -1304,13 +1330,20 @@ static int study(int argc, char **argv)
         fprintf(stderr, "Map spawn is not navigable.\n");
         goto cleanup;
     }
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#ifdef PROTEUS_BOAT_NET
     // AR6 (L0), L6, L2, L1 and L1b: plain free boating, the time trial (bundled or a course
     // package), voyages and tours with or without an objective, and `--plugin` authoring of each,
     // live, scripted (`--demo`) or captured, run as a local authority and client. The working
     // harbour, rooms, replay viewing and the developer studies keep the direct path until their
-    // ledger rows migrate them.
+    // ledger rows migrate them. L4a/L4b: the browser runs the same session while it is not
+    // authoring, its authority evaluating objectives on the isolated worker; authoring keeps the
+    // direct path until L4b's next step moves it onto the authority.
     static WakeLocal local;
+#ifdef __EMSCRIPTEN__
+    static const WakeObjectiveWorker web_worker = { wake_web_objective_start,
+        wake_web_objective_status, wake_web_objective_read, wake_web_objective_close };
+    local.worker = &web_worker;
+#endif
     // L1b: the plugin's objective and commits run on the local authority while it is active.
     static WakePluginAuthority plugin_authority;
     static LocalAuthority local_authority;
@@ -1323,7 +1356,13 @@ static int study(int argc, char **argv)
         && plugin_active                                                                           \
         && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
-                    || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))
+                    || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route))      \
+        && LOCAL_PLATFORM_ELIGIBLE())
+#ifdef __EMSCRIPTEN__
+#define LOCAL_PLATFORM_ELIGIBLE() (!plugin.authoring && plugin.host.depth)
+#else
+#define LOCAL_PLATFORM_ELIGIBLE() true
+#endif
 #endif
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;
@@ -1347,9 +1386,14 @@ static int study(int argc, char **argv)
             fprintf(stderr, "The scripted landing delivery did not complete.\n");
             goto cleanup;
         }
+        // L3: the capture presents the local authority's checkpoint of the scripted session.
+        if (!wake_work_start(&work, &session, 0)) {
+            fprintf(stderr, "Working harbour could not start: %s.\n", work.local.failure);
+            goto cleanup;
+        }
     } else if (screenshot) {
         bool scripted_local = false;
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#ifdef PROTEUS_BOAT_NET
         // L6: the capture's scripted drive runs through the local session on virtual time.
         scripted_local = LOCAL_ELIGIBLE();
         if (scripted_local) {
@@ -1580,9 +1624,18 @@ static int study(int argc, char **argv)
         }
     }
     result = 0;
-    if (work_mode)
+    if (work_mode) {
         wake_work_autosave(&work, true);
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+        // L3: a capture's work session already started (after its scripted drive).
+        if (!work.local.running && !wake_work_start(&work, &session, GetTime())) {
+            snprintf(study_failure, sizeof(study_failure), "Working harbour could not start: %s.",
+                work.local.failure);
+            fprintf(stderr, "%s\n", study_failure);
+            result = 1;
+            goto cleanup;
+        }
+    }
+#ifdef PROTEUS_BOAT_NET
     // A capture's local session already ran its scripted drive (L6).
     if (!local.active && LOCAL_ELIGIBLE()) {
         local_plugin(&local, &plugin, plugin_active);
@@ -1812,7 +1865,7 @@ static int study(int argc, char **argv)
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
             minimap_mode = boat_minimap_next(minimap_mode);
 #ifdef PROTEUS_BOAT_NET
-        if (active && net && net_study_deathmatch(net) && IsKeyPressed(KEY_V))
+        if (active && net && wake_room_deathmatch(net) && IsKeyPressed(KEY_V))
             mirror.enabled = !mirror.enabled;
 #endif
         if (active) {
@@ -1917,7 +1970,14 @@ static int study(int argc, char **argv)
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), wake_app_now());
         if (plugin_active)
             plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#if defined(PROTEUS_BOAT_NET) && defined(__EMSCRIPTEN__)
+        // L4a: the console began authoring (an edit or an export promoted the package), which
+        // the browser's authority does not run yet. The session restarts on the direct path
+        // before any staged revision can reach the authority.
+        if (local.active && !LOCAL_ELIGIBLE())
+            plugin_restart = true;
+#endif
+#ifdef PROTEUS_BOAT_NET
         // L1b: authoring runs on the local authority too; a request it could not take stops the
         // session (D10).
         if (plugin_authority.failed) {
@@ -1928,9 +1988,16 @@ static int study(int argc, char **argv)
             break;
         }
 #endif
-        if (plugin_active && wake_plugin_waiting(&plugin))
+        // L4b: the local authority's isolated evaluation holds a reset as the direct path's does.
+        bool local_waiting = false;
+#ifdef PROTEUS_BOAT_NET
+        local_waiting = wake_local_waiting(&local);
+#endif
+        if (plugin_active && (wake_plugin_waiting(&plugin) || local_waiting)) {
             plugin_reset_pending |= reset_requested;
-        else if (plugin_reset_pending) {
+            if (local_waiting)
+                reset_requested = false; // The local frame below still services the authority.
+        } else if (plugin_reset_pending) {
             reset_requested = true;
             plugin_reset_pending = false;
         }
@@ -1945,10 +2012,14 @@ static int study(int argc, char **argv)
         }
         double simulation_started_at = boat_profile_time(true);
         bool work_active = active || console_simulating;
-        // The work session's key actions run once per frame and its crane axes drive each tick.
-        WakeWorkDrive work_drive = { 0 };
+        // L3: the work session's keys and helm targets for this frame, which its local authority
+        // applies before the frame's ticks. Sent with the grant below, or alone (grant zero) on a
+        // paused frame; a restart frame drops them, as the reset discarded their effects.
+        BoatWorkFrame work_frame = { 0 };
+        bool work_frame_sent = !work_mode;
         if (work_mode)
-            work_drive = wake_work_frame_input(&work, active && !demo);
+            work_frame = wake_work_frame_input(
+                &work, active && !demo, demo, steering_target, steering_rate, thrust_target);
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
             BoatInput input = { 0 };
@@ -1958,7 +2029,7 @@ static int study(int argc, char **argv)
                 };
             // No multiplayer pause: the room keeps running while help or focus is away.
             uint32_t previous_life = net->own_life;
-            if (!net_study_frame(net, &session, input, thrust_target, steering_target, active,
+            if (!wake_room_frame(net, &session, input, thrust_target, steering_target, active,
                     reset_requested)) {
                 result = 1;
                 break;
@@ -1981,7 +2052,7 @@ static int study(int argc, char **argv)
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#ifdef PROTEUS_BOAT_NET
             if (local.active) {
                 // L1: the authority places the same recovery before the next frame's first tick.
                 if (!wake_local_recover(&local, &session, objects)) {
@@ -2008,8 +2079,15 @@ static int study(int argc, char **argv)
                 select_course_best(&session, data_dir, waves);
                 boat_replay_runs_reset(&session.runs);
             }
-            if (work_mode)
-                wake_work_reset(&work, &session);
+            work_frame_sent = true;
+            if (work_mode && !wake_work_reset(&work, &session, GetTime())) {
+                // D10: back to the title; the leave-time save below still runs.
+                snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                    work.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
             if (wake) {
                 boat_wake_player_reset(wake);
                 session.world.wake_field = boat_wake_player_field(wake);
@@ -2017,22 +2095,38 @@ static int study(int argc, char **argv)
             if (objects)
                 object_study_reset(objects, &session, object_crossing, object_life, object_height);
             accumulator = 0;
-            if (plugin_active)
-                wake_plugin_reset_objective(&plugin, &session);
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-            // A restart recreates both endpoints with a new generation; a revision that is no
-            // longer plain free boating continues on the direct path from the reset session.
-            if (local.active)
-                local_plugin(&local, &plugin, plugin_active); // The revision may be new.
+#ifdef PROTEUS_BOAT_NET
+            // A revision that no longer runs on the local authority continues on the direct path
+            // from the reset session, which starts its own objective below.
             if (local.active && !LOCAL_ELIGIBLE()) {
                 wake_local_close(&local);
                 wake_plugin_attach(&plugin, NULL);
-            } else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
+            }
+#endif
+            if (plugin_active)
+                wake_plugin_reset_objective(&plugin, &session);
+#ifdef PROTEUS_BOAT_NET
+            // A restart recreates both endpoints with a new generation.
+            if (local.active)
+                local_plugin(&local, &plugin, plugin_active); // The revision may be new.
+            if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
                 snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
                     local.local.failure);
                 fprintf(stderr, "%s\n", study_failure);
                 result = 1;
                 break;
+            } else if (!local.active && LOCAL_ELIGIBLE()) {
+                // L7: a session that started by viewing a replay (--replay) runs no authority;
+                // its restart is the first live run, which starts the local session.
+                local_plugin(&local, &plugin, plugin_active);
+                wake_plugin_attach(&plugin, &plugin_authority);
+                if (!wake_local_open(&local, &session, objects, worlds, GetTime())) {
+                    snprintf(study_failure, sizeof(study_failure),
+                        "Single player could not start: %s.", local.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
             }
 #endif
             demo_tick = 0;
@@ -2055,7 +2149,18 @@ static int study(int argc, char **argv)
             accumulator += work_mode
                 ? boat_time_work_frame_seconds(raw_active_delta, time_speed_index, work_was_active)
                 : boat_time_frame_seconds(raw_active_delta, time_speed_index);
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            if (work_mode) {
+                // L3: the frame's keys and its grant run on the work session's local authority.
+                work_frame_sent = true;
+                if (!wake_work_frame(&work, &session, &accumulator, &work_frame, GetTime())) {
+                    snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                        work.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
+            }
+#ifdef PROTEUS_BOAT_NET
             // The grant is the same accumulator arithmetic; the client derives each tick's rates
             // from its predicted boat as the loop below does from the session's.
             bool local_ok = !local.active
@@ -2074,31 +2179,17 @@ static int study(int argc, char **argv)
             if (local.active)
                 local_view(&plugin_authority, &local);
 #endif
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+#ifdef PROTEUS_BOAT_NET
             // L0's removal point: a local session's ticks never fall back to the direct path;
             // a grant above BOAT_LOCAL_MAX_GRANT waits in the accumulator for the next frame.
-            bool direct_ticks = !local.active;
+            bool direct_ticks = !local.active && !work_mode;
 #else
-            bool direct_ticks = true;
+            bool direct_ticks = !work_mode;
 #endif
             while (direct_ticks && accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
-                if (work_mode) {
-                    // The helm is the game's own (throttle, wheel, mouse); the crane view and a
-                    // brake take it over.
-                    const BoatWorkSession *w = &work.session;
-                    BoatInput helm = { 0 };
-                    if (!w->crane_view && !demo) {
-                        helm.steering_rate = isfinite(steering_target)
-                            ? boat_steering_rate(w->boat.wheel, steering_target)
-                            : steering_rate;
-                        helm.throttle_rate
-                            = w->braking ? 0 : boat_throttle_rate(w->boat.throttle, thrust_target);
-                    }
-                    wake_work_tick(
-                        &work, &session, work_drive.slew, work_drive.reach, work_drive.hoist, helm);
-                } else if (demo)
+                if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else
                     timed_boat_step(&session,
@@ -2114,6 +2205,17 @@ static int study(int argc, char **argv)
             }
         } else {
             accumulator = 0;
+        }
+        if (!work_frame_sent) {
+            // A paused frame still delivers its actions (RETURN CRATE, the released brake).
+            double none = 0;
+            if (!wake_work_frame(&work, &session, &none, &work_frame, GetTime())) {
+                snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                    work.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
         }
         if (work_mode)
             work_was_active = work_active;
@@ -2149,9 +2251,9 @@ static int study(int argc, char **argv)
             live_view.props = wake_work_props(&work);
 #ifdef PROTEUS_BOAT_NET
         if (net) {
-            live_view.skin = net_study_skin(net->client.slot); // Every client agrees.
-            net_study_race_view(net, &live_view);
-            net_study_marks_view(net, &live_view);
+            live_view.skin = wake_room_skin(net->client.slot); // Every client agrees.
+            wake_room_race_view(net, &live_view);
+            wake_room_marks_view(net, &live_view);
         }
 #endif
         if (view == &playback)
@@ -2165,7 +2267,7 @@ static int study(int argc, char **argv)
             .landing = view_presentation->landing_strength,
             .landing_serial = view_presentation->landing_serial };
 #ifdef PROTEUS_BOAT_NET
-        if (net && net_study_deathmatch(net)) {
+        if (net && wake_room_deathmatch(net)) {
             const BoatFleet *f = boat_net_client_view(&net->client);
             const BoatCombat *c = &f->state.combat;
             for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i) {
@@ -2210,9 +2312,9 @@ static int study(int argc, char **argv)
         bool mirror_visible = false;
 #ifdef PROTEUS_BOAT_NET
         if (net) {
-            net_study_rivals(net, live_view.time, &rivals);
+            wake_room_rivals(net, live_view.time, &rivals);
             // The large chart takes the mirror's place while it is open.
-            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible
+            mirror_visible = mirror.enabled && wake_room_deathmatch(net) && net->own_visible
                 && minimap_mode != BOAT_MINIMAP_CHART;
         }
 #endif
@@ -2324,7 +2426,7 @@ static int study(int argc, char **argv)
         }
 #ifdef PROTEUS_BOAT_NET
         if (net)
-            net_study_combat_hud(
+            wake_room_combat_hud(
                 net, width, height, view, view_presentation, view_world, camera_settings);
 #endif
         if (mirror_visible)
@@ -2363,11 +2465,11 @@ static int study(int argc, char **argv)
         const char *notice = NULL;
 #ifdef PROTEUS_BOAT_NET
         if (networked) {
-            float fade = net_study_fade(net);
+            float fade = wake_room_fade(net);
             if (fade > 0)
                 DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
                     Fade((Color) { 14, 23, 32, 255 }, fade));
-            notice = net_study_notice(net);
+            notice = wake_room_notice(net);
         }
 #endif
         boat_course_hud(&view->course, view->boat.position, GetScreenWidth());
@@ -2390,7 +2492,7 @@ static int study(int argc, char **argv)
             course_runs_hud(&session.runs, view, ghost_view, GetScreenWidth());
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
-            boat_ui_text(net_study_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
+            boat_ui_text(wake_room_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
                 12, SKYBLUE);
             int match_top
                 = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
@@ -2398,13 +2500,13 @@ static int study(int argc, char **argv)
             if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
                 roster_top = (int)fmaxf((float)roster_top,
                     destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
-            int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
+            int feed_top = wake_room_draw_roster(net, GetScreenWidth() - 12, roster_top);
             int objective_bottom
-                = net_study_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
+                = wake_room_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
             feed_top = objective_bottom > feed_top + 8 ? objective_bottom : feed_top;
-            net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
+            wake_room_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
-            net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
+            wake_room_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
 #endif
         } else if (!IsWindowFocused() && !menu.open)
@@ -2422,8 +2524,8 @@ static int study(int argc, char **argv)
         if (help_visible) {
             bool deathmatch = false, race = false;
 #ifdef PROTEUS_BOAT_NET
-            deathmatch = networked && net_study_deathmatch(net);
-            race = networked && net_study_race(net);
+            deathmatch = networked && wake_room_deathmatch(net);
+            race = networked && wake_room_race(net);
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
                 deathmatch, race, networked, plugin_active && plugin.authoring, work_mode);
@@ -2511,10 +2613,10 @@ static int study(int argc, char **argv)
                 = objects && objects->traffic_enabled ? objects->traffic.live : 0;
             boat_capture_add(&capture, &sample);
             if (work_clock_report)
-                wake_lighting_review_frame(&lighting_review, &sample, work.session.tick,
-                    work.session.lighting_hours, work.session.lighting_cycle_seconds,
-                    boat_time_rate(time_speed_index), work.lighting_cycle,
-                    gpu_enabled ? NULL : &renderer);
+                wake_lighting_review_frame(&lighting_review, &sample, wake_work_view(&work)->tick,
+                    wake_work_view(&work)->lighting_hours,
+                    wake_work_view(&work)->lighting_cycle_seconds, boat_time_rate(time_speed_index),
+                    work.lighting_cycle, gpu_enabled ? NULL : &renderer);
             previous_performance_start = current_frame_started_at;
             boat_gpu_timer_poll(
                 &performance_timer, performance_query_complete, &performance_query, false);
@@ -2562,7 +2664,7 @@ static int study(int argc, char **argv)
         // READY makes the authority queue reliable spawn and roster traffic; it must not land
         // during that first frame's shader and presentation work.
         if (networked && !net_ready_sent) {
-            if (!net_study_ready(net)) {
+            if (!wake_room_ready(net)) {
                 result = 1;
                 break;
             }
@@ -2570,8 +2672,10 @@ static int study(int argc, char **argv)
         }
 #endif
     }
-    if (work_mode)
+    if (work_mode) {
         wake_work_save_leave(&work); // Quitting, closing the window or returning to the title.
+        wake_work_stop(&work);
+    }
     if (performance_report) {
         if (!performance_capture || !capture.count) {
             fprintf(stderr, "No performance samples were captured; the report was not written.\n");
@@ -2610,7 +2714,8 @@ static int study(int argc, char **argv)
         }
     }
 cleanup:
-#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    wake_work_stop(&work); // Idempotent; the window loop's exit already stopped it.
+#ifdef PROTEUS_BOAT_NET
     if (local.local.stats.frames)
         fprintf(stdout,
             "Local session: generation %u, %llu ticks in %llu chunks (at most %u per frame), "
@@ -2664,7 +2769,7 @@ cleanup:
     boat_wake_player_destroy(wake);
 #ifdef PROTEUS_BOAT_NET
     if (net)
-        net_study_close(net);
+        wake_room_close(net);
 #if !defined(__EMSCRIPTEN__)
     net_host_stop(&net_host); // After leaving, so the room says goodbye to the others only.
 #endif
@@ -2844,11 +2949,11 @@ static int title_join(BoatTitleSettings *settings, bool host)
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
-    net_study.failure[0] = 0;
+    wake_room.failure[0] = 0;
     study_mouse_steering = settings->mouse_steering;
     int result = study(count, arguments);
-    if (net_study.failure[0])
-        snprintf(settings->message, sizeof(settings->message), "%s", net_study.failure);
+    if (wake_room.failure[0])
+        snprintf(settings->message, sizeof(settings->message), "%s", wake_room.failure);
     else if (result)
         snprintf(settings->message, sizeof(settings->message),
             host ? "Could not host a room." : "Could not join that address.");

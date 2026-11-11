@@ -57,19 +57,49 @@ bool wake_work_save_leave(WakeWork *work)
     return false;
 }
 
-WakeWorkDrive wake_work_frame_input(WakeWork *work, bool active)
+BoatWorkFrame wake_work_frame_input(WakeWork *work, bool active, bool demo, float steering_target,
+    float steering_rate, float thrust_target)
 {
     (void)work;
     (void)active;
-    return (WakeWorkDrive) { 0 };
+    (void)demo;
+    (void)steering_target;
+    (void)steering_rate;
+    (void)thrust_target;
+    return (BoatWorkFrame) { 0 };
+}
+
+bool wake_work_start(WakeWork *work, BoatSession *game, double now)
+{
+    (void)work;
+    (void)game;
+    (void)now;
+    return false;
+}
+
+void wake_work_stop(WakeWork *work) { (void)work; }
+
+const BoatWorkSession *wake_work_view(const WakeWork *work) { return &work->session; }
+
+bool wake_work_frame(
+    WakeWork *work, BoatSession *game, double *accumulator, const BoatWorkFrame *frame, double now)
+{
+    (void)work;
+    (void)game;
+    (void)accumulator;
+    (void)frame;
+    (void)now;
+    return false;
 }
 
 void wake_work_return_crate(WakeWork *work) { (void)work; }
 
-void wake_work_reset(WakeWork *work, BoatSession *game)
+bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
 {
     (void)work;
     (void)game;
+    (void)now;
+    return false;
 }
 
 bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
@@ -78,17 +108,6 @@ bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
     (void)game;
     (void)pose;
     return false;
-}
-
-void wake_work_tick(
-    WakeWork *work, BoatSession *game, float slew, float reach, float hoist, BoatInput input)
-{
-    (void)work;
-    (void)game;
-    (void)slew;
-    (void)reach;
-    (void)hoist;
-    (void)input;
 }
 
 bool wake_work_script(WakeWork *work, BoatSession *game, uint64_t ticks)

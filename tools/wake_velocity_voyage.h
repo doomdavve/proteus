@@ -22,9 +22,9 @@
 
 #define WAKE_VOYAGE_STATE_BYTES 40
 // The objective's tail after the voyage's bytes: generation (4), active revision (4), the latest
-// commit's revision (4), commits handled (4), the latest commit's status (1), diagnostic text
-// length (1) and that many bytes of text.
-#define WAKE_VOYAGE_OBJECTIVE_BYTES 18
+// commit's revision (4), commits handled (4), the latest commit's status (1), whether an isolated
+// evaluation is pending (1, L4b), diagnostic text length (1) and that many bytes of text.
+#define WAKE_VOYAGE_OBJECTIVE_BYTES 19
 
 // The adapter's commit codes on the wire.
 typedef enum {
@@ -53,18 +53,28 @@ typedef struct {
     char commit_message[sizeof(((BoatPluginDiagnostic *)0)->message)];
     BoatNetObjectiveState reported; // The HUD last reported through rules.state.
     bool has_reported;
+    // L4b: the isolated evaluator (borrowed; NULL evaluates natively, at once), its job in flight
+    // and the latest service's elapsed time.
+    const WakeObjectiveWorker *worker;
+    WakeObjectiveJob job;
+    double now;
 } WakeVoyageAuthority;
 
-// A new generation from SESSION's voyage (its route and start state). The objective's trace is
-// kept; zero VOYAGE to clear it.
+// A new generation from SESSION's voyage (its route and start state). The objective's trace and
+// worker are kept (an evaluation in flight is closed); zero VOYAGE to clear them.
 void wake_voyage_init(WakeVoyageAuthority *voyage, const BoatSession *session, unsigned slot);
 // L1b: REVISION (a voyage revision, borrowed; NULL for none) is the active one, its objective
 // (when it has one) starts as generation GENERATION at TICK, and commits resolve their revisions
 // through RESOLVE.
 void wake_voyage_revision(WakeVoyageAuthority *voyage, const BoatPluginRevision *revision,
     unsigned generation, uint64_t tick, WakeVoyageResolve resolve, void *resolve_context);
+// Close the evaluation in flight, if any (the session ends).
+void wake_voyage_close(WakeVoyageAuthority *voyage);
 // The rules adapter for the local authority: committed ticks, weather, recovery, commits, the
-// objective's HUD and private state.
+// objective's HUD and private state, and (L4b) the isolated evaluator's service. With a worker,
+// INIT and every boundary's UPDATE start a job; its result arrives in a later grant's service
+// (INIT before any tick, an UPDATE staged for the tick after its boundary), so the host must not
+// grant a tick while the private state reports the job pending.
 BoatNetRules wake_voyage_rules(WakeVoyageAuthority *voyage);
 // The voyage state codec.
 size_t wake_voyage_encode(const BoatVoyage *voyage, uint8_t *out);
