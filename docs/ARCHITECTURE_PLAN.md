@@ -1078,9 +1078,10 @@ PR #184):
   world options.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11): `wake_study`
-captures byte-identical to the L1 build's `wake_velocity` for `--player-wake`,
+captures byte-identical to `main`'s `wake_velocity` (`aaafd8d`) for `--player-wake`,
 `--no-player-wake`, `--wake-objects-crossing`, `--player-wake --current --waves` (all
-`--time 9`) and `--wake-field --time 3`; the game's basin capture unchanged; new
+`--time 9`), `--wake-field --time 3` and outer `--no-player-wake --time 5`; the game's basin
+capture unchanged; new
 `wake_velocity_study_rejected.<option>` tests; `ctest --preset full -j8` passed 531/531 (13
 disabled). Not verified: the `--replay` restart in a window (no scripted restart exists), any
 browser or Windows build.
@@ -1116,9 +1117,7 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
   fails `trace`.
 - Captures byte-identical to a build of `main` at `aaafd8d`: `--location outer --work` at
   `--time` 3, 12, 14, 30 and 60, the `swing`, `deck` and `approach` review poses, and basin
-  `--work` at 3 and with `swing`. The plain outer capture is unchanged too. (L7/L8's captures
-  above were compared with the L1 build, which predates `main`'s cloud-deck changes; they were
-  basin captures, which those changes leave equal.)
+  `--work` at 3 and with `swing`. The plain outer capture is unchanged too.
 - The 69 work, cargo, sandbox and title-start tests pass, including `--save-now`, resume and
   set-aside.
 
