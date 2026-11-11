@@ -12,8 +12,8 @@ tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualifica
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
 L1a (voyages and tours without an objective on the local authority) is implemented on
 `arch/l1-voyages`; native voyage manual check owed.
-**Next:** L1b (authoring and objectives on the authority, L9 folded in): design proposed,
-decisions L1-1 to L1-4 await the user.
+**Next:** L1b (authoring and objectives on the authority, L9 folded in); design and
+decisions L1-1 to L1-4 accepted 2026-11-11.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -957,8 +957,8 @@ Owed manual checks: a native windowed voyage and tour (recover after passing a s
 Backspace, the weather building near the storm, arrival, restart), and promoting a running
 voyage to authoring from the console.
 
-L1b (authoring and objectives on the authority), design proposed 2026-11-11, decisions
-[L1-1 to L1-4](#l1b-decisions) awaiting the user:
+L1b (authoring and objectives on the authority), design 2026-11-11; the user accepted
+[L1-1 to L1-4](#l1b-decisions) as recommended on 2026-11-11:
 
 - Scope: native `--plugin DIR` sessions of every solo kind (voyage, course, free) and runtime
   packages the console promotes. The browser keeps its authoring and isolated objective on the
@@ -1005,7 +1005,7 @@ L1b (authoring and objectives on the authority), design proposed 2026-11-11, dec
   a failing callback quarantining on both; the existing plugin session, stage, console and
   bridge validators passing unchanged; Shelter tour captures byte-identical.
 
-<a id="l1b-decisions"></a>Decisions for the user:
+<a id="l1b-decisions"></a>Decisions (all accepted as recommended, 2026-11-11):
 
 | ID | Question | Options | Recommendation |
 | --- | --- | --- | --- |
