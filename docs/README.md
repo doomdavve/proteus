@@ -36,6 +36,15 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | Human input/audio and wider network review; Firefox deadline | 2026-11-01 | [releases](RELEASES.md#status-and-verification) |
 
+## Building architecture overhaul — 2026-11-11
+
+The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot followed by
+reusable building families across the city: distinct silhouettes, facade depth and readable
+street edges at the default resolution. The deliverable includes implementation and a
+`BUILDINGS.md` specification of the source-to-rendering construction system. Planning only;
+B0 baseline and architecture decisions are next. Crane/landmark work and living-city actors
+remain with their existing owners. No implementation PR is authorized.
+
 ## Cloud deck — grouping and drift follow-up, 2026-11-10
 
 The user accepted the softer cloud outlines, deeper-blue Day sky and sparser three-tone
