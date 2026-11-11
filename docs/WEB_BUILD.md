@@ -705,7 +705,10 @@ Existing application sequence numbers discard stale state/births. Current protoc
 
 Build an optional native endpoint (C++ compiler and OpenSSL development files required;
 C application sources remain C17). The first configure fetches pinned libdatachannel v0.24.1
-and its pinned submodules. No new dependency enters default native or Wasm builds:
+and its pinned submodules. CMake enables C++ before adding module/application subdirectories
+so executables using the static WebRTC dependency inherit the compiler's C++ runtime.
+No `CMAKE_C_STANDARD_LIBRARIES` override is required. No new dependency enters default
+native or Wasm builds:
 
 ```sh
 cmake -S . -B build-rtc -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_WEBRTC=ON
