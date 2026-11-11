@@ -266,3 +266,54 @@ BoatNetError boat_net_private_decode_recover(
     *header = h;
     return BOAT_NET_OK;
 }
+
+size_t boat_net_private_encode_commit(const BoatNetHeader *header, uint32_t revision,
+    uint8_t change, uint8_t out[BOAT_NET_MAX_MESSAGE])
+{
+    uint8_t *p = out;
+    put32(&p, BOAT_NET_MAGIC);
+    put16(&p, BOAT_NET_VERSION);
+    put8(&p, BOAT_NET_PRIVATE_COMMIT);
+    put8(&p, 0);
+    put32(&p, header->epoch);
+    put32(&p, header->sequence);
+    put64(&p, header->tick);
+    put16(&p, BOAT_NET_PRIVATE_COMMIT_BYTES);
+    put16(&p, 0);
+    put32(&p, 0);
+    put32(&p, revision);
+    put8(&p, change);
+    return (size_t)(p - out);
+}
+
+BoatNetError boat_net_private_decode_commit(
+    const uint8_t *data, size_t size, BoatNetHeader *header, uint32_t *revision, uint8_t *change)
+{
+    if (!data || size < BOAT_NET_HEADER_BYTES)
+        return BOAT_NET_TRUNCATED;
+    const uint8_t *p = data;
+    if (get32(&p) != BOAT_NET_MAGIC)
+        return BOAT_NET_BAD_MAGIC;
+    if (get16(&p) != BOAT_NET_VERSION)
+        return BOAT_NET_BAD_VERSION;
+    BoatNetHeader h = { 0 };
+    h.type = get8(&p);
+    h.flags = get8(&p);
+    h.epoch = get32(&p);
+    h.sequence = get32(&p);
+    h.tick = get64(&p);
+    h.payload = get16(&p);
+    uint16_t reserved16 = get16(&p);
+    uint32_t reserved32 = get32(&p);
+    if (h.flags || reserved16 || reserved32)
+        return BOAT_NET_BAD_HEADER;
+    if (h.type != BOAT_NET_PRIVATE_COMMIT)
+        return BOAT_NET_BAD_TYPE;
+    if (h.payload != BOAT_NET_PRIVATE_COMMIT_BYTES
+        || size != BOAT_NET_HEADER_BYTES + BOAT_NET_PRIVATE_COMMIT_BYTES)
+        return BOAT_NET_BAD_LENGTH;
+    *revision = get32(&p);
+    *change = get8(&p);
+    *header = h;
+    return BOAT_NET_OK;
+}

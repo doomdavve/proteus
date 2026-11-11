@@ -32,7 +32,8 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
     local->objective = (WakeObjectiveView) { 0 };
     if (local->voyage_active) {
         wake_voyage_init(&local->voyage, session, 0);
-        wake_voyage_objective(&local->voyage, local->revision, local->generation, session->tick);
+        wake_voyage_revision(&local->voyage, local->revision, local->generation, session->tick,
+            local->resolve, local->resolve_context);
         config.rules = wake_voyage_rules(&local->voyage);
         config.weather = wake_voyage_weather;
         config.weather_context = (void *)session->voyage.route;
@@ -54,13 +55,9 @@ static void course_sync(WakeLocal *local, BoatSession *session)
         wake_course_view(state, size, session);
     else if (state)
         wake_voyage_view(state, size, session);
-    const BoatNetObjectiveState *hud = boat_local_objective(&local->local);
-    if (local->voyage_active && state && hud
-        && wake_voyage_objective_view(state, size, &local->objective)) {
-        local->objective.valid = true;
-        local->objective.suspended = hud->suspended;
-        local->objective.hud = *hud;
-    }
+    if (local->voyage_active && state)
+        wake_voyage_objective_view(
+            state, size, boat_local_objective(&local->local), &local->objective);
     if (local->course_active)
         wake_course_take(&local->course, &session->runs);
 }
@@ -188,6 +185,25 @@ bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *obj
         = (BoatVoyageEvents) { .items = { { BOAT_VOYAGE_RECOVERED, voyage.shelter } }, .count = 1 };
     boat_presentation_reset(&session->presentation);
     objects->wakes = boat_local_view(&local->local)->state.wakes;
+    return true;
+}
+
+bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    const BoatPluginRevision *revision, BoatPluginChange change, bool moved)
+{
+    if (!local->voyage_active || !session->voyage.route)
+        return true;
+    uint8_t code = change == BOAT_PLUGIN_LIVE  ? WAKE_VOYAGE_LIVE
+        : change == BOAT_PLUGIN_MIGRATE        ? WAKE_VOYAGE_MIGRATE
+        : change == BOAT_PLUGIN_RESTART_VOYAGE ? WAKE_VOYAGE_RESTART
+                                               : WAKE_VOYAGE_REBIND;
+    if (!boat_local_commit(&local->local, revision->number, code, moved ? &session->boat : NULL,
+            session->world.water.storm)) {
+        local->active = false;
+        return false;
+    }
+    if (moved)
+        objects->wakes = boat_local_view(&local->local)->state.wakes;
     return true;
 }
 

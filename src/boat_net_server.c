@@ -493,10 +493,54 @@ static void private_recover(BoatNetServer *s, unsigned peer, const BoatNetEvent 
     ++s->stats.recoveries;
 }
 
+// L1b: a commit request at the frame boundary it names; any other tick is ignored.
+static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    uint32_t revision;
+    uint8_t change;
+    if (boat_net_private_decode_commit(event->data, event->size, &header, &revision, &change)
+            != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch) {
+        ++s->stats.stale_packets;
+        return;
+    }
+    BoatFleetSlot *slot = &s->fleet.state.slots[p->slot];
+    Boat boat = slot->boat;
+    bool moved = false;
+    if (p->phase != BOAT_NET_PEER_READY || !slot->active || header.tick != s->fleet.state.tick
+        || !s->config.rules.commit
+        || !s->config.rules.commit(
+            s->config.rules.context, header.tick, p->slot, revision, change, &boat, &moved)) {
+        ++s->stats.commits_ignored;
+        return;
+    }
+    if (moved)
+        boat_fleet_relocate(&s->fleet, p->slot, boat);
+    BoatStorm storm;
+    if (s->config.rules.weather && s->config.rules.weather(s->config.rules.context, &storm))
+        s->fleet.world.water.storm = storm;
+    ++s->stats.commits;
+}
+
 static void private_message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
     if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_RECOVER) {
         private_recover(s, peer, event, now);
+        return;
+    }
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_COMMIT) {
+        private_commit(s, peer, event, now);
         return;
     }
     BoatNetServerPeer *p = &s->peers[peer];

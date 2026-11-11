@@ -217,6 +217,18 @@ bool boat_local_recover(BoatLocal *local, Boat pose)
     return true;
 }
 
+bool boat_local_commit(
+    BoatLocal *local, uint32_t revision, uint8_t change, const Boat *pose, BoatStorm storm)
+{
+    if (!local->running
+        || !boat_net_client_private_commit(&local->client, local->tick, revision, change, pose)) {
+        fail(local, "the local client could not commit a revision");
+        return false;
+    }
+    boat_net_client_private_storm(&local->client, storm);
+    return true;
+}
+
 const BoatFleet *boat_local_view(const BoatLocal *local) { return &local->client.prediction.fleet; }
 
 unsigned boat_local_slot(const BoatLocal *local) { return local->client.slot; }

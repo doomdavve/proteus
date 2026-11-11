@@ -25,6 +25,9 @@ typedef struct {
     // none) and the generation the next open or restart starts it as. Set by the game.
     const BoatPluginRevision *revision;
     unsigned generation;
+    // L1b: the host's revision table, through which the authority resolves a commit's revision.
+    WakeVoyageResolve resolve;
+    void *resolve_context;
     // L1b: the client's view of the authority's objective after each frame.
     WakeObjectiveView objective;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
@@ -64,6 +67,13 @@ bool wake_local_scripted_drive(
 // does: SESSION shows the recovered boat, presentation and voyage at once, and the authority
 // applies the same recovery before the next frame's first tick. False on an endpoint failure.
 bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *objects);
+// L1b: between frames, after the host committed REVISION with CHANGE into SESSION (its view: the
+// voyage rebound or restarted, the boat at the tour start when MOVED), the authority installs
+// the same revision before the next frame's first tick. A migration's outcome arrives in
+// LOCAL's objective view after that frame (its commit and commit_status); until then SESSION's
+// revision must not change. False on an endpoint failure.
+bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    const BoatPluginRevision *revision, BoatPluginChange change, bool moved);
 void wake_local_close(WakeLocal *local);
 
 #endif

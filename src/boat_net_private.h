@@ -31,6 +31,12 @@ typedef struct {
 // recovery pose at a frame boundary; HEADER.tick is the authority's tick it applies after. No
 // payload.
 #define BOAT_NET_PRIVATE_RECOVER 0xc2
+// C->S on the reliable control channel (L1b): install a host-managed definition revision at a
+// frame boundary; HEADER.tick is the authority's tick it applies after. Payload: the revision
+// number (u32) and a change code (u8), both opaque to the protocol; the rules adapter resolves
+// and interprets them.
+#define BOAT_NET_PRIVATE_COMMIT 0xc3
+#define BOAT_NET_PRIVATE_COMMIT_BYTES 5
 
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
@@ -59,5 +65,12 @@ uint8_t boat_net_private_type(const uint8_t *data, size_t size);
 // Decode a private recover request. Never writes HEADER on failure.
 BoatNetError boat_net_private_decode_recover(
     const uint8_t *data, size_t size, BoatNetHeader *header);
+
+// A private commit request; HEADER's type is ignored.
+size_t boat_net_private_encode_commit(const BoatNetHeader *header, uint32_t revision,
+    uint8_t change, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode a private commit request. Never writes the destinations on failure.
+BoatNetError boat_net_private_decode_commit(
+    const uint8_t *data, size_t size, BoatNetHeader *header, uint32_t *revision, uint8_t *change);
 
 #endif

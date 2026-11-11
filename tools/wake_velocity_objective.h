@@ -35,6 +35,26 @@ typedef struct {
     unsigned trace_count;
 } WakeObjective;
 
+// The view of an objective that runs elsewhere (the local authority's, L1b): what its client
+// received after the latest frame.
+typedef enum {
+    WAKE_COMMIT_NONE,
+    WAKE_COMMIT_APPLIED,
+    WAKE_COMMIT_FAILED, // A migration failed; the authority kept its revision.
+} WakeCommitStatus;
+
+typedef struct {
+    bool valid; // A HUD and the private state's objective tail have arrived.
+    unsigned generation, revision; // The objective's generation and the authority's revision.
+    unsigned commit; // The latest commit request's revision number, and its result.
+    WakeCommitStatus commit_status;
+    bool suspended;
+    // The suspension's, or a failed migration's, diagnostic text.
+    char message[sizeof(((BoatPluginDiagnostic *)0)->message)];
+    BoatPluginHud hud[BOAT_PLUGIN_HUD];
+    unsigned hud_count;
+} WakeObjectiveView;
+
 // Append a trace entry for REVISION's ACTION from digest BEFORE to AFTER.
 void wake_objective_trace(WakeObjective *run, unsigned revision, BoatPluginTransition action,
     uint64_t before, const BoatPluginObjective *after, unsigned events);

@@ -987,6 +987,25 @@ bool boat_net_client_private_recover(BoatNetClient *c, uint64_t tick, Boat pose)
     return true;
 }
 
+bool boat_net_client_private_commit(
+    BoatNetClient *c, uint64_t tick, uint32_t revision, uint8_t change, const Boat *pose)
+{
+    if (!c->local.enabled || !c->predict || !boat_net_client_own(c)
+        || c->prediction.fleet.state.tick != tick || c->command_count)
+        return false;
+    BoatNetHeader header
+        = { .epoch = c->epoch, .sequence = c->sequence[BOAT_NET_CONTROL], .tick = tick };
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    size_t size = boat_net_private_encode_commit(&header, revision, change, bytes);
+    if (!boat_net_send(&c->transport, 0, BOAT_NET_CONTROL, bytes, size))
+        return false;
+    ++c->sequence[BOAT_NET_CONTROL];
+    if (pose)
+        boat_fleet_relocate(&c->prediction.fleet, c->slot, *pose);
+    ++c->stats.commits;
+    return true;
+}
+
 void boat_net_client_private_storm(BoatNetClient *c, BoatStorm storm)
 {
     c->fleet.world.water.storm = storm;

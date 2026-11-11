@@ -478,13 +478,29 @@ The voyage's (`tools/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exp
 4 too fast, 8 observed, 16 weather begun), `u8` latest event, `u8` its shelter, `u32` recoveries,
 then `f64` weather start, start, arrival and latest event time (40 bytes, big-endian like the
 course's). The client derives the storm its water carries from these bytes and the route, which
-both endpoints borrow as an immutable resource.
+both endpoints borrow as an immutable resource. A voyage with a plugin revision appends its
+objective's tail: `u32` generation, `u32` the authority's active revision, `u32` the latest
+commit request's revision, `u8` its status (0 none, 1 applied, 2 migration failed), `u8` text
+length (at most 159), then that many bytes of text: the suspension's diagnostic when the objective
+is suspended, else a failed migration's (54 bytes plus the text). The objective's HUD and
+suspension travel as ObjectiveState, as a room objective's do; Lua state never leaves the
+authority.
 
 `0xC2` PrivateRecover (channel 0, client to server): header only (no payload). Sent at a frame
 boundary with the header tick equal to the authority's tick: the authority's rules adapter places
 its recovery pose in the same life before the next tick (`BoatNetRules.recover`), and the client
 predicts the same pose. A request for another tick, from a peer that is not ready, or to a server
 whose adapter has no recovery is counted and ignored.
+
+`0xC3` PrivateCommit (channel 0, client to server): `u32` revision, `u8` change (5 bytes), both
+opaque to the protocol. Sent at a frame boundary with the header tick equal to the authority's
+tick: the rules adapter (`BoatNetRules.commit`) resolves the host-managed revision by number and
+installs it before the next tick, the authority reads the water's storm again, and a commit that
+moves the boat relocates it in the same life, which the client predicts. The voyage adapter's
+changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's `migrate` runs on the
+authority; a failure keeps the active revision and reports it in PrivateState) and 4 restart the
+voyage. A request for another tick, from a peer that is not ready, for an unknown revision or to
+a server whose adapter has no commit is counted and ignored.
 
 ### Other control messages
 

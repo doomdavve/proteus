@@ -91,6 +91,8 @@ static bool voyaging;
 // wake_plugin_before_tick/after_tick step it) beside the authority adapter's objective.
 static const BoatPluginRevision *objective_revision;
 static WakeObjective reference;
+// The frame after a migration request: the host rebinds its view only when the result arrives.
+static bool route_lag;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -316,7 +318,8 @@ static bool same_voyage(void)
     wake_voyage_encode(&game.voyage.voyage, c);
     const BoatStorm *storm = &direct.session.world.water.storm;
     return !memcmp(a, b, sizeof(a)) && !memcmp(a, c, sizeof(a))
-        && play.session.voyage.route == direct.session.voyage.route
+        && (route_lag || play.session.voyage.route == direct.session.voyage.route)
+        && game.voyage.voyage.route == direct.session.voyage.route
         && !memcmp(storm, &play.session.world.water.storm, sizeof(*storm))
         && !memcmp(storm, &lp->server.fleet.world.water.storm, sizeof(*storm))
         && !memcmp(storm, &lp->client.prediction.fleet.world.water.storm, sizeof(*storm));
@@ -367,12 +370,13 @@ static bool same_objective(void)
     const WakeObjectiveView *v = &game.objective;
     const BoatPluginObjective *o = &a->objective;
     if (!v->valid || v->generation != a->generation || v->suspended != o->quarantined
-        || v->hud.row_count != o->hud_count
-        || strcmp(v->message, o->quarantined ? a->objective_diagnostic.message : ""))
+        || v->hud_count != o->hud_count
+        || (v->commit_status != WAKE_COMMIT_FAILED
+            && strcmp(v->message, o->quarantined ? a->objective_diagnostic.message : "")))
         return false;
     for (unsigned i = 0; i < o->hud_count; ++i)
-        if (strcmp(v->hud.rows[i].id, o->hud[i].id) || strcmp(v->hud.rows[i].label, o->hud[i].label)
-            || v->hud.rows[i].value != o->hud[i].value)
+        if (strcmp(v->hud[i].id, o->hud[i].id) || strcmp(v->hud[i].label, o->hud[i].label)
+            || v->hud[i].value != o->hud[i].value)
             return false;
     return true;
 }
@@ -1435,8 +1439,8 @@ static int objective_trace(void)
         || voyage_until(ahead, weather_begun, 2000) || voyage_until(ahead, exposed, 2000)
         || recover_both() || voyage_until(ahead_8x, arrived, 4000) || drive(ahead, 30);
     if (!failed) {
-        CHECK(game.objective.hud.row_count == 3 && game.objective.hud.rows[1].value == 1);
-        CHECK(game.objective.hud.rows[0].value >= 1 && game.objective.hud.rows[2].value >= 1);
+        CHECK(game.objective.hud_count == 3 && game.objective.hud[1].value == 1);
+        CHECK(game.objective.hud[0].value >= 1 && game.objective.hud[2].value >= 1);
         CHECK(reference.trace_count > 4 && !reference.objective.quarantined);
         // A restart: both start the objective over as generation 2.
         play_restart(&direct);
@@ -1447,11 +1451,11 @@ static int objective_trace(void)
         CHECK(wake_local_restart(&game, &play.session, &play.objects, now));
         CHECK(same_objective_authority());
         failed = voyage_until(ahead, past_ahead, 2000) || drive(ahead, 30);
-        CHECK(!failed && game.objective.generation == 2 && game.objective.hud.rows[0].value == 1);
+        CHECK(!failed && game.objective.generation == 2 && game.objective.hud[0].value == 1);
     }
     printf("objective: %u trace entries, HUD reached %lld, recovered %lld, timer %lld\n",
-        reference.trace_count, (long long)game.objective.hud.rows[0].value,
-        (long long)game.objective.hud.rows[1].value, (long long)game.objective.hud.rows[2].value);
+        reference.trace_count, (long long)game.objective.hud[0].value,
+        (long long)game.objective.hud[1].value, (long long)game.objective.hud[2].value);
     objective_revision = NULL;
     game.revision = NULL;
     return failed;
@@ -1471,6 +1475,163 @@ static int objective_quarantine(void)
     }
     objective_revision = NULL;
     game.revision = NULL;
+    return failed;
+}
+
+// L1b commits: test revisions numbered from 1 (the objective's), resolved by the authority through
+// this table as the game's host table resolves its own.
+enum { REVISIONS = 8 };
+static BoatPluginRevision revisions[REVISIONS];
+
+static const BoatPluginRevision *resolve(void *context, unsigned number)
+{
+    (void)context;
+    return number >= 1 && number <= REVISIONS && revisions[number - 1].number == number
+        ? &revisions[number - 1]
+        : NULL;
+}
+
+// Revision NUMBER as a copy of BASE with ROUTE (NULL keeps BASE's) and SOURCE appended to its
+// objective's table (NULL keeps the source).
+static BoatPluginRevision *revision_from(unsigned number, const BoatPluginRevision *base,
+    const BoatVoyageRoute *route, const char *source)
+{
+    BoatPluginRevision *r = &revisions[number - 1];
+    *r = *base;
+    r->number = number;
+    if (route)
+        r->voyage.route = *route;
+    if (source) {
+        int n = snprintf(r->source, sizeof(r->source),
+            "local p=(function() %.*s\nend)(); %s; return p", (int)base->source_size, base->source,
+            source);
+        r->source_size = (size_t)n;
+    }
+    return r;
+}
+
+// The host's commit on both paths: the direct session and objective as wake_velocity_plugin.c's
+// commit changes them, and the local host's view followed by its request to the authority. A
+// migration's result reaches the local host a frame later, so it is checked by the caller.
+static int commit_both(BoatPluginRevision *next, BoatPluginChange change)
+{
+    const BoatPluginRevision *previous = resolve(NULL, game.voyage.revision->number);
+    BoatSession *sessions[2] = { &direct.session, &play.session };
+    bool moved = false;
+    if (change == BOAT_PLUGIN_LIVE) {
+        const char *ids[BOAT_VOYAGE_SHELTERS];
+        for (unsigned i = 0; i < next->voyage.route.shelter_count; ++i)
+            ids[i] = next->voyage.shelter_ids[i];
+        const char *old = previous->voyage.shelter_ids[direct.session.voyage.shelter];
+        for (unsigned i = 0; i < 2; ++i)
+            boat_session_rebind_voyage_live(
+                sessions[i], &next->voyage.route, old, ids, next->voyage.route.shelter_count);
+    } else if (change == BOAT_PLUGIN_RESTART_VOYAGE) {
+        for (unsigned i = 0; i < 2; ++i)
+            boat_session_restart_voyage(sessions[i], &next->voyage.route);
+        if (wake_objective_clear(&reference, next, direct.session.tick))
+            wake_objective_init(&reference, next, direct.session.tick);
+        moved = next->voyage.route.ordered;
+    } else if (change == BOAT_PLUGIN_MIGRATE) {
+        static BoatPluginObjective migrated;
+        if (wake_objective_migrate(
+                &reference, next, previous->number, direct.session.tick, &migrated)) {
+            wake_objective_adopt(&reference, next->number, &migrated);
+            boat_session_rebind_voyage(&direct.session, &next->voyage.route);
+        }
+    } else {
+        for (unsigned i = 0; i < 2; ++i)
+            boat_session_rebind_voyage(sessions[i], &next->voyage.route);
+    }
+    objective_revision
+        = change == BOAT_PLUGIN_MIGRATE && direct.session.voyage.route != &next->voyage.route
+        ? objective_revision
+        : next;
+    CHECK(wake_local_commit(&game, &play.session, &play.objects, next, change, moved));
+    return 0;
+}
+
+// Every commit kind lands between the same ticks as on the direct path: a rebind, a live route
+// edit that moves the reached shelter's index, a migration that fails (nothing changes; the host
+// hears why) and one that succeeds (a new generation from the migrated state), and a voyage
+// restart onto an ordered tour that moves the boat to its start; the voyage, storm, boats and
+// objective stay equal after every frame.
+static int objective_commits(void)
+{
+    objective_revision = objective_test(false);
+    memset(revisions, 0, sizeof(revisions));
+    revisions[0] = objective_test_revision;
+    objective_revision = &revisions[0];
+    game.resolve = resolve;
+    int failed = open_voyage(OUTER, false);
+    revisions[0].voyage.route = test_route;
+    failed = failed || voyage_until(ahead, past_ahead, 2000) || drive(ahead, 20);
+    if (!failed) {
+        CHECK(game.voyage.revision == &revisions[0] && game.objective.revision == 1);
+        // A rebind: the same route in revision 2's storage.
+        if (commit_both(revision_from(2, &revisions[0], NULL, NULL), BOAT_PLUGIN_RENAMED)
+            || drive(ahead, 15))
+            failed = 1;
+        CHECK(!failed && game.objective.revision == 2 && lp->server.stats.commits == 1);
+        // A live edit: a new shelter before AHEAD, so the reached one moves from index 1 to 2.
+        BoatVoyageRoute live = test_route;
+        memmove(&live.shelters[2], &live.shelters[1], 3 * sizeof(live.shelters[0]));
+        live.shelters[1] = (BoatVoyageShelter) { "EXTRA",
+            Vector2Add(test_route.shelters[0].position, (Vector2) { 200, 200 }),
+            test_route.shelters[0].heading, 10, NULL };
+        live.shelter_count = 5;
+        BoatPluginRevision *r3 = revision_from(3, &revisions[1], &live, NULL);
+        static const char *const ids[] = { "start", "extra", "ahead", "near_storm", "end" };
+        for (unsigned i = 0; i < 5; ++i)
+            snprintf(r3->voyage.shelter_ids[i], sizeof(r3->voyage.shelter_ids[i]), "%s", ids[i]);
+        if (commit_both(r3, BOAT_PLUGIN_LIVE) || drive(ahead, 15))
+            failed = 1;
+        CHECK(!failed && play.session.voyage.shelter == 2 && game.voyage.voyage.shelter == 2);
+        // A migration that fails: everything stays, and the host hears why a frame later.
+        if (commit_both(
+                revision_from(4, r3, NULL, "p.migrate=function(c,s) error('no migrate') end"),
+                BOAT_PLUGIN_MIGRATE)
+            || drive(ahead, 1))
+            failed = 1;
+        CHECK(!failed && game.objective.commit == 4
+            && game.objective.commit_status == WAKE_COMMIT_FAILED
+            && strstr(game.objective.message, "no migrate") && game.objective.revision == 3
+            && game.voyage.revision == r3 && reference.generation == 1
+            && game.objective.generation == 1);
+        failed = drive(ahead, 10);
+        // A migration that succeeds: generation 2 from the migrated state.
+        BoatPluginRevision *r5 = revision_from(5, r3, NULL,
+            "p.migrate=function(c,s) s.reached=s.reached+100; return s, "
+            "{{kind='hud.set', generation=c.generation, id='reached', label='REACHED',"
+            " value=s.reached}} end");
+        route_lag = true;
+        if (failed || commit_both(r5, BOAT_PLUGIN_MIGRATE) || drive(ahead, 1))
+            failed = 1;
+        route_lag = false;
+        CHECK(!failed && game.objective.commit == 5
+            && game.objective.commit_status == WAKE_COMMIT_APPLIED && game.objective.revision == 5
+            && game.objective.generation == 2);
+        boat_session_rebind_voyage(&play.session, &r5->voyage.route); // The host commits now.
+        if (drive(ahead, 15))
+            failed = 1;
+        CHECK(!failed && game.objective.hud[0].value >= 101);
+        // A voyage restart onto an ordered tour: the boat goes back to its start, generation 3.
+        BoatVoyageRoute tour = live;
+        tour.ordered = true;
+        if (commit_both(revision_from(6, r5, &tour, NULL), BOAT_PLUGIN_RESTART_VOYAGE)
+            || drive(ahead, 1))
+            failed = 1;
+        CHECK(!failed && game.objective.generation == 3 && play.session.voyage.shelter == 0
+            && lp->server.stats.commits == 5 && !lp->server.stats.commits_ignored);
+        // The tour's next stop (EXTRA) lies off the line: the drive passes AHEAD out of order.
+        failed = drive(ahead, 300);
+    }
+    printf("commits: %" PRIu64 " applied, generation %u, HUD reached %lld\n",
+        lp->server.stats.commits, game.objective.generation,
+        (long long)game.objective.hud[0].value);
+    objective_revision = NULL;
+    game.revision = NULL;
+    game.resolve = NULL;
     return failed;
 }
 
@@ -1517,6 +1678,41 @@ static int voyage_state(void)
     CHECK(boat_net_private_decode_recover(message, length, &read) == BOAT_NET_OK);
     CHECK(read.tick == 48 && read.epoch == 3);
     CHECK(boat_net_private_decode_recover(message, length - 1, &read) != BOAT_NET_OK);
+    // The commit request (L1b): private, revision and change, never v14, input or recover.
+    length = boat_net_private_encode_commit(&header, 7, WAKE_VOYAGE_LIVE, message);
+    CHECK(length == BOAT_NET_HEADER_BYTES + BOAT_NET_PRIVATE_COMMIT_BYTES);
+    CHECK(boat_net_private_type(message, length) == BOAT_NET_PRIVATE_COMMIT);
+    CHECK(boat_net_decode(message, length, &decoded) == BOAT_NET_BAD_TYPE);
+    CHECK(boat_net_private_decode_recover(message, length, &read) == BOAT_NET_BAD_TYPE);
+    uint32_t revision = 0;
+    uint8_t change = 0;
+    CHECK(
+        boat_net_private_decode_commit(message, length, &read, &revision, &change) == BOAT_NET_OK);
+    CHECK(revision == 7 && change == WAKE_VOYAGE_LIVE && read.tick == 48);
+    CHECK(boat_net_private_decode_commit(message, length - 1, &read, &revision, &change)
+        != BOAT_NET_OK);
+    // The objective tail after the voyage's bytes.
+    static WakeVoyageAuthority authority;
+    static BoatPluginRevision tail_revision;
+    tail_revision.number = 3;
+    authority.voyage = v;
+    authority.revision = &tail_revision;
+    authority.objective.generation = 9;
+    authority.commit = 3;
+    authority.commit_status = WAKE_COMMIT_FAILED;
+    snprintf(authority.commit_message, sizeof(authority.commit_message), "bad migrate");
+    BoatNetRules rules = wake_voyage_rules(&authority);
+    size = rules.private_state(&authority, bytes);
+    CHECK(size == WAKE_VOYAGE_STATE_BYTES + WAKE_VOYAGE_OBJECTIVE_BYTES + 11);
+    WakeObjectiveView view = { 0 };
+    BoatNetObjectiveState hud = { .row_count = 1, .rows = { { "a", "ROW", 4 } } };
+    CHECK(wake_voyage_objective_view(bytes, size, &hud, &view));
+    CHECK(view.valid && view.generation == 9 && view.revision == 3 && view.commit == 3
+        && view.commit_status == WAKE_COMMIT_FAILED && !strcmp(view.message, "bad migrate")
+        && view.hud_count == 1 && view.hud[0].value == 4);
+    CHECK(wake_voyage_decode(bytes, size, &back)); // The voyage reads its own bytes.
+    CHECK(!wake_voyage_objective_view(bytes, size - 1, &hud, &view));
+    CHECK(!wake_voyage_objective_view(bytes, WAKE_VOYAGE_STATE_BYTES, &hud, &view));
     return 0;
 }
 
@@ -1630,6 +1826,7 @@ int main(int argc, char **argv)
         SLOW_CASE(tour_trace),
         SLOW_CASE(objective_trace),
         SLOW_CASE(objective_quarantine),
+        SLOW_CASE(objective_commits),
         TEST_CASE(voyage_state),
         TEST_CASE(recover_ignored),
     };

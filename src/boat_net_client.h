@@ -71,6 +71,7 @@ typedef struct {
     uint64_t revisions, revisions_invalid, revisions_ignored;
     uint64_t private_states; // Private state messages installed (L2).
     uint64_t recoveries; // Private recover requests sent (L1).
+    uint64_t commits; // Private commit requests sent (L1b).
 } BoatNetClientStats;
 
 // A deathmatch event as received, with the roster names of that moment (leavers keep theirs).
@@ -247,6 +248,11 @@ bool boat_net_client_local_service(BoatNetClient *client, double now);
 // from the voyage state this client last received. False (nothing sent) when the client has no
 // boat, the prediction is not at TICK or the transport refused the request.
 bool boat_net_client_private_recover(BoatNetClient *client, uint64_t tick, Boat pose);
+// L1b, private sessions only: between frames, when the prediction stands at TICK (the authority's
+// tick), ask the authority to install REVISION with CHANGE, and predict POSE when the commit moves
+// the boat (NULL when it does not). False when it could not be sent.
+bool boat_net_client_private_commit(
+    BoatNetClient *client, uint64_t tick, uint32_t revision, uint8_t change, const Boat *pose);
 // L1: the storm the private world's water carries now, in the mirror and the prediction, as the
 // authority's rules adapter reported it in private state.
 void boat_net_client_private_storm(BoatNetClient *client, BoatStorm storm);
