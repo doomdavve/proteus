@@ -14,8 +14,9 @@ L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
 ([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
 ([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
 until every L* row is done.
-**Next:** L4b and L5 wait for the user's decisions [L4-1, L4-2](#l4b-decision) and
-[L5-1](#l5-decision).
+**Next:** L5 (close by evidence, rename `NetStudy` to `WakeRoom`), then L4b objectives and
+authoring on the browser authority; the user accepted [L4-1, L4-2](#l4b-decision) and
+[L5-1](#l5-decision) as recommended on 2026-11-11.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1156,7 +1157,7 @@ Evidence (macOS 26.6.2, Apple M1 Max, emcc 6.0.12 MinSizeRel and AppleClang 21.0
 Not verified: Firefox and WebKit, mobile touch, a time trial in the browser, and any manual play.
 
 <a id="l4b-decision"></a>L4b (browser objectives and authoring on the authority), decisions
-needed, 2026-11-11. AR1's B1 moves the worker gate "to the authority's grant". In the local
+2026-11-11; the user accepted L4-1 (a) and L4-2 (b) as recommended on 2026-11-11. AR1's B1 moves the worker gate "to the authority's grant". In the local
 session the client predicts each tick before the authority runs it, so the authority cannot
 simply refuse ticks: the host must stop granting at the evaluated boundary, and something must
 poll the worker while no ticks run. Today `boat_local_frame` with a zero grant does nothing on
@@ -1167,7 +1168,8 @@ the authority (commit and recover requests wait for the next tick).
 | L4-1 | Where the gate lives | (a) the host ends each grant at the objective cadence's next boundary and grants nothing while the client's objective view reports a pending evaluation; the authority services its evaluator (and pending requests) on zero-grant frames, a change to `boat_local`'s L0 path; the result is seen one frame later than today; (b) the host polls the authority's adapter between frames as host management (as L3's persistence capture), same latency as today, but the gate decision reads authority state | (a): keeps rule 2; one frame (about 17 ms) per update against a worker round trip of 35–100 ms |
 | L4-2 | Browser authoring | (a) stays on the direct path with L4a's restart on promotion, the one remaining direct path; (b) moves too: the worker's migrate runs for the authority and its result commits frames later (L1-1's two-phase commit, asynchronous), staging and Apply wait as L1-3 | (b), as a step after the objectives, since "done when" needs every shipped mode on the authority; it needs Chromium, Firefox and WebKit qualification |
 
-<a id="l5-decision"></a>L5 (hosted rooms), decision needed, 2026-11-11. AR1's ledger names no
+<a id="l5-decision"></a>L5 (hosted rooms), decision 2026-11-11; the user accepted L5-1 (a) as
+recommended on 2026-11-11. AR1's ledger names no
 missing commands or state and an unchanged topology; its removal point is "`net_study` glue
 merges into the common client". Hosted rooms already run as authority/client: the game is a
 `BoatNetClient` of `boat_server` (or its `--host` child), and private sessions run the same
