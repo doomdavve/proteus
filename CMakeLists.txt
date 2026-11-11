@@ -172,6 +172,13 @@ else()
   target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_posix.c)
 endif()
 
+# The voyage objective transaction shared by the direct path and the local authority (L1b).
+add_library(proteus_wake_objective STATIC tools/wake_velocity_objective.c
+  tools/wake_velocity_objective.h)
+target_include_directories(proteus_wake_objective PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_link_libraries(proteus_wake_objective PUBLIC proteus_plugins)
+target_compile_options(proteus_wake_objective PRIVATE ${PROTEUS_WARNINGS})
+
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The
 # generated table and the lookup/decode helpers form a library that depends on proteus_plugins;
 # the generator itself never links the catalog, so there is no cycle. PD4 builds the same
@@ -484,7 +491,7 @@ endif()
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
   tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h
   tools/wake_console_bridge.h)
-target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
+target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
 endif()
@@ -982,7 +989,7 @@ proteus_add_case_tests(boat_plugin_state validate_boat_plugin_state LABELS core 
 # Its game_controls case drives wake_velocity's --plugin glue on files in a scratch directory.
 add_executable(validate_boat_plugin_session tools/validate_boat_plugin_session.c
   tools/wake_velocity_plugin.c)
-target_link_libraries(validate_boat_plugin_session PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
+target_link_libraries(validate_boat_plugin_session PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_plugin_session PRIVATE ${PROTEUS_WARNINGS})
 set(BOAT_PLUGIN_SESSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-session-test")
 file(MAKE_DIRECTORY "${BOAT_PLUGIN_SESSION_DIR}")
@@ -995,7 +1002,7 @@ add_executable(validate_wake_plugin_objective tools/validate_wake_plugin_objecti
   tools/wake_velocity_plugin.c)
 target_compile_definitions(validate_wake_plugin_objective PRIVATE
   WAKE_PLUGIN_ISOLATED_OBJECTIVE=1)
-target_link_libraries(validate_wake_plugin_objective PRIVATE proteus_plugins
+target_link_libraries(validate_wake_plugin_objective PRIVATE proteus_plugins proteus_wake_objective
   proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_wake_plugin_objective PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(wake_plugin_objective validate_wake_plugin_objective LABELS core cpu
@@ -1029,12 +1036,12 @@ if(NOT EMSCRIPTEN)
 endif()
 # P3.3b display-free objective inspection and native checkpoint/seek review.
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
-target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
+target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
 # P4 native isolated authoring validator; intentionally absent from the browser runtime.
 if(NOT EMSCRIPTEN)
   add_executable(boat_plugin_worker tools/boat_plugin_worker.c tools/wake_velocity_plugin.c)
-  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
+  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
   add_executable(validate_boat_plugin_eval tools/validate_boat_plugin_eval.c)
   target_link_libraries(validate_boat_plugin_eval PRIVATE proteus_plugins)
@@ -1043,7 +1050,7 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_plugin_eval PROPERTIES LABELS "cpu;quick" TIMEOUT 10)
   add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
     tools/wake_velocity_plugin.c)
-  target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
+  target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_boat_plugin_stage PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
   target_compile_definitions(validate_boat_plugin_stage PRIVATE
@@ -1063,7 +1070,7 @@ if(NOT EMSCRIPTEN)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
   add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
     tools/wake_velocity_plugin.c tools/wake_command.c)
-  target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
+  target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_wake_bridge PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-bridge-test")
   target_compile_definitions(validate_wake_bridge PRIVATE
@@ -1076,7 +1083,7 @@ if(NOT EMSCRIPTEN)
   add_executable(validate_wake_command tools/validate_wake_command.c
     tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c
     tools/wake_console_bridge.c)
-  target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_plugin_catalog
+  target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog
     proteus_boat_session)
   target_compile_options(validate_wake_command PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-command-test")

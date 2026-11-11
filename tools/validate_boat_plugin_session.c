@@ -1091,14 +1091,14 @@ static int live_objective(void)
     BoatSession s;
     boat_session_init(&s, outer(), calm());
     CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
-    CHECK(p.objective.initialized && p.objective.hud[0].value == 0);
+    CHECK(p.run.objective.initialized && p.run.objective.hud[0].value == 0);
     const BoatVoyageRoute *r = s.voyage.route;
     observe_objective(&p, &s, 1, r->shelters[1].position);
     observe_objective(&p, &s, 2, r->shelters[2].position);
     observe_objective(&p, &s, 12, r->arrival_centre);
-    CHECK(s.voyage.arrived && p.objective_pending);
-    CHECK(p.objective.hud[0].value == 0 && p.objective.acknowledged == 0);
-    CHECK(p.staged_objective.hud[0].value == 2);
+    CHECK(s.voyage.arrived && p.run.objective_pending);
+    CHECK(p.run.objective.hud[0].value == 0 && p.run.objective.acknowledged == 0);
+    CHECK(p.run.staged_objective.hud[0].value == 2);
     // A metadata-only rename at T keeps pending state/source ownership until T+1.
     static BoatPluginFiles renamed;
     renamed = p.files;
@@ -1109,30 +1109,30 @@ static int live_objective(void)
     CHECK(boat_plugin_host_stage(&p.host, &rename_bundle));
     CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
-    CHECK(p.objective_pending && p.generation == 1);
+    CHECK(p.run.objective_pending && p.run.generation == 1);
     // Recovery at T after dispatch must not publish before T+1 or retire its newer notice.
     boat_session_recover(&s);
     wake_plugin_after_tick(&p, &s);
-    CHECK(p.objective_pending && p.objective.hud[0].value == 0);
+    CHECK(p.run.objective_pending && p.run.objective.hud[0].value == 0);
     wake_plugin_before_tick(&p);
-    CHECK(!p.objective_pending && p.event_count == 1);
-    CHECK(p.objective.acknowledged == p.sequence - 1);
-    CHECK(!strcmp(p.objective.hud[0].label, "TOUR COMPLETE"));
-    CHECK(!strcmp(p.events[0].kind, "voyage.recovered") && p.events[0].tick == 12);
+    CHECK(!p.run.objective_pending && p.run.event_count == 1);
+    CHECK(p.run.objective.acknowledged == p.run.sequence - 1);
+    CHECK(!strcmp(p.run.objective.hud[0].label, "TOUR COMPLETE"));
+    CHECK(!strcmp(p.run.events[0].kind, "voyage.recovered") && p.run.events[0].tick == 12);
     observe_objective(&p, &s, 24, r->arrival_centre);
     wake_plugin_before_tick(&p);
-    CHECK(p.objective.acknowledged == p.sequence);
+    CHECK(p.run.objective.acknowledged == p.run.sequence);
     // A new native voyage resets objective state; arriving directly remains successful natively.
     boat_session_restart_voyage(&s, r);
     wake_plugin_reset_objective(&p, &s);
     observe_objective(&p, &s, 36, r->arrival_centre);
     wake_plugin_before_tick(&p);
-    CHECK(s.voyage.arrived && !strcmp(p.objective.hud[0].label, "TOUR MISSED"));
+    CHECK(s.voyage.arrived && !strcmp(p.run.objective.hud[0].label, "TOUR MISSED"));
     // Repeated shelter entries after arrival cannot retroactively complete the tour.
     observe_objective(&p, &s, 37, r->shelters[1].position);
     observe_objective(&p, &s, 48, r->shelters[2].position);
     wake_plugin_before_tick(&p);
-    CHECK(p.objective.hud[0].value == 0);
+    CHECK(p.run.objective.hud[0].value == 0);
     boat_session_destroy(&s);
     return 0;
 }
@@ -1144,7 +1144,7 @@ static int objective_revision_failure(void)
     BoatSession s;
     boat_session_init(&s, outer(), calm());
     CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
-    uint64_t initial = boat_plugin_objective_digest(&p.objective);
+    uint64_t initial = boat_plugin_objective_digest(&p.run.objective);
     BoatPluginBundle denied = original();
     denied.source = p.files.source;
     denied.source_size = p.files.source_size;
@@ -1165,8 +1165,8 @@ static int objective_revision_failure(void)
     BoatPluginBundle failed = boat_plugin_bundle(&candidate);
     CHECK(!boat_plugin_host_stage(&p.host, &failed));
     CHECK(p.host.diagnostic.status == BOAT_PLUGIN_RUNTIME);
-    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.generation == 1);
-    CHECK(boat_plugin_objective_digest(&p.objective) == initial);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.run.generation == 1);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == initial);
     candidate = p.files;
     // Only update fails; staging exercises init without changing active source/state.
     const char suffix[] = "\n-- new immutable behavior revision\n";
@@ -1180,24 +1180,24 @@ static int objective_revision_failure(void)
     memset(candidate.source, '!', candidate.source_size);
     CHECK(held->source[0] == '-'); // Not borrowed from the read/staging scratch buffer.
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
-    CHECK(p.generation == 2 && p.objective.hud[0].value == 0);
+    CHECK(p.run.generation == 2 && p.run.objective.hud[0].value == 0);
     CHECK(boat_plugin_host_active(&p.host)->number == 2);
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
     CHECK(boat_plugin_host_held(&p.host));
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 3));
-    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.generation == 3);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.run.generation == 3);
     // Inject a runtime failure into an accepted revision to exercise adapter quarantine.
     BoatPluginRevision *active = &p.host.slots[p.host.history[p.host.depth - 1]];
     const char bad[] = "return {init=function() return {},{} end, "
                        "update=function(c,s) c.random(); error('adapter failure') end}";
     memcpy(active->source, bad, sizeof(bad) - 1);
     active->source_size = sizeof(bad) - 1;
-    uint64_t before = boat_plugin_objective_digest(&p.objective);
+    uint64_t before = boat_plugin_objective_digest(&p.run.objective);
     observe_objective(&p, &s, 12, s.voyage.route->arrival_centre);
-    CHECK(s.voyage.arrived && p.objective.quarantined && !p.objective_pending);
-    CHECK(boat_plugin_objective_digest(&p.objective) == before);
-    CHECK(p.event_count && p.objective.acknowledged == 0);
-    CHECK(strstr(p.objective_diagnostic.message, "adapter failure"));
+    CHECK(s.voyage.arrived && p.run.objective.quarantined && !p.run.objective_pending);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == before);
+    CHECK(p.run.event_count && p.run.objective.acknowledged == 0);
+    CHECK(strstr(p.run.objective_diagnostic.message, "adapter failure"));
     boat_session_destroy(&s);
     return 0;
 }
@@ -1209,14 +1209,14 @@ static int objective_overflow(void)
     boat_session_init(&s, outer(), calm());
     CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
     observe_objective(&p, &s, 12, s.voyage.route->shelters[0].position);
-    CHECK(p.objective_pending);
+    CHECK(p.run.objective_pending);
     for (unsigned i = 0; i <= BOAT_PLUGIN_EVENTS; ++i) {
         boat_session_recover(&s);
         wake_plugin_after_tick(&p, &s);
     }
-    CHECK(p.objective.quarantined && p.event_count == BOAT_PLUGIN_EVENTS);
-    CHECK(p.objective.acknowledged == 0 && !p.objective_pending);
-    CHECK(strstr(p.objective_diagnostic.message, "overflow"));
+    CHECK(p.run.objective.quarantined && p.run.event_count == BOAT_PLUGIN_EVENTS);
+    CHECK(p.run.objective.acknowledged == 0 && !p.run.objective_pending);
+    CHECK(strstr(p.run.objective_diagnostic.message, "overflow"));
     observe_objective(&p, &s, 24, s.voyage.route->arrival_centre);
     CHECK(s.voyage.arrived);
     boat_session_destroy(&s);
@@ -1250,14 +1250,14 @@ static int objective_tick_parity(void)
         CHECK(same_boat(&a.boat, &b.boat));
         CHECK(same_progress(a.voyage, b.voyage));
         CHECK(same_storm(a.world.water.storm, b.world.water.storm));
-        CHECK(boat_plugin_objective_digest(&p.objective)
-            == boat_plugin_objective_digest(&replay.objective));
-        CHECK(p.objective_pending == replay.objective_pending);
+        CHECK(boat_plugin_objective_digest(&p.run.objective)
+            == boat_plugin_objective_digest(&replay.run.objective));
+        CHECK(p.run.objective_pending == replay.run.objective_pending);
     }
     printf("live_hash=%016llx lua_peak=%zu instructions=%llu host_bytes=%zu adapter_bytes=%zu\n",
-        (unsigned long long)boat_plugin_objective_digest(&p.objective),
-        p.objective_diagnostic.cost.peak_bytes,
-        (unsigned long long)p.objective_diagnostic.cost.instructions, sizeof(BoatPluginHost),
+        (unsigned long long)boat_plugin_objective_digest(&p.run.objective),
+        p.run.objective_diagnostic.cost.peak_bytes,
+        (unsigned long long)p.run.objective_diagnostic.cost.instructions, sizeof(BoatPluginHost),
         sizeof(WakePlugin));
     printf("launch_pair_cpu_ms=%.3f callbacks_200_cpu_ms=%.3f\n",
         1000.0 * launch_cost / CLOCKS_PER_SEC, 1000.0 * callback_cost / CLOCKS_PER_SEC);
@@ -1298,14 +1298,14 @@ static int objective_timers_reload(void)
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
-    CHECK(p.objective.timers_enabled && p.objective.timer_count == 1);
+    CHECK(p.run.objective.timers_enabled && p.run.objective.timer_count == 1);
     const BoatVoyageRoute *route = s.voyage.route;
     observe_objective(&p, &s, 12, route->shelters[0].position);
     wake_plugin_before_tick(&p);
-    CHECK(p.objective.timer_count == 1 && p.objective.hud[0].value == 0);
+    CHECK(p.run.objective.timer_count == 1 && p.run.objective.hud[0].value == 0);
     observe_objective(&p, &s, 24, route->shelters[0].position);
-    CHECK(p.objective_pending && p.objective.timer_count == 1);
-    CHECK(!p.staged_objective.timer_count && p.staged_objective.hud[0].value == 1);
+    CHECK(p.run.objective_pending && p.run.objective.timer_count == 1);
+    CHECK(!p.run.staged_objective.timer_count && p.run.staged_objective.hud[0].value == 1);
     // Metadata rename preserves committed timers and their pending consumption.
     char *name = strstr(files.manifest, "Timer test");
     CHECK(name);
@@ -1313,26 +1313,26 @@ static int objective_timers_reload(void)
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 2));
-    CHECK(p.objective_pending && p.objective.timer_count == 1);
+    CHECK(p.run.objective_pending && p.run.objective.timer_count == 1);
     wake_plugin_before_tick(&p);
-    CHECK(!p.objective.timer_count && p.objective.hud[0].value == 1);
+    CHECK(!p.run.objective.timer_count && p.run.objective.hud[0].value == 1);
     // Behavior edit waits for explicit restart; native clock is already at 24.
     files.source[files.source_size++] = ' ';
     bundle = boat_plugin_bundle(&files);
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 3));
-    CHECK(p.objective.timer_count == 1 && p.objective.timers[0].tick == 37);
-    unsigned generation = p.generation;
+    CHECK(p.run.objective.timer_count == 1 && p.run.objective.timers[0].tick == 37);
+    unsigned generation = p.run.generation;
     observe_objective(&p, &s, 48, s.voyage.route->shelters[0].position);
-    CHECK(p.objective_pending);
+    CHECK(p.run.objective_pending);
     // Undo code restarts with a fresh generation, dropping the due pending output.
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4));
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 5));
-    CHECK(p.generation == generation + 1 && !p.objective_pending);
-    CHECK(p.objective.timer_count == 1 && p.objective.timers[0].tick == 61);
-    CHECK(!p.objective.hud_count);
-    uint64_t before = boat_plugin_objective_digest(&p.objective);
+    CHECK(p.run.generation == generation + 1 && !p.run.objective_pending);
+    CHECK(p.run.objective.timer_count == 1 && p.run.objective.timers[0].tick == 61);
+    CHECK(!p.run.objective.hud_count);
+    uint64_t before = boat_plugin_objective_digest(&p.run.objective);
     // Failed init cannot replace the active timer or grant.
     const char *failure = "return {init=function() error('timer candidate') end,"
                           "update=function(c,s) return s,{} end}";
@@ -1344,17 +1344,18 @@ static int objective_timers_reload(void)
     files.source_size = (size_t)n;
     bundle = boat_plugin_bundle(&files);
     CHECK(!boat_plugin_host_stage(&p.host, &bundle));
-    CHECK(boat_plugin_objective_digest(&p.objective) == before);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == before);
     observe_objective(&p, &s, 72, s.voyage.route->shelters[0].position);
-    CHECK(p.objective_pending && !p.staged_objective.timer_count);
+    CHECK(p.run.objective_pending && !p.run.staged_objective.timer_count);
     for (unsigned i = 0; i <= BOAT_PLUGIN_EVENTS; ++i) {
         boat_session_recover(&s);
         wake_plugin_after_tick(&p, &s);
     }
-    CHECK(p.objective.quarantined && !p.objective_pending);
-    CHECK(p.objective.timer_count == 1 && boat_plugin_objective_digest(&p.objective) == before);
+    CHECK(p.run.objective.quarantined && !p.run.objective_pending);
+    CHECK(p.run.objective.timer_count == 1
+        && boat_plugin_objective_digest(&p.run.objective) == before);
     wake_plugin_before_tick(&p);
-    CHECK(p.objective.timer_count == 1); // Discarded staged output never consumes a due timer.
+    CHECK(p.run.objective.timer_count == 1); // Discarded staged output never consumes a due timer.
     boat_session_destroy(&s);
     return 0;
 }
@@ -1391,19 +1392,20 @@ static int live_migration(void)
     CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
     CHECK(!wake_plugin_open(&second, "plugins/shelter-tour", &s, 0));
     observe_objective(&p, &s, 12, s.voyage.route->shelters[1].position);
-    CHECK(p.objective_pending && p.staged_objective.hud[0].value == 1);
-    uint64_t before = boat_plugin_objective_digest(&p.objective);
-    uint64_t pending = boat_plugin_objective_digest(&p.staged_objective);
-    unsigned queued = p.event_count;
+    CHECK(p.run.objective_pending && p.run.staged_objective.hud[0].value == 1);
+    uint64_t before = boat_plugin_objective_digest(&p.run.objective);
+    uint64_t pending = boat_plugin_objective_digest(&p.run.staged_objective);
+    unsigned queued = p.run.event_count;
     CHECK(migration_bundle(
         &f, &p.files, 2, "function(c,s) c.random(); error('migration rejected') end"));
     BoatPluginBundle bundle = boat_plugin_bundle(&f);
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(p.host.change == BOAT_PLUGIN_MIGRATE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
-    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.generation == 1);
-    CHECK(p.objective_pending && boat_plugin_objective_digest(&p.objective) == before);
-    CHECK(boat_plugin_objective_digest(&p.staged_objective) == pending && p.event_count == queued);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.run.generation == 1);
+    CHECK(p.run.objective_pending && boat_plugin_objective_digest(&p.run.objective) == before);
+    CHECK(boat_plugin_objective_digest(&p.run.staged_objective) == pending
+        && p.run.event_count == queued);
     CHECK(migration_bundle(&f, &p.files, 2,
         "function(c,s) assert((c.previous_state_version==1 or c.previous_state_version==3) and "
         "c.state_version==2); "
@@ -1414,45 +1416,46 @@ static int live_migration(void)
     Boat boat = s.boat;
     BoatVoyage voyage = s.voyage;
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 2));
-    CHECK(p.generation == 2 && p.objective.state_version == 2 && !p.objective_pending);
+    CHECK(p.run.generation == 2 && p.run.objective.state_version == 2 && !p.run.objective_pending);
     CHECK(same_boat(&s.boat, &boat) && same_progress(s.voyage, voyage) && s.tick == 12);
-    CHECK(p.event_count == queued && p.objective.acknowledged == 0);
-    CHECK(p.objective.hud_count == 1 && !strcmp(p.objective.hud[0].id, "new"));
+    CHECK(p.run.event_count == queued && p.run.objective.acknowledged == 0);
+    CHECK(p.run.objective.hud_count == 1 && !strcmp(p.run.objective.hud[0].id, "new"));
     observe_objective(&p, &s, 24, s.voyage.route->shelters[1].position);
     wake_plugin_before_tick(&p);
-    CHECK(p.objective.acknowledged == p.sequence && p.objective.hud_count == 2);
+    CHECK(p.run.objective.acknowledged == p.run.sequence && p.run.objective.hud_count == 2);
     CHECK(wake_plugin_preview_save(&checkpoint, &p, &s));
     // Undo old code migrates current state after native time has advanced.
     CHECK(migration_bundle(&f, &p.files, 3, "function(c,s) return s,{} end"));
     bundle = boat_plugin_bundle(&f);
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 2));
-    CHECK(p.generation == 3 && p.objective.state_version == 3);
+    CHECK(p.run.generation == 3 && p.run.objective.state_version == 3);
     observe_objective(&p, &s, 36, s.voyage.route->shelters[2].position);
-    CHECK(p.objective_pending);
+    CHECK(p.run.objective_pending);
     voyage = s.voyage;
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
     CHECK(p.host.change == BOAT_PLUGIN_MIGRATE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 2));
-    CHECK(p.generation == 4 && p.objective.state_version == 2 && !p.objective_pending);
+    CHECK(p.run.generation == 4 && p.run.objective.state_version == 2 && !p.run.objective_pending);
     CHECK(s.tick == 36 && same_progress(voyage, s.voyage));
     // An invalid retirement batch cannot remove an already committed row.
-    before = boat_plugin_objective_digest(&p.objective);
+    before = boat_plugin_objective_digest(&p.run.objective);
     CHECK(migration_bundle(&f, &p.files, 3,
         "function(c,s) return s,{{kind='hud.remove',generation=c.generation,id='new'},"
         "{kind='hud.set',generation=1,id='bad',label='BAD',value=1}} end"));
     bundle = boat_plugin_bundle(&f);
     CHECK(boat_plugin_host_stage(&p.host, &bundle));
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 3));
-    CHECK(boat_plugin_objective_digest(&p.objective) == before && p.objective.hud_count == 1);
+    CHECK(
+        boat_plugin_objective_digest(&p.run.objective) == before && p.run.objective.hud_count == 1);
     // Old code has no migration: Undo explicitly resets alongside native voyage progress.
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4)); // Discard failed candidate.
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 5));
     CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, true, 6));
-    CHECK(p.generation == 5 && p.objective.state_version == 1 && !p.event_count);
+    CHECK(p.run.generation == 5 && p.run.objective.state_version == 1 && !p.run.event_count);
     CHECK(wake_plugin_preview_restore(&checkpoint, &p, &s, NULL, NULL));
-    CHECK(p.generation == 2 && p.objective.state_version == 2 && s.tick == 24);
+    CHECK(p.run.generation == 2 && p.run.objective.state_version == 2 && s.tick == 24);
     CHECK(boat_plugin_host_active(&p.host)->voyage.manifest.state_version == 2);
     CHECK(boat_plugin_host_undo(&p.host) && p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
     boat_session_destroy(&s);
@@ -1535,10 +1538,10 @@ static bool same_presentation(const BoatPresentation *a, const BoatPresentation 
 
 static bool same_trace(const WakePlugin *a, const WakePlugin *b)
 {
-    if (a->trace_count != b->trace_count)
+    if (a->run.trace_count != b->run.trace_count)
         return false;
-    for (unsigned i = 0; i < a->trace_count; ++i) {
-        const WakePluginTrace *x = &a->trace[i], *y = &b->trace[i];
+    for (unsigned i = 0; i < a->run.trace_count; ++i) {
+        const WakePluginTrace *x = &a->run.trace[i], *y = &b->run.trace[i];
         if (x->tick != y->tick || x->revision != y->revision || x->events != y->events
             || x->transition != y->transition || x->status != y->status || x->before != y->before
             || x->after != y->after || x->command_count != y->command_count)
@@ -1588,7 +1591,7 @@ static int preview_seek(void)
     // Save at a boundary with uncommitted output and queued notices.
     observe_objective(&p, &s, 12, s.voyage.route->shelters[1].position);
     objects.tick = s.tick;
-    CHECK(p.objective_pending && wake_plugin_preview_save(&checkpoint, &p, &s));
+    CHECK(p.run.objective_pending && wake_plugin_preview_save(&checkpoint, &p, &s));
     for (unsigned i = 0; i < 240; ++i) {
         ticks[i].input.throttle_rate = i < 100 ? 1 : 0;
         ticks[i].input.steering_rate = i < 100 ? .2f : -.2f;
@@ -1600,8 +1603,8 @@ static int preview_seek(void)
     BoatVoyage final_voyage = replay.voyage;
     BoatPresentation final_presentation = replay.presentation;
     BoatWakeObjects final_wakes = restored;
-    uint64_t final_hash = boat_plugin_objective_digest(&resumed.objective);
-    uint64_t staged_hash = boat_plugin_objective_digest(&resumed.staged_objective);
+    uint64_t final_hash = boat_plugin_objective_digest(&resumed.run.objective);
+    uint64_t staged_hash = boat_plugin_objective_digest(&resumed.run.staged_objective);
     // Compare seek with the production pre-step wakes / physics / stern / plugin ordering.
     for (unsigned i = 0; i < 240; ++i) {
         if (ticks[i].recover) {
@@ -1624,15 +1627,15 @@ static int preview_seek(void)
     CHECK(!same_wakes(&objects, &restored));
     --restored.emitters[0].tracked;
     CHECK(same_wakes(&traffic, &restored_traffic));
-    CHECK(boat_plugin_objective_digest(&p.objective) == final_hash);
-    CHECK(boat_plugin_objective_digest(&p.staged_objective) == staged_hash);
-    CHECK(p.event_count == resumed.event_count && p.sequence == resumed.sequence);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == final_hash);
+    CHECK(boat_plugin_objective_digest(&p.run.staged_objective) == staged_hash);
+    CHECK(p.run.event_count == resumed.run.event_count && p.run.sequence == resumed.run.sequence);
     CHECK(same_trace(&p, &resumed));
     // Destroy source ownership before restore: checkpoint owns all revision source/strings.
     memset(&p, 0, sizeof(p));
     CHECK(wake_plugin_preview_seek(
         &checkpoint, &resumed, &replay, &restored, &restored_traffic, ticks, 0));
-    CHECK(replay.tick == 12 && resumed.objective_pending && !resumed.watching);
+    CHECK(replay.tick == 12 && resumed.run.objective_pending && !resumed.watching);
     CHECK(replay.voyage.route == &boat_plugin_host_active(&resumed.host)->voyage.route);
     CHECK(!strcmp(replay.voyage.route->shelters[1].name, "BRIDGE"));
     CHECK(wake_plugin_preview_seek(
@@ -1640,9 +1643,9 @@ static int preview_seek(void)
     CHECK(same_boat(&final_boat, &replay.boat) && same_progress(final_voyage, replay.voyage));
     CHECK(same_presentation(&final_presentation, &replay.presentation));
     CHECK(same_wakes(&final_wakes, &restored) && restored.tick == 252);
-    CHECK(final_hash == boat_plugin_objective_digest(&resumed.objective));
-    CHECK(staged_hash == boat_plugin_objective_digest(&resumed.staged_objective));
-    CHECK(resumed.trace_count == WAKE_PLUGIN_TRACE && resumed.trace[15].command_count == 1);
+    CHECK(final_hash == boat_plugin_objective_digest(&resumed.run.objective));
+    CHECK(staged_hash == boat_plugin_objective_digest(&resumed.run.staged_objective));
+    CHECK(resumed.run.trace_count == WAKE_PLUGIN_TRACE && resumed.run.trace[15].command_count == 1);
     FILE *inspection = tmpfile();
     CHECK(inspection);
     wake_plugin_inspect(&resumed, inspection);

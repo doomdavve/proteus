@@ -6,19 +6,8 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_stage.h"
 #include "boat_session.h"
+#include "wake_velocity_objective.h"
 #include <stdio.h>
-
-#define WAKE_PLUGIN_TRACE 16
-
-typedef struct {
-    int64_t tick;
-    unsigned revision, events;
-    BoatPluginTransition transition;
-    BoatPluginStatus status;
-    uint64_t before, after;
-    BoatPluginCommand commands[BOAT_PLUGIN_COMMANDS];
-    unsigned command_count;
-} WakePluginTrace;
 
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
@@ -37,14 +26,7 @@ typedef struct {
     bool alert;
     const char *outcome; // Machine word for the latest status: "staging", "held", "applied", ...
     unsigned requests; // Staging requests begun, by saves, F5 or the tool bridge.
-    BoatPluginObjective objective, staged_objective;
-    BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
-    unsigned event_count, generation;
-    int64_t sequence;
-    bool objective_pending;
-    BoatPluginDiagnostic objective_diagnostic;
-    WakePluginTrace trace[WAKE_PLUGIN_TRACE]; // Oldest first; bounded inspection history.
-    unsigned trace_count;
+    WakeObjective run; // The objective transaction on the direct path.
 } WakePlugin;
 
 // Persistent native owner (all revision slots, file buffers, state/pending output, events,

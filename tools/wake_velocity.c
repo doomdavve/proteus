@@ -1263,7 +1263,7 @@ static int study(int argc, char **argv)
     static WakeLocal local;
 #define LOCAL_ELIGIBLE()                                                                           \
     (!networked && !work_mode && objects && !objects->crossing && !wake && !session.runs.playing   \
-        && plugin_active && !plugin.authoring && !plugin.objective.initialized                     \
+        && plugin_active && !plugin.authoring && !plugin.run.objective.initialized                 \
         && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
                     || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))

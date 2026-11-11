@@ -238,7 +238,7 @@ static int accept_init(WakePlugin *p, BoatSession *s, double now)
 {
     CHECK(model_reply(model_current()));
     CHECK(!wake_plugin_frame(p, s, false, false, false, now));
-    CHECK(p->objective.initialized && !p->objective.quarantined && !wake_plugin_waiting(p));
+    CHECK(p->run.objective.initialized && !p->run.objective.quarantined && !wake_plugin_waiting(p));
     return 0;
 }
 
@@ -261,7 +261,7 @@ static int begin_update(WakePlugin *p, BoatSession *s)
         observe(p, s, tick);
     CHECK(wake_plugin_waiting(p));
     CHECK(model_open_jobs() == 1);
-    CHECK(!p->objective_pending);
+    CHECK(!p->run.objective_pending);
     return 0;
 }
 
@@ -274,13 +274,13 @@ static int init_before_deadline(void)
     CHECK(begin(&p, &s, 100.0) == 0);
     CHECK(wake_plugin_waiting(&p));
     CHECK(model.started == 1 && model_open_jobs() == 1);
-    CHECK(!p.objective.initialized);
+    CHECK(!p.run.objective.initialized);
     unsigned job = model_current();
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 104.0));
-    CHECK(wake_plugin_waiting(&p) && !p.objective.quarantined);
+    CHECK(wake_plugin_waiting(&p) && !p.run.objective.quarantined);
     CHECK(model_reply(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, nextafter(105.0, 0.0)));
-    CHECK(p.objective.initialized && !p.objective.quarantined && !wake_plugin_waiting(&p));
+    CHECK(p.run.objective.initialized && !p.run.objective.quarantined && !wake_plugin_waiting(&p));
     CHECK(model_closed(job));
     wake_plugin_close(&p, &s);
     boat_session_destroy(&s);
@@ -297,8 +297,8 @@ static int init_at_deadline(void)
     unsigned job = model_current();
     CHECK(model_reply(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 105.0));
-    CHECK(p.objective.quarantined);
-    CHECK(!strcmp(p.objective_diagnostic.message, "isolated objective deadline"));
+    CHECK(p.run.objective.quarantined);
+    CHECK(!strcmp(p.run.objective_diagnostic.message, "isolated objective deadline"));
     CHECK(!wake_plugin_waiting(&p));
     CHECK(model_closed(job));
     wake_plugin_close(&p, &s);
@@ -314,14 +314,14 @@ static int update_at_deadline(void)
     model_reset();
     CHECK(begin_update(&p, &s) == 0);
     unsigned job = model_current();
-    uint64_t digest = boat_plugin_objective_digest(&p.objective);
-    CHECK(!p.objective_pending);
+    uint64_t digest = boat_plugin_objective_digest(&p.run.objective);
+    CHECK(!p.run.objective_pending);
     wake_plugin_before_tick(&p);
-    CHECK(boat_plugin_objective_digest(&p.objective) == digest);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == digest);
     CHECK(model_reply(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 106.0));
-    CHECK(p.objective.quarantined);
-    CHECK(!strcmp(p.objective_diagnostic.message, "isolated objective deadline"));
+    CHECK(p.run.objective.quarantined);
+    CHECK(!strcmp(p.run.objective_diagnostic.message, "isolated objective deadline"));
     CHECK(!wake_plugin_waiting(&p));
     CHECK(model_closed(job));
     wake_plugin_close(&p, &s);
@@ -337,17 +337,17 @@ static int update_before_deadline(void)
     model_reset();
     CHECK(begin_update(&p, &s) == 0);
     unsigned job = model_current();
-    uint64_t digest = boat_plugin_objective_digest(&p.objective);
+    uint64_t digest = boat_plugin_objective_digest(&p.run.objective);
     CHECK(model_reply(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, nextafter(106.0, 0.0)));
-    CHECK(!p.objective.quarantined && !wake_plugin_waiting(&p));
-    CHECK(p.objective_pending);
-    CHECK(boat_plugin_objective_digest(&p.objective) == digest);
+    CHECK(!p.run.objective.quarantined && !wake_plugin_waiting(&p));
+    CHECK(p.run.objective_pending);
+    CHECK(boat_plugin_objective_digest(&p.run.objective) == digest);
     wake_plugin_before_tick(&p);
-    CHECK(!p.objective_pending);
-    CHECK(p.objective.tick == 12);
-    CHECK(boat_plugin_objective_digest(&p.objective)
-        == boat_plugin_objective_digest(&p.staged_objective));
+    CHECK(!p.run.objective_pending);
+    CHECK(p.run.objective.tick == 12);
+    CHECK(boat_plugin_objective_digest(&p.run.objective)
+        == boat_plugin_objective_digest(&p.run.staged_objective));
     wake_plugin_close(&p, &s);
     boat_session_destroy(&s);
     return 0;
@@ -364,8 +364,8 @@ static int stale_receipt(void)
     boat_session_set_tick(&s, 13);
     CHECK(model_reply(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 102.0));
-    CHECK(p.objective.quarantined);
-    CHECK(!strcmp(p.objective_diagnostic.message, "stale objective receipt"));
+    CHECK(p.run.objective.quarantined);
+    CHECK(!strcmp(p.run.objective_diagnostic.message, "stale objective receipt"));
     CHECK(!wake_plugin_waiting(&p));
     CHECK(model_closed(job));
     wake_plugin_close(&p, &s);
@@ -383,8 +383,8 @@ static int failed_reply(void)
     unsigned job = model_current();
     CHECK(model_fail(job));
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 102.0));
-    CHECK(p.objective.quarantined);
-    CHECK(!strcmp(p.objective_diagnostic.message, "invalid or failed objective worker reply"));
+    CHECK(p.run.objective.quarantined);
+    CHECK(!strcmp(p.run.objective_diagnostic.message, "invalid or failed objective worker reply"));
     CHECK(!wake_plugin_waiting(&p));
     CHECK(model_closed(job));
     wake_plugin_close(&p, &s);
@@ -439,7 +439,7 @@ static int reset_and_repeated_sessions(void)
     CHECK(begin(&p, &second, 200.0) == 0);
     CHECK(model_reply(model_current()));
     CHECK(!wake_plugin_frame(&p, &second, false, false, false, 201.0));
-    CHECK(p.objective.initialized && !wake_plugin_waiting(&p));
+    CHECK(p.run.objective.initialized && !wake_plugin_waiting(&p));
     wake_plugin_close(&p, &second);
     CHECK(model_open_jobs() == 0);
     CHECK(model.shutdowns == 2);

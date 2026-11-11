@@ -102,8 +102,8 @@ static bool preview(WakePlugin *plugin, const BoatWorldResources *resources, uns
         && wake_plugin_preview_save(checkpoint, plugin, &session)
         && wake_plugin_preview_seek(
             checkpoint, plugin, &session, &objects, &traffic, inputs + split, ticks - split);
-    if (plugin->objective.quarantined) {
-        *d = plugin->objective_diagnostic;
+    if (plugin->run.objective.quarantined) {
+        *d = plugin->run.objective_diagnostic;
         ok = false;
     }
     if (ok) {
@@ -113,20 +113,20 @@ static bool preview(WakePlugin *plugin, const BoatWorldResources *resources, uns
                "\"pending_digest\":\"%016llx\",\"pending\":%s,\"generation\":%u,\"hud\":[",
             ticks, split, (double)session.boat.position.x, (double)session.boat.position.y,
             objects.live, traffic.live,
-            (unsigned long long)boat_plugin_objective_digest(&plugin->objective),
-            (unsigned long long)(plugin->objective_pending
-                    ? boat_plugin_objective_digest(&plugin->staged_objective)
+            (unsigned long long)boat_plugin_objective_digest(&plugin->run.objective),
+            (unsigned long long)(plugin->run.objective_pending
+                    ? boat_plugin_objective_digest(&plugin->run.staged_objective)
                     : 0),
-            plugin->objective_pending ? "true" : "false", plugin->generation);
-        for (unsigned i = 0; i < plugin->objective.hud_count; ++i) {
+            plugin->run.objective_pending ? "true" : "false", plugin->run.generation);
+        for (unsigned i = 0; i < plugin->run.objective.hud_count; ++i) {
             if (i)
                 putchar(',');
             printf("{\"id\":");
-            json_text(plugin->objective.hud[i].id);
+            json_text(plugin->run.objective.hud[i].id);
             printf(",\"label\":");
-            json_text(plugin->objective.hud[i].label);
+            json_text(plugin->run.objective.hud[i].label);
             // int64 JSON string avoids rounding in browser/tool consumers.
-            printf(",\"value\":\"%lld\"}", (long long)plugin->objective.hud[i].value);
+            printf(",\"value\":\"%lld\"}", (long long)plugin->run.objective.hud[i].value);
         }
         printf("]}");
     } else if (d->status == BOAT_PLUGIN_OK)
