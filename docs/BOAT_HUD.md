@@ -67,7 +67,7 @@ after INT 1 and the S-52 day palette:
 - **Lettering:** the HUD's 3×5 capitals, black for land features and magenta for the
   overprint, knocked out of a paper halo. Diacritics are dropped (ALVSBORGSBRON, LANGEDRAG).
 
-Code: [`boat_minimap.c`](../src/boat_minimap.c); the HUD's 3×5 lettering is shared through
+Code: [`boat_minimap.c`](../src/render/boat_minimap.c); the HUD's 3×5 lettering is shared through
 `boat_hud_glyph` (with G, J, X and Z added).
 
 Review captures (agent review, 2026-10-28, macOS arm64, CPU scene, composed by the
@@ -176,9 +176,9 @@ the case so it does not cover the instruments. Help covers the HUD.
 
 ## Original HUD integration handoff (historical)
 
-`src/boat_hud.[ch]` is presentation-only and linked in `proteus_render`. The draw function
+`src/render/boat_hud.[ch]` is presentation-only and linked in `proteus_render`. The draw function
 allocates no resources and retains no state. It needs raylib and three telemetry floats.
-The thrust helper (`src/boat_throttle.h`) shares detents and their visual positions. Core
+The thrust helper (`src/core/boat_throttle.h`) shares detents and their visual positions. Core
 physics and wire layouts retain their signed rate semantics. The multiplayer client adds an
 optional target service, generating ordinary rates from its predicted boat each tick; callers
 using the original rate service retain their behavior.
@@ -221,7 +221,7 @@ Manual keyboard play, connected native sessions and user acceptance remain pendi
 ## Held thrust, scroll direction and steering setting, 2026-10-24
 
 Completed task (user request): holding Up/W or Down/S repeats one thrust detent every 0.5 s
-(`boat_throttle_hold` in `src/boat_throttle.h`), with each new press stepping at once and
+(`boat_throttle_hold` in `src/core/boat_throttle.h`), with each new press stepping at once and
 restarting the wait. Scroll direction is flipped in `tools/wake_velocity.c` for native and browser
 input alike: scrolling down opens the throttle. The title's new SETTINGS panel (NAME, BOAT,
 STEERING, BACK) holds a persistent `mouse_steering=on|off` in `title.txt`; title sessions pass
@@ -238,7 +238,7 @@ mouse steering at session start from the title. User acceptance pending.
 Completed task: M mode toggle, `--mouse-steering`, horizontal target/dead zone, cursor/focus
 handling, scene-pixel mode label and per-tick steering target conversion for solo and predicted
 multiplayer. The core steering rules and wire input format retain their behavior. The shared
-unwind constant is now in `src/boat_steering.h` beside the pure mouse mapping/controller.
+unwind constant is now in `src/core/boat_steering.h` beside the pure mouse mapping/controller.
 
 Automated coverage adds all 49 wheel transitions in both float and wire-quantized form, checks
 settling and sustained holding within 0.0002 wheel units, and verifies mouse targets on the

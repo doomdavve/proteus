@@ -43,7 +43,7 @@ def constant(file, name):
     return int(re.search(r'^#define ' + name + r' (\d+)$', (source / file).read_text(), re.M)[1])
 metadata = {'commit': commit,
             'protocol': constant('src/boat_net_protocol.h', 'BOAT_NET_VERSION'),
-            'physics': constant('src/boat.h', 'BOAT_PHYSICS_REVISION')}
+            'physics': constant('src/core/boat.h', 'BOAT_PHYSICS_REVISION')}
 (output / 'deployment.json').write_text(json.dumps(metadata, indent=2) + '\n')
 PY
 printf 'Browser UI with released protocol/physics: %s/site\n' "$build_dir"

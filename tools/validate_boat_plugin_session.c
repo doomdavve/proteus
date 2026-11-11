@@ -1937,7 +1937,7 @@ static int grodan_tour(void)
 {
     double grodan, own;
     CHECK(!drive_tour(&boat_handling_grodan, *boat_handling_grodan.hull, &grodan));
-    // The speedboat's hull: src/boat.c HULL_BOW, HULL_STERN and HULL_HALF_BEAM.
+    // The speedboat's hull: src/core/boat.c HULL_BOW, HULL_STERN and HULL_HALF_BEAM.
     CHECK(!drive_tour(&boat_handling_speedboat, (BoatHull) { 2.0f, 1.6f, .75f, 0 }, &own));
     // The short canal loop: about a quarter of an hour at the autopilot's canal speed.
     CHECK(grodan > 8 && grodan < 25);

@@ -41,13 +41,13 @@ Do not add a general rigid-body engine, a new weapon, difficulty menus or hostin
 
 | Area | Baseline and consequence | Read first |
 | --- | --- | --- |
-| Grenade | 7 m astern, 1 s fuse, 4 m crest, 10 m/s propagation, 70 m range, 8 s recharge. Creates a radial wave; **no hull damage**. Wave amplitude already falls as `(1 - radius/range)^2`. | `src/boat_combat.[ch]`: default rules, `boat_combat_advance`; `src/boat_water.c`: `boat_water_radial_query` |
-| Stability | Ordinary wet-turn guard starts at 25 degrees; object worlds also receive automatic airborne and wet roll recovery. Capsize latches after 0.6 s of inverted wet contact. Several independent assists can erase a wave upset. | `src/boat.c`: constants, `hull_wet`, `motion_step`, `buoyancy_step`; `src/boat_pose.c` |
-| Torpedo | 40 damage against 100 health; 32 m/s, three per life, 0.25 s arming. Actual health removed drives damage feedback. | `src/boat_combat.c`: defaults, `boat_combat_hits`; `tools/validate_boat_combat.c`: `hits`, `torpedoes` |
-| Boat pairs | Whole-boat transformed vertical intervals reject separated boats, then heading-only rectangles choose a **horizontal** separation/impulse. A cabin corner can make intervals overlap even where hulls clear. No vertical pair response. | `src/boat.c`: `hull_vertical_bounds`, `boat_pair_*`; `src/boat.h`: `BoatPairContact`; `src/boat_fleet.c`: `boat_fleet_solve` |
-| Projectile hits | Moving-position slab sweep uses final heading and one box; pitch/roll are ignored. “3D” here means a height slab, not full-pose collision. | `src/boat_combat.c`: `hull_hit` |
-| Defeats | Match observation hard-codes hull destruction with a killer as **torpedo**. Grenade attribution currently comes from wave exposure. New grenade hull damage needs a real cause path. | `src/boat_match.c`: `touches`, `boat_match_observe`; `src/boat_match.h` |
-| Compatibility | Physics revision 9 / protocol 8 at this baseline. Default combat rules enter `boat_net_content_digest` through checkpoint encoding. Combat has full and compact codecs with fixed capacities. | `src/boat.h`, `src/boat_combat.[ch]`, `src/boat_net_protocol.[ch]`, `src/boat_prediction.c` |
+| Grenade | 7 m astern, 1 s fuse, 4 m crest, 10 m/s propagation, 70 m range, 8 s recharge. Creates a radial wave; **no hull damage**. Wave amplitude already falls as `(1 - radius/range)^2`. | `src/core/boat_combat.[ch]`: default rules, `boat_combat_advance`; `src/core/boat_water.c`: `boat_water_radial_query` |
+| Stability | Ordinary wet-turn guard starts at 25 degrees; object worlds also receive automatic airborne and wet roll recovery. Capsize latches after 0.6 s of inverted wet contact. Several independent assists can erase a wave upset. | `src/core/boat.c`: constants, `hull_wet`, `motion_step`, `buoyancy_step`; `src/core/boat_pose.c` |
+| Torpedo | 40 damage against 100 health; 32 m/s, three per life, 0.25 s arming. Actual health removed drives damage feedback. | `src/core/boat_combat.c`: defaults, `boat_combat_hits`; `tools/validate_boat_combat.c`: `hits`, `torpedoes` |
+| Boat pairs | Whole-boat transformed vertical intervals reject separated boats, then heading-only rectangles choose a **horizontal** separation/impulse. A cabin corner can make intervals overlap even where hulls clear. No vertical pair response. | `src/core/boat.c`: `hull_vertical_bounds`, `boat_pair_*`; `src/core/boat.h`: `BoatPairContact`; `src/core/boat_fleet.c`: `boat_fleet_solve` |
+| Projectile hits | Moving-position slab sweep uses final heading and one box; pitch/roll are ignored. “3D” here means a height slab, not full-pose collision. | `src/core/boat_combat.c`: `hull_hit` |
+| Defeats | Match observation hard-codes hull destruction with a killer as **torpedo**. Grenade attribution currently comes from wave exposure. New grenade hull damage needs a real cause path. | `src/core/boat_match.c`: `touches`, `boat_match_observe`; `src/core/boat_match.h` |
+| Compatibility | Physics revision 9 / protocol 8 at this baseline. Default combat rules enter `boat_net_content_digest` through checkpoint encoding. Combat has full and compact codecs with fixed capacities. | `src/core/boat.h`, `src/core/boat_combat.[ch]`, `src/boat_net_protocol.[ch]`, `src/boat_prediction.c` |
 
 ## Step 0 — reproducible encounter baseline
 
@@ -74,7 +74,7 @@ as passing or weaken an existing physical bound to make the baseline pass.
 
 ## Step 1 — one armed torpedo hit sinks a healthy boat
 
-Parent: step 0. Primary files: `src/boat_combat.c`, `tools/validate_boat_combat.c`,
+Parent: step 0. Primary files: `src/core/boat_combat.c`, `tools/validate_boat_combat.c`,
 `tools/validate_boat_match.c`, the deathmatch plan and `docs/PLAYING.md`.
 
 1. Set default torpedo damage to default full hull health (100 at this baseline). Continue
@@ -138,7 +138,7 @@ Record that first-candidate limitation and check a quay encounter during review.
 
 ## Step 3 — let strong wave encounters overcome assistance
 
-Parent: step 2. Primary files: `src/boat.c`, stability/arcade/banking validators and shared
+Parent: step 2. Primary files: `src/core/boat.c`, stability/arcade/banking validators and shared
 review fixtures; `docs/ARCADE_STABILITY.md`, `docs/BOAT_PHYSICS_PLAN.md`.
 
 Start with shared behavior, because the physical problem exists in free boating too. Do not
@@ -181,7 +181,7 @@ scoped follow-up; do not improvise a client-only deathmatch multiplier.
 ## Step 4 — full-pose boat contact detection
 
 Parent: step 3. Change geometry/detection first; vertical response follows in step 5.
-Primary files: `src/boat.[ch]`, `src/boat_pose.[ch]`, `src/boat_model.[ch]`,
+Primary files: `src/core/boat.[ch]`, `src/core/boat_pose.[ch]`, `src/core/boat_model.[ch]`,
 `tools/validate_boat_fleet.c`, `tools/boat_fleet_review.c`. A small core contact module is
 acceptable if these helpers would otherwise overgrow `boat.c`; no general framework.
 
@@ -213,7 +213,7 @@ still do. These tests must expose why a smaller global height threshold is insuf
 
 ## Steps 5a–5c — vertical contacts and crossings during a tick
 
-Parent: step 4. Primary files: pair solver in `src/boat.c`, `src/boat_fleet.c`, pose motion
+Parent: step 4. Primary files: pair solver in `src/core/boat.c`, `src/core/boat_fleet.c`, pose motion
 helpers, fleet/match/net/prediction validators and review fixtures.
 
 Execute these as three mandatory stacked PRs: **5a** implements paragraphs 1–2 and the

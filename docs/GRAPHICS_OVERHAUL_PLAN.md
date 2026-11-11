@@ -486,7 +486,7 @@ Stage coverage: G0. **Depends on:** current main.
 Human review: No human gate; establishes all three review batches.
 
 **Read first:** `tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`,
-`src/renderer_gpu.[ch]`, [performance](BOATING_PERFORMANCE.md), [testing](TESTING.md).
+`src/render/renderer_gpu.[ch]`, [performance](BOATING_PERFORMANCE.md), [testing](TESTING.md).
 
 **Tasks, in order:**
 
@@ -545,7 +545,7 @@ The current Debug table is history, not a substitute. No look/default change.
   are linked there alongside the GeForce matrix and deferred river hitch.
 - Next checkpoint/task and files to read: G0w task 1, then G1; read
   `tools/boat_water_review.c`, [Boating performance](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01)
-  and `src/renderer_gpu.c`.
+  and `src/render/renderer_gpu.c`.
 
 ### G0w — Native performance capture and Windows-to-Mac reports
 
@@ -555,8 +555,8 @@ Human review: collect the first Windows baseline when the user has the machine a
 at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
 before that hardware run; Windows performance remains unqualified until actual reports return.
 
-**Read first:** `src/profiler.[ch]`, `src/boat_profile.[ch]`, `tools/wake_velocity.c`,
-`tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/renderer_gpu.[ch]`,
+**Read first:** `src/render/profiler.[ch]`, `src/boat_profile.[ch]`, `tools/wake_velocity.c`,
+`tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
 `CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
 `tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),
 [testing](TESTING.md) and [releases](RELEASES.md). Proposed new tool names below are design targets,
@@ -719,8 +719,8 @@ No new human acceptance is claimed.
 Stage coverage: G1. **Depends on:** G0 budgets/review manifest and G0w capture tools.
 Human review: Batch A after G2b; agent checks still run here.
 
-**Read first:** `src/renderer_gpu.[ch]` (`draw_colored_mesh`, `draw_life`, `box_in_view`,
-`set_water_uniforms`), `src/waterfront_scene.[ch]`, `assets/shaders/waterfront_city.*`, [3D](3D.md),
+**Read first:** `src/render/renderer_gpu.[ch]` (`draw_colored_mesh`, `draw_life`, `box_in_view`,
+`set_water_uniforms`), `src/render/waterfront_scene.[ch]`, `assets/shaders/waterfront_city.*`, [3D](3D.md),
 [performance](BOATING_PERFORMANCE.md).
 
 **Tasks, in order:**
@@ -757,7 +757,7 @@ widen tolerance.
   stress CPU gate as changed by the owner below. No human review is implied.
 - Commit(s): `73e0a1b` caches uniform locations and culls transformed objects per pass. The
   instancing change is on `feat/graphics-g1-instancing`, stacked on this package's branch.
-- Interfaces/owners: `ObjectBatch` in `src/renderer_gpu.c` records `draw_life`/`draw_scenery`
+- Interfaces/owners: `ObjectBatch` in `src/render/renderer_gpu.c` records `draw_life`/`draw_scenery`
   objects and replays contiguous same-mesh runs from one bounded 8,192-instance buffer; a full
   batch replays early, in order, so storage never grows. Scalar is the reference path
   (`waterfront_gpu_scene_set_instancing_enabled`) and the fallback if setup fails. Both programs
@@ -811,8 +811,8 @@ widen tolerance.
 Stage coverage: G2 parts 1. **Depends on:** G1.
 Human review: Batch A after G2b.
 
-**Read first:** `src/renderer_gpu.[ch]` (`MeshBuilder`, `builder_triangle`), `src/boat_gpu.[ch]`,
-`src/boat_model.[ch]`, `src/boat_scenery.[ch]`, [3D](3D.md).
+**Read first:** `src/render/renderer_gpu.[ch]` (`MeshBuilder`, `builder_triangle`), `src/render/boat_gpu.[ch]`,
+`src/core/boat_model.[ch]`, `src/scenery/boat_scenery.[ch]`, [3D](3D.md).
 
 **Tasks, in order:**
 
@@ -903,7 +903,7 @@ are not in the table, and peak bind memory was not measured.
 Stage coverage: G2 parts 2–3. **Depends on:** G2a.
 Human review: Batch A: geometry and submission review.
 
-**Read first:** `src/renderer_gpu.[ch]` (tile drawing and near/far shadow cameras),
+**Read first:** `src/render/renderer_gpu.[ch]` (tile drawing and near/far shadow cameras),
 `tools/boat_water_review.c`, [shadow coverage](3D.md#gameplay-shadow-coverage),
 [sunset](SUNSET_PLAN.md).
 
@@ -1036,7 +1036,7 @@ Record revision, commands, settings, route, player, date, verdict, actions and u
 Stage coverage: G3 part 1. **Depends on:** G2b and Batch A verdict resolved.
 Human review: Batch B after G4.
 
-**Read first:** `src/boat_gpu.[ch]`, `src/renderer_gpu.[ch]`, `assets/shaders/waterfront_water.vs`,
+**Read first:** `src/render/boat_gpu.[ch]`, `src/render/renderer_gpu.[ch]`, `assets/shaders/waterfront_water.vs`,
 `assets/shaders/waterfront_water.fs`, [wake rewrite](WAKE_REWRITE_PLAN.md),
 [performance](BOATING_PERFORMANCE.md).
 
@@ -1082,7 +1082,7 @@ Commits: `676b12f` (field, stamp shader, sampled water shading, probe and fallba
   highlight; crest foam feeds only the fragment's foam band. Vertex height stays analytic: up to
   38,864 near-patch triangles a frame in the stress fixture still loop over all live pieces in
   the vertex shader. That loop, not the fragment one, is the remaining per-piece GPU work.
-- **Interfaces and ownership:** `WaterfrontWakeStamp` (`src/waterfront_wake_stamp.[ch]`) is
+- **Interfaces and ownership:** `WaterfrontWakeStamp` (`src/render/waterfront_wake_stamp.[ch]`) is
   owned by each `WaterfrontGpuScene`, created with it and destroyed with it, so each view and
   context owns its field. `prepare_object_wakes` packs the records once a draw, places and
   stamps before any pass, and restores the caller's target; the record texture gained a third
@@ -1137,8 +1137,8 @@ Commits: `676b12f` (field, stamp shader, sampled water shading, probe and fallba
 Stage coverage: G3 parts 2–3. **Depends on:** G3a.
 Human review: Batch B after G4.
 
-**Read first:** G3a field owner/shaders, `src/waterfront_scene.[ch]`, `src/waterfront_harbor.[ch]`,
-`src/waterfront_flock.[ch]`, [wake constraints](WAKE_REWRITE_PLAN.md).
+**Read first:** G3a field owner/shaders, `src/render/waterfront_scene.[ch]`, `src/core/waterfront_harbor.[ch]`,
+`src/core/waterfront_flock.[ch]`, [wake constraints](WAKE_REWRITE_PLAN.md).
 
 **Tasks, in order:**
 
@@ -1176,7 +1176,7 @@ Batch B. Owner: P2, on draft PR #134.
 
 - **State:** machine-verified. Commits `02fa6bf` (history owner, shaders and renderer),
   `69ba462` (check, schema 7 benchmark, review clip) and the docs commit that records this.
-- **Interfaces and owners:** `src/waterfront_water_history.[ch]` owns the history: two
+- **Interfaces and owners:** `src/render/waterfront_water_history.[ch]` owns the history: two
   512x512 RGBA16F ping-pong states (R foam, G ripple height, B previous height) and an RGBA8
   shore mask, 0.25 m texels over 128 m around the player, 5 MB. `waterfront_water_history.vs/.fs`
   runs a substep (mode 0) or fills (mode 1, clears and the mask). `renderer_gpu.c` owns one per
@@ -1248,7 +1248,7 @@ Batch B. Owner: P2, on draft PR #134.
 Stage coverage: G4. **Depends on:** G3b.
 Human review: Batch B: living water and place.
 
-**Read first:** `tools/map_pack.py`, `src/boat_scenery.[ch]`, `src/renderer_gpu.[ch]`,
+**Read first:** `tools/map_pack.py`, `src/scenery/boat_scenery.[ch]`, `src/render/renderer_gpu.[ch]`,
 `assets/shaders/waterfront_water.*` (`exposure`), `cmake/Web.cmake`, [river guide](river/README.md),
 [web](WEB_BUILD.md), [protocol](MULTIPLAYER_PROTOCOL.md).
 
@@ -1294,7 +1294,7 @@ and basin the same day. Owner: P2.
   (opaque depth copy and quay contact), `eed48bd` (atlas exposure), `4f530b5` (gusts, glitter and
   squall water), `bddd335` (F8 water layers and docs).
 - **Contract:** `assets/geometry/<map>/water_atlas.bin` is an optional, versioned sidecar ("PWAT"
-  v1, `src/boat_water_atlas.h`) baked deterministically in C from the compiled water and keyed to
+  v1, `src/scenery/boat_water_atlas.h`) baked deterministically in C from the compiled water and keyed to
   it: shore distance, estimated depth (a bank profile, not bathymetry), shelter and chop; river
   615×494 at 4 m, outer 1190×778 at 8 m. Physics, the server and the content digest never read
   it; missing, stale or malformed atlases load nothing and the hand-written field stays. The
@@ -1377,7 +1377,7 @@ Any seams at the atlas edge or around the boat's wave patch?
 Stage coverage: G5 parts 1–2. **Depends on:** G4 and Batch B verdict resolved.
 Human review: Batch C after G5c.
 
-**Read first:** `src/boat_gpu.[ch]`, `src/renderer_gpu.[ch]`, `tools/wake_velocity.c`,
+**Read first:** `src/render/boat_gpu.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/wake_velocity.c`,
 `assets/shaders/`, `cmake/Web.cmake`, [3D](3D.md), [web](WEB_BUILD.md), [boating](BOATING_PLAN.md).
 
 **Tasks, in order:**
@@ -1455,7 +1455,7 @@ Stage coverage: G5 parts 3–4. **Depends on:** G5a; external sunset shared fram
 prerequisites below.
 Human review: Batch C after G5c.
 
-**Read first:** `src/renderer_gpu.[ch]` (`select_local_lights`), `src/waterfront_scene.[ch]`,
+**Read first:** `src/render/renderer_gpu.[ch]` (`select_local_lights`), `src/render/waterfront_scene.[ch]`,
 `assets/shaders/waterfront_city.*`, `assets/shaders/waterfront_water.*`, [sunset
 owner](SUNSET_PLAN.md), [plugins](PLUGIN_PLAN.md).
 
@@ -1497,7 +1497,7 @@ stays open.
 - State: machine-verified on the M1 Max; human review is Batch C.
 - Task 1: the sunset frame and fixed presets merged in #138 and the user approved them on
   2026-11-03; G5b reads `WaterfrontLighting.window_light` and adds no clock, phase or setting.
-- Interfaces/owners and decisions to preserve: `src/waterfront_lights.[ch]` owns the clusters
+- Interfaces/owners and decisions to preserve: `src/render/waterfront_lights.[ch]` owns the clusters
   (8 m world X/Z cells wrapped onto 64 × 64 slots, 16 lights per slot, 1,024 lights, rank order
   intensity × radius then lower ID, stats for drops/clipping/overflow) and the RGBA32F upload
   layout. Slots depend on no camera, so the view, reflection and water read the same lists. Stable
@@ -1553,8 +1553,8 @@ stays open.
 Stage coverage: G5 part 5 and qualification. **Depends on:** G5b.
 Human review: Batch C: resolution, mood and final integrated review.
 
-**Read first:** `tools/map_pack.py`, `src/boat_scenery.[ch]`, `src/renderer_gpu.[ch]`,
-`src/boat_gpu.[ch]`, particle recipes in `src/waterfront_scene.[ch]`, [3D](3D.md),
+**Read first:** `tools/map_pack.py`, `src/scenery/boat_scenery.[ch]`, `src/render/renderer_gpu.[ch]`,
+`src/render/boat_gpu.[ch]`, particle recipes in `src/render/waterfront_scene.[ch]`, [3D](3D.md),
 [testing](TESTING.md).
 
 **Tasks, in order:**
@@ -1596,7 +1596,7 @@ default-resolution change without a later explicit user decision.
   ambient occlusion), `673f1d2` (particle reference and cost switch), then the F9 toggle and
   these docs.
 - Task 1, ambient occlusion: `tools/ambient_bake.c` writes `assets/geometry/<map>/ambient.bin`
-  (`src/boat_ambient.[ch]`: one byte per scenery triangle corner, 24 fixed rays within 6 m,
+  (`src/scenery/boat_ambient.[ch]`: one byte per scenery triangle corner, 24 fixed rays within 6 m,
   nearness-weighted; facade corners are point samples, other corners the mean of four points in
   their third of the triangle; water open; keyed to the pack). It loads after the water atlas in
   `boat_scenery_load_location`, optional like G4's sidecar; legacy packs, flat facets and authored
@@ -1740,7 +1740,7 @@ identifies a backend-limited fix.
 Human review: Only if opened; no routine fourth playtest.
 
 **Read first:** [G0 results](#g0--measurement-and-review-harness),
-[performance](BOATING_PERFORMANCE.md), [3D](3D.md), `src/renderer_gpu.[ch]`, [web
+[performance](BOATING_PERFORMANCE.md), [3D](3D.md), `src/render/renderer_gpu.[ch]`, [web
 guide](WEB_BUILD.md).
 
 **Tasks, in order:**

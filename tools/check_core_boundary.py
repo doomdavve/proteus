@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 ALLOWED_QUOTED = {"raylib.h", "raymath.h"}
-GEOMETRY_INCLUDE = re.compile(r"\.\./assets/geometry/[a-z]+/water\.h")
+GEOMETRY_INCLUDE = re.compile(r"\.\./\.\./assets/geometry/[a-z]+/water\.h")
 ALLOWED_SYSTEM = {
     "assert.h", "float.h", "limits.h", "math.h", "stdbool.h", "stddef.h", "stdint.h",
     "stdlib.h", "string.h", "time.h", "Accelerate/Accelerate.h",

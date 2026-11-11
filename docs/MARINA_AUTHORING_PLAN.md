@@ -54,9 +54,9 @@ must be kept synchronized until then.
 
 ## M1: structures and capacity
 
-Read `src/boat_scene_definition.[ch]` (including validation), `src/waterfront_harbor.[ch]`,
+Read `src/core/boat_scene_definition.[ch]` (including validation), `src/core/waterfront_harbor.[ch]`,
 `src/boat_plugin_lua.c`, `src/boat_plugin_wire.[ch]`,
-`src/waterfront_scene.[ch]` and `docs/HARBOR_BOATS.md`. Confirm current filenames and ownership
+`src/render/waterfront_scene.[ch]` and `docs/HARBOR_BOATS.md`. Confirm current filenames and ownership
 before editing; these entry points do not prescribe a broad refactor.
 
 Replace the fixed pontoon recipes with configurable walkway and finger-pier pieces, fixed
@@ -86,8 +86,8 @@ Acceptance:
 
 ## M2: boat appearance
 
-Read `src/boat_model.[ch]`, `src/waterfront_harbor.[ch]`,
-`src/boat_scene_definition.[ch]`, validation in `src/boat_scene_definition.[ch]` and both renderers.
+Read `src/core/boat_model.[ch]`, `src/core/waterfront_harbor.[ch]`,
+`src/core/boat_scene_definition.[ch]`, validation in `src/core/boat_scene_definition.[ch]` and both renderers.
 
 Keep registered hull recipes as starting shapes; add bounded length, beam, mast-height and
 hull/deck/trim color overrides plus a name painted on the hull. Define which recipes have a
@@ -128,11 +128,11 @@ ferry keep their existing recipes.
 
 | Owner at the baseline | Current behavior and M2 work |
 | --- | --- |
-| [`boat_model.[ch]`](../src/boat_model.h) | `BoatModelSpec` already has length, beam, mast height and hull/deck/trim colors. `BoatModel` is caller-owned, capped at 1,024 triangles and must not be copied after initialization because its mesh points into its own arrays. Resolve overrides before generation; add bounded hull lettering without copying initialized mesh views. |
-| [`boat_scene_definition.[ch]`](../src/boat_scene_definition.h), [`boat_plugin_lua.c`](../src/boat_plugin_lua.c) | `BoatSceneBerth` stores recipe/placement/mooring only. Add pointer-free appearance data, strict Lua decoding, structural validation and explicit-field digests. Keep IDs separate from painted names. |
-| [`boat_plugin.c`](../src/boat_plugin.c), [`waterfront_harbor.[ch]`](../src/waterfront_harbor.h) | Placement, traffic clearance, water pose, ropes, contacts and camera bounds obtain a spec by recipe. Route every authored-berth consumer through one resolved spec, including discovery's reported hull dimensions. Preserve the existing excursion margins. |
-| [`boat_view.[ch]`](../src/boat_view.h), [`waterfront.c`](../src/waterfront.c), [`renderer_gpu.[ch]`](../src/renderer_gpu.h) | CPU harbor drawing indexes static recipe meshes; GPU scene bind uploads seven recipe meshes and drawing indexes `frame.recipes`. Add view-owned bounded per-boat resources, revision refresh and destruction. A transform alone cannot supply different colors or names to two boats sharing a recipe. |
-| [`boat_plugin_wire.c`](../src/boat_plugin_wire.c), [`boat_room_definition.c`](../src/boat_room_definition.c), [`plugin_author.js`](../web/plugin_author.js) | Native/browser staging and the room codec encode scene fields explicitly. Carry appearance through both codecs and the browser decoder; update magic/version checks, catalog generation, source export and content identity together. Clients continue consuming data without Lua. |
+| [`boat_model.[ch]`](../src/core/boat_model.h) | `BoatModelSpec` already has length, beam, mast height and hull/deck/trim colors. `BoatModel` is caller-owned, capped at 1,024 triangles and must not be copied after initialization because its mesh points into its own arrays. Resolve overrides before generation; add bounded hull lettering without copying initialized mesh views. |
+| [`boat_scene_definition.[ch]`](../src/core/boat_scene_definition.h), [`boat_plugin_lua.c`](../src/boat_plugin_lua.c) | `BoatSceneBerth` stores recipe/placement/mooring only. Add pointer-free appearance data, strict Lua decoding, structural validation and explicit-field digests. Keep IDs separate from painted names. |
+| [`boat_plugin.c`](../src/boat_plugin.c), [`waterfront_harbor.[ch]`](../src/core/waterfront_harbor.h) | Placement, traffic clearance, water pose, ropes, contacts and camera bounds obtain a spec by recipe. Route every authored-berth consumer through one resolved spec, including discovery's reported hull dimensions. Preserve the existing excursion margins. |
+| [`boat_view.[ch]`](../src/render/boat_view.h), [`waterfront.c`](../src/render/waterfront.c), [`renderer_gpu.[ch]`](../src/render/renderer_gpu.h) | CPU harbor drawing indexes static recipe meshes; GPU scene bind uploads seven recipe meshes and drawing indexes `frame.recipes`. Add view-owned bounded per-boat resources, revision refresh and destruction. A transform alone cannot supply different colors or names to two boats sharing a recipe. |
+| [`boat_plugin_wire.c`](../src/boat_plugin_wire.c), [`boat_room_definition.c`](../src/core/boat_room_definition.c), [`plugin_author.js`](../web/plugin_author.js) | Native/browser staging and the room codec encode scene fields explicitly. Carry appearance through both codecs and the browser decoder; update magic/version checks, catalog generation, source export and content identity together. Clients continue consuming data without Lua. |
 | [`plugin_schema.py`](../tools/plugin_schema.py), [`PLUGIN_API.md`](PLUGIN_API.md), [`HARBOR_BOATS.md`](HARBOR_BOATS.md) | Schemas, discovery and guides currently promise fixed recipes. Update live claims with the implemented contract; retain dated baseline findings as history. |
 
 #### Proposed contract for implementation
@@ -317,8 +317,8 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 
 ## M3: authored routes and docking motion
 
-Read `src/waterfront_traffic.[ch]`, `src/waterfront_upstream.[ch]`,
-validation in `src/boat_scene_definition.[ch]`, `src/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
+Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
+validation in `src/core/boat_scene_definition.[ch]`, `src/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
 
 Add bounded plugin-authored waypoint routes with native smooth turns, speed limits, stops,
 slow docking approaches and departure maneuvers. Define open versus looping routes, heading

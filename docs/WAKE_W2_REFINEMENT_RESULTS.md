@@ -6,7 +6,7 @@ Current status and next task: [runtime feasibility checkpoint](WAKE_RUNTIME_RESU
 The intervening [matched-accuracy proof](WAKE_W2_FIELD_RESULTS.md) completed W2.1's numerical gates.
 The decisions/measurements below describe this earlier checkpoint; exact baseline reproduction
 requires that commit.
-Implementation: [boat_wake.c](../src/boat_wake.c),
+Implementation: [boat_wake.c](../src/core/boat_wake.c),
 [review tool](../tools/wake_field_review.c).
 
 The owned candidate now has a positive polynomial-tail correction and optional fourth/eighth
@@ -168,13 +168,13 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ./build/wake_field_review --check
-cc -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tools/wake_field_review.c src/boat_wake.c -lm -o build/wake_field_review_optimized
+cc -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tools/wake_field_review.c src/core/boat_wake.c -lm -o build/wake_field_review_optimized
 ./build/wake_field_review_optimized --accuracy > build/wake-w2b-accuracy.json
 ./build/wake_field_review_optimized --small > build/wake-w2b-small-rejected.json
 # The --small command above intentionally exits 1: the small domain fails its declared gate.
 ./build/wake_field_review_optimized build/wake-w2b-domain.ppm > build/wake-w2b-domain.json
 sips -s format png build/wake-w2b-domain.ppm --out build/wake-w2b-domain.png
-cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tools/wake_field_review.c src/boat_wake.c -lm -o build/wake_field_review_sanitize
+cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tools/wake_field_review.c src/core/boat_wake.c -lm -o build/wake_field_review_sanitize
 ./build/wake_field_review_sanitize --check
 xcrun xctrace record --template 'Time Profiler' --output build/wake-w2b-cost.trace --launch -- ./build/wake_field_review_optimized --accuracy
 ```

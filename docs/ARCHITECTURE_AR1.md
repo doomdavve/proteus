@@ -120,7 +120,7 @@ version stay v14. Candidates, each tied to its ledger row:
 
 | Need | Why v14 lacks it |
 | --- | --- |
-| Handling class per slot | Fleet steps every slot with `boat_step` (`src/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/boat_session.c:148-149`). |
+| Handling class per slot | Fleet steps every slot with `boat_step` (`src/core/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/boat_session.c:148-149`). |
 | Current and crossing water | Rooms use calm water without them (`tools/wake_velocity.c:365-371`). |
 | Restart session (new generation) | SpawnRequest respawns one boat; solo reset sets the tick back to 0 (`src/boat_session.c:20`) and restarts water and wakes. See [restart](#restart-and-session-generations). |
 | Full-precision commands | v14 rates are `int8` ×127 (`src/boat_net_protocol.h:141`, `src/boat_net_protocol.c:1109-1121`); see D4 and the hosted-path risk below. |
@@ -264,7 +264,7 @@ limits, and produced late commands), and raising the catch-up cap (same clock co
 
 The replay recorder needs the camera-follow value that today comes from presentation
 (`src/boat_replay.h:28-30`). It is one exponential follow of heading
-(`src/boat_presentation.c:258-260`); the time-trial group gives the recorder its own copy of that
+(`src/render/boat_presentation.c:258-260`); the time-trial group gives the recorder its own copy of that
 expression so the authority links no renderer and replay bytes stay identical. Pose ghosts stay
 `BoatReplay` files; P5g session records, when they land, are the format for authority
 command/state recordings; resumable state stays the sandbox save. Personal save paths and best
@@ -288,7 +288,7 @@ Working harbour stays native-only (D7). Offline solo needs no remote server.
 ## 8. Command precision
 
 Solo feeds float rates to the simulation; throttle is always target-derived
-(`src/boat_throttle.h:72-76`) and mouse/touch steering too (`src/boat_steering.h:25-31`); only
+(`src/core/boat_throttle.h:72-76`) and mouse/touch steering too (`src/core/boat_steering.h:25-31`); only
 keyboard steering is exactly ±1/0. v14 rounds rates to 1/127, so adopting it would change solo
 handling slightly everywhere, including the throttle approach to its target.
 

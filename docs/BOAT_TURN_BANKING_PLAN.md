@@ -43,10 +43,10 @@ Source audit at `7d5fd48`, with a clean starting worktree:
 
 | Location | Relevant behavior / required integration |
 | --- | --- |
-| `src/boat.c`, `boat_step` | 120 Hz. Computes water-relative propulsion, longitudinal drag, two lateral hull-station forces, and skeg force; applies horizontal/yaw motion, contacts, then buoyancy. Capture loads before contacts. |
-| `src/boat.c`, `buoyancy_step` | Six unilateral supports already integrate heave, pitch, roll and their velocities. Add one applied roll moment here, before integration. |
-| `src/boat.c`, `hull_rotation`, `hull_motion`, `boat_player_pose` | Shared rolled pose and attachment velocities already exist. Rendering reflects simulation X. Test physical sides, not Euler-component guesses. |
-| `src/boat.h` | Owns `roll`, `roll_velocity`, `planing`; add only the filtered turn-load state if using the specified filter. |
+| `src/core/boat.c`, `boat_step` | 120 Hz. Computes water-relative propulsion, longitudinal drag, two lateral hull-station forces, and skeg force; applies horizontal/yaw motion, contacts, then buoyancy. Capture loads before contacts. |
+| `src/core/boat.c`, `buoyancy_step` | Six unilateral supports already integrate heave, pitch, roll and their velocities. Add one applied roll moment here, before integration. |
+| `src/core/boat.c`, `hull_rotation`, `hull_motion`, `boat_player_pose` | Shared rolled pose and attachment velocities already exist. Rendering reflects simulation X. Test physical sides, not Euler-component guesses. |
+| `src/core/boat.h` | Owns `roll`, `roll_velocity`, `planing`; add only the filtered turn-load state if using the specified filter. |
 | `src/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
 | `tools/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
 | `tools/validate_boat_environment.c`, `tools/validate_boat_replay.c`, `tools/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
@@ -227,7 +227,7 @@ existing behavior only; new banking expectations activate with T2.
 
 ### T2 — Implement the specified model
 
-Edit `src/boat.[ch]`, the focused validator, replay revision and directly affected fixtures.
+Edit `src/core/boat.[ch]`, the focused validator, replay revision and directly affected fixtures.
 Expose load diagnostics only as needed for tests/reports; no runtime HUD/API framework.
 Preserve existing force ordering and use the specified moment/filter/guard equations.
 

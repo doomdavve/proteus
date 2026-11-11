@@ -222,7 +222,7 @@ define emission visibility between ticks; introducing `BoatWorld` alone does not
 
 ### P1 — frame/tick records and timing boundaries
 
-Read/edit: `src/profiler.[ch]`, `tools/wake_velocity.c`; add `src/boat_profile.[ch]` for boating-specific
+Read/edit: `src/render/profiler.[ch]`, `tools/wake_velocity.c`; add `src/boat_profile.[ch]` for boating-specific
 records/reporting so the main demo's existing profiler output remains compatible.
 
 1. Add a bounded metrics record. Store completed-frame wall time, simulation-loop total, physics
@@ -247,8 +247,8 @@ a test that merely duplicates timer calls.
 
 ### P2 — benchmark tool, counts, and report contract
 
-Read/edit: `tools/boat_water_review.c`, `tools/wake_velocity.c`, `src/boat_gpu.[ch]`,
-`src/renderer_gpu.[ch]`, `src/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
+Read/edit: `tools/boat_water_review.c`, `tools/wake_velocity.c`, `src/render/boat_gpu.[ch]`,
+`src/render/renderer_gpu.[ch]`, `src/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
 
 1. Share the existing scripted controls/routes in a small tools-only fixture helper. Preserve
    their behavior. Both app-style and benchmark driving must ultimately use the production tick
@@ -333,8 +333,8 @@ Proposed commands, available only after P2 (not current repository commands):
 
 ### C1 — authoritative ticks, precise seconds, compatibility
 
-Read/edit: `src/boat.[ch]`, `src/boat_course.[ch]`, `src/boat_replay.[ch]`,
-`tools/wake_velocity.c`, fixture/validator callers. Add a small `src/boat_clock.h`.
+Read/edit: `src/core/boat.[ch]`, `src/core/boat_course.[ch]`, `src/boat_replay.[ch]`,
+`tools/wake_velocity.c`, fixture/validator callers. Add a small `src/core/boat_clock.h`.
 
 1. Define `BOAT_TICK_HZ = 120`, retain float `BOAT_STEP` for the existing force integrator, and
    define exact double tick duration `1.0 / BOAT_TICK_HZ` for the accumulator/course timestamps.
@@ -365,8 +365,8 @@ files intact. C1 alone is not completion of the long-session fix: C2 must remove
 
 ### C2 — water, traffic, and shader time contracts
 
-Read/edit: `src/boat_water.[ch]`, `src/waterfront_scene.[ch]`, `src/waterfront_harbor.[ch]`,
-`src/waterfront_traffic.[ch]`, `src/renderer_gpu.c`, both `waterfront_water` shaders, and
+Read/edit: `src/core/boat_water.[ch]`, `src/render/waterfront_scene.[ch]`, `src/core/waterfront_harbor.[ch]`,
+`src/core/waterfront_traffic.[ch]`, `src/render/renderer_gpu.c`, both `waterfront_water` shaders, and
 `tools/validate_boat_environment.c`'s production-shader probe.
 
 1. Carry double evaluation time through water/traffic/scene APIs and the scene frame; wake birth
@@ -419,9 +419,9 @@ water/traffic phase paths, documented replay behavior, all applicable automated 
 
 ### W1 — immutable location definitions instead of global selection
 
-Read/edit: `src/waterfront_scene.[ch]`, `src/boat_map.c`, `src/boat_water.c`,
-`src/waterfront.c`, `src/renderer_gpu.[ch]`, all `waterfront_scene_select_river` callers.
-Add `src/boat_location.[ch]` with enum and immutable `BoatWorldDefinition` records.
+Read/edit: `src/render/waterfront_scene.[ch]`, `src/core/boat_map.c`, `src/core/boat_water.c`,
+`src/render/waterfront.c`, `src/render/renderer_gpu.[ch]`, all `waterfront_scene_select_river` callers.
+Add `src/core/boat_location.[ch]` with enum and immutable `BoatWorldDefinition` records.
 
 Definitions contain location ID, borrowed compiled map mesh (none for basin), bridge-triangle
 metadata, basin bounds, spawn and existing location-specific defaults. Separate world defaults
@@ -439,8 +439,8 @@ checks, mapped captures, and bridge/navigation validators retain the C3 baseline
 
 ### W2 — per-owner map and water-mesh caches
 
-Read/edit: `src/boat_map.[ch]`, `src/boat_water.[ch]`, `src/boat_gpu.[ch]`, CPU drawing and
-review tools. Add `src/boat_water_mesh.[ch]` for tessellation/cache code moved from water physics.
+Read/edit: `src/core/boat_map.[ch]`, `src/core/boat_water.[ch]`, `src/render/boat_gpu.[ch]`, CPU drawing and
+review tools. Add `src/render/boat_water_mesh.[ch]` for tessellation/cache code moved from water physics.
 
 1. Replace `shore`, `shore_count`, `water_count` globals with `BoatMap`. Init takes a definition;
    query takes a `const BoatMap *`; destroy is safe on zero/partially initialized state. Keep
@@ -459,7 +459,7 @@ the existing map/patch outputs as reference; do not fix performance by changing 
 
 ### W3 — introduce the world and session owners
 
-Add `src/boat_world.[ch]`, `src/boat_session.[ch]`; update `src/boat.[ch]`, app/tools/tests.
+Add `src/core/boat_world.[ch]`, `src/boat_session.[ch]`; update `src/core/boat.[ch]`, app/tools/tests.
 
 1. `BoatWorld` owns its immutable definition reference, initialized collision cache, and the
    existing `BoatWater` settings/history. Read-only physics APIs accept `const` world/water
@@ -504,8 +504,8 @@ do not claim an interactive location-switching feature was added.
 
 ### S1 — extract pure pose and rendering responsibilities
 
-Read/edit: `src/boat.[ch]`, `src/boat_gpu.[ch]`, `src/boat_course.[ch]`, CPU waterfront drawing.
-Add `src/boat_pose.[ch]`, `src/boat_view.[ch]`, `src/boat_course_view.[ch]`.
+Read/edit: `src/core/boat.[ch]`, `src/render/boat_gpu.[ch]`, `src/core/boat_course.[ch]`, CPU waterfront drawing.
+Add `src/core/boat_pose.[ch]`, `src/render/boat_view.[ch]`, `src/render/boat_course_view.[ch]`.
 
 Move shared hull rotation/attachment math into `boat_pose` with no draw calls; physics buoyancy
 and presentation must use this one implementation. Move camera construction, scene assembly,
@@ -523,7 +523,7 @@ evaluated actor poses. Pose helpers remain covered through existing heading/atta
 
 ### S2 — move camera and cosmetic state out of physics
 
-Add `src/boat_presentation.[ch]`. Move particle arrays, cosmetic emission counters/timers, and
+Add `src/render/boat_presentation.[ch]`. Move particle arrays, cosmetic emission counters/timers, and
 camera-follow state into `BoatPresentation`. Keep physical wake emitter state and wave-entry
 load used by physics/audio on `Boat`. Move `water_step` cosmetic behavior and camera update
 mechanically; keep their fixed-tick schedule, expressions, and deterministic variation sequence.
@@ -540,8 +540,8 @@ do not claim different wall-clock keyboard sampling is automatically identical.
 
 ### S3 — session rules, replay views, and finish persistence
 
-Read/edit: `src/boat_session.[ch]`, `src/boat_course.[ch]`, `src/boat_replay.[ch]`,
-`src/boat_audio.[ch]`, `tools/wake_velocity.c` and benchmark fixtures.
+Read/edit: `src/boat_session.[ch]`, `src/core/boat_course.[ch]`, `src/boat_replay.[ch]`,
+`src/audio/boat_audio.[ch]`, `tools/wake_velocity.c` and benchmark fixtures.
 
 1. Move course state and run/replay orchestration into `BoatSession`; physics returns previous/
    current pose for swept gate checks and consumes only `BoatInput`, environment, and explicit
@@ -737,7 +737,7 @@ P1 is implemented; P2 remains next. Integer world-time migration (C1/C2) is stil
 
 After commit `84ca2bf` was pushed, Windows run
 [39309664424](https://github.com/doomdavve/proteus/actions/runs/39309664424/job/118255664525)
-failed compiling `src/profiler.c`: the new `_WIN32` `windows.h` include exposed Win32
+failed compiling `src/render/profiler.c`: the new `_WIN32` `windows.h` include exposed Win32
 `Rectangle`, `CloseWindow`, `ShowCursor`, and `DrawText` declarations that conflict with
 raylib. Applied the repository's existing `WIN32_LEAN_AND_MEAN`/`NOGDI`/`NOUSER` header
 defines in both profiling translation units. This changes no timing logic. The local host
@@ -953,13 +953,13 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   implemented, starting from `e83f545` with a clean tree. Next: the basin S1/S2 slice.
   Mapped W1 (selector removal, definition-bound map/scene queries), W2, mapped W3 resources and
   W4 remain pending, as do full P2/P3.
-- **Location definitions (W1 basin):** `src/boat_location.[ch]` holds immutable
+- **Location definitions (W1 basin):** `src/core/boat_location.[ch]` holds immutable
   `BoatWorldDefinition` records for basin, Eriksberg and river: `mapped`, basin half extents,
   spawn, the authored current/crossing-source placement, and presentation companion values
   (default camera, far plane, particle water colour). `boat_location_find` parses
   `--location`. `Boat.eriksberg` is gone; physics reads `definition->mapped`/`half_extent`.
   `BOAT_BASIN_HALF_X/Z` moved to `boat_location.h`.
-- **World and session (W3 basin):** `BoatWorld` (`src/boat_world.[ch]`) holds a borrowed
+- **World and session (W3 basin):** `BoatWorld` (`src/core/boat_world.[ch]`) holds a borrowed
   definition, the `BoatWater` settings and D3 history by value, and the optional borrowed legacy
   `wake_field`. `BoatSession` (`src/boat_session.[ch]`) holds world, boat and the only live
   clock (`tick`). `boat_session_step` advances once (refusing at `UINT64_MAX`) and calls
@@ -1019,20 +1019,20 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   pending from full S1: one `WaterfrontSceneFrame` per displayed frame consumed by both CPU and
   GPU (the CPU path still draws directly; the GPU path builds the frame). Mapped W1/W2/W3, W4
   and full P2/P3 remain pending.
-- **Shared pose math (S1):** `src/boat_pose.[ch]` holds hull rotation, renderer Euler
+- **Shared pose math (S1):** `src/core/boat_pose.[ch]` holds hull rotation, renderer Euler
   conversion, attachments, attachment motion (`BoatPoseMotion`), hull up, thrust direction,
   the unit hull frame and the rendered hull/cabin/engine parts, plus `BOAT_ENGINE_ARM`. It
   has no state and no draw calls. Buoyancy, contacts, stern sampling, particles, cloth,
   replay cloth pinning and drawing all call this one implementation; the copies in
   `boat.c` are gone.
-- **Views (S1):** `src/boat_view.[ch]` owns `BoatCamera`/`BOAT_CAMERA_DEFAULT`, camera
+- **Views (S1):** `src/render/boat_view.[ch]` owns `BoatCamera`/`BOAT_CAMERA_DEFAULT`, camera
   construction, particle size/colour/pose, current cues and wake-source scenery, basin
   scenery (now from `definition->half_extent` rather than the basin macros; the GPU basin plane
   likewise), `boat_scene_frame`, `boat_player_pose` and the CPU `boat_draw*` entry points.
-  `src/boat_course_view.[ch]` owns gate visitors, drawing and the HUD; `boat_course` keeps
+  `src/render/boat_course_view.[ch]` owns gate visitors, drawing and the HUD; `boat_course` keeps
   only crossing math and includes only `raylib.h`. `boat.h` no longer includes renderer or
   scene headers. No temporary header forwarding was added; callers include the view headers.
-- **Presentation (S2):** `src/boat_presentation.[ch]` owns `BoatPresentation`: the 384
+- **Presentation (S2):** `src/render/boat_presentation.[ch]` owns `BoatPresentation`: the 384
   particles, slot cursor, emission/wake-variation counters, wash/wake/spray timers, flag cloth
   and camera follow. `Boat` keeps physical state, the D3 emitter bookkeeping and `wave_spray`
   (bow-entry load read by particles and audio). `boat_presentation_step` runs the moved
@@ -1102,7 +1102,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   same failure notices as before and prints the notice. `wake_velocity` flushes after each frame's
   catch-up tick loop and at shutdown, and reset flushes first. Only a reset replaces last/best,
   so a pending request cannot lose its run. Saves stay synchronous; no queue beyond one finish.
-- **View state:** `src/boat_view_state.h` holds `BoatViewState { Boat boat; double time;
+- **View state:** `src/core/boat_view_state.h` holds `BoatViewState { Boat boat; double time;
   BoatCourse course; }`. `boat_session_view`, `boat_replay_sample` and ghosts produce it. CPU,
   GPU, scene-frame, player-pose and replay-flag APIs consume it. `Boat.time` and
   `Boat.replay_view` are gone: physics/presentation have no view flag, and a sampled view
@@ -1238,7 +1238,7 @@ and `clang-format` pass.
   minimum core prerequisites in the
   [multiplayer prerequisite slices](#multiplayer-prerequisite-slices--2026-10-23). Next:
   multiplayer M2 (`boat_world_step(world, inputs[4])`, checkpoints, local four-boat authority).
-- **API:** the data-only core header `src/boat_input.h` defines
+- **API:** the data-only core header `src/core/boat_input.h` defines
   `BoatInput { float steering_rate, throttle_rate; }`. The semantics are unchanged: signed
   rates clamped to -1..1 when applied. Zero steering lets the wheel spring back to centre, and
   zero throttle holds the setting. `boat_step(boat, world, now, input)`,

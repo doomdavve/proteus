@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scenery packs: the baked map meshes the game loads at run time (src/boat_scenery.c).
+"""Scenery packs: the baked map meshes the game loads at run time (src/scenery/boat_scenery.c).
 
 A bake writes two files into assets/geometry/<name>/:
 

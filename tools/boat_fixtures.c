@@ -1,6 +1,6 @@
 #include "boat_fixtures.h"
 
-// The outer location's first-slice outing, copied from src/boat_voyage.c before compiled
+// The outer location's first-slice outing, copied from src/core/boat_voyage.c before compiled
 // selection was removed.
 const BoatVoyageRoute boat_fixture_voyage_outer = {
     .shelters
@@ -26,7 +26,7 @@ const BoatCourseDefinition boat_fixture_course_default = {
     .gates = { { { 0, 35 }, 12 }, { { 22, 7 }, 10 }, { { -22, -23 }, 10 }, { { 0, -53 }, 12 } },
 };
 
-// The shortened river sprint, copied from src/boat_race.c.
+// The shortened river sprint, copied from src/core/boat_race.c.
 const BoatRaceCourse boat_fixture_river_course = {
     .start = { { -180, -250 }, { .786f, -.618f }, 40 },
     .gates = { { { -72.3f, -376.6f }, { .830f, -.558f }, 18 },

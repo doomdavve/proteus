@@ -28,7 +28,7 @@ control. Dry-stern counts are not measurements of continuous whole-hull airtime.
 
 ## Findings, ordered by gameplay impact
 
-1. **Overturning has no defined outcome.** `src/boat.c` applies a roll guard beginning at
+1. **Overturning has no defined outcome.** `src/core/boat.c` applies a roll guard beginning at
    25 degrees, even during flight, while pitch can rotate freely. In a temporary extension
    of the seeded diagonal fixture, one wake reaches 183.09 degrees of pitch and settles
    at 180 degrees after 25 s; simulation continues. Two perpendicular wakes reach 387.85

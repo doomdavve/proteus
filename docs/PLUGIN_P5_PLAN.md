@@ -60,7 +60,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
   the solo glue turns voyage notices into events (`tools/wake_velocity_plugin.c:371`).
 - **Free packages** have no objective grant unless they author work sites
   ([free schema](PLUGIN_API.md#free-schema)).
-- **Rooms.** `BoatRoomDefinition` (`src/boat_room_definition.h:32`) carries mode, location, course,
+- **Rooms.** `BoatRoomDefinition` (`src/core/boat_room_definition.h:32`) carries mode, location, course,
   rules and an optional scene; modes are free, deathmatch and race. `boat_room_package_load`
   (`tools/boat_room_package.h:20`) builds it on the authority. The server observes match or race
   rules after each fleet step (`src/boat_net_server.c`).
@@ -75,7 +75,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 
 A free package granted `objective.hud` may author `marks`: up to 16 entries of
 `{ id, name, x, z, radius }` (radius 10–200 m, on open water, non-overlapping). They travel in the
-room definition as data. A small core module (`src/boat_marks.[ch]`, in `proteus_boat_core`)
+room definition as data. A small core module (`src/core/boat_marks.[ch]`, in `proteus_boat_core`)
 keeps, per fleet slot, which mark the boat is inside, and after each fleet step emits
 `mark.reached { id, crew }` on entry (outside → inside). A respawn or a new life clears that slot's
 inside flag, so re-entering counts as a new event; whether it scores is the script's business.
@@ -165,7 +165,7 @@ and pass the `test_time` lint. Each updates this status header.
 The `marks` schema for free packages with `objective.hud`, its validation (open water, radius,
 overlap, count), the core detector over fleet slots, and the bundled `plugins/outer-hunt`
 package (five marks, the script above). No networking yet.
-Files: new `src/boat_marks.[ch]`, the free-package loader and validator, `plugins/outer-hunt/`,
+Files: new `src/core/boat_marks.[ch]`, the free-package loader and validator, `plugins/outer-hunt/`,
 `tools/validate_boat_marks.c` (or a case in an existing validator), `docs/PLUGIN_API.md`.
 Tests: the package loads and its marks validate on `outer`; invalid marks are refused with field
 diagnostics; a scripted fleet driving through marks emits exactly one `mark.reached` per entry
@@ -173,7 +173,7 @@ with the right crew, and a respawn re-arms the slot; evaluating the script over 
 yields the expected HUD rows, `FIRST`, and the restart; core boundary check.
 Gate: headless events and HUD match the expected tables.
 
-**P5a result, 2026-11-08 (commit on `feat/plugin-p5`).** `src/boat_marks.[ch]` in
+**P5a result, 2026-11-08 (commit on `feat/plugin-p5`).** `src/core/boat_marks.[ch]` in
 `proteus_boat_core` (validation, digest, the per-slot entry detector); `free.marks` parsed,
 decoded, map-checked and carried over the browser wire; `objective.hud` may now follow
 `free.define` directly; objective events gain an optional `crew`; `plugins/outer-hunt` (five river
@@ -214,7 +214,7 @@ on leave; full suite results are in the PR.
 
 Room definition v4 with marks; ObjectiveState; version bump; client stores the HUD; `boat_bot`
 prints it.
-Files: `src/boat_net_protocol.[ch]`, `src/boat_room_definition.[ch]`, `src/boat_net_server.c`,
+Files: `src/boat_net_protocol.[ch]`, `src/core/boat_room_definition.[ch]`, `src/boat_net_server.c`,
 `src/boat_net_client.[ch]`, `tools/boat_bot.c`, `tools/validate_boat_net.c`,
 `docs/MULTIPLAYER_PROTOCOL.md` (v13).
 Tests: golden bytes and round trips; every truncation; v12 Hello rejected; definition and

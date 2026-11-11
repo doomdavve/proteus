@@ -851,7 +851,7 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
   presentation code), and settles a finish at its tick: best selection
   against the generation's best time, the practice latch, and one pending finish request holding
   the copied run. The camera follow is one pure inline helper (`boat_camera_follow`,
-  `src/boat_presentation.h`) that both the presentation and the recorder call.
+  `src/render/boat_presentation.h`) that both the presentation and the recorder call.
 - Wire: private type `0xC1` PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)),
   sent at the end of a grant when it changed; the client keeps the newest
   (`boat_local_state`). The glue decodes it into the session's course and practice latch after
@@ -1428,13 +1428,15 @@ list, because data and host share `src/plugins/`, and it reads `src/plugins/CMak
 **Commits** (one per row; each builds, passes `ctest --preset full` and keeps captures
 byte-identical to main):
 
-1. AR8a core, scenery, render, audio: `git mv`, the module's `CMakeLists.txt` cut verbatim
-   from the root, its include directory, path updates in scripts, CI and docs.
+1. AR8a core, scenery, render, audio: `git mv`, the moved directories as temporary include
+   paths, path updates in the root CMake, scripts, CI and docs. Local `CMakeLists.txt` files
+   come in AR9 (row 7), so the moves leave target definitions untouched.
 2. AR8a net and json; 3. AR8a plugins.
 4. AR8b platform, session, room; 5. AR8b applications.
 6. AR8b tests and tools: validators and checks into `tests/`, registration with them.
-7. AR9 target changes kept out of the moves: `proteus_audio`, `proteus_room`, `boat_profile`
-   out of `proteus_boat_drive`.
+7. AR9 local `CMakeLists.txt` per module with its test registration, and the target changes
+   kept out of the moves: `proteus_audio`, `proteus_room`, `boat_profile` out of
+   `proteus_boat_drive`.
 8. AR8-1 qualified includes in every file; the temporary include paths removed.
 9. AR9 `module_includes` and the directory-based gates, with mutation evidence.
 10. Closing: owning docs, `AGENTS.md` layout section, plan status.

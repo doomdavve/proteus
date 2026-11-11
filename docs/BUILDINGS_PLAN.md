@@ -43,11 +43,11 @@ Code inspection, not a new visual or performance baseline:
   `tools/outer_dressing.py` supplies a separate broader-building importer and simple roof
   choices; audit courtyard filling and rectangular gable approximations during normalization.
 - `tools/map_pack.py` writes version-1 scenery packs: vertices and coloured triangles, without
-  explicit building or facade identity. `src/boat_scenery.[ch]` loads/checks those packs.
-- `src/waterfront.c` and `src/renderer_gpu.c` independently derive windows from wall triangles.
+  explicit building or facade identity. `src/scenery/boat_scenery.[ch]` loads/checks those packs.
+- `src/render/waterfront.c` and `src/render/renderer_gpu.c` independently derive windows from wall triangles.
   Surface classification relies on palette/geometry conventions; occupancy seeds use triangle
   indices. New massing could accidentally change window identities or receive duplicate windows.
-- `src/waterfront_corner.c` also supplies existing shops/entrances and masks competing generic
+- `src/render/waterfront_corner.c` also supplies existing shops/entrances and masks competing generic
   windows at the cafe; migrate frontage decisions rather than stacking a second system.
 - Geometry-keyed `ambient.bin` assets need rebaking after geometry changes; verify dependent
   atlas validity, browser loading and packaging rather than assuming a scenery-only change.

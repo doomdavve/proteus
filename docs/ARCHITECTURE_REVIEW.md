@@ -58,8 +58,8 @@ gameplay visibility, with a few intentional visual baselines.
 
 ### 1. Establish a long-session clock before expanding exploration
 
-[`Boat.time`](../src/boat.h) is a float incremented by `BOAT_STEP` in
-[`boat_step`](../src/boat.c). It drives water, traffic, and presentation. A standalone C probe
+[`Boat.time`](../src/core/boat.h) is a float incremented by `BOAT_STEP` in
+[`boat_step`](../src/core/boat.c). It drives water, traffic, and presentation. A standalone C probe
 using the exact increment produced these results on this Mac:
 
 | Fixed ticks | Intended seconds | Accumulated float seconds |
@@ -79,9 +79,9 @@ traces, check water/traffic interactions, and assess replay/handling revision co
 
 ### 2. Make world ownership explicit before adding location transitions
 
-[`waterfront_scene.c`](../src/waterfront_scene.c) selects the river through a process-global
-boolean. [`boat_map.c`](../src/boat_map.c) lazily caches shoreline edges globally, while
-[`boat_water.c`](../src/boat_water.c) caches surfaces by a basin/mapped boolean. The API explicitly
+[`waterfront_scene.c`](../src/render/waterfront_scene.c) selects the river through a process-global
+boolean. [`boat_map.c`](../src/core/boat_map.c) lazily caches shoreline edges globally, while
+[`boat_water.c`](../src/core/boat_water.c) caches surfaces by a basin/mapped boolean. The API explicitly
 requires map selection before cache/resource initialization. This works for the current
 launch-once location choice; it is not a safe runtime world-switching API.
 
@@ -97,9 +97,9 @@ whether newly emitted wakes affect the next tick so vessel iteration order canno
 
 ### 3. Separate simulation, session rules, and presentation incrementally
 
-[`boat.c`](../src/boat.c) contains forces, contacts, particles, camera, scene construction, and
+[`boat.c`](../src/core/boat.c) contains forces, contacts, particles, camera, scene construction, and
 CPU drawing. `Boat` contains course progress and presentation state alongside physics.
-[`boat_course.c`](../src/boat_course.c) mixes timing with HUD rendering; physics validators
+[`boat_course.c`](../src/core/boat_course.c) mixes timing with HUD rendering; physics validators
 therefore pull in scenery and drawing implementations. [`tools/wake_velocity.c`](../tools/wake_velocity.c)
 is now the actual game application, with input, pause, replay transport, audio, saving, and
 rendering coordinated in one loop.
@@ -127,7 +127,7 @@ Count dropped time and choose an explicit race-validity policy before competitiv
 
 ### 4. Spatial queries and render visibility are the main growth risks
 
-[`boat_map_water_contact`](../src/boat_map.c) searches water triangles and scans every shoreline
+[`boat_map_water_contact`](../src/core/boat_map.c) searches water triangles and scans every shoreline
 edge. Normal clear-water translation and rotation checks together can issue twelve queries per
 120 Hz tick, before traffic correction and presentation queries. This is a visible scaling
 problem in the algorithm; it is not a measured claim that collision dominates today's frames.
@@ -168,7 +168,7 @@ The existing route audit is a good starting fixture, but it does not cover all t
 
 Two specific costs to investigate:
 
-- [`boat_gpu.c`](../src/boat_gpu.c) renders AA at 1280x800 before downsampling to 320x200:
+- [`boat_gpu.c`](../src/render/boat_gpu.c) renders AA at 1280x800 before downsampling to 320x200:
   sixteen times the main-target pixel count. Both water shaders loop over live wake entries
   (capacity 64), with early exits. Bound nearby wake work and expose quality settings before
   multiplying history by the number of vessels. Preserve exact physics queries separately from

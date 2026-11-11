@@ -12,7 +12,7 @@ low passes, opening circles, and recovery climbs. Individual sizes, heights, win
 glide intervals, and asymmetric wing trim break up synchronized movement.
 
 Since L4.1 (2026-10-30), the four groups, counts, centres, radii, heights, turn rates and cue
-intervals live in `src/waterfront_flock.[ch]` as a caller-owned bounded definition. The compiled
+intervals live in `src/core/waterfront_flock.[ch]` as a caller-owned bounded definition. The compiled
 definition remains the default; traffic avoidance reads the accepted traffic routes. L4.2 exposes
 `scene.gulls.flocks` with up to four flocks and 16 half-open 120 Hz cue intervals each. Cue-only
 edits are cosmetic and keep the session clock; flock layout edits follow the restart policy.
@@ -24,7 +24,7 @@ responses, not bird physics or persistent memory: birds resume their routine as 
 There are no bird contacts, sound effects, perching, nesting, terrain avoidance, or feeding controls.
 The routes are authored for the waterfront; arbitrary building/bridge clearance is not guaranteed.
 
-`waterfront_boating_gulls` in `src/waterfront_scene.c` writes renderer-independent transforms
+`waterfront_boating_gulls` in `src/render/waterfront_scene.c` writes renderer-independent transforms
 into `WaterfrontSceneFrame`. CPU boating draws the same poses as GPU color, reflection, and
 shadow passes. The snapshot has room for 32 gulls. Explicit time and player pose fully determine the result, including
 backward seeks. The social paths are authored cues rather than an integrated boids simulation.

@@ -212,7 +212,7 @@ def verify(root, args, commit):
     protocol = int(re.search(r'#define BOAT_NET_VERSION (\d+)',
                             (root / 'src/boat_net_protocol.h').read_text())[1])
     physics = int(re.search(r'#define BOAT_PHYSICS_REVISION (\d+)',
-                           (root / 'src/boat.h').read_text())[1])
+                           (root / 'src/core/boat.h').read_text())[1])
     room = next((s for s in directory['servers'] if s['name'] == 'Winterfell'), None)
     if room is None:
         raise RuntimeError('Winterfell is missing from the public server directory')

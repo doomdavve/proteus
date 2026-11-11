@@ -10,7 +10,7 @@ FILES = (
     "src/boat_net_client.c",
     "src/boat_net_protocol.c",
     "src/boat_prediction.c",
-    "src/boat_view.c",
+    "src/render/boat_view.c",
     "tools/wake_velocity_net.c",
     "tools/boat_bot.c",
 )

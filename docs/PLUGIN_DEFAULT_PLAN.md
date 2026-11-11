@@ -217,7 +217,7 @@ still use compiled content. A temporary `--no-plugins` restores the compiled pat
 
 Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/boat_title.[ch]`,
 `src/boat_plugin.[ch]`, `src/boat_plugin_host.[ch]`, `src/boat_plugin_stage.c`,
-`src/boat_course.[ch]`, `src/boat_course_view.c`, `src/boat_replay.c`,
+`src/core/boat_course.[ch]`, `src/render/boat_course_view.c`, `src/boat_replay.c`,
 `tools/boat_race_plugin.[ch]`.
 
 ### Tasks
@@ -387,8 +387,8 @@ Read first: [hot reload](PLUGIN_PLAN.md#hot-reload-is-the-normal-development-pat
 [replacement rules](PLUGIN_API.md#replacement-restart-and-owner-lifetime), the
 [live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent),
 `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity_bridge.c`, `src/boat_plugin_host.c`,
-`src/boat_plugin_stage.c`, `src/boat_session.c`, `src/boat_scene_definition.[ch]`, and the scene
-consumers in `src/boat.c`, `src/boat_combat.c`, `src/waterfront_*.c`, `src/boat_view.c`, `src/boat_gpu.c`.
+`src/boat_plugin_stage.c`, `src/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
+consumers in `src/core/boat.c`, `src/core/boat_combat.c`, `src/waterfront_*.c`, `src/render/boat_view.c`, `src/render/boat_gpu.c`.
 
 ### Language
 
@@ -631,7 +631,7 @@ rules), `src/boat_net_protocol.[ch]`, `src/boat_net_server.[ch]`, `src/boat_net_
 
 Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server.c:421` and `:699`,
 `boat_net_race_bind` (`src/boat_net_protocol.c:1494`), `tools/wake_velocity_net.c:574`,
-`src/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
+`src/render/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
 `src/boat_net_protocol.c:1086`.
 
 ### Settled from the source, 2026-10-31
@@ -643,7 +643,7 @@ Each of these was checked on `4e11c2a`. The tasks below assume them.
 | The hosted room runs `--mode deathmatch --location river` (`ansible/roles/wake_velocity/defaults/main.yml` in `davve-srv`). Its service line passes both flags. | That command must keep working with no `davve-srv` change. One `plugins/deathmatch` serves every location: a `match` package without a scene takes its location from `--location`, and the definition always carries the resolved location. A package with a scene fixes its location, and a conflicting flag refuses to start. |
 | No free package exists for `outer`, and `--location outer` is hostable. | Add `plugins/outer-free`. Defaults with no `--package`: free uses `basin-free`, `river-free` or `outer-free`; deathmatch uses `deathmatch`; race uses `river-sprint`. Solo is unaffected, because the title's rows and `--package` kind checks already exclude these. |
 | Race rooms are river-only in `boat_net_server_init`, the server's flags and the `race` manifest rule. | Keep that. Only the course's values become data, not the map. |
-| `boat_combat_enable` hardcodes the default rules (`src/boat_combat.c:60`). Clients already install rules from the checkpoint, and compact pages omit them. | Give the enable call the rules. Do not add a second path for them on the client: it compares the checkpoint's rules with the definition at install and closes on a mismatch. |
+| `boat_combat_enable` hardcodes the default rules (`src/core/boat_combat.c:60`). Clients already install rules from the checkpoint, and compact pages omit them. | Give the enable call the rules. Do not add a second path for them on the client: it compares the checkpoint's rules with the definition at install and closes on a mismatch. |
 | `BOAT_NET_EARLY_BOOTSTRAP` holds one checkpoint's messages until Accept and **drops the rest**, which on a reliable channel leaves the client stuck in bootstrap. | Size it for the largest definition plus the largest checkpoint, and test every bootstrap message arriving before Accept. Bootstrap and control are separate channels, so this ordering is real. |
 | `validate_boat_net` links only `proteus_boat_net`, and `boat_server` links only the ENet library. | Keep `validate_boat_net` free of plugins and have it build definitions in code. A new `validate_boat_room_package` links plugins, catalog and net for the edited-package proof. Add plugins and catalog to `boat_server`. `boat_server.c` also links into `wake_velocity` for `--serve`. |
 | The hosted build runs `cmake --build --target boat_server boat_bot`. | It will now build and run the catalog generator, so check that exact target list from a clean configure, with `PROTEUS_WEBRTC=ON` where available. No new configure flag may be needed. |
@@ -656,7 +656,7 @@ name is shown only after joining.
 
 ### Tasks
 
-1. **Add the room definition.** New `src/boat_room_definition.[ch]` in `proteus_boat_core`: a
+1. **Add the room definition.** New `src/core/boat_room_definition.[ch]` in `proteus_boat_core`: a
    versioned, pointer-free struct with package ID and display name, mode, location,
    `BoatRaceCourse`, `BoatRaceRules`, `BoatMatchRules` and `BoatCombatRules`, plus a validator
    usable without Lua or files. Move the structural parts of the race checks out of the plugin
@@ -727,7 +727,7 @@ a hosted cutover at the next release.
 
 ### PD2 result, 2026-10-31
 
-**Implemented.** `src/boat_room_definition.[ch]` is the core's pointer-free room definition
+**Implemented.** `src/core/boat_room_definition.[ch]` is the core's pointer-free room definition
 (package ID/name, mode, location, course and race rules, match and combat rules, optional scene)
 with a structural validator, a shared `boat_race_course_validate` used by plugin staging and
 rooms, and a canonical fieldwise codec capped at 16 KiB. The new `match` kind and
@@ -782,8 +782,8 @@ enough until the HOST row and room console arrive.
 machine, and a room can move to a new package revision between rounds. Physical harbor data leaves
 the handshake digest.
 
-Read first: `src/boat_world.[ch]`, `src/boat_fleet.[ch]`, `src/boat_prediction.[ch]`,
-`src/boat_scene_definition.[ch]`, `src/waterfront_harbor.[ch]`, `src/waterfront_traffic.[ch]`,
+Read first: `src/core/boat_world.[ch]`, `src/core/boat_fleet.[ch]`, `src/boat_prediction.[ch]`,
+`src/core/boat_scene_definition.[ch]`, `src/core/waterfront_harbor.[ch]`, `src/core/waterfront_traffic.[ch]`,
 the [scene contract](PLUGIN_API.md#location-life-scene-contract-planned-l11) and
 [multiplayer prediction contract](PLUGIN_PLAN.md#multiplayer-prediction-and-recording).
 
@@ -792,15 +792,15 @@ This is the riskiest step in the plan because prediction copies fleets and repla
 
 Checked on `4e11c2a`, which narrows the risk:
 
-- **Where the pointer must be bound.** Hull and projectile contacts (`src/boat.c:123`, `:183`,
-  `src/boat_combat.c:279`) read `world->scene`. `boat_fleet_world` and `boat_prediction_reset` copy the
+- **Where the pointer must be bound.** Hull and projectile contacts (`src/core/boat.c:123`, `:183`,
+  `src/core/boat_combat.c:279`) read `world->scene`. `boat_fleet_world` and `boat_prediction_reset` copy the
   fleet's world by value, so they carry the pointer. The sites to change are `boat_net_server_init`, and
   `install` in `src/boat_net_client.c`, which builds a new fleet with `boat_fleet_init` at each bootstrap.
   Confirm this with a test, not by inspection.
 - **Clock.** Physics poses use `boat_fleet_time`, which is `tick` seconds and so already shared. Check
   only the presentation path.
 - **Moving craft create no wake state.** Rooms never set `water.traffic_objects`, and authored routes
-  are visual-only by rule (`src/waterfront_traffic.c:151`). Keep both, so checkpoints need no traffic wake
+  are visual-only by rule (`src/core/waterfront_traffic.c:151`). Keep both, so checkpoints need no traffic wake
   pool. Physical traffic wakes in rooms are out of scope.
 - **Size.** In memory on Apple Silicon: scene 7,944 bytes, course 312, race rules 72, match rules 64 and
   combat rules 92, about 8.5 KiB. The fieldwise encoding should fit the 16 KiB cap in about nine pages.
@@ -1163,7 +1163,7 @@ Other findings:
 - **Keep:** a room with no scene falls back to the compiled harbour contacts. This is the registered default the
   decisions table allows, not compiled selection. Physics paths also stay: `RIVER_SPAWNS` and the recipes.
 - **Moving contact seams:** moving craft do collide, through `waterfront_traffic_contact_height_scene` at
-  `src/boat.c:183`. `tools/validate_boat_room_package.c:458` has the room harness. `room.server.tick_limit` in
+  `src/core/boat.c:183`. `tools/validate_boat_room_package.c:458` has the room harness. `room.server.tick_limit` in
   `snapshot_resync` (`tools/validate_boat_net.c:1018`) forces a resync.
 - **First hosted build with the Node generator:** v0.0.23 predates it. The role configures with `emsdk_env.sh`
   sourced, then builds `--target web` with only `EMSDK` and `EM_CONFIG` added. The Node emulator is cached as an

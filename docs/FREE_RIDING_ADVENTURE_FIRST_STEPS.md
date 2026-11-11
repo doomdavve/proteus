@@ -61,8 +61,8 @@ initializer. Result sections below keep the values as recorded at the time.
 ## A0.1 — preserve the current reference
 
 **Read:** `docs/river/README.md`, `docs/river/survey.py`, `tools/prepare_waterfront.py`,
-`src/boat_map.c`, `src/boat_water_mesh.c`, `src/boat_location.[ch]`, `src/boat_world.[ch]`,
-`src/boat_session.[ch]`, `src/boat_fleet.[ch]`, `tools/boat_water_review.c`,
+`src/core/boat_map.c`, `src/render/boat_water_mesh.c`, `src/core/boat_location.[ch]`, `src/core/boat_world.[ch]`,
+`src/boat_session.[ch]`, `src/core/boat_fleet.[ch]`, `tools/boat_water_review.c`,
 `tools/boat_benchmark.c`, `src/boat_profile.h`, and `docs/BOATING_PERFORMANCE.md`.
 
 **Create:** `docs/adventure/README.md` as the survey/evidence guide and
@@ -385,7 +385,7 @@ safe to destroy and must report failure before the first mapped simulation tick.
 
 ## A1.1 — explicit map data and collision-cache construction
 
-**Edit:** `src/boat_location.[ch]`, `src/waterfront_city.[ch]`, `src/boat_map.[ch]`,
+**Edit:** `src/core/boat_location.[ch]`, `src/core/waterfront_city.[ch]`, `src/core/boat_map.[ch]`,
 `tools/validate_boat_world.c` or a focused map validator, and its CMake registration.
 
 1. Add a read-only map description containing the existing mesh and bridge-triangle metadata;
@@ -407,7 +407,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
 
 **A1.1 result, 2026-10-25:** Started from a clean `413460d`.
 
-- **Description:** `BoatMapDescription` (`src/boat_map.h`) holds the mesh and
+- **Description:** `BoatMapDescription` (`src/core/boat_map.h`) holds the mesh and
   `bridge_first_triangle`. The compiled river crop is `waterfront_city_river_map`, with
   unchanged arrays, ordering, colours and water-first inference. `BoatWorldDefinition.map`
   points to it for the river and is NULL for the basin. The `mapped` flag remains; A1.2
@@ -421,7 +421,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
 - **Compatibility surface (removed by A1.2, kept here as history):** `boat_map_legacy_water()`,
   `boat_map_legacy_water_contact()` and `boat_map_legacy_destroy()`. They lazily prepare one
   process-global `BoatMap` of the river through the same functions. Callers by file (call count):
-  - Runtime: `src/boat.c` (1, hull contact) and `src/boat_view.c` (4, particle/spray
+  - Runtime: `src/core/boat.c` (1, hull contact) and `src/render/boat_view.c` (4, particle/spray
     filtering). Also `tools/wake_velocity.c` (2: spawn check and shutdown) and
     `tools/boat_water_review.c` (11).
   - Validators: `validate_boat` (8), `validate_traffic` (7), `validate_harbor` (5),
@@ -469,8 +469,8 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
 
 ## A1.2 — wire physical map ownership through all callers
 
-**Edit:** `src/boat_world.[ch]`, `src/boat_session.[ch]`, `src/boat.c`,
-`src/boat_fleet.[ch]`, affected prediction/net client/server initialization,
+**Edit:** `src/core/boat_world.[ch]`, `src/boat_session.[ch]`, `src/core/boat.c`,
+`src/core/boat_fleet.[ch]`, affected prediction/net client/server initialization,
 `src/boat_net_protocol.c`, `tools/wake_velocity*.c`, server/bot/review tools and validators.
 Use A0.1's caller inventory; these are entry points, not an exhaustive filename list.
 
@@ -496,7 +496,7 @@ double frees, and unavailable lifecycle checks are identified.
 
 Started from a clean `ef2be24`.
 
-- **Owner:** `BoatWorldResources` (`src/boat_world.h`) pairs a definition with its prepared
+- **Owner:** `BoatWorldResources` (`src/core/boat_world.h`) pairs a definition with its prepared
   `BoatMap`. `boat_world_resources_init()` fails, leaving the owner zeroed, for a missing
   definition, a `mapped` flag that disagrees with `map`, or a map that cannot be prepared.
   The basin is a valid owner with an empty map and no allocation. Destroy is idempotent.
@@ -570,7 +570,7 @@ Started from a clean `ef2be24`.
 
 ## A1.3 — make water-mesh caches belong to views
 
-**Edit:** `src/boat_water_mesh.[ch]`, `src/boat_gpu.[ch]`, `src/boat_view.[ch]`,
+**Edit:** `src/render/boat_water_mesh.[ch]`, `src/render/boat_gpu.[ch]`, `src/render/boat_view.[ch]`,
 their CPU/GPU callers and water/world validators.
 
 1. Move `surfaces`, `candidate_surface`, `patches` and `patch_centers` into an explicit
@@ -592,7 +592,7 @@ current appearance and rebuild behavior. Indexing and bounded outer water rings 
 
 Started from a clean `2ea4755`.
 
-- **Cache:** `BoatWaterMeshCache` (`src/boat_water_mesh.h`) holds what used to be four static
+- **Cache:** `BoatWaterMeshCache` (`src/render/boat_water_mesh.h`) holds what used to be four static
   arrays: the CPU reference surface, the basin field grid, the ordinary and arcade GPU rest
   patches, and their snapped centres. It starts zeroed and is bound to the
   `BoatMapDescription` it last built from; NULL means the 240 × 160 m basin. That pointer
@@ -672,8 +672,8 @@ Started from a clean `2ea4755`.
 
 ## A1.4 — bind scenery and both renderers to explicit map data
 
-**Edit:** `src/waterfront.[ch]`, `src/waterfront_city.[ch]`, `src/waterfront_corner.[ch]`,
-`src/waterfront_scene.[ch]`, `src/renderer_gpu.[ch]`, `src/boat_gpu.[ch]` and CPU view callers.
+**Edit:** `src/render/waterfront.[ch]`, `src/core/waterfront_city.[ch]`, `src/render/waterfront_corner.[ch]`,
+`src/render/waterfront_scene.[ch]`, `src/render/renderer_gpu.[ch]`, `src/render/boat_gpu.[ch]` and CPU view callers.
 
 1. Pass the selected description into CPU city/window drawing and GPU city, facade, roof,
    water and bridge builders. GPU initialization currently takes only an AA flag; add the
@@ -696,7 +696,7 @@ than loosening visual/geometry expectations as part of an ownership change.
 
 Started from a clean `d73688a`.
 
-- **Scenery owner:** `WaterfrontScenery` (`src/waterfront_corner.h`) replaces the corner
+- **Scenery owner:** `WaterfrontScenery` (`src/render/waterfront_corner.h`) replaces the corner
   dressing's 16,384-box static arrays, bounds, counters and `initialized` flag. It is built
   from one borrowed `BoatMapDescription`, and the construction scratch (local frame, ground
   surfaces, counters) lives in a builder that does not outlive `waterfront_scenery_init()`.
@@ -710,7 +710,7 @@ Started from a clean `d73688a`.
   the cafe and crane lights are authored for the compiled river crop. They appear only when
   the owner's map is `waterfront_city_river_map` (its `river` flag). A synthetic map therefore
   gets its own derived dressing and none of the river's.
-- **CPU binding:** `BoatCpuView` (`src/boat_view.h`) holds a view's water-mesh cache and
+- **CPU binding:** `BoatCpuView` (`src/render/boat_view.h`) holds a view's water-mesh cache and
   scenery, and replaces the bare cache in `boat_draw()`, `boat_draw_with_ghost()` and
   `boat_draw_scene()`. A mapped draw binds the scenery to the world's map.
   `waterfront_draw_boating()` takes the scenery and draws its map's mesh, windows and
@@ -1000,7 +1000,7 @@ harness throughout.
 
 ## A2.1 — application submission and triangle counters
 
-**Edit:** `src/renderer3d.[ch]`, `src/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
+**Edit:** `src/render/renderer3d.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
 `tools/validate_renderer3d.c`, `tools/validate_boat_water_benchmark.py` and the benchmark
 guide. Counting must not change pixels, traces or the benchmark's timed work beyond a few
 integer additions.
@@ -1078,7 +1078,7 @@ Started from a clean `642ca78`.
 
 ## A2.2 — tile catalogue and indexed collision
 
-**Edit:** `src/boat_map.[ch]`, a tile module if `boat_map.c` would otherwise mix concerns,
+**Edit:** `src/core/boat_map.[ch]`, a tile module if `boat_map.c` would otherwise mix concerns,
 `tools/validate_boat_map.c`, the core boundary test inventory, and the review tool for
 counts. Keep everything in `proteus_boat_core`: no drawing or file I/O.
 
@@ -1125,7 +1125,7 @@ Started from a clean `0fc2517`.
 
   `boat_map_water_contact_reference()` keeps the previous exhaustive scan for tests and
   review, and `boat_map_water_contact_cost()` also reports the candidates a query inspected.
-- **Tile catalogue:** the new `src/boat_map_tiles.[ch]` (core) builds `BoatMapTiles` from
+- **Tile catalogue:** the new `src/core/boat_map_tiles.[ch]` (core) builds `BoatMapTiles` from
   a prepared map at a chosen tile size, with the origin on a tile multiple.
   - **Water triangles and shore edges** are listed in every tile within the margin.
   - **Land** differs from the plan: each land triangle, bridge included, belongs to exactly
@@ -1208,8 +1208,8 @@ Started from a clean `0fc2517`.
 
 ## A2.3 — per-tile land culling
 
-**Edit:** `src/renderer_gpu.[ch]`, `src/boat_gpu.c`, the CPU drawing of the map in
-`src/waterfront.c`/`src/boat_view.c`, the scenery owner if it holds the catalogue, the review
+**Edit:** `src/render/renderer_gpu.[ch]`, `src/render/boat_gpu.c`, the CPU drawing of the map in
+`src/render/waterfront.c`/`src/render/boat_view.c`, the scenery owner if it holds the catalogue, the review
 tool and the benchmark guide. The core catalogue stays as A2.2 built it.
 
 1. Build the GPU map meshes per tile from one catalogue that the view owns. These are city,
@@ -1391,7 +1391,7 @@ Started from a clean `65434fc` (v0.0.17) on branch `adventure-a2-4`, in a worktr
 
 ## A2.4 — water bounded by intersecting tiles
 
-**Edit:** `src/boat_water_mesh.[ch]`, `src/boat_view.c`, `src/boat_gpu.c` (if callers pass
+**Edit:** `src/render/boat_water_mesh.[ch]`, `src/render/boat_view.c`, `src/render/boat_gpu.c` (if callers pass
 the catalogue), the review tool, `tools/validate_boat_map_index.c` or a new water-mesh test,
 and `docs/3D.md`. The bake, the collision grid and the A2.3 land tiles stay as they are.
 
@@ -1521,7 +1521,7 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
   `assets/geometry/outer/geometry.h` (1.15 MB) and `manifest.json`: 7,796
   vertices, 15,556 triangles (2,668 water first), 8.0 km² water and 8.5 km² land in a 16.5 km²
   region. Two runs produced identical bytes (2.4 s each). The collision cache is 1.2 MB.
-  [`src/waterfront_outer.[ch]`](../src/waterfront_outer.h) expose it as `waterfront_outer_map`
+  [`src/core/waterfront_outer.[ch]`](../src/core/waterfront_outer.h) expose it as `waterfront_outer_map`
   in the core library; nothing uses it at runtime yet, and its bridge range is empty (as of A3.1; A3.3 fills it).
 - **Route and shelter:** the A0.3 slice route (6.02 km, dock to Långedrag old harbour) stays in
   the baked water with the 8 m envelope (generator assertion, 27.6 m minimum shore clearance),
@@ -1712,7 +1712,7 @@ passed in 200 s (13 retired disabled).
 Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was rebased onto
 `origin/main` (above).
 
-- **Voyage (core):** [`src/boat_voyage.[ch]`](../src/boat_voyage.h) holds a pointer-free
+- **Voyage (core):** [`src/core/boat_voyage.[ch]`](../src/core/boat_voyage.h) holds a pointer-free
   `BoatVoyage` and the authored `boat_voyage_outer` route, which `BoatWorldDefinition.voyage`
   attaches to `outer` only. `BoatSession` observes it after every step; it never moves the boat.
   *Later (Lua plugin P1, 2026-10-28):* this compiled route stays the default and parity
@@ -1736,7 +1736,7 @@ Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was reb
     and present from the start; A3.5 owns the transition.
 - **Game:** solo `wake_velocity --location outer` adds the patch to the free-boating water, a
   top-centre panel (bearing arrow, distance or arrival time, the latest notice or the current
-  shelter; [`boat_voyage_view.c`](../src/boat_voyage_view.c)), and Backspace / Esc > RECOVER
+  shelter; [`boat_voyage_view.c`](../src/render/boat_voyage_view.c)), and Backspace / Esc > RECOVER
   BOAT returns to the last shelter. Rooms (`--host`, `--connect`, `boat_server`) are unchanged:
   calm water, no voyage, no protocol or digest change.
 - **Tests:** new `boat_voyage` CTest (`tools/validate_boat_voyage.c`, under 1 s): shelters and
@@ -1856,7 +1856,7 @@ request after the playtest.
   authored orange pennant with a graphite cross), on the same speedboat geometry. Choose it with
   `--skin explorer` or BOAT in the title's settings, whose hint then reads FASTER ENGINE WHEN
   FREE RIDING SOLO.
-- **Engine (decision):** `BoatHandling` in `src/boat.h` carries the forward thrust;
+- **Engine (decision):** `BoatHandling` in `src/core/boat.h` carries the forward thrust;
   `boat_step()` keeps the speedboat's 11 units and `boat_step_handling()` takes another.
   `BoatSession.handling` is the speedboat after init, survives restarts, and is ignored on
   course ticks, so runs and bests always compare. `wake_velocity` sets the explorer's 18 units
@@ -1973,7 +1973,7 @@ Eriksberg and other details." They chose this step first from a three-step landm
 ([backlog](#landmark-backlog-2026-10-27)).
 
 - **Kit (decision):** the authored river kit was river-only (A3.2), switched by map identity.
-  `waterfront_kit_ground(map)` (in [`waterfront_outer.h`](../src/waterfront_outer.h)) now names
+  `waterfront_kit_ground(map)` (in [`waterfront_outer.h`](../src/core/waterfront_outer.h)) now names
   the land under the kit: `waterfront_outer_ground` for the outer map, NULL otherwise. A map
   with a kit ground carries the kit, and the scene frame (cars, lamps, harbour) reads the same
   function, so `BoatWorldDefinition.kit_ground` from A3.5b is gone.
@@ -2149,7 +2149,7 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
   with its quay side 2–7 m off the mapped bank (the bank curves; nothing fills the gap) and
   22 m clear of the race start and grid. A first berth lay square to a bank corner 15–30 m off
   the quay; the harbour test's bollard check caught it.
-- **Model:** built in [`waterfront_harbor.c`](../src/waterfront_harbor.c) from `boat_model`
+- **Model:** built in [`waterfront_harbor.c`](../src/core/waterfront_harbor.c) from `boat_model`
   boxes, 736 triangles under the 1,024 cap: antifouling, navy band and white topsides, a
   stepped bow, the stern door, three superstructure tiers with window bands, bridge wings,
   lifeboats, funnel and mast, the name in five-row pixel letters and two green wave
@@ -2320,7 +2320,7 @@ plus a tile cache; Ortofoto later, for colours only.
   the core still read no files. The digest therefore changed: builds before and after A3.5i do
   not join each other ([protocol note](MULTIPLAYER_PROTOCOL.md)); the hosted room needs the next
   release.
-- **Loading:** `src/boat_scenery.[ch]` (outside the core) loads a pack, validates every count,
+- **Loading:** `src/scenery/boat_scenery.[ch]` (outside the core) loads a pack, validates every count,
   range and index, and requires its water to equal the compiled water exactly, then hands the
   renderers and minimap the full description (`WaterfrontScenery.full`). Native builds load all
   packs at start, in under 0.1 s. Packaging (macOS, Windows) ships both packs.

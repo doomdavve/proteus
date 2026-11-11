@@ -54,6 +54,13 @@ if(APPLE)
   link_libraries("-framework Accelerate") # Double cosine backend; portable FFT elsewhere.
 endif()
 
+# AR8 transition: until every include is qualified (AR8-1), each moved directory is an include
+# path for every target defined below, so flat includes keep resolving and moves stay renames.
+set(PROTEUS_TRANSITION_INCLUDES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/core ${CMAKE_CURRENT_SOURCE_DIR}/src/scenery
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio)
+include_directories(${PROTEUS_TRANSITION_INCLUDES})
+
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 
 # Boating code links from static libraries, once per executable, without cycles:
@@ -62,25 +69,25 @@ set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wped
 # harbor/traffic contacts and boat/city geometry data. It must not draw, read input, open
 # windows or audio, or touch files; boat_core_boundary checks its sources and symbols.
 set(PROTEUS_BOAT_CORE_SOURCES
-  src/boat_cargo.c src/boat_cargo.h
-  src/boat_vessel_wake.c src/boat_vessel_wake.h
-  src/boat.c src/boat.h src/boat_clock.h src/boat_course.c src/boat_course.h
-  src/boat_combat.c src/boat_combat.h src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
-  src/boat_map.h src/boat_map_tiles.c src/boat_map_tiles.h
-  src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
-  src/boat_room_definition.c src/boat_room_definition.h
-  src/boat_scene_definition.c src/boat_scene_definition.h
-  src/boat_marks.c src/boat_marks.h
-  src/waterfront_flock.c src/waterfront_flock.h
-  src/boat_input.h src/boat_helm.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
-  src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
-  src/boat_voyage.c src/boat_voyage.h src/boat_water.h src/boat_world.c src/boat_world.h
-  src/geometry3d.h
-  src/waterfront_city.c src/waterfront_city.h src/waterfront_harbor.c src/waterfront_harbor.h
-  src/waterfront_outer.c src/waterfront_outer.h
-  src/waterfront_route.c src/waterfront_route.h
-  src/waterfront_traffic.c src/waterfront_traffic.h
-  src/waterfront_upstream.c src/waterfront_upstream.h)
+  src/core/boat_cargo.c src/core/boat_cargo.h
+  src/core/boat_vessel_wake.c src/core/boat_vessel_wake.h
+  src/core/boat.c src/core/boat.h src/core/boat_clock.h src/core/boat_course.c src/core/boat_course.h
+  src/core/boat_combat.c src/core/boat_combat.h src/core/boat_fleet.c src/core/boat_fleet.h src/core/boat_match.c src/core/boat_match.h src/core/boat_race.c src/core/boat_race.h src/core/boat_location.c src/core/boat_location.h src/core/boat_map.c
+  src/core/boat_map.h src/core/boat_map_tiles.c src/core/boat_map_tiles.h
+  src/core/boat_model.c src/core/boat_model.h src/core/boat_pose.c src/core/boat_pose.h
+  src/core/boat_room_definition.c src/core/boat_room_definition.h
+  src/core/boat_scene_definition.c src/core/boat_scene_definition.h
+  src/core/boat_marks.c src/core/boat_marks.h
+  src/core/waterfront_flock.c src/core/waterfront_flock.h
+  src/core/boat_input.h src/core/boat_helm.h src/core/boat_reset_hold.h src/core/boat_throttle.h src/core/boat_steering.h src/core/boat_view_state.h src/core/boat_wake.c src/core/boat_wake.h src/core/boat_wake_objects.c
+  src/core/boat_wake_objects.h src/core/boat_wake_player.c src/core/boat_wake_player.h src/core/boat_water.c
+  src/core/boat_voyage.c src/core/boat_voyage.h src/core/boat_water.h src/core/boat_world.c src/core/boat_world.h
+  src/core/geometry3d.h
+  src/core/waterfront_city.c src/core/waterfront_city.h src/core/waterfront_harbor.c src/core/waterfront_harbor.h
+  src/core/waterfront_outer.c src/core/waterfront_outer.h
+  src/core/waterfront_route.c src/core/waterfront_route.h
+  src/core/waterfront_traffic.c src/core/waterfront_traffic.h
+  src/core/waterfront_upstream.c src/core/waterfront_upstream.h)
 add_library(proteus_boat_core STATIC ${PROTEUS_BOAT_CORE_SOURCES})
 target_include_directories(proteus_boat_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Types and raymath only; Debug builds resolve raymath's out-of-line definitions from raylib.
@@ -96,8 +103,8 @@ target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
-add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h
-  src/boat_water_atlas.c src/boat_water_atlas.h src/boat_ambient.c src/boat_ambient.h)
+add_library(proteus_boat_scenery STATIC src/scenery/boat_scenery.c src/scenery/boat_scenery.h
+  src/scenery/boat_water_atlas.c src/scenery/boat_water_atlas.h src/scenery/boat_ambient.c src/scenery/boat_ambient.h)
 target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
 # Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -250,25 +257,25 @@ target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
-  src/boat_cargo_view.c src/boat_cargo_view.h
-  src/boat_ui.c src/boat_ui.h
-  src/boat_hud.c src/boat_hud.h src/boat_cabin.c src/boat_cabin.h src/boat_grodan.c
-  src/boat_grodan.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
-  src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
-  src/boat_flag.c src/boat_presentation.c src/boat_view.c
-  src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
-  src/waterfront_harbor_view.c src/waterfront_harbor_view.h
-  src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c
-  src/boat_screen.c src/boat_screen.h src/waterfront_grade.c src/waterfront_grade.h
-  src/waterfront_lights.c src/waterfront_lights.h)
+  src/render/boat_cargo_view.c src/render/boat_cargo_view.h
+  src/render/boat_ui.c src/render/boat_ui.h
+  src/render/boat_hud.c src/render/boat_hud.h src/render/boat_cabin.c src/render/boat_cabin.h src/render/boat_grodan.c
+  src/render/boat_grodan.h src/render/boat_skin.c src/render/boat_skin.h src/render/boat_course_view.c
+  src/render/boat_voyage_view.c src/render/boat_voyage_view.h src/render/boat_minimap.c src/render/boat_minimap.h
+  src/render/boat_flag.c src/render/boat_presentation.c src/render/boat_view.c
+  src/render/boat_water_mesh.c src/render/renderer3d.c src/render/waterfront.c src/render/waterfront_corner.c
+  src/render/waterfront_harbor_view.c src/render/waterfront_harbor_view.h
+  src/render/waterfront_lighting.c src/render/waterfront_lighting.h src/render/waterfront_scene.c
+  src/render/boat_screen.c src/render/boat_screen.h src/render/waterfront_grade.c src/render/waterfront_grade.h
+  src/render/waterfront_lights.c src/render/waterfront_lights.h)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
 
 # GPU renderers, linked only by graphics executables.
-add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/waterfront_wake_stamp.c
-  src/waterfront_water_history.c
-  src/boat_rearview.c src/boat_rearview.h)
+add_library(proteus_gpu STATIC src/render/boat_gpu.c src/render/renderer_gpu.c src/render/waterfront_wake_stamp.c
+  src/render/waterfront_water_history.c
+  src/render/boat_rearview.c src/render/boat_rearview.h)
 target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
 
@@ -332,8 +339,8 @@ add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
   tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
   tools/wake_velocity_controls.h
   tools/boat_title.c
-  tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
-  src/xm_audio.c src/boat_capture.c)
+  tools/cli_usage.c tools/wake_velocity_performance.c src/render/profiler.c src/audio/boat_audio.c
+  src/audio/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
   proteus_work_save)
 # WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
@@ -472,7 +479,7 @@ if(NOT EMSCRIPTEN)
 endif()
 
 if(NOT EMSCRIPTEN)
-  add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/boat_audio.c)
+  add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/audio/boat_audio.c)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
@@ -547,7 +554,7 @@ add_dependencies(gpu_fixture proteus_assets)
 
 add_executable(validate_xm
   tools/validate_xm.c
-  src/xm_audio.c
+  src/audio/xm_audio.c
 )
 target_include_directories(validate_xm PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -748,7 +755,7 @@ if(NOT EMSCRIPTEN)
   endforeach()
   list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_scene_survives_reset)
 endif()
-add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
+add_executable(validate_boat_audio tools/validate_boat_audio.c src/audio/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(validate_boat_audio PRIVATE raylib)
 target_compile_options(validate_boat_audio PRIVATE
@@ -1617,7 +1624,7 @@ add_test(NAME boat_server_river_location_retired COMMAND boat_server --location 
 set_tests_properties(boat_river_location_retired boat_server_river_location_retired PROPERTIES
   PASS_REGULAR_EXPRESSION "location is retired; --location outer")
 
-add_executable(dance_study tools/dance_study.c src/dance.c src/choreography.c src/xm_audio.c)
+add_executable(dance_study tools/dance_study.c src/dance.c src/choreography.c src/audio/xm_audio.c)
 target_link_libraries(dance_study PRIVATE proteus_render)
 target_compile_definitions(dance_study PRIVATE
   PROTEUS_ASSET_DIR="$<TARGET_FILE_DIR:dance_study>/assets"

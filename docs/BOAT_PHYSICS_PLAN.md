@@ -98,7 +98,7 @@ the [race plan](RACE_PLAN.md) relies on current jump counts, so record any chang
 
 ### L1 candidate — 2026-10-24
 
-**Physics (`src/boat.c`, revision 8).** While the motion state is `BOAT_LANDING` (the
+**Physics (`src/core/boat.c`, revision 8).** While the motion state is `BOAT_LANDING` (the
 0.35 s after a whole-hull flight regains water support), each wetted support plunging faster
 than 2.5 m/s adds its squared excess entry speed to a plunge measure. Water-relative
 horizontal velocity then decays by `exp(-0.14 × plunge × dt)`. Hard and bow-first landings
@@ -214,9 +214,9 @@ expansion, or unrelated cleanup. If a task proves too large, split it here rathe
 
 Likely entry points (verify against the current tree):
 
-- `src/boat.c`, `src/boat.h`: fixed-step simulation, CPU boat rendering, shared GPU player snapshot.
-- `src/boat_map.c`: navigable water and shoreline boundaries.
-- `src/boat_gpu.c`, `src/renderer_gpu.c`, `src/waterfront_scene.h`: GPU integration.
+- `src/core/boat.c`, `src/core/boat.h`: fixed-step simulation, CPU boat rendering, shared GPU player snapshot.
+- `src/core/boat_map.c`: navigable water and shoreline boundaries.
+- `src/render/boat_gpu.c`, `src/render/renderer_gpu.c`, `src/render/waterfront_scene.h`: GPU integration.
 - `tools/wake_velocity.c`: input, HUD, deterministic preview and capture options.
 - `tools/validate_boat.c`: handling regression tests; `CMakeLists.txt`: test registration.
 - `README.md`: public controls and launch commands.
@@ -677,7 +677,7 @@ Dated records describe each step at the time it landed. In particular, B2's cosm
 notes are superseded by the C3 acceptance below. Test counts refer to those revisions.
 
 - 2026-10-17: C3 implementation adds local normal resistance at the six supports in
-  `src/boat.[ch]` and `src/boat_water.[ch]`. It replaces wave-mode vertical damping with a
+  `src/core/boat.[ch]` and `src/core/boat_water.[ch]`. It replaces wave-mode vertical damping with a
   dissipative 3D normal force using point velocity (translation plus pitch/roll/yaw), local
   analytic normal, and water surface velocity. Generalized torques apply the same force to
   angular motion; there are no random impacts or additional spring/lift terms. Exit damping
@@ -729,7 +729,7 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   between vertices approximate the analytic surface.
 
 - 2026-10-17: C1 complete following the user's request to start Phase C. Added
-  `src/boat_water.[ch]`: explicit analytic height, unit normal, and vertical surface velocity
+  `src/core/boat_water.[ch]`: explicit analytic height, unit normal, and vertical surface velocity
   at simulation X/Z and time; zero settings return exact flat/still water. The opt-in `--waves`
   preset is amplitude 0.22, wavelength 48, period 4 seconds, travelling along (0.6, -0.8).
   CPU and GPU consume the same tessellated surface and exaggerated slope colors. Eriksberg
@@ -749,11 +749,11 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   C2 is next; player assessment of buoyancy and wave encounters waits for C2/C3.
 
 - 2026-10-17: A1 complete. Added bounded reverse propulsion and signed, rate-limited
-  `engine_response` in `src/boat.[ch]`; thrust and wash use the response at the stern.
+  `engine_response` in `src/core/boat.[ch]`; thrust and wash use the response at the stern.
   Before A2, keyboard throttle remained forward-only. `validate_boat` covers forward/reverse signs,
   saturation, deterministic response/reset, and a sustained reverse run. A2 adds player controls
   and feedback.
-- 2026-10-17: A2 complete. Replaced the proposed selector with held signed thrust in `src/boat.[ch]`:
+- 2026-10-17: A2 complete. Replaced the proposed selector with held signed thrust in `src/core/boat.[ch]`:
   Up/W moves toward forward and Down/S moves through neutral into reverse. The HUD shows signed
   thrust and engine response, while the deterministic preview demonstrates the transition.
   `validate_boat` covers the signed range, reversal, saturation, and reset; CPU/GPU continue to
@@ -765,13 +765,13 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   walls. `validate_boat` covers a glancing rebound and all eight cardinal/intercardinal headings;
   Eriksberg runs retain shoreline and map-crop containment. Contacts remain a deliberately simple
   footprint, without quay geometry above the waterline or damage.
-- 2026-10-17: B1 complete. Added a bounded, rate-limited `planing` blend in `src/boat.[ch]`, driven
+- 2026-10-17: B1 complete. Added a bounded, rate-limited `planing` blend in `src/core/boat.[ch]`, driven
   only by forward speed. Separate 6.5/5.0 unit-per-second enter/exit thresholds prevent chatter;
   the blend reduces the existing longitudinal resistance to 62% at full plane. This remains a
   horizontal handling approximation: no visual attitude or vertical lift has been added. The
   deterministic boat validator covers smooth entry, neutral energy decay, planing decay, and the
   reverse exclusion; README and boating notes describe the limitation.
-- 2026-10-17: B2 complete. `src/boat.[ch]` adds isolated `visual_pitch` at 120 Hz: an
+- 2026-10-17: B2 complete. `src/core/boat.[ch]` adds isolated `visual_pitch` at 120 Hz: an
   8-degree transition hump plus a 3-degree cruise target, smoothed with a 5/s exponential response.
   No physical lift or horizontal forces were added. A shared pose helper rotates cabin/outboard
   offsets with the hull and composes local engine steering; CPU rendering and the GPU snapshot

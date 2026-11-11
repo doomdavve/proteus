@@ -4,7 +4,7 @@ The boating game plays the XM modules in `assets/music/`; CMake copies the direc
 build on every build, so rebuild after editing one. The four-minute demo and its “Below the
 surface” soundtrack were removed on 2026-10-25 and remain in the git history.
 
-The playback helper (`src/xm_audio.c`) reconstructs the XM decoder from its source before
+The playback helper (`src/audio/xm_audio.c`) reconstructs the XM decoder from its source before
 starting or seeking. Raylib's duration scan can leave a pending jump which its partial decoder
 reset does not clear; reusing that state would play only the first sound. The XM validation
 covers that loader sequence and backward seeking as well as full-song decoding. Call the

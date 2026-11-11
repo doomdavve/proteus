@@ -267,7 +267,7 @@ they cannot source measured heights or looks. Branch `feat/canal-bridges`, stack
 
 ## GH3: the canal boat
 
-Read `src/boat_skin.[ch]`, `src/boat_model.[ch]` and the
+Read `src/render/boat_skin.[ch]`, `src/core/boat_model.[ch]` and the
 [cabin boat return](BOATING_PLAN.md#cabin-boat-return--2026-10-30).
 
 - A new boat choice: low and flat, open passenger rows under a low windscreen, a helm aft and an

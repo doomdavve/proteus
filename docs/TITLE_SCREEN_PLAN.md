@@ -219,7 +219,7 @@ bounds. No new generated art or asset changes are required. There is no runtime 
 
 The Escape menu uses the selected palette, m5x7 and a fixed chevron in place of the older
 bobbing `(*)`. Gameplay overlays/help/scoreboard text use the same m5x7, scaled only by whole
-integers; instrument labels use m3x6. `src/boat_ui.[ch]` owns shared colours and the game font
+integers; instrument labels use m3x6. `src/render/boat_ui.[ch]` owns shared colours and the game font
 lifetime, loaded only after a graphics context exists and released before it closes.
 Standalone instrument primitive review tools retain their built-in fallback lettering when
 UI fonts have not been loaded. Core/session simulation and world lighting are unchanged.

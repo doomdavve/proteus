@@ -431,7 +431,7 @@ above owns the current execution order.
   and two parked bicycles. The existing north garden and the traffic lanes remain clear.
   The destination reads during the opening approach, especially t=1–2.5 on the short
   route. Camera position, music, actor motion, and generated geographic assets are unchanged.
-  Static scene-owned box/beam data lives in `src/waterfront_corner.[ch]`; the GPU uploads
+  Static scene-owned box/beam data lives in `src/render/waterfront_corner.[ch]`; the GPU uploads
   two batches and reuses them for colour, reflection, and opaque shadows (five additional
   mesh submissions with all passes enabled). One reserved shop light fits the existing
   32-light limit, keeping the street lamps and at least three headlight slots.

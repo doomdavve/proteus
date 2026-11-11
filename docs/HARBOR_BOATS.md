@@ -12,7 +12,7 @@ and moored like the fleet, with its own contact box.
 
 ## Boat recipes
 
-`src/boat_model.[ch]` owns the renderer-independent visual generator. A `BoatModelSpec`
+`src/core/boat_model.[ch]` owns the renderer-independent visual generator. A `BoatModelSpec`
 defines a low-poly hull, raised gunwale, inset deck/cockpit, seats, optional cabin and
 windows, outboards, mast/furled sail, work-deck equipment, cleats, and optional fenders.
 The named presets provide starting points rather than fixed assets:
@@ -64,7 +64,7 @@ Generate/upload when a recipe changes, not on every frame.
 
 ## Shared berth evaluation
 
-`src/waterfront_harbor.[ch]` owns placements, cached meshes, pontoon/quay equipment, and
+`src/core/waterfront_harbor.[ch]` owns placements, cached meshes, pontoon/quay equipment, and
 `WaterfrontHarborFrame`. Default models upload once; M2 customized hulls rebuild/upload only when their resolved appearance changes. Each snapshot evaluates the moored
 hull poses, floating pontoon, sloping gangway and handrails, and two sagging lines per boat.
 CPU, GPU color, reflection, and shadow passes consume the same transforms.

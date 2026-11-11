@@ -15,9 +15,9 @@ Nearest-neighbour presentation remains unchanged.
 The owning status and acceptance record is in [the boating plan](BOATING_PLAN.md#speedboat-skins--2026-10-24).
 The original cabin craft has returned as a separate solo option, following the 2026-10-30 model review.
 Since 2026-11-04 the solo choices also include the GRODAN, a 15 m open canal tour boat
-(`src/boat_grodan.[ch]`, [GH3](GOTHENBURG_HARBOUR_PLAN.md#gh3-the-canal-boat)). Unlike the
+(`src/render/boat_grodan.[ch]`, [GH3](GOTHENBURG_HARBOUR_PLAN.md#gh3-the-canal-boat)). Unlike the
 other choices it is not presentation only: its handling carries a 15 × 4.2 m contact hull
-(`BoatHull` in `src/boat.h`). It has no outboards (`boat_skin_outboards`) and flies its ensign
+(`BoatHull` in `src/core/boat.h`). It has no outboards (`boat_skin_outboards`) and flies its ensign
 6 m farther aft.
 
 ## Try the liveries
@@ -33,7 +33,7 @@ other choices it is not presentation only: its handling carries a 15 × 4.2 m co
 
 The explorer (2026-10-26, from the [adventure playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#explorer-boat-2026-10-26))
 uses a stronger engine: `wake_velocity` pairs it with
-`boat_handling_explorer` (`src/boat.h`) in solo free boating, an engine of 18 instead of 11
+`boat_handling_explorer` (`src/core/boat.h`) in solo free boating, an engine of 18 instead of 11
 thrust units, about 30 m/s flat out. Courses use the standard engine, and room slots use only
 the four countries.
 
@@ -54,7 +54,7 @@ GPU modes need a desktop graphics context; CPU screenshots do not open a window.
 
 ## Customization boundary
 
-`src/boat_skin.[ch]` belongs to the presentation library. `BoatSkinPalette` exposes hull,
+`src/render/boat_skin.[ch]` belongs to the presentation library. `BoatSkinPalette` exposes hull,
 deck, accent and upholstery colors; `boat_skin_generate` builds caller-owned geometry
 for a palette, while `boat_skin_mesh` caches the immutable presets for rendering.
 The legacy `waterfront_player_*_mesh` accessors return Sweden for existing review callers.

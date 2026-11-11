@@ -369,7 +369,7 @@ predict credit.
 - Torpedo hull defeats, cannon capsizes and grenade-wave capsizes extend the causes above.
 
 **Credit.** When a boat first latches `BOAT_CAPSIZED` (the existing rule: 0.6 s inverted in
-water, `motion_step` in `src/boat.c`), the latest touch within a 5 s credit window scores +1
+water, `motion_step` in `src/core/boat.c`), the latest touch within a 5 s credit window scores +1
 for its slot. Without such a touch the victim scores −1 (self-capsize). Rows track score,
 kills, deaths and self-capsizes. Hull health reaching zero credits the lethal shooter immediately; the same per-life latch prevents a second capsize score.
 
@@ -391,15 +391,15 @@ pending credit to them is dropped. Ties share first place.
 
 ## Architecture
 
-- `src/boat_match.[ch]` (new, `proteus_boat_core`, obeys the core boundary): `BoatMatchRules`
+- `src/core/boat_match.[ch]` (new, `proteus_boat_core`, obeys the core boundary): `BoatMatchRules`
   (round, intermission, window, thresholds, grace, respawn delay, mechanic toggles) and
   `BoatMatch` (phase, phase end tick, score rows, last touches, lives and latches seen,
   respawn deadlines). `boat_match_observe` runs after each `boat_fleet_step`, returns bounded
   events (`CAPSIZE{victim, attacker|none, cause}`, `ROUND_START`, `ROUND_END`) and spawn
   requests for the server to apply. It never changes physics, the fleet hash or prediction.
-- `src/boat_fleet.[ch]`: diagnostic `pair_impulse[BOAT_FLEET_PAIRS]` in `BoatFleetStats`,
+- `src/core/boat_fleet.[ch]`: diagnostic `pair_impulse[BOAT_FLEET_PAIRS]` in `BoatFleetStats`,
   filled from the solver's accumulated impulses; physics never reads it.
-- `src/boat_wake_objects.[ch]`: read-only `boat_wake_objects_query_emitter`, the ordinary
+- `src/core/boat_wake_objects.[ch]`: read-only `boat_wake_objects_query_emitter`, the ordinary
   evaluation restricted to one emitter's 32 slots.
 - `src/boat_net_server.[ch]`: room mode and rules in `BoatNetServerConfig`, a `BoatMatch`
   beside the fleet, automatic respawns and bailouts through the spawn request handler.
@@ -408,7 +408,7 @@ pending credit to them is dropped. Ties share first place.
   for join-in-progress) and `MATCH_EVENT` (tick, kind, victim, victim life, attacker, cause),
   with golden, round-trip, truncation and invalid-field fixtures.
 - `src/boat_net_client.[ch]`: latest match state and a six-entry event ring.
-- `tools/wake_velocity.c`, `src/boat_hud.c`: in deathmatch only, round timer and own score, a
+- `tools/wake_velocity.c`, `src/render/boat_hud.c`: in deathmatch only, round timer and own score, a
   four-line kill feed (5 s per entry, roster names), a Tab-held scoreboard also shown during
   intermission, and `CAPSIZED BY <name> / RESPAWN n`. Free mode HUD unchanged.
 - `tools/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
@@ -476,7 +476,7 @@ in dated handoff sections below.
 
 Implemented:
 
-- `src/boat_match.[ch]` in `proteus_boat_core`: `BoatMatchRules` (defaults as in the rules
+- `src/core/boat_match.[ch]` in `proteus_boat_core`: `BoatMatchRules` (defaults as in the rules
   above), `boat_match_observe`, `boat_match_reset` and `boat_match_rank`. Presence is derived
   from the fleet (active or pending), lives from `BoatFleetSlot.life`.
 - `BoatFleetStats.pair_impulse`, the solver's accumulated impulse per pair (diagnostic), and

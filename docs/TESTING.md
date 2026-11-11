@@ -1120,7 +1120,7 @@ oversubscribed `-j 40` runs passed. The longest tests are now sweeps:
 - `wake_objects_contracts_jumps`: 35 s became 0.12 s of quick cases plus 1.7 s of slow ones.
 - `boat_banking`: 22.3 s became 0.3 s quick plus 1.5 s slow.
 - `boat_world_isolation.view_binding`: 3.9 s → 73 ms; `city_dressing`: 4.2 s → 0.24 s. Both
-  come from the scenery ground index in `src/waterfront_corner.c`, which keeps the pinned
+  come from the scenery ground index in `src/render/waterfront_corner.c`, which keeps the pinned
   dressing digest and identical captures.
 - `boat_environment`: 2.9 s → 0.3 s.
 - `boat_net_session` and `boat_net_river`: 36 s → 16 s each, then replaced by

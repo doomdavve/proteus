@@ -24,15 +24,15 @@ playground for iterating on effects, timing, audio, and presentation.
 ## Layout
 
 - `tools/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
-- `src/waterfront_scene.[ch]`, `src/waterfront.c`: river scenery, sky, gulls and street actors
+- `src/render/waterfront_scene.[ch]`, `src/render/waterfront.c`: river scenery, sky, gulls and street actors
   evaluated into a frame shared by the CPU (`renderer3d`) and GPU (`renderer_gpu`) renderers.
-- `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
-- `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
-- `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
+- `src/core/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
+- `src/core/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
+- `src/core/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
+- `src/core/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
   outer map holds the same water): its scenery pack lays out the river kit on the outer map, and
   validators use it as a small mapped fixture (`tools/boat_test_location.h`).
-- `src/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
+- `src/scenery/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
   `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
   compiled water in `water.h`. Collision and the server need the compiled water and maps; room
   definitions supply the course, rules and optional scene as data.
@@ -59,8 +59,8 @@ playground for iterating on effects, timing, audio, and presentation.
   `boat_plugin_host`) and reference packages; core and net never link it. The game's native
   `--plugin` glue is `tools/wake_velocity_plugin.[ch]`.
   `docs/PLUGIN_API.md` owns the contract and `docs/PLUGIN_PLAN.md` the roadmap.
-- `src/profiler.c`: rolling frame statistics and the F3 overlay.
-- `src/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
+- `src/render/profiler.c`: rolling frame statistics and the F3 overlay.
+- `src/audio/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
 - `assets/music/`: XM music for the boating game and the dance study.
 - `assets/samples/`: source WAV samples for tracker editing.
 - `tools/generate_audio.py`: deterministic generator for the starter samples and XM.

@@ -1,6 +1,6 @@
 #include "waterfront_outer.h"
 
-#include "../assets/geometry/outer/water.h"
+#include "../../assets/geometry/outer/water.h"
 
 #include <math.h>
 
