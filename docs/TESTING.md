@@ -745,8 +745,8 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
-`boat_local` (AR6 ledger rows L0, L6 and L2, labels `core;cpu`; quick except the slow-lane
-scripted drives and time trials) runs
+`boat_local` (AR6 ledger rows L0, L6, L2 and L1, labels `core;cpu`; quick except the slow-lane
+scripted drives, time trials and voyages) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
 glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
@@ -786,7 +786,17 @@ frame's flush under the working directory's `boat-local-saves`, selected on a fr
 raced as the ghost; an equal finish is not a best), all slow; `course_state` (the time trial's
 state codec and the PrivateState message, which the v14 and input decoders reject); and
 `private_state_rejected` (a hosted server counts PrivateState as malformed and rejects the
-sender; a playing hosted client counts it as a decode error and keeps no state). Each
+sender; a playing hosted client counts it as a decode error and keeps no state); and the L1
+voyage cases on a test route laid along the outer spawn's heading (a shelter 40 m ahead, weather
+that begins 110 m from a storm 160 m ahead, the destination 300 m ahead), where both paths drive
+straight ahead at full throttle: `voyage_trace` (1x with 0.1 s frames past the shelter, the
+weather's start and exposed water, a recovery between frames back to the shelter, then 8x to
+arrival: voyage state, the client's and authority's storm and every predicted tick equal the
+direct session's) and `tour_trace` (the same stops as an ordered tour at 8x, a restart that keeps
+no voyage progress, then a recovery), both slow; `voyage_state` (the voyage codec, its weather
+reader and the PrivateRecover message, which the v14 and input decoders reject); and
+`recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
+next snapshot corrects the client; a client refuses a request for another tick). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports

@@ -72,6 +72,10 @@ bool boat_fleet_init_scene(BoatFleet *fleet, const BoatWorldResources *resources
 bool boat_fleet_request_spawn(BoatFleet *fleet, unsigned slot);
 // Place BOAT in SLOT now, bypassing the spawn rules (fixtures and adapters). Starts a new life.
 void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat);
+// L1: move SLOT's active boat to BOAT now, between ticks, in the same life (a voyage recovery).
+// Its wake span ends without a seam across the move, as a placement's does (a recovered boat is at
+// rest, so its emitter would restart the span anyway).
+void boat_fleet_relocate(BoatFleet *fleet, unsigned slot, Boat boat);
 // Hold SLOT in place from the next tick (race grid and countdown), or release it.
 void boat_fleet_hold(BoatFleet *fleet, unsigned slot, bool held);
 // True when CANDIDATE could be placed in SLOT now: clear of land, of other hulls over the

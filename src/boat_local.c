@@ -174,6 +174,14 @@ static bool run_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
             local->running = false;
             return false;
         }
+        uint64_t states = client->stats.private_states;
+        if (local->config.weather && states != local->weather_states) {
+            local->weather_states = states;
+            BoatStorm storm;
+            if (local->config.weather(local->config.weather_context, client->private_state,
+                    client->private_state_size, &storm))
+                boat_net_client_private_storm(client, storm);
+        }
         remaining -= count;
         ++chunks;
     }
@@ -198,6 +206,15 @@ bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
         return false;
     }
     return run_frame(local, now, grant, (BoatInput) { 0 }, NAN, NAN, script, observer);
+}
+
+bool boat_local_recover(BoatLocal *local, Boat pose)
+{
+    if (!local->running || !boat_net_client_private_recover(&local->client, local->tick, pose)) {
+        fail(local, "the local client could not recover its boat");
+        return false;
+    }
+    return true;
 }
 
 const BoatFleet *boat_local_view(const BoatLocal *local) { return &local->client.prediction.fleet; }

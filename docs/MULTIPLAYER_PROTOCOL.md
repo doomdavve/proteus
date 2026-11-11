@@ -474,6 +474,17 @@ grant only when it differs from the last one sent; the client keeps the newest o
 bytes belong to the adapter's own codec: the time trial's (`tools/wake_velocity_course.c`) is
 `u8` next gate, `u8` flags (1 practice, 2 finished, 4 recording stopped), then `f64` elapsed,
 four `f64` splits and four `f64` crossings (74 bytes).
+The voyage's (`tools/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
+4 too fast, 8 observed, 16 weather begun), `u8` latest event, `u8` its shelter, `u32` recoveries,
+then `f64` weather start, start, arrival and latest event time (40 bytes, big-endian like the
+course's). The client derives the storm its water carries from these bytes and the route, which
+both endpoints borrow as an immutable resource.
+
+`0xC2` PrivateRecover (channel 0, client to server): header only (no payload). Sent at a frame
+boundary with the header tick equal to the authority's tick: the authority's rules adapter places
+its recovery pose in the same life before the next tick (`BoatNetRules.recover`), and the client
+predicts the same pose. A request for another tick, from a peer that is not ready, or to a server
+whose adapter has no recovery is counted and ignored.
 
 ### Other control messages
 

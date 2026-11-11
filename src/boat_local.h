@@ -24,6 +24,11 @@ typedef struct {
     // L2: the authority's rules adapter (application code, e.g. the time trial's); zero for none.
     // Its private state reaches the client after each chunk (boat_local_state).
     BoatNetRules rules;
+    // L1: the client's reading of a private STATE: true with the storm the world's water carries
+    // at its tick, applied to the client's mirror and prediction after each chunk that received
+    // new state. Optional; pairs with RULES.weather.
+    bool (*weather)(void *context, const uint8_t *state, size_t size, BoatStorm *storm);
+    void *weather_context;
 } BoatLocalConfig;
 
 // Called after each predicted tick of a chunk's intake: VIEW is the client's prediction at TICK
@@ -59,6 +64,7 @@ typedef struct {
     uint64_t tick; // Ticks granted so far: the authority's tick.
     bool running;
     BoatWakeObjects water; // The observer's pre-emission pool for the current tick.
+    uint64_t weather_states; // Private states the weather reader has seen (L1).
     char failure[128]; // Why the latest start, frame or restart failed.
     BoatLocalStats stats;
 } BoatLocal;
@@ -86,6 +92,11 @@ bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
 // boat_local_frame with each tick's command from SCRIPT instead of one frame's helm.
 bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
     const BoatLocalScript *script, const BoatLocalObserver *observer);
+// L1: between frames, recover the player's boat to POSE (the rules adapter's recovery, which the
+// host computes from the voyage state the client last received). The authority applies its own
+// adapter's pose at the next frame's start, before its first tick. False with failure text when
+// the client could not send the request.
+bool boat_local_recover(BoatLocal *local, Boat pose);
 // The client's view: the predicted fleet, at the authority's tick after a frame.
 const BoatFleet *boat_local_view(const BoatLocal *local);
 // The player's slot in the view.

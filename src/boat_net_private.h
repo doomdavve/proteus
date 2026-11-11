@@ -27,6 +27,10 @@ typedef struct {
 // opaque bytes the adapter's own codec reads; HEADER.tick is the authority's tick.
 #define BOAT_NET_PRIVATE_STATE 0xc1
 #define BOAT_NET_PRIVATE_STATE_BYTES 256 // The largest private state.
+// C->S on the reliable control channel (L1): recover the client's boat to the rules adapter's
+// recovery pose at a frame boundary; HEADER.tick is the authority's tick it applies after. No
+// payload.
+#define BOAT_NET_PRIVATE_RECOVER 0xc2
 
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
@@ -46,5 +50,14 @@ size_t boat_net_private_encode_state(const BoatNetHeader *header, const uint8_t 
 // Decode a private state message into STATE and *STATE_SIZE. Never writes them on failure.
 BoatNetError boat_net_private_decode_state(const uint8_t *data, size_t size, BoatNetHeader *header,
     uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES], size_t *state_size);
+
+// A private recover request; HEADER's type is ignored. Always BOAT_NET_HEADER_BYTES.
+size_t boat_net_private_encode_recover(
+    const BoatNetHeader *header, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// The private type of DATA (an encoded private message), or zero when it carries none.
+uint8_t boat_net_private_type(const uint8_t *data, size_t size);
+// Decode a private recover request. Never writes HEADER on failure.
+BoatNetError boat_net_private_decode_recover(
+    const uint8_t *data, size_t size, BoatNetHeader *header);
 
 #endif

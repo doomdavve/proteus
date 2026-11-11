@@ -73,6 +73,14 @@ void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat)
     *emitter = (BoatWakeObjectEmitter) { .next = emitter->next };
 }
 
+void boat_fleet_relocate(BoatFleet *fleet, unsigned slot, Boat boat)
+{
+    assert(slot < BOAT_FLEET_SLOTS);
+    fleet->state.slots[slot].boat = boat;
+    BoatWakeObjectEmitter *emitter = &fleet->state.wakes.emitters[slot];
+    *emitter = (BoatWakeObjectEmitter) { .next = emitter->next };
+}
+
 void boat_fleet_leave(BoatFleet *fleet, unsigned slot)
 {
     assert(slot < BOAT_FLEET_SLOTS);

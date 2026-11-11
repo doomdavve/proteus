@@ -28,20 +28,32 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
     } else {
         wake_course_destroy(&local->course);
     }
+    local->voyage_active = !local->course_active && session->voyage.route;
+    if (local->voyage_active) {
+        wake_voyage_init(&local->voyage, session, 0);
+        config.rules = wake_voyage_rules(&local->voyage);
+        config.weather = wake_voyage_weather;
+        config.weather_context = (void *)session->voyage.route;
+    }
     return config;
 }
 
-// The client's view of the authority's course after a frame, and the finish the frame settled.
+// The client's view of the authority's course after a frame, and the finish the frame settled;
+// or the client's view of the authority's voyage after a frame.
 static void course_sync(WakeLocal *local, BoatSession *session)
 {
-    if (!local->course_active)
+    if (!local->course_active && !local->voyage_active)
         return;
     size_t size;
     uint64_t tick;
     const uint8_t *state = boat_local_state(&local->local, &size, &tick);
-    if (state) // Sent only when it changes, so the newest describes the authority's tick.
+    // Sent only when it changes, so the newest describes the authority's tick.
+    if (state && local->course_active)
         wake_course_view(state, size, session);
-    wake_course_take(&local->course, &session->runs);
+    else if (state)
+        wake_voyage_view(state, size, session);
+    if (local->course_active)
+        wake_course_take(&local->course, &session->runs);
 }
 
 bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectStudy *objects,
@@ -149,9 +161,30 @@ bool wake_local_scripted_drive(
     return true;
 }
 
+bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *objects)
+{
+    if (!local->voyage_active || !session->voyage.route)
+        return true;
+    // The authority's adapter makes the same recovery from the same voyage state.
+    BoatVoyage voyage = session->voyage;
+    Boat boat = session->boat;
+    boat_voyage_recover(&voyage, &boat, boat_session_time(session));
+    if (!boat_local_recover(&local->local, boat)) {
+        local->active = false;
+        return false;
+    }
+    session->boat = boat;
+    session->voyage = voyage;
+    session->voyage_events
+        = (BoatVoyageEvents) { .items = { { BOAT_VOYAGE_RECOVERED, voyage.shelter } }, .count = 1 };
+    boat_presentation_reset(&session->presentation);
+    objects->wakes = boat_local_view(&local->local)->state.wakes;
+    return true;
+}
+
 void wake_local_close(WakeLocal *local)
 {
     boat_local_stop(&local->local);
     wake_course_destroy(&local->course);
-    local->active = local->course_active = false;
+    local->active = local->course_active = local->voyage_active = false;
 }

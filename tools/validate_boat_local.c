@@ -6,7 +6,9 @@
  * the scripted drive instead (demo_step against the glue's scripted frames and capture drive). The
  * L2 cases run the time trial: a course autopilot through the direct session's own course and
  * recorder beside the local authority's course adapter, with equal course state, runs, bests,
- * notices and save requests after every frame.
+ * notices and save requests after every frame. The L1 cases run a voyage or tour: the direct
+ * session's own voyage beside the authority's voyage adapter, with equal voyage state, weather
+ * and boats through a recovery.
  * Frame time is a scripted value, never wall time. `--bench` reports per-frame cost (not a test).
  */
 #include "boat_fixtures.h"
@@ -83,6 +85,8 @@ typedef struct {
 } Pilot;
 static Pilot pilots[2];
 static bool autopilot;
+// L1: both sessions carry a voyage; every frame compares voyage state and weather.
+static bool voyaging;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -285,6 +289,22 @@ static bool same_course(void)
         && same_run(&r->best, &q->best) && same_run(&r->opponent, &q->opponent);
 }
 
+// L1: the client's voyage view and storm, and the authority adapter's voyage and the authority's
+// storm, equal the direct session's.
+static bool same_voyage(void)
+{
+    uint8_t a[WAKE_VOYAGE_STATE_BYTES], b[WAKE_VOYAGE_STATE_BYTES], c[WAKE_VOYAGE_STATE_BYTES];
+    wake_voyage_encode(&direct.session.voyage, a);
+    wake_voyage_encode(&play.session.voyage, b);
+    wake_voyage_encode(&game.voyage.voyage, c);
+    const BoatStorm *storm = &direct.session.world.water.storm;
+    return !memcmp(a, b, sizeof(a)) && !memcmp(a, c, sizeof(a))
+        && play.session.voyage.route == direct.session.voyage.route
+        && !memcmp(storm, &play.session.world.water.storm, sizeof(*storm))
+        && !memcmp(storm, &lp->server.fleet.world.water.storm, sizeof(*storm))
+        && !memcmp(storm, &lp->client.prediction.fleet.world.water.storm, sizeof(*storm));
+}
+
 // Run FRAMES of SCRIPT through both paths; compare at every tick and after every frame.
 static int drive(Script script, unsigned frames)
 {
@@ -319,6 +339,8 @@ static int drive(Script script, unsigned frames)
         CHECK(observed - before == ticks);
         CHECK(mismatches == 0);
         CHECK(same_authority());
+        if (voyaging)
+            CHECK(same_voyage());
         if (autopilot) {
             CHECK(same_course());
             // The frame's storage service: both flush (an empty best path fails the save).
@@ -333,7 +355,7 @@ static int drive(Script script, unsigned frames)
 static int open_world(World w)
 {
     world = w;
-    scripted = autopilot = false;
+    scripted = autopilot = voyaging = false;
     game.script = NULL;
     play_open(&direct);
     play_open(&play);
@@ -1115,6 +1137,220 @@ static int course_state(void)
     return 0;
 }
 
+// L1: a test route laid along the outer spawn's heading, so a short straight drive meets it: a
+// shelter 40 m ahead, weather that begins 110 m from a storm 160 m ahead (60 m radius, grown over
+// 4 s, exposed inside 48 m) and the destination 300 m ahead, reached at any speed. A tour passes
+// the same stops in order.
+static BoatVoyageRoute test_route;
+
+static void route_along(const Boat *spawn, bool ordered)
+{
+    Vector2 forward = { sinf(spawn->heading), -cosf(spawn->heading) };
+    Vector2 at[4];
+    const float distance[4] = { 0, 40, 160, 300 };
+    for (unsigned i = 0; i < 4; ++i)
+        at[i] = Vector2Add(spawn->position, Vector2Scale(forward, distance[i]));
+    test_route = (BoatVoyageRoute) {
+        .shelters = { { "START", at[0], spawn->heading, 15, NULL },
+            { "AHEAD", at[1], spawn->heading, 15, NULL },
+            { "NEAR STORM", Vector2Add(at[2], (Vector2) { forward.y * 90, -forward.x * 90 }),
+                spawn->heading, 20, NULL },
+            { "END", at[3], spawn->heading, 0, NULL } },
+        .shelter_count = 4,
+        .ordered = ordered,
+        .arrival_centre = at[3],
+        .arrival_radius = 25,
+        .arrival_speed = 40, // Arrives at full throttle.
+        .exposure = { .centre = at[2], .radius = 60, .height = 1.6f, .build = 4 },
+        .exposed_fraction = .8f,
+        .weather_range = 110,
+    };
+}
+
+static void voyage_open(Play *p)
+{
+    boat_session_init(&p->session, test_world(world.location), world_water());
+    p->session.voyage_route = &test_route;
+    boat_session_restart(&p->session, world_water());
+    object_study_reset(
+        &p->objects, &p->session, false, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT);
+    p->accumulator = 0;
+}
+
+static int open_voyage(World w, bool ordered)
+{
+    if (open_world(w))
+        return 1;
+    route_along(&direct.session.boat, ordered);
+    wake_local_close(&game);
+    voyage_open(&direct);
+    voyage_open(&play);
+    voyaging = true;
+    CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
+    CHECK(game.voyage_active && !game.course_active && same_authority() && same_voyage());
+    // The straight line ahead is open water as far as the destination.
+    for (float d = 0; d <= 320; d += 5) {
+        Vector2 at = Vector2Add(test_route.shelters[0].position,
+            Vector2Scale((Vector2) { sinf(test_route.shelters[0].heading),
+                             -cosf(test_route.shelters[0].heading) },
+                d));
+        CHECK(boat_map_water(&test_world(w.location)->map, at, 2.5f));
+    }
+    return 0;
+}
+
+// Straight ahead at full throttle: 1x with an occasional 0.1 s frame, or 8x.
+static Frame ahead(unsigned n)
+{
+    return (Frame) { .seconds = n % 7 == 3 ? .1 : 1.0 / 60,
+        .speed = BOAT_TIME_NORMAL,
+        .thrust_target = 1,
+        .steering_target = NAN };
+}
+
+static Frame ahead_8x(unsigned n)
+{
+    Frame f = ahead(n);
+    f.speed = BOAT_TIME_MAX_INDEX;
+    return f;
+}
+
+// Both paths take the game's recover branch between frames.
+static int recover_both(void)
+{
+    boat_session_recover(&direct.session);
+    direct.accumulator = 0;
+    uint64_t recoveries = lp->server.stats.recoveries;
+    CHECK(wake_local_recover(&game, &play.session, &play.objects));
+    play.accumulator = 0;
+    CHECK(!memcmp(&play.session.boat, &direct.session.boat, sizeof(Boat)));
+    CHECK(play.session.voyage.recoveries == direct.session.voyage.recoveries);
+    CHECK(play.session.voyage_events.count == 1
+        && play.session.voyage_events.items[0].kind == BOAT_VOYAGE_RECOVERED);
+    // The authority places it at the next frame's start.
+    if (drive(ahead, 1))
+        return 1;
+    CHECK(lp->server.stats.recoveries == recoveries + 1 && !lp->server.stats.recoveries_ignored);
+    return 0;
+}
+
+// Drive SCRIPT until the direct voyage satisfies DONE, at most FRAMES frames.
+static int voyage_until(Script script, bool (*done)(const BoatVoyage *), unsigned frames)
+{
+    for (unsigned n = 0; n < frames && !done(&direct.session.voyage); ++n)
+        if (drive(script, 1))
+            return 1;
+    CHECK(done(&direct.session.voyage));
+    return 0;
+}
+
+static bool past_ahead(const BoatVoyage *v) { return v->shelter == 1; }
+static bool weather_begun(const BoatVoyage *v) { return v->weather; }
+static bool exposed(const BoatVoyage *v) { return v->exposed; }
+static bool arrived(const BoatVoyage *v) { return v->arrived; }
+
+// Equal voyage progress, events, weather and boats from the same commands: the shelter ahead, the
+// weather beginning and growing, exposed water under the hull, a recovery back to the shelter and
+// on to the destination.
+static int voyage_trace(void)
+{
+    if (open_voyage(OUTER, false) || voyage_until(ahead, past_ahead, 2000)
+        || voyage_until(ahead, weather_begun, 2000))
+        return 1;
+    CHECK(direct.session.voyage.event == BOAT_VOYAGE_WEATHER);
+    CHECK(lp->server.fleet.world.water.storm.radius > 0);
+    if (voyage_until(ahead, exposed, 2000) || drive(ahead, 120))
+        return 1;
+    if (recover_both())
+        return 1;
+    CHECK(play.session.voyage.recoveries == 1 && play.session.voyage.shelter == 1);
+    if (voyage_until(ahead_8x, arrived, 4000) || drive(ahead, 30))
+        return 1;
+    printf("voyage: arrived at %.2f s, %u recovery\n", play.session.voyage.arrival,
+        play.session.voyage.recoveries);
+    return clean_commands();
+}
+
+// A tour starts at its first stop and passes the stops in order; a restart is a new generation
+// with the weather met so far kept, as boat_session_restart keeps none of it (both paths alike).
+static int tour_trace(void)
+{
+    if (open_voyage(OUTER, true) || voyage_until(ahead_8x, past_ahead, 2000)
+        || voyage_until(ahead_8x, weather_begun, 2000))
+        return 1;
+    play_restart(&direct);
+    play_restart(&play);
+    CHECK(wake_local_restart(&game, &play.session, &play.objects, now));
+    CHECK(same_authority() && same_voyage() && play.session.voyage.shelter == 0);
+    if (voyage_until(ahead_8x, past_ahead, 2000) || recover_both())
+        return 1;
+    CHECK(play.session.voyage.shelter == 1 && lp->generation == 2);
+    return clean_commands();
+}
+
+// The voyage codec round-trips and rejects malformed bytes; the recover request is private.
+static int voyage_state(void)
+{
+    route_along(&(Boat) { .position = { 0, 0 } }, false);
+    BoatVoyage v = { .route = &test_route,
+        .shelter = 2,
+        .exposed = true,
+        .weather = true,
+        .observed = true,
+        .weather_started = 3.5,
+        .started = 1,
+        .recoveries = 7,
+        .event = BOAT_VOYAGE_EXPOSED,
+        .event_shelter = 2,
+        .event_time = 9.25 };
+    uint8_t bytes[BOAT_NET_PRIVATE_STATE_BYTES];
+    size_t size = wake_voyage_encode(&v, bytes);
+    CHECK(size == WAKE_VOYAGE_STATE_BYTES);
+    BoatVoyage back = { .route = &test_route };
+    CHECK(wake_voyage_decode(bytes, size, &back));
+    uint8_t again[WAKE_VOYAGE_STATE_BYTES];
+    CHECK(wake_voyage_encode(&back, again) == size && !memcmp(bytes, again, size));
+    BoatStorm storm;
+    CHECK(wake_voyage_weather((void *)&test_route, bytes, size, &storm));
+    CHECK(storm.radius == 60 && storm.started == 3.5);
+    CHECK(!wake_voyage_decode(bytes, size - 1, &back));
+    bytes[0] = 4; // Outside the route's shelters.
+    CHECK(!wake_voyage_decode(bytes, size, &back) && back.shelter == 2);
+    BoatVoyage none = { 0 };
+    CHECK(!wake_voyage_decode(again, size, &none));
+    // The recover request: private, header only, never v14 or an input batch.
+    BoatNetHeader header = { .epoch = 3, .sequence = 4, .tick = 48 }, read;
+    uint8_t message[BOAT_NET_MAX_MESSAGE];
+    size_t length = boat_net_private_encode_recover(&header, message);
+    CHECK(length == BOAT_NET_HEADER_BYTES && boat_net_private_message(message, length));
+    CHECK(boat_net_private_type(message, length) == BOAT_NET_PRIVATE_RECOVER);
+    static BoatNetMessage decoded;
+    CHECK(boat_net_decode(message, length, &decoded) == BOAT_NET_BAD_TYPE);
+    BoatNetInputBatch batch;
+    CHECK(boat_net_private_decode_input(message, length, &read, &batch) == BOAT_NET_BAD_TYPE);
+    CHECK(boat_net_private_decode_recover(message, length, &read) == BOAT_NET_OK);
+    CHECK(read.tick == 48 && read.epoch == 3);
+    CHECK(boat_net_private_decode_recover(message, length - 1, &read) != BOAT_NET_OK);
+    return 0;
+}
+
+// A recover request for a tick other than the authority's is ignored, and a free-boating
+// authority without a voyage adapter ignores every request.
+static int recover_ignored(void)
+{
+    if (open_world(OUTER) || drive(one, 10))
+        return 1;
+    CHECK(boat_local_recover(lp, play.session.boat));
+    if (drive(one, 1))
+        return 1;
+    // The prediction moved; the authority did not, so the frame's snapshot corrected it.
+    CHECK(lp->server.stats.recoveries == 0 && lp->server.stats.recoveries_ignored == 1);
+    if (open_voyage(OUTER, false) || drive(ahead, 10))
+        return 1;
+    CHECK(!boat_net_client_private_recover(&lp->client, lp->tick + 1, play.session.boat));
+    return 0;
+}
+
 // Per-frame cost at 8x on outer: processor time of one frame's grant through both endpoints.
 static int bench(void)
 {
@@ -1204,6 +1440,10 @@ int main(int argc, char **argv)
         SLOW_CASE(course_saved_ghost),
         TEST_CASE(course_state),
         TEST_CASE(private_state_rejected),
+        SLOW_CASE(voyage_trace),
+        SLOW_CASE(tour_trace),
+        TEST_CASE(voyage_state),
+        TEST_CASE(recover_ignored),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     boat_local_stop(lp);

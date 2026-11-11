@@ -1255,16 +1255,18 @@ static int study(int argc, char **argv)
         goto cleanup;
     }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    // AR6 (L0), L6 and L2: plain free boating and the time trial (bundled or a course package),
-    // live, scripted (`--demo`) or captured, run as a local authority and client. Voyages,
-    // objectives, the working harbour, rooms, replay viewing and the developer studies keep the
-    // direct path until their ledger rows migrate them.
+    // AR6 (L0), L6, L2 and L1: plain free boating, the time trial (bundled or a course package)
+    // and voyages and tours without an objective, live, scripted (`--demo`) or captured, run as a
+    // local authority and client. Objectives, plugin authoring, the working harbour, rooms,
+    // replay viewing and the developer studies keep the direct path until their ledger rows
+    // migrate them.
     static WakeLocal local;
 #define LOCAL_ELIGIBLE()                                                                           \
-    (!networked && !work_mode && objects && !objects->crossing && !wake && !session.voyage_route   \
-        && !session.runs.playing && plugin_active && !plugin.authoring                             \
-        && plugin.host.kind == (course ? BOAT_PLUGIN_KIND_COURSE : BOAT_PLUGIN_KIND_FREE)          \
-        && !plugin.objective.initialized)
+    (!networked && !work_mode && objects && !objects->crossing && !wake && !session.runs.playing   \
+        && plugin_active && !plugin.authoring && !plugin.objective.initialized                     \
+        && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
+                   : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
+                    || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))
 #endif
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;
@@ -1849,6 +1851,13 @@ static int study(int argc, char **argv)
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), wake_app_now());
         if (plugin_active)
             plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+        // L1: a session that stops being eligible between frames (the console promoted its plugin
+        // to authoring) continues on the direct path from the client's view, which holds the
+        // boat, clock, voyage, storm and wake pool, before any authoring change reaches it.
+        if (local.active && !LOCAL_ELIGIBLE())
+            wake_local_close(&local);
+#endif
         if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
         else if (plugin_reset_pending) {
@@ -1902,7 +1911,19 @@ static int study(int argc, char **argv)
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
-            boat_session_recover(&session);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+            if (local.active) {
+                // L1: the authority places the same recovery before the next frame's first tick.
+                if (!wake_local_recover(&local, &session, objects)) {
+                    snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                        local.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
+            } else
+#endif
+                boat_session_recover(&session);
             if (plugin_active)
                 wake_plugin_after_tick(&plugin, &session);
             accumulator = 0;

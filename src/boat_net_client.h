@@ -70,6 +70,7 @@ typedef struct {
     // does not answer READY and will be dropped); ignored as duplicate or stale.
     uint64_t revisions, revisions_invalid, revisions_ignored;
     uint64_t private_states; // Private state messages installed (L2).
+    uint64_t recoveries; // Private recover requests sent (L1).
 } BoatNetClientStats;
 
 // A deathmatch event as received, with the roster names of that moment (leavers keep theirs).
@@ -241,6 +242,14 @@ bool boat_net_client_flush(BoatNetClient *client);
 // is no peer timeout, snapshot-silence close or ping. NOW only bounds startup
 // (BOAT_NET_HANDSHAKE_TIMEOUT). False once rejected, closed or timed out joining.
 bool boat_net_client_local_service(BoatNetClient *client, double now);
+// L1: at the frame boundary TICK (the authority's tick, the prediction's too), ask the authority to
+// recover the own boat, and predict POSE: the same recovery the authority's rules adapter makes
+// from the voyage state this client last received. False (nothing sent) when the client has no
+// boat, the prediction is not at TICK or the transport refused the request.
+bool boat_net_client_private_recover(BoatNetClient *client, uint64_t tick, Boat pose);
+// L1: the storm the private world's water carries now, in the mirror and the prediction, as the
+// authority's rules adapter reported it in private state.
+void boat_net_client_private_storm(BoatNetClient *client, BoatStorm storm);
 // Ask the authority for a new life at a safe spawn (menu action or held Backspace).
 void boat_net_client_request_reset(BoatNetClient *client);
 // Progress of the latest reset request; SECONDS (may be NULL) receives its age.

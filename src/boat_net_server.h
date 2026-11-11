@@ -51,6 +51,13 @@ typedef struct {
     // BOAT_NET_PRIVATE_STATE_BYTES); zero for none. Called at the end of every grant; the state is
     // sent to each ready peer (BOAT_NET_PRIVATE_STATE) when it differs from the last one sent.
     size_t (*private_state)(void *context, uint8_t *out);
+    // L1, private sessions only: the storm the world's water carries from the next tick, after
+    // committed. False leaves the water as it is. Optional.
+    bool (*weather)(void *context, BoatStorm *storm);
+    // L1, private sessions only: the client asked to recover SLOT at a frame boundary after TICK.
+    // BOAT holds its current boat; true places the adapter's pose there in the same life. Optional;
+    // without it a request is ignored.
+    bool (*recover)(void *context, uint64_t tick, unsigned slot, Boat *boat);
 } BoatNetRules;
 
 typedef struct {
@@ -122,6 +129,7 @@ typedef struct {
     uint32_t revision; // The running definition's revision (1 at start).
     uint64_t spawn_requests, resyncs, output_faults, emission_failures, births_truncated;
     uint64_t private_states; // Private state messages sent (L2).
+    uint64_t recoveries, recoveries_ignored; // Private recover requests (L1).
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
 

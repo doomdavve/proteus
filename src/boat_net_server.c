@@ -462,8 +462,43 @@ static void refill(BoatNetServerPeer *p, double now)
 
 // AR6: the private range, accepted only by a private session (a hosted room's decoder counts it
 // as malformed like any unknown type).
+// L1: a recover request at the frame boundary it names; any other tick is ignored.
+static void private_recover(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    if (boat_net_private_decode_recover(event->data, event->size, &header) != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch) {
+        ++s->stats.stale_packets;
+        return;
+    }
+    BoatFleetSlot *slot = &s->fleet.state.slots[p->slot];
+    Boat boat = slot->boat;
+    if (p->phase != BOAT_NET_PEER_READY || !slot->active || header.tick != s->fleet.state.tick
+        || !s->config.rules.recover
+        || !s->config.rules.recover(s->config.rules.context, header.tick, p->slot, &boat)) {
+        ++s->stats.recoveries_ignored;
+        return;
+    }
+    boat_fleet_relocate(&s->fleet, p->slot, boat);
+    ++s->stats.recoveries;
+}
+
 static void private_message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_RECOVER) {
+        private_recover(s, peer, event, now);
+        return;
+    }
     BoatNetServerPeer *p = &s->peers[peer];
     BoatNetHeader header;
     BoatNetInputBatch batch;
@@ -985,6 +1020,10 @@ static void tick(BoatNetServer *s)
     }
     if (s->config.local.enabled && s->config.rules.committed)
         s->config.rules.committed(s->config.rules.context, next, &s->fleet);
+    BoatStorm storm;
+    if (s->config.local.enabled && s->config.rules.weather
+        && s->config.rules.weather(s->config.rules.context, &storm))
+        s->fleet.world.water.storm = storm;
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
     objective_poll(s);

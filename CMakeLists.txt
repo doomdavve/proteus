@@ -437,7 +437,8 @@ if(NOT EMSCRIPTEN)
   # AR6 (L0): private free boating as a local authority and client (native only for now). The
   # glue is a library so validate_boat_local drives the game's own code.
   add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
-    tools/wake_velocity_course.c tools/wake_velocity_course.h)
+    tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
+    tools/wake_velocity_voyage.h)
   target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
   target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net)
   target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})

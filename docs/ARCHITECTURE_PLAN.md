@@ -10,7 +10,9 @@ browser-built or Windows-built.
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** L1 with L9 (voyages, objectives and plugin authoring) on `arch/l1-voyages`.
+L1a (voyages and tours without an objective on the local authority) is implemented on
+`arch/l1-voyages`; native voyage manual check owed.
+**Next:** L1b, the plugin objective adapter on the authority; then L1c (L9, plugin authoring).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -900,6 +902,55 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
 Owed manual checks: a native windowed time trial (feel on the wake pool, finish, new best saved
 and loaded as the ghost on the next launch, practice at altered time, restart), plus the L0 items
 still open from AR6. Browser and Windows: nothing run.
+
+L1 is split into three steps on branch `arch/l1-voyages` (from `main` after PR #181): L1a
+voyages and tours without an objective; L1b the plugin objective adapter on the authority; L1c
+(ledger L9) plugin authoring, staging and commit at the authority's tick boundary.
+
+L1a (voyage state, events, weather and recover), implemented 2026-11-11:
+
+- Authority adapter: `tools/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
+  authority's `BoatNetRules` for a session with a voyage route. `committed` steps the voyage from
+  the committed boat as `boat_session_step` does. Two new optional private-only callbacks:
+  `weather` (the storm the world's water carries from the next tick; the server writes it into
+  its fleet's water) and `recover`. Voyage state reaches the client as PrivateState (40 bytes,
+  [protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)); the glue decodes
+  it into the session's voyage and storm after each frame. The route is an immutable resource
+  both sides borrow.
+- Weather on the client: `BoatLocalConfig.weather` reads each new private state after a chunk and
+  sets the storm in the client's mirror and prediction (`boat_net_client_private_storm`). Ticks
+  predicted between the weather's start and the end of that chunk use the previous storm; the
+  chunk's snapshot corrects them. Shipped voyages start the weather 2.5 km from a storm of 700 m
+  radius, so the hull never meets that difference, and the validator finds every predicted tick
+  equal.
+- Recover: new private type `0xC2` PrivateRecover (client to server, header only). Between
+  frames the glue computes the recovery from the client's voyage view, the client predicts it and
+  sends the request, and the authority's adapter places its own pose before the next frame's
+  first tick (`boat_fleet_relocate`: the same life, so in-flight commands stay valid; the wake
+  span restarts). The session shows the recovered boat, voyage and presentation at once, as
+  `boat_session_recover` does.
+- The game: `LOCAL_ELIGIBLE` admits voyage packages with a route and no objective (the bundled
+  Långedrag voyage, Harbor life and the Grodan and canal tours). A session that stops being
+  eligible between frames (the console promoted its plugin to authoring) closes the local session
+  and continues on the direct path from the client's view, before an authoring change reaches it.
+  Voyages with an objective (Shelter tour) and `--plugin` authoring keep the direct path until
+  L1b and L1c.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_local` gains `voyage_trace` (about 0.7 s) and `tour_trace` (about 0.14 s), slow lane, and
+  `voyage_state` and `recover_ignored`, quick ([cases](TESTING.md#network-checks)). Negative
+  checks during development: a server that ignores the adapter's storm fails `voyage_trace`
+  (`same_voyage`), and one that ignores the recovery fails it (`same_authority`).
+- Captures byte-identical to a build of `dba5bc1` (the direct path): `outer` at `--time` 3, 20
+  and 60 (the Långedrag voyage, now local), `basin` at 3, 20 and 60, `--course` at 3 and 25,
+  `--package proteus.harbor-life` and `--package proteus.grodan --skin grodan` at 5 and 40 (local),
+  and `--plugin plugins/shelter-tour` at 5 and 40 (direct path).
+- `ctest --preset full -j8` passed 522/522 (13 disabled). No browser or Windows build.
+
+Owed manual checks: a native windowed voyage and tour (recover after passing a shelter by holding
+Backspace, the weather building near the storm, arrival, restart), and promoting a running
+voyage to authoring from the console.
 
 ### AR8 — Move files into owning directories
 
