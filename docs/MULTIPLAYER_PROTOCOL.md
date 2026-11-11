@@ -502,7 +502,11 @@ borrowed scenery) installs it on the authority's world. The client predicts the 
 scene. The voyage adapter's changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's
 `migrate` runs on the authority; a failure keeps the active revision and its scene, and reports
 it in PrivateState) and 4 restart the voyage; the course adapter's only change is 1 rebind (an
-unchanged or renamed course). A request for another tick, from a peer that is not ready, for an unknown revision or to
+unchanged or renamed course). An adapter may defer a commit it cannot finish at once (the
+browser's migration on its isolated worker, `BoatNetCommitResult.deferred`): nothing is applied
+until a later grant collects its outcome (`BoatNetRules.completion`), which installs the scene,
+relocation and storm then, or nothing when it failed or was canceled. One commit is deferred at a
+time. A request for another tick, from a peer that is not ready, for an unknown revision or to
 a server whose adapter has no commit is counted and ignored.
 
 `0xC4` PrivateInspect (channel 0, client to server): header only. The rules adapter

@@ -21,10 +21,12 @@ typedef struct {
     Boat spawn; // Authority only: the accepted player's boat, placed before its checkpoint.
 } BoatNetPrivateSession;
 
-// L1b: what a private commit changes besides the adapter's own state.
+// L1b: what a private commit changes besides the adapter's own state. L4b: an adapter that cannot
+// finish a commit at once sets DEFERRED and applies nothing; its outcome arrives later through
+// BoatNetRules.completion.
 typedef struct {
     Boat boat;
-    bool moved, rescene;
+    bool moved, rescene, deferred;
     const BoatSceneDefinition *scene;
 } BoatNetCommitResult;
 

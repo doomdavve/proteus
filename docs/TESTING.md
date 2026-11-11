@@ -883,7 +883,10 @@ reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect
 PrivateInspection messages, which the v14 and
 input decoders reject);
 `recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
-next snapshot corrects the client; a client refuses a request for another tick); and the L4b
+next snapshot corrects the client; a client refuses a request for another tick);
+`deferred_commit` (a fake adapter defers a commit: the authority applies nothing until the
+adapter's completion reports the outcome after a later grant, then relocates the boat and installs
+the scene; a request taken while one is deferred settles it); and the L4b
 cases, which give a second session's authority a C model of the browser's objective worker:
 `isolated_objective` (slow; beside the native authority on the same per-tick script, equal
 boats, voyages, objectives, staged batches and traces at every frame while the model answers

@@ -1955,6 +1955,88 @@ static int recover_ignored(void)
     return 0;
 }
 
+// L4b: a deferred commit through a fake adapter. The server applies nothing until the adapter's
+// completion reports the outcome after a later grant's service; then the relocation and scene
+// land at once. A request the adapter takes while one is deferred (a cancel) settles it, and
+// completion is asked only while one is open.
+static struct {
+    unsigned commits, completions;
+    bool defer, ready, apply;
+    Boat boat;
+} fake;
+static const BoatSceneDefinition fake_scene; // Only its address is installed; no tick reads it.
+
+static bool fake_commit(void *context, uint64_t tick, unsigned slot, uint32_t revision,
+    uint8_t change, BoatNetCommitResult *result)
+{
+    (void)context, (void)tick, (void)slot, (void)revision, (void)change;
+    ++fake.commits;
+    result->deferred = fake.defer;
+    return true;
+}
+
+static bool fake_completion(void *context, BoatNetCommitResult *result)
+{
+    (void)context;
+    ++fake.completions;
+    if (!fake.ready)
+        return false;
+    if (fake.apply) {
+        result->boat = fake.boat;
+        result->moved = true;
+        result->rescene = true;
+        result->scene = &fake_scene;
+    }
+    return true;
+}
+
+static void fake_service(void *context, double at) { (void)context, (void)at; }
+
+static int deferred_commit(void)
+{
+    static BoatLocal deferred;
+    if (open_world(BASIN))
+        return 1;
+    BoatLocalConfig config = lp->config;
+    config.rules = (BoatNetRules) {
+        .commit = fake_commit, .completion = fake_completion, .service = fake_service
+    };
+    memset(&fake, 0, sizeof(fake));
+    CHECK(boat_local_start(&deferred, &config, 1, now));
+    const BoatNetServer *server = &deferred.server;
+    BoatNetCommitResult predicted = { .boat = server->fleet.state.slots[0].boat };
+    BoatStorm storm = server->fleet.world.water.storm;
+    fake.defer = true;
+    CHECK(boat_local_commit(&deferred, 2, 1, &predicted, storm));
+    CHECK(boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(fake.commits == 1 && fake.completions == 1 && server->stats.commits_deferred == 1);
+    CHECK(server->stats.commits == 0 && server->deferred_slot == 0);
+    fake.boat = server->fleet.state.slots[0].boat;
+    fake.boat.position.x += 5;
+    CHECK(boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(fake.completions == 2 && server->stats.commits == 0);
+    fake.ready = fake.apply = true;
+    CHECK(boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(fake.completions == 3 && server->stats.commits == 1
+        && server->stats.commits_completed == 1 && server->deferred_slot < 0);
+    CHECK(server->fleet.state.slots[0].boat.position.x == fake.boat.position.x
+        && server->fleet.world.scene == &fake_scene);
+    CHECK(boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(fake.completions == 3); // Nothing deferred: completion is not asked.
+    // A second deferred commit, then a cancel the adapter takes at once: nothing is applied.
+    fake.ready = fake.apply = false;
+    CHECK(boat_local_commit(&deferred, 3, 1, &predicted, storm)
+        && boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(server->deferred_slot == 0 && server->stats.commits_deferred == 2);
+    fake.defer = false;
+    unsigned completions = fake.completions;
+    CHECK(boat_local_commit(&deferred, 3, 0, &predicted, storm)
+        && boat_local_frame(&deferred, now, 0, (BoatInput) { 0 }, 0, NAN, NULL));
+    CHECK(server->deferred_slot < 0 && fake.completions == completions && fake.commits == 3);
+    boat_local_stop(&deferred);
+    return 0;
+}
+
 // Per-frame cost at 8x on outer: processor time of one frame's grant through both endpoints.
 static int bench(void)
 {
@@ -2330,6 +2412,7 @@ int main(int argc, char **argv)
         SLOW_CASE(authoring_trace),
         TEST_CASE(voyage_state),
         TEST_CASE(recover_ignored),
+        TEST_CASE(deferred_commit),
         SLOW_CASE(isolated_objective),
         SLOW_CASE(isolated_quarantine),
         TEST_CASE(isolated_deadline),

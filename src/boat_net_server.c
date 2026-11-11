@@ -68,6 +68,7 @@ bool boat_net_server_init(
             server->fleet.handling[i] = local->handling;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         server->slot_peer[i] = -1;
+    server->deferred_slot = -1;
     boat_marks_tracker_reset(&server->marks);
     server->backlog_since = -1;
     server->next_checkpoint = 1;
@@ -493,6 +494,34 @@ static void private_recover(BoatNetServer *s, unsigned peer, const BoatNetEvent 
     ++s->stats.recoveries;
 }
 
+// L1b: install what a commit changes besides the adapter's state, then read the storm again.
+static void commit_apply(BoatNetServer *s, unsigned slot, const BoatNetCommitResult *result)
+{
+    if (result->moved)
+        boat_fleet_relocate(&s->fleet, slot, result->boat);
+    if (result->rescene)
+        s->fleet.world.scene = result->scene;
+    BoatStorm storm;
+    if (s->config.rules.weather && s->config.rules.weather(s->config.rules.context, &storm))
+        s->fleet.world.water.storm = storm;
+    ++s->stats.commits;
+}
+
+// L4b: the deferred commit's outcome, once the adapter has it.
+static void commit_complete(BoatNetServer *s)
+{
+    if (s->deferred_slot < 0 || !s->config.rules.completion)
+        return;
+    unsigned slot = (unsigned)s->deferred_slot;
+    BoatNetCommitResult result = { .boat = s->fleet.state.slots[slot].boat };
+    if (!s->config.rules.completion(s->config.rules.context, &result))
+        return;
+    s->deferred_slot = -1;
+    ++s->stats.commits_completed;
+    if (result.moved || result.rescene)
+        commit_apply(s, slot, &result);
+}
+
 // L1b: a commit request at the frame boundary it names; any other tick is ignored.
 static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
@@ -524,14 +553,14 @@ static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *
         ++s->stats.commits_ignored;
         return;
     }
-    if (result.moved)
-        boat_fleet_relocate(&s->fleet, p->slot, result.boat);
-    if (result.rescene)
-        s->fleet.world.scene = result.scene;
-    BoatStorm storm;
-    if (s->config.rules.weather && s->config.rules.weather(s->config.rules.context, &storm))
-        s->fleet.world.water.storm = storm;
-    ++s->stats.commits;
+    // L4b: a request the adapter took while one was deferred (a cancel) settles that one.
+    s->deferred_slot = -1;
+    if (result.deferred) {
+        s->deferred_slot = (int)p->slot;
+        ++s->stats.commits_deferred;
+        return;
+    }
+    commit_apply(s, p->slot, &result);
 }
 
 // L1b: the rules adapter's inspection text in reliable chunks, in order.
@@ -1211,6 +1240,7 @@ bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
     handle_events(s, now);
     if (s->config.rules.service) {
         s->config.rules.service(s->config.rules.context, now);
+        commit_complete(s);
         objective_poll(s);
     }
     for (unsigned n = 0; n < ticks; ++n) {
