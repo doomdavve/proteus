@@ -2791,6 +2791,35 @@ static int isolated_deadline(void)
     return 0;
 }
 
+// L4b: a worker that reports failure, or a reply that does not match its request, quarantines the
+// objective with its own text and closes the job; play resumes ungated.
+static int isolated_failed_reply(void)
+{
+    for (unsigned corrupt = 0; corrupt < 2; ++corrupt) {
+        if (open_isolated(false))
+            return 1;
+        int slot = 0;
+        for (; slot < MODEL_JOBS && !model.id[slot]; ++slot)
+            ;
+        CHECK(slot < MODEL_JOBS);
+        if (corrupt) {
+            model_reply_all();
+            model.reply_size[slot] /= 2; // A truncated reply.
+        } else {
+            model.status[slot] = -1;
+        }
+        double none = 0;
+        CHECK(wake_local_scripted_frame(
+            &isolated_game, &isolated_play.session, &isolated_play.objects, &none, now, NULL));
+        CHECK(isolated_game.voyage.objective.objective.quarantined && model_open() == 0);
+        CHECK(!strcmp(isolated_game.voyage.objective.objective_diagnostic.message,
+            "invalid or failed objective worker reply"));
+        CHECK(isolated_game.objective.suspended && !wake_local_waiting(&isolated_game));
+        close_isolated();
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--bench")) {
@@ -2839,6 +2868,7 @@ int main(int argc, char **argv)
         SLOW_CASE(isolated_objective),
         SLOW_CASE(isolated_quarantine),
         TEST_CASE(isolated_deadline),
+        TEST_CASE(isolated_failed_reply),
         SLOW_CASE(isolated_migrate),
         SLOW_CASE(isolated_authoring),
     };

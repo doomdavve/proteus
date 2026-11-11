@@ -1022,16 +1022,6 @@ target_compile_definitions(validate_boat_plugin_session PRIVATE
   BOAT_PLUGIN_SESSION_DIR="${BOAT_PLUGIN_SESSION_DIR}")
 proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-# AR3e: the browser objective policy compiled natively over a C model of its page bridges.
-add_executable(validate_wake_plugin_objective tools/validate_wake_plugin_objective.c
-  tools/wake_velocity_plugin.c)
-target_compile_definitions(validate_wake_plugin_objective PRIVATE
-  WAKE_PLUGIN_ISOLATED_OBJECTIVE=1)
-target_link_libraries(validate_wake_plugin_objective PRIVATE proteus_plugins proteus_wake_objective
-  proteus_plugin_catalog proteus_boat_session)
-target_compile_options(validate_wake_plugin_objective PRIVATE ${PROTEUS_WARNINGS})
-proteus_add_case_tests(wake_plugin_objective validate_wake_plugin_objective LABELS core cpu
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # PD1: bundled catalog entries equal their evaluated sources and compiled defaults; no Lua VM.
 add_executable(validate_boat_plugin_catalog tools/validate_boat_plugin_catalog.c)
 target_link_libraries(validate_boat_plugin_catalog PRIVATE proteus_plugins proteus_plugin_catalog)

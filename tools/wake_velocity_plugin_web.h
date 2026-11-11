@@ -3,9 +3,10 @@
 // AR3 browser backend for the game's plugin glue: the page's authoring panel
 // (Module.boatPluginOwner/Notice/Editing/Actions/ResetPending/MenuOpen), package export
 // (Module.boatPluginExport) and the isolated objective evaluator (Module.boatPluginObjective,
-// web/plugin_objective.js). Only the browser build compiles wake_velocity_plugin_web.c; the
-// request/acceptance policy, deadlines and the T/T+1 gate stay in wake_velocity_plugin.c, which
-// validate_wake_plugin_objective compiles natively over a C model of these functions (AR3e).
+// web/plugin_objective.js). Only the browser build compiles wake_velocity_plugin_web.c. L4b:
+// the game's local authority uses the evaluator as its WakeObjectiveWorker; the request and
+// acceptance policy, deadlines and the clock gate live in wake_velocity_objective.c and
+// wake_velocity_local.c, which boat_local's isolated cases check over a C model of the worker.
 #include <stdbool.h>
 
 // Publish the active revision's owner identity and status line.

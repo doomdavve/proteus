@@ -15,17 +15,10 @@
 #include <unistd.h>
 #endif
 
-// The browser evaluates objectives (and runs its page panel's actions) through the isolated
-// worker policy below; native evaluates synchronously. A native validator selects the browser
-// policy with WAKE_PLUGIN_ISOLATED_OBJECTIVE=1 over a C model of the page bridges (AR3e).
-#ifndef WAKE_PLUGIN_ISOLATED_OBJECTIVE
+// The browser evaluates objectives only on its local authority's isolated worker (L4b): a host
+// with an authority never evaluates, and the browser's direct path (replay viewing) runs no
+// objective. Native direct hosts (the review tools) evaluate synchronously.
 #ifdef __EMSCRIPTEN__
-#define WAKE_PLUGIN_ISOLATED_OBJECTIVE 1
-#else
-#define WAKE_PLUGIN_ISOLATED_OBJECTIVE 0
-#endif
-#endif
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE || defined(__EMSCRIPTEN__)
 #include "wake_velocity_plugin_web.h"
 #endif
 
@@ -106,15 +99,6 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
     return boat_location_find(manifest.location);
 }
 
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-static void trace(WakePlugin *p, BoatPluginTransition action, uint64_t before,
-    const BoatPluginObjective *after, unsigned events)
-{
-    wake_objective_trace(
-        &p->run, boat_plugin_host_active(&p->host)->number, action, before, after, events);
-}
-#endif
-
 // A callback receipt is private to its request and complete committed input. No imported
 // Lua is evaluated by this adapter in a browser, including initialization and Undo.
 static bool commit(WakePlugin *plugin, BoatSession *session);
@@ -139,132 +123,9 @@ static bool scene_differs(const BoatPluginRevision *active, const BoatPluginRevi
     return active->voyage.has_scene != candidate->voyage.has_scene
         || active->voyage.scene_digest != candidate->voyage.scene_digest;
 }
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-struct WakePluginEvaluation {
-    BoatPluginEvalRequest request;
-    unsigned job;
-    double deadline;
-};
-static void close_evaluation(WakePlugin *plugin)
-{
-    if (plugin->evaluation) {
-        wake_web_objective_close(plugin->evaluation->job);
-        free(plugin->evaluation);
-        plugin->evaluation = NULL;
-    }
-}
-static bool begin_evaluation(
-    WakePlugin *p, BoatPluginTransition action, int64_t tick, const BoatPluginRevision *revision)
-{
-    static uint64_t serial;
-    if (p->evaluation || serial == UINT64_MAX)
-        return false;
-    struct WakePluginEvaluation *e = calloc(1, sizeof(*e));
-    unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REQUEST_MAX);
-    if (!e || !bytes) {
-        free(e);
-        free(bytes);
-        return false;
-    }
-    BoatPluginEvalRequest *r = &e->request;
-    r->serial = ++serial;
-    r->epoch = p->host.epoch;
-    r->revision = boat_plugin_host_active(&p->host)->number;
-    r->candidate = revision->number;
-    r->transition = action;
-    r->tick = tick;
-    r->objective = p->run.objective;
-    r->source_size = revision->source_size;
-    memcpy(r->source, revision->source, r->source_size);
-    r->version = revision->voyage.manifest.state_version;
-    r->generation
-        = action == BOAT_PLUGIN_OBJECTIVE_MIGRATE ? p->run.generation + 1 : p->run.generation;
-    r->timers = revision->voyage.manifest.timers;
-    if (action == BOAT_PLUGIN_OBJECTIVE_UPDATE) {
-        r->event_count = p->run.event_count;
-        memcpy(r->events, p->run.events, r->event_count * sizeof(r->events[0]));
-    }
-    size_t size = boat_plugin_eval_encode_request(r, bytes, BOAT_PLUGIN_EVAL_REQUEST_MAX);
-    if (size)
-        e->job = wake_web_objective_start(bytes, (unsigned)size);
-    free(bytes);
-    if (!e->job) {
-        free(e);
-        return false;
-    }
-    e->deadline = p->frame_now + 5;
-    p->evaluation = e;
-    return true;
-}
-static bool poll_evaluation(WakePlugin *p, BoatSession *session, double now)
-{
-    struct WakePluginEvaluation *e = p->evaluation;
-    if (!e)
-        return false;
-    int status = wake_web_objective_status(e->job);
-    bool stale = p->host.epoch != e->request.epoch
-        || boat_plugin_host_active(&p->host)->number != e->request.revision
-        || session->tick != (uint64_t)e->request.tick
-        || p->run.objective.quarantined != e->request.objective.quarantined
-        || boat_plugin_objective_digest(&p->run.objective)
-            != boat_plugin_objective_digest(&e->request.objective);
-    bool migration = e->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE;
-    if (migration) {
-        const BoatPluginRevision *held = boat_plugin_host_held(&p->host);
-        stale |= !held || held->number != e->request.candidate;
-    }
-    bool expired = !isfinite(now) || now >= e->deadline;
-    if (!status && !stale && !expired)
-        return false;
-    unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REPLY_MAX);
-    int size = status == 1 && bytes ? wake_web_objective_read(e->job, bytes) : -1;
-    BoatPluginObjective result;
-    BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
-    bool accepted = !stale && !expired && size > 0
-        && boat_plugin_eval_result(&e->request, bytes, (size_t)size, &result, &d);
-    free(bytes);
-    if (!accepted) {
-        d.status = BOAT_PLUGIN_IO;
-        snprintf(d.message, sizeof(d.message), "%s",
-            stale         ? "stale objective receipt"
-                : expired ? "isolated objective deadline"
-                          : "invalid or failed objective worker reply");
-    }
-    BoatPluginTransition action = e->request.transition;
-    uint64_t before = boat_plugin_objective_digest(&p->run.objective);
-    unsigned events = e->request.event_count;
-    close_evaluation(p);
-    p->run.objective_diagnostic = d;
-    if (accepted && d.status == BOAT_PLUGIN_OK) {
-        p->run.staged_objective = result;
-        if (migration) {
-            p->evaluation_migrated = true;
-            return commit(p, session);
-        }
-        if (action == BOAT_PLUGIN_OBJECTIVE_INIT || action == BOAT_PLUGIN_OBJECTIVE_RESET)
-            p->run.objective
-                = result; // Initialization completes before any native step is permitted.
-        else
-            p->run.objective_pending = true;
-        trace(p, action, before, &p->run.staged_objective, events);
-    } else {
-        if (!migration)
-            p->run.objective.quarantined = true;
-        trace(p, action, before, &p->run.objective, events);
-        report(p, migration ? "migration_failed" : "objective_suspended", true, d.message,
-            migration ? "MIGRATION FAILED; ACTIVE REVISION KEPT" : "OBJECTIVE SUSPENDED");
-    }
-    return false;
-}
-#endif
-
-bool wake_plugin_waiting(const WakePlugin *plugin) { return plugin->evaluation != NULL; }
 
 void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
 {
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    close_evaluation(plugin);
-#endif
     const BoatPluginRevision *r = plugin->host.depth && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
         ? boat_plugin_host_active(&plugin->host)
         : NULL;
@@ -272,14 +133,11 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
     // generation when the game restarts it.
     if (!wake_objective_clear(&plugin->run, r, session->tick) || plugin->authority)
         return;
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_INIT, (int64_t)session->tick, r)) {
-        plugin->run.objective.quarantined = true;
-        plugin->run.objective_diagnostic.status = BOAT_PLUGIN_IO;
-        snprintf(plugin->run.objective_diagnostic.message,
-            sizeof(plugin->run.objective_diagnostic.message),
-            "cannot start isolated objective initialization");
-    }
+#ifdef __EMSCRIPTEN__
+    plugin->run.objective.quarantined = true;
+    plugin->run.objective_diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
+    snprintf(plugin->run.objective_diagnostic.message,
+        sizeof(plugin->run.objective_diagnostic.message), "no isolated objective evaluator");
 #else
     wake_objective_init(&plugin->run, r, session->tick);
 #endif
@@ -298,15 +156,7 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
     const BoatPluginRevision *r = boat_plugin_host_active(&plugin->host);
     if (!wake_objective_queue(&plugin->run, r, session->tick, &session->voyage_events))
         return;
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_UPDATE, (int64_t)session->tick, r)) {
-        plugin->run.objective.quarantined = true;
-        plugin->run.objective_diagnostic.status = BOAT_PLUGIN_IO;
-        snprintf(plugin->run.objective_diagnostic.message,
-            sizeof(plugin->run.objective_diagnostic.message),
-            "cannot start isolated objective update");
-    }
-#else
+#ifndef __EMSCRIPTEN__ // Unreachable in the browser: its direct path never initializes one.
     wake_objective_update(&plugin->run, r, session->tick);
 #endif
 }
@@ -321,7 +171,6 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     memset(plugin, 0, sizeof(*plugin));
     plugin->directory = directory;
     plugin->authoring = true;
-    plugin->frame_now = now;
     uint64_t key;
     bool read = read_package(plugin, &key) == BOAT_PLUGIN_OK;
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
@@ -413,7 +262,6 @@ bool wake_plugin_open_catalog(
     memset(plugin, 0, sizeof(*plugin));
     plugin->directory = entry->id;
     plugin->authoring = false;
-    plugin->frame_now = 0;
 #ifdef __EMSCRIPTEN__
     // The browser stages edits in a worker; there is no executable path.
     plugin->stage_executable = "browser-worker";
@@ -451,9 +299,6 @@ static void forward(WakePlugin *plugin, BoatSession *session, const BoatPluginRe
 
 void wake_plugin_attach(WakePlugin *plugin, WakePluginAuthority *authority)
 {
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    close_evaluation(plugin); // L4b: the authority starts its own INIT; this one is inert.
-#endif
     plugin->authority = authority;
     WakeObjective *run = &plugin->run;
     run->objective = (BoatPluginObjective) { .generation = run->generation };
@@ -495,16 +340,10 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
             return false;
         }
         if (!a) {
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-            if (!plugin->evaluation_migrated) {
-                if (session->tick > INT64_MAX || plugin->run.generation == UINT_MAX
-                    || !begin_evaluation(
-                        plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE, (int64_t)session->tick, held))
-                    report(plugin, "migration_failed", true, "cannot start isolated migration",
-                        "MIGRATION FAILED; ACTIVE REVISION KEPT");
-                return false;
-            }
-            plugin->evaluation_migrated = false;
+#ifdef __EMSCRIPTEN__
+            report(plugin, "migration_failed", true, "no isolated objective evaluator",
+                "MIGRATION FAILED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
+            return false;
 #else
             BoatPluginObjective migrated;
             if (!wake_objective_migrate(&plugin->run, held,
@@ -716,9 +555,8 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
         }
         session->world.scene = NULL;
     }
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    close_evaluation(plugin);
-    wake_web_objective_shutdown();
+#ifdef __EMSCRIPTEN__
+    wake_web_objective_shutdown(); // The authority's worker; late replies are inert.
 #endif
 }
 
@@ -1015,7 +853,6 @@ bool wake_plugin_frame(
 {
     if (!plugin->authoring)
         return false;
-    plugin->frame_now = now;
     unsigned actions = plugin->actions;
     plugin->actions = 0;
     WakePluginAuthority *a = plugin->authority;
@@ -1049,43 +886,19 @@ bool wake_plugin_frame(
             return false;
         }
     }
-    // L4b: the authority's isolated evaluation holds every control, as the direct path's does.
+    // L4b: the authority's isolated evaluation holds every control.
     if (a && a->view.pending) {
         if (actions || reload || undo || apply)
             report(plugin, "busy", false, "RETRY WHEN THE CALLBACK FINISHES",
                 "OBJECTIVE EVALUATION BUSY");
         return false;
     }
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    if (!a && plugin->evaluation
-        && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE
-        && ((actions & (WAKE_PLUGIN_ACTION_UNDO | WAKE_PLUGIN_ACTION_CANCEL)) || undo)) {
-        close_evaluation(plugin);
-        boat_plugin_host_discard(&plugin->host);
-        report(plugin, "canceled", false, "ACTIVE REVISION AND STATE KEPT", "MIGRATION CANCELED");
-        return false;
-    }
-#endif
     if ((actions & WAKE_PLUGIN_ACTION_CANCEL) && plugin->staging) {
         close_stage(plugin);
         boat_plugin_host_discard(&plugin->host);
         report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
         actions &= ~(unsigned)WAKE_PLUGIN_ACTION_CANCEL;
     }
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    if (!a) {
-        bool restart = poll_evaluation(plugin, session, now);
-        if (restart)
-            return true;
-        if (wake_plugin_waiting(plugin)) {
-            // Control actions are refused visibly rather than applied to an in-flight checkpoint.
-            if (actions || reload || undo || apply)
-                report(plugin, "busy", false, "RETRY WHEN THE CALLBACK FINISHES",
-                    "OBJECTIVE EVALUATION BUSY");
-            return false;
-        }
-    }
-#endif
     reload |= (actions & WAKE_PLUGIN_ACTION_STAGE) != 0;
     undo |= (actions & WAKE_PLUGIN_ACTION_UNDO) != 0;
     apply |= (actions & WAKE_PLUGIN_ACTION_APPLY) != 0;
@@ -1163,7 +976,6 @@ bool wake_plugin_checkpoint(
         out->initialized = run->objective.initialized;
         out->quarantined = run->objective.quarantined;
         out->events = run->event_count;
-        out->waiting = wake_plugin_waiting(plugin);
         out->state_size = run->objective.state.size;
         memcpy(out->state, run->objective.state.bytes, out->state_size);
         return true;
@@ -1177,15 +989,18 @@ bool wake_plugin_checkpoint(
     text[a->inspection_size] = 0;
     const char *second = strchr(text, '\n');
     const char *state = strstr(text, "\nstate=");
-    long long tick, queued;
+    long long tick, queued, generation, suspended;
+    // An inspection older than the view's generation (it lags by a frame) is not shown with it.
     if (!second || !state || !inspected(text, " tick=", &tick)
-        || !inspected(second + 1, "queued=", &queued) || queued < 0)
+        || !inspected(text, " generation=", &generation)
+        || !inspected(text, " suspended=", &suspended) || !inspected(second + 1, "queued=", &queued)
+        || queued < 0 || generation != (long long)a->view.generation)
         return false;
     out->tick = tick;
     out->events = (unsigned)queued;
-    out->generation = a->view.generation;
+    out->generation = (unsigned)generation;
     out->initialized = a->view.initialized;
-    out->quarantined = a->view.suspended;
+    out->quarantined = suspended != 0;
     out->waiting = a->view.pending;
     for (const char *h = state + 7; h[0] && h[0] != '\n'; h += 2) {
         unsigned byte;
@@ -1292,7 +1107,7 @@ static bool preview_session(const BoatSession *s)
 
 bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const BoatSession *s)
 {
-    if (p->staging || p->evaluation || !preview_session(s) || !p->host.depth
+    if (p->staging || !preview_session(s) || !p->host.depth
         || p->host.kind != BOAT_PLUGIN_KIND_VOYAGE
         || s->voyage_route != &boat_plugin_host_active(&p->host)->voyage.route
         || s->voyage.route != s->voyage_route)
@@ -1320,7 +1135,7 @@ bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const B
 bool wake_plugin_preview_restore(const WakePluginPreview *c, WakePlugin *p, BoatSession *s,
     BoatWakeObjects *objects, BoatWakeObjects *traffic)
 {
-    if (p->staging || p->evaluation || !c->valid || c->plugin.evaluation || !preview_session(s)
+    if (p->staging || !c->valid || !preview_session(s)
         || s->world.resources != c->session.world.resources || (c->has_objects && !objects)
         || (c->has_traffic && !traffic) || (c->has_objects && c->has_traffic && objects == traffic))
         return false;

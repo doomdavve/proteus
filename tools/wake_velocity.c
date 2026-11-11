@@ -1988,15 +1988,14 @@ static int study(int argc, char **argv)
             break;
         }
 #endif
-        // L4b: the local authority's isolated evaluation holds a reset as the direct path's does.
+        // L4b: the local authority's isolated evaluation holds a reset until its result.
         bool local_waiting = false;
 #ifdef PROTEUS_BOAT_NET
         local_waiting = wake_local_waiting(&local);
 #endif
-        if (plugin_active && (wake_plugin_waiting(&plugin) || local_waiting)) {
+        if (plugin_active && local_waiting) {
             plugin_reset_pending |= reset_requested;
-            if (local_waiting)
-                reset_requested = false; // The local frame below still services the authority.
+            reset_requested = false; // The local frame below still services the authority.
         } else if (plugin_reset_pending) {
             reset_requested = true;
             plugin_reset_pending = false;
@@ -2046,9 +2045,6 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
-        } else if (plugin_active && wake_plugin_waiting(&plugin) && !plugin_restart) {
-            // Keep drawing and polling the worker, but never advance past callback boundary T.
-            accumulator = 0;
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
@@ -2198,10 +2194,6 @@ static int study(int argc, char **argv)
                 if (plugin_active)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
-                if (plugin_active && wake_plugin_waiting(&plugin)) {
-                    accumulator = 0;
-                    break;
-                }
             }
         } else {
             accumulator = 0;

@@ -9,9 +9,10 @@
 #include "wake_velocity_objective.h"
 #include <stdio.h>
 
-// L1b: the native game's local authority runs the objective and installs every commit. The
+// L1b: the game's local authority runs the objective and installs every commit. The
 // game sets it (wake_plugin_attach) while a local session runs this plugin and fills VIEW and the
-// inspection after each frame; NULL on the direct path (the browser, the review tools).
+// inspection after each frame; NULL on the direct path (the review tools, and replay viewing).
+// L4b: the browser's runs the objective on its isolated worker; the host never evaluates there.
 typedef struct WakePluginAuthority {
     void *context;
     // After the host committed REVISION with CHANGE into SESSION (MOVED: the boat went to a tour's
@@ -48,10 +49,7 @@ enum {
 
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
-    struct WakePluginEvaluation *evaluation; // Browser callback receipt, never checkpointed.
     struct BoatPluginStageJob *query; // PC console query in the isolated worker.
-    double frame_now;
-    bool evaluation_migrated;
     BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
     const char *directory;
     bool authoring; // --plugin DIR: file watch, staging worker, bridge, hotkeys and panel.
@@ -86,8 +84,6 @@ bool wake_plugin_open_catalog(
 // Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
 // evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session);
-// Browser callback at T must finish before solo simulation may step T+1.
-bool wake_plugin_waiting(const WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.
 bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
@@ -152,8 +148,10 @@ typedef struct {
     unsigned char state[BOAT_PLUGIN_STATE_BYTES];
 } WakePluginCheckpoint;
 
-// The checkpoint: the direct path's objective, or with an authority its view and latest
-// inspection (which can lag the view by a frame). False before an authority's first inspection.
+// The checkpoint: the direct path's objective, or with an authority its latest inspection (tick,
+// generation, suspension, queue and state, which can lag the view by a frame) and its view
+// (initialized, waiting). False before an authority's first inspection, and while that
+// inspection is of an older generation than the view.
 bool wake_plugin_checkpoint(
     const WakePlugin *plugin, const BoatSession *session, WakePluginCheckpoint *out);
 // L4b: in the browser while authoring, publish the checkpoint and, with an authority, ask for the
