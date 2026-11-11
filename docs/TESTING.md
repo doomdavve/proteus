@@ -899,7 +899,13 @@ resumes; a tick granted past a pending boundary quarantines as an overrun) and
 from the request until the outcome; an accepted one adopts the migrated objective and a failing
 one keeps everything, both equal to the native authority's digests, traces and text; a canceled
 one changes nothing and its ready reply is inert; an unanswered one fails at the 5 s deadline and
-a tick granted during one fails it as an overrun, the objective running on). Each
+a tick granted during one fails it as an overrun, the objective running on) and
+`isolated_authoring` (slow; the game's own host, `tools/wake_velocity_plugin.c`, on the isolated
+authority beside the same host on the native one: controls answer busy while an update is in
+flight; F7 on a migration holds the clock until the worker answers and then commits the host's
+table; a rename applies at once; the page's cancel closes a migration in flight; Undo restarts
+the voyage with INIT on the worker; equal revisions, generations, outcomes and objectives, and
+the browser checkpoint read from the authority's inspection). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports

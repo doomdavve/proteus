@@ -555,6 +555,12 @@ static bool local_commit(void *context, BoatSession *session, const BoatPluginRe
     return wake_local_commit(a->local, session, a->objects, revision, change, moved);
 }
 
+static bool local_cancel(void *context, BoatSession *session, unsigned revision)
+{
+    LocalAuthority *a = context;
+    return wake_local_cancel(a->local, session, revision);
+}
+
 static bool local_inspect(void *context)
 {
     LocalAuthority *a = context;
@@ -1335,9 +1341,8 @@ static int study(int argc, char **argv)
     // package), voyages and tours with or without an objective, and `--plugin` authoring of each,
     // live, scripted (`--demo`) or captured, run as a local authority and client. The working
     // harbour, rooms, replay viewing and the developer studies keep the direct path until their
-    // ledger rows migrate them. L4a/L4b: the browser runs the same session while it is not
-    // authoring, its authority evaluating objectives on the isolated worker; authoring keeps the
-    // direct path until L4b's next step moves it onto the authority.
+    // ledger rows migrate them. L4a/L4b: the browser runs the same sessions, authoring included,
+    // its authority evaluating objectives and migrations on the isolated worker.
     static WakeLocal local;
 #ifdef __EMSCRIPTEN__
     static const WakeObjectiveWorker web_worker = { wake_web_objective_start,
@@ -1349,20 +1354,17 @@ static int study(int argc, char **argv)
     static LocalAuthority local_authority;
     local_authority = (LocalAuthority) { &local, objects };
     plugin_authority = (WakePluginAuthority) {
-        .context = &local_authority, .commit = local_commit, .inspect = local_inspect
+        .context = &local_authority,
+        .commit = local_commit,
+        .inspect = local_inspect,
+        .cancel = local_cancel,
     };
 #define LOCAL_ELIGIBLE()                                                                           \
     (!networked && !work_mode && objects && !objects->crossing && !wake && !session.runs.playing   \
         && plugin_active                                                                           \
         && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
-                    || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route))      \
-        && LOCAL_PLATFORM_ELIGIBLE())
-#ifdef __EMSCRIPTEN__
-#define LOCAL_PLATFORM_ELIGIBLE() (!plugin.authoring && plugin.host.depth)
-#else
-#define LOCAL_PLATFORM_ELIGIBLE() true
-#endif
+                    || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))
 #endif
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;
@@ -1965,18 +1967,16 @@ static int study(int argc, char **argv)
         if (bridge_path)
             plugin_restart |= wake_bridge_frame(&bridge, &plugin, &session, GetTime());
 #endif
-        if (plugin_active && plugin.authoring)
+        if (plugin_active && plugin.authoring) {
+#ifdef __EMSCRIPTEN__
+            plugin.actions = wake_web_plugin_actions(); // The page's Stage, Undo, Apply, Cancel.
+#endif
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), wake_app_now());
+            wake_plugin_publish(&plugin, &session);
+        }
         if (plugin_active)
             plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
-#if defined(PROTEUS_BOAT_NET) && defined(__EMSCRIPTEN__)
-        // L4a: the console began authoring (an edit or an export promoted the package), which
-        // the browser's authority does not run yet. The session restarts on the direct path
-        // before any staged revision can reach the authority.
-        if (local.active && !LOCAL_ELIGIBLE())
-            plugin_restart = true;
-#endif
 #ifdef PROTEUS_BOAT_NET
         // L1b: authoring runs on the local authority too; a request it could not take stops the
         // session (D10).
@@ -2205,6 +2205,23 @@ static int study(int argc, char **argv)
             }
         } else {
             accumulator = 0;
+#ifdef PROTEUS_BOAT_NET
+            // L4b: a paused frame (menu, help, focus, the browser's authoring panel) grants no
+            // tick but still lets the authority take the host's requests (commits, cancels,
+            // inspections) and collect its isolated evaluations, as a paused work frame does.
+            if (local.active) {
+                double none = 0;
+                if (!wake_local_frame(&local, &session, objects, &none, (BoatInput) { 0 }, 0, NAN,
+                        GetTime(), NULL)) {
+                    snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                        local.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
+                local_view(&plugin_authority, &local);
+            }
+#endif
         }
         if (!work_frame_sent) {
             // A paused frame still delivers its actions (RETURN CRATE, the released brake).

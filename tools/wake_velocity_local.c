@@ -263,9 +263,10 @@ bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *obje
         local->active = false;
         return false;
     }
-    // L4b: a migration on the worker starts at the next frame's start; that frame grants nothing,
-    // and the view keeps the clock held until the outcome arrives.
-    if (code == WAKE_VOYAGE_MIGRATE && local->worker)
+    // L4b: a migration, or a restart's INIT, on the worker starts at the next frame's start; that
+    // frame grants nothing, and the view keeps the clock held until the outcome arrives.
+    if ((code == WAKE_VOYAGE_MIGRATE || code == WAKE_VOYAGE_RESTART) && local->voyage_active
+        && local->worker)
         local->hold = true;
     if (moved)
         objects->wakes = boat_local_view(&local->local)->state.wakes;

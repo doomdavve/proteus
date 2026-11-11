@@ -33,7 +33,8 @@ typedef struct {
     // L4b: the authority's isolated objective evaluator (the browser's worker; NULL natively,
     // where the authority evaluates at once). Set by the game before opening.
     const WakeObjectiveWorker *worker;
-    // L4b: a migration request is on its way to the worker; the next frame grants nothing.
+    // L4b: a request that starts a job on the worker (a migration or a voyage restart) is on its
+    // way; the next frame grants nothing.
     bool hold;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
     void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
@@ -54,7 +55,7 @@ bool wake_local_restart(
     WakeLocal *local, const BoatSession *session, const ObjectStudy *objects, double now);
 // L4b: whether the host must hold the clock: with a worker, until the client has seen the
 // authority's objective after a start, while it reports an evaluation pending, and in the frame
-// that carries a migration request. Read from the client's view only.
+// that carries a migration or voyage restart request. Read from the client's view only.
 bool wake_local_waiting(const WakeLocal *local);
 // Grant the ticks ACCUMULATOR holds (boat_time_grant, at most BOAT_LOCAL_MAX_GRANT; any excess
 // stays for the next frame) and run them. L4b: with a worker and an objective, a grant ends at

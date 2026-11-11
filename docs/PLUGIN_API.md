@@ -974,17 +974,22 @@ change is held for F7. A new revision after an Undo discards the undone ones (no
 Progress is never inferred from an old shelter index: a live route edit maps it by shelter ID,
 while a restart begins at shelter 0.
 
-In the native game the objective runs on the in-process local authority, and every commit
-reaches it before the next tick. A migration runs there: F7 (or `live-apply`) reports
-`migrating` while the active revision keeps running, and the result arrives on the next frame,
-either `applied` under the candidate's number or `migration_failed` with the active revision
-kept. Until then staging, Undo and F7 answer `busy` (MIGRATION IN PROGRESS). The objective's
-inspection lines come from the authority and answer `live-inspect` on the frame after it is
-asked; they can be a frame older than the owner fields. The browser's local authority evaluates the
-objective in the isolated worker: at each update boundary the game holds the clock (no ticks,
-the scene still drawn) until the result arrives, a frame later than on the browser's direct
-path. A browser session that is authoring still runs on that direct path, with the worker gate
-in the game itself.
+The objective runs on the in-process local authority, native and browser alike, and every
+commit reaches it before the next tick, also while play is paused. A migration runs there: F7
+(the panel's Apply, or `live-apply`) reports `migrating` while the active revision keeps
+running, and the result arrives a frame later natively, either `applied` under the candidate's
+number or `migration_failed` with the active revision kept. Until then staging, Undo and F7
+answer `busy` (MIGRATION IN PROGRESS). The objective's inspection lines come from the
+authority and answer `live-inspect` on the frame after it is asked; they can be a frame older
+than the owner fields.
+
+The browser's local authority evaluates the objective, its migrations and a restart's
+initialization in the isolated worker, never on the game thread. At each update boundary, and
+from a migration or restart request until its result, the game holds the clock (no ticks, the
+scene still drawn); a result can take several frames and fails at the five-second deadline.
+While an evaluation is in flight every panel action answers `busy` (OBJECTIVE EVALUATION BUSY);
+Undo or Cancel during a migration cancels it (MIGRATION CANCELED), keeping the active revision
+and state, and its late result is ignored.
 
 ## Live console and command layer (PC)
 

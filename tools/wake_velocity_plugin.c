@@ -478,20 +478,10 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     bool undo = plugin->host.undo;
     const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
     if (change == BOAT_PLUGIN_MIGRATE && held) {
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-        if (!plugin->evaluation_migrated) {
-            if (session->tick > INT64_MAX || plugin->run.generation == UINT_MAX
-                || !begin_evaluation(
-                    plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE, (int64_t)session->tick, held))
-                report(plugin, "migration_failed", true, "cannot start isolated migration",
-                    "MIGRATION FAILED; ACTIVE REVISION KEPT");
-            return false;
-        }
-        plugin->evaluation_migrated = false;
-#else
         WakePluginAuthority *a = plugin->authority;
         if (a && a->migrating != held->number) {
-            // L1-1: the authority runs the migration; the host commits once it has (next frame).
+            // L1-1: the authority runs the migration (natively at once, in the browser on its
+            // isolated worker); the host commits once it has, a frame or more later.
             if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
                 return false;
             if (!a->commit(a->context, session, held, BOAT_PLUGIN_MIGRATE, false)) {
@@ -504,21 +494,34 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
                 "R%u MIGRATING STATE", held->number);
             return false;
         }
-        BoatPluginObjective migrated;
-        if (a) {
-            // The authority migrated it: commit the host's table to the same revision.
-        } else if (!wake_objective_migrate(&plugin->run, held,
-                       boat_plugin_host_active(&plugin->host)->number, session->tick, &migrated)) {
-            report(plugin, "migration_failed", true, plugin->run.objective_diagnostic.message,
-                "MIGRATION FAILED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
-            return false;
-        }
-        // Commit below cannot fail once the base has been checked.
-        if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
-            return false;
-        if (!a)
+        if (!a) {
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
+            if (!plugin->evaluation_migrated) {
+                if (session->tick > INT64_MAX || plugin->run.generation == UINT_MAX
+                    || !begin_evaluation(
+                        plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE, (int64_t)session->tick, held))
+                    report(plugin, "migration_failed", true, "cannot start isolated migration",
+                        "MIGRATION FAILED; ACTIVE REVISION KEPT");
+                return false;
+            }
+            plugin->evaluation_migrated = false;
+#else
+            BoatPluginObjective migrated;
+            if (!wake_objective_migrate(&plugin->run, held,
+                    boat_plugin_host_active(&plugin->host)->number, session->tick, &migrated)) {
+                report(plugin, "migration_failed", true, plugin->run.objective_diagnostic.message,
+                    "MIGRATION FAILED; KEEPING R%u",
+                    boat_plugin_host_active(&plugin->host)->number);
+                return false;
+            }
+            // Commit below cannot fail once the base has been checked.
+            if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
+                return false;
             plugin->run.staged_objective = migrated;
 #endif
+        } else if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number) {
+            return false; // The authority migrated it: commit the host's table to the same one.
+        }
     }
     bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
         && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
@@ -1013,15 +1016,29 @@ bool wake_plugin_frame(
     if (!plugin->authoring)
         return false;
     plugin->frame_now = now;
+    unsigned actions = plugin->actions;
+    plugin->actions = 0;
     WakePluginAuthority *a = plugin->authority;
     if (a && a->migrating) {
         const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
         if (!held || held->number != a->migrating) {
             a->migrating = 0; // The host dropped it; the authority keeps whatever it reported.
         } else if (a->view.commits == a->migrate_seen || a->view.commit != a->migrating) {
-            if (reload || undo || apply)
+            // Still in flight (only on the browser's isolated worker): Undo or the page's cancel
+            // closes it, as the direct path's cancel did; anything else waits.
+            if (undo || (actions & (WAKE_PLUGIN_ACTION_UNDO | WAKE_PLUGIN_ACTION_CANCEL))) {
+                if (!a->cancel || !a->cancel(a->context, session, a->migrating)) {
+                    a->failed = true;
+                    return false;
+                }
+                a->migrating = 0;
+                boat_plugin_host_discard(&plugin->host);
+                report(plugin, "canceled", false, "ACTIVE REVISION AND STATE KEPT",
+                    "MIGRATION CANCELED");
+            } else if (reload || apply || actions) {
                 report(plugin, "busy", false, "RETRY WHEN THE MIGRATION FINISHES",
                     "MIGRATION IN PROGRESS");
+            }
             return false;
         } else if (a->view.commit_status == WAKE_COMMIT_APPLIED) {
             return commit(plugin, session);
@@ -1032,41 +1049,46 @@ bool wake_plugin_frame(
             return false;
         }
     }
-#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
-    unsigned actions = wake_web_plugin_actions();
-    if (plugin->evaluation
-        && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE
-        && ((actions & (2 | 8)) || undo)) {
-        close_evaluation(plugin);
-        boat_plugin_host_discard(&plugin->host);
-        report(plugin, "canceled", false, "ACTIVE REVISION AND STATE KEPT", "MIGRATION CANCELED");
-        return false;
-    }
-    if ((actions & 8) && plugin->staging) {
-        close_stage(plugin);
-        boat_plugin_host_discard(&plugin->host);
-        report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
-        actions &= ~8u;
-    }
-    bool restart = poll_evaluation(plugin, session, now);
-    wake_web_objective_snapshot((unsigned)plugin->run.objective.tick,
-        (unsigned)((uint64_t)plugin->run.objective.tick >> 32), (unsigned)session->tick,
-        (unsigned)(session->tick >> 32), plugin->run.generation, plugin->run.objective.initialized,
-        plugin->run.objective.quarantined, plugin->run.event_count, wake_plugin_waiting(plugin),
-        plugin->run.objective.state.bytes, plugin->run.objective.state.size);
-    if (restart)
-        return true;
-    if (wake_plugin_waiting(plugin)) {
-        // Control actions are refused visibly rather than applied to an in-flight checkpoint.
+    // L4b: the authority's isolated evaluation holds every control, as the direct path's does.
+    if (a && a->view.pending) {
         if (actions || reload || undo || apply)
             report(plugin, "busy", false, "RETRY WHEN THE CALLBACK FINISHES",
                 "OBJECTIVE EVALUATION BUSY");
         return false;
     }
-    reload |= (actions & 1) != 0;
-    undo |= (actions & 2) != 0;
-    apply |= (actions & 4) != 0;
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
+    if (!a && plugin->evaluation
+        && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE
+        && ((actions & (WAKE_PLUGIN_ACTION_UNDO | WAKE_PLUGIN_ACTION_CANCEL)) || undo)) {
+        close_evaluation(plugin);
+        boat_plugin_host_discard(&plugin->host);
+        report(plugin, "canceled", false, "ACTIVE REVISION AND STATE KEPT", "MIGRATION CANCELED");
+        return false;
+    }
 #endif
+    if ((actions & WAKE_PLUGIN_ACTION_CANCEL) && plugin->staging) {
+        close_stage(plugin);
+        boat_plugin_host_discard(&plugin->host);
+        report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
+        actions &= ~(unsigned)WAKE_PLUGIN_ACTION_CANCEL;
+    }
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
+    if (!a) {
+        bool restart = poll_evaluation(plugin, session, now);
+        if (restart)
+            return true;
+        if (wake_plugin_waiting(plugin)) {
+            // Control actions are refused visibly rather than applied to an in-flight checkpoint.
+            if (actions || reload || undo || apply)
+                report(plugin, "busy", false, "RETRY WHEN THE CALLBACK FINISHES",
+                    "OBJECTIVE EVALUATION BUSY");
+            return false;
+        }
+    }
+#endif
+    reload |= (actions & WAKE_PLUGIN_ACTION_STAGE) != 0;
+    undo |= (actions & WAKE_PLUGIN_ACTION_UNDO) != 0;
+    apply |= (actions & WAKE_PLUGIN_ACTION_APPLY) != 0;
     if (apply && !plugin->staging && boat_plugin_host_held(&plugin->host)) {
         close_stage(plugin);
         return commit(plugin, session);
@@ -1119,6 +1141,80 @@ bool wake_plugin_frame(
         && plugin->host.change == BOAT_PLUGIN_LIVE && wake_plugin_live_ready(plugin, session))
         return commit(plugin, session);
     return false;
+}
+
+// The unsigned value after KEY in the line that starts at LINE, or false.
+static bool inspected(const char *line, const char *key, long long *value)
+{
+    const char *end = strchr(line, '\n');
+    const char *at = strstr(line, key);
+    return at && (!end || at < end) && sscanf(at + strlen(key), "%lld", value) == 1;
+}
+
+bool wake_plugin_checkpoint(
+    const WakePlugin *plugin, const BoatSession *session, WakePluginCheckpoint *out)
+{
+    const WakePluginAuthority *a = plugin->authority;
+    *out = (WakePluginCheckpoint) { .native_tick = session->tick };
+    if (!a) {
+        const WakeObjective *run = &plugin->run;
+        out->tick = run->objective.tick;
+        out->generation = run->generation;
+        out->initialized = run->objective.initialized;
+        out->quarantined = run->objective.quarantined;
+        out->events = run->event_count;
+        out->waiting = wake_plugin_waiting(plugin);
+        out->state_size = run->objective.state.size;
+        memcpy(out->state, run->objective.state.bytes, out->state_size);
+        return true;
+    }
+    // The authority's inspection (wake_objective_inspect's lines): tick, queue and state bytes.
+    // The largest inspection (BOAT_NET_PRIVATE_INSPECTION_BYTES, 32 KiB) and a terminator.
+    static char text[32768 + 1];
+    if (!a->inspection || !a->inspection_size || a->inspection_size >= sizeof(text))
+        return false;
+    memcpy(text, a->inspection, a->inspection_size);
+    text[a->inspection_size] = 0;
+    const char *second = strchr(text, '\n');
+    const char *state = strstr(text, "\nstate=");
+    long long tick, queued;
+    if (!second || !state || !inspected(text, " tick=", &tick)
+        || !inspected(second + 1, "queued=", &queued) || queued < 0)
+        return false;
+    out->tick = tick;
+    out->events = (unsigned)queued;
+    out->generation = a->view.generation;
+    out->initialized = a->view.initialized;
+    out->quarantined = a->view.suspended;
+    out->waiting = a->view.pending;
+    for (const char *h = state + 7; h[0] && h[0] != '\n'; h += 2) {
+        unsigned byte;
+        if (!h[1] || out->state_size == sizeof(out->state) || sscanf(h, "%2x", &byte) != 1)
+            return false;
+        out->state[out->state_size++] = (unsigned char)byte;
+    }
+    return true;
+}
+
+void wake_plugin_publish(WakePlugin *plugin, const BoatSession *session)
+{
+#ifdef __EMSCRIPTEN__
+    static WakePluginCheckpoint c;
+    if (wake_plugin_checkpoint(plugin, session, &c))
+        wake_web_objective_snapshot((unsigned)c.tick, (unsigned)((uint64_t)c.tick >> 32),
+            (unsigned)c.native_tick, (unsigned)(c.native_tick >> 32), c.generation, c.initialized,
+            c.quarantined, c.events, c.waiting, c.state, c.state_size);
+    // One inspection in flight at a time: each answers within the next frame.
+    WakePluginAuthority *a = plugin->authority;
+    if (a && (!a->checkpoint_pending || a->inspections != a->checkpoint_asked)) {
+        a->checkpoint_asked = a->inspections;
+        a->checkpoint_pending = true;
+        if (!a->inspect(a->context))
+            a->failed = true;
+    }
+#else
+    (void)plugin, (void)session;
+#endif
 }
 
 void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom)

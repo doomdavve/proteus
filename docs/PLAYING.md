@@ -56,8 +56,7 @@ crisp integer scaling. Only the boat drawing uses fixed-width cells. The translu
 the world beneath it; GPU rendering adds a light background blur while the text stays sharp. It takes typed input while the world keeps running with a neutral helm. A plain line
 edits the package's `def` table, `= expression` inspects it without changing it, and `/` runs a command.
 Try `/status`, `/help` or `/help status`; see [the console contract](PLUGIN_API.md#live-console-and-command-layer-pc).
-Replays, demos, screenshots and rooms do not offer it. In a browser, the first edit or `/save`
-of a bundled package restarts play from its start.
+Replays, demos, screenshots and rooms do not offer it.
 
 While the console is open:
 
