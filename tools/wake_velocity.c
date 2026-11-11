@@ -420,7 +420,7 @@ static void course_runs_hud(
 }
 
 #ifdef PROTEUS_BOAT_NET
-static NetStudy net_study; // Outlives a session so the title can show why it ended.
+static WakeRoom wake_room; // Outlives a session so the title can show why it ended.
 #if !defined(__EMSCRIPTEN__)
 static NetHost net_host; // The room this session started with --host, if any.
 #endif
@@ -641,7 +641,7 @@ static int study(int argc, char **argv)
     const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
     const char *work_review_pose_name = NULL; // --work-review-pose: developer bounded fixture.
 #ifdef PROTEUS_BOAT_NET
-    NetStudy *net = NULL;
+    WakeRoom *net = NULL;
 #endif
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--help") == 0) {
@@ -1276,18 +1276,18 @@ static int study(int argc, char **argv)
 #if !defined(__EMSCRIPTEN__)
     if (host_mode
         && !net_host_start(
-            &net_host, &host_options, net_study.failure, sizeof(net_study.failure))) {
-        fprintf(stderr, "%s\n", net_study.failure);
+            &net_host, &host_options, wake_room.failure, sizeof(wake_room.failure))) {
+        fprintf(stderr, "%s\n", wake_room.failure);
         goto cleanup;
     }
 #endif
     if (connect_to) {
-        if (!net_study_connect(&net_study, connect_to, net_name, net_token, worlds, &session))
+        if (!wake_room_connect(&wake_room, connect_to, net_name, net_token, worlds, &session))
             goto cleanup;
-        net = &net_study;
+        net = &wake_room;
         networked = true;
         location = session.world.definition;
-        waves = net_study.client.accept.waves;
+        waves = wake_room.client.accept.waves;
         camera_default.distance = location->camera_distance;
         camera_default.height = location->camera_height;
         if (!camera_distance_set)
@@ -1862,7 +1862,7 @@ static int study(int argc, char **argv)
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
             minimap_mode = boat_minimap_next(minimap_mode);
 #ifdef PROTEUS_BOAT_NET
-        if (active && net && net_study_deathmatch(net) && IsKeyPressed(KEY_V))
+        if (active && net && wake_room_deathmatch(net) && IsKeyPressed(KEY_V))
             mirror.enabled = !mirror.enabled;
 #endif
         if (active) {
@@ -2019,7 +2019,7 @@ static int study(int argc, char **argv)
                 };
             // No multiplayer pause: the room keeps running while help or focus is away.
             uint32_t previous_life = net->own_life;
-            if (!net_study_frame(net, &session, input, thrust_target, steering_target, active,
+            if (!wake_room_frame(net, &session, input, thrust_target, steering_target, active,
                     reset_requested)) {
                 result = 1;
                 break;
@@ -2237,9 +2237,9 @@ static int study(int argc, char **argv)
             live_view.props = wake_work_props(&work);
 #ifdef PROTEUS_BOAT_NET
         if (net) {
-            live_view.skin = net_study_skin(net->client.slot); // Every client agrees.
-            net_study_race_view(net, &live_view);
-            net_study_marks_view(net, &live_view);
+            live_view.skin = wake_room_skin(net->client.slot); // Every client agrees.
+            wake_room_race_view(net, &live_view);
+            wake_room_marks_view(net, &live_view);
         }
 #endif
         if (view == &playback)
@@ -2253,7 +2253,7 @@ static int study(int argc, char **argv)
             .landing = view_presentation->landing_strength,
             .landing_serial = view_presentation->landing_serial };
 #ifdef PROTEUS_BOAT_NET
-        if (net && net_study_deathmatch(net)) {
+        if (net && wake_room_deathmatch(net)) {
             const BoatFleet *f = boat_net_client_view(&net->client);
             const BoatCombat *c = &f->state.combat;
             for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i) {
@@ -2298,9 +2298,9 @@ static int study(int argc, char **argv)
         bool mirror_visible = false;
 #ifdef PROTEUS_BOAT_NET
         if (net) {
-            net_study_rivals(net, live_view.time, &rivals);
+            wake_room_rivals(net, live_view.time, &rivals);
             // The large chart takes the mirror's place while it is open.
-            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible
+            mirror_visible = mirror.enabled && wake_room_deathmatch(net) && net->own_visible
                 && minimap_mode != BOAT_MINIMAP_CHART;
         }
 #endif
@@ -2412,7 +2412,7 @@ static int study(int argc, char **argv)
         }
 #ifdef PROTEUS_BOAT_NET
         if (net)
-            net_study_combat_hud(
+            wake_room_combat_hud(
                 net, width, height, view, view_presentation, view_world, camera_settings);
 #endif
         if (mirror_visible)
@@ -2451,11 +2451,11 @@ static int study(int argc, char **argv)
         const char *notice = NULL;
 #ifdef PROTEUS_BOAT_NET
         if (networked) {
-            float fade = net_study_fade(net);
+            float fade = wake_room_fade(net);
             if (fade > 0)
                 DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
                     Fade((Color) { 14, 23, 32, 255 }, fade));
-            notice = net_study_notice(net);
+            notice = wake_room_notice(net);
         }
 #endif
         boat_course_hud(&view->course, view->boat.position, GetScreenWidth());
@@ -2478,7 +2478,7 @@ static int study(int argc, char **argv)
             course_runs_hud(&session.runs, view, ghost_view, GetScreenWidth());
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
-            boat_ui_text(net_study_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
+            boat_ui_text(wake_room_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
                 12, SKYBLUE);
             int match_top
                 = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
@@ -2486,13 +2486,13 @@ static int study(int argc, char **argv)
             if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
                 roster_top = (int)fmaxf((float)roster_top,
                     destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
-            int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
+            int feed_top = wake_room_draw_roster(net, GetScreenWidth() - 12, roster_top);
             int objective_bottom
-                = net_study_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
+                = wake_room_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
             feed_top = objective_bottom > feed_top + 8 ? objective_bottom : feed_top;
-            net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
+            wake_room_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
-            net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
+            wake_room_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
 #endif
         } else if (!IsWindowFocused() && !menu.open)
@@ -2510,8 +2510,8 @@ static int study(int argc, char **argv)
         if (help_visible) {
             bool deathmatch = false, race = false;
 #ifdef PROTEUS_BOAT_NET
-            deathmatch = networked && net_study_deathmatch(net);
-            race = networked && net_study_race(net);
+            deathmatch = networked && wake_room_deathmatch(net);
+            race = networked && wake_room_race(net);
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
                 deathmatch, race, networked, plugin_active && plugin.authoring, work_mode);
@@ -2650,7 +2650,7 @@ static int study(int argc, char **argv)
         // READY makes the authority queue reliable spawn and roster traffic; it must not land
         // during that first frame's shader and presentation work.
         if (networked && !net_ready_sent) {
-            if (!net_study_ready(net)) {
+            if (!wake_room_ready(net)) {
                 result = 1;
                 break;
             }
@@ -2755,7 +2755,7 @@ cleanup:
     boat_wake_player_destroy(wake);
 #ifdef PROTEUS_BOAT_NET
     if (net)
-        net_study_close(net);
+        wake_room_close(net);
 #if !defined(__EMSCRIPTEN__)
     net_host_stop(&net_host); // After leaving, so the room says goodbye to the others only.
 #endif
@@ -2935,11 +2935,11 @@ static int title_join(BoatTitleSettings *settings, bool host)
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
-    net_study.failure[0] = 0;
+    wake_room.failure[0] = 0;
     study_mouse_steering = settings->mouse_steering;
     int result = study(count, arguments);
-    if (net_study.failure[0])
-        snprintf(settings->message, sizeof(settings->message), "%s", net_study.failure);
+    if (wake_room.failure[0])
+        snprintf(settings->message, sizeof(settings->message), "%s", wake_room.failure);
     else if (result)
         snprintf(settings->message, sizeof(settings->message),
             host ? "Could not host a room." : "Could not join that address.");

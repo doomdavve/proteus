@@ -14,8 +14,8 @@ L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
 ([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
 ([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
 until every L* row is done.
-**Next:** L5 (close by evidence, rename `NetStudy` to `WakeRoom`), then L4b objectives and
-authoring on the browser authority; the user accepted [L4-1, L4-2](#l4b-decision) and
+L5 closed by evidence ([L5](#l5-decision)).
+**Next:** L4b objectives, then authoring, on the browser authority; the user accepted [L4-1, L4-2](#l4b-decision) and
 [L5-1](#l5-decision) as recommended on 2026-11-11.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
@@ -1182,6 +1182,13 @@ was ever specified.
 | ID | Question | Options | Recommendation |
 | --- | --- | --- | --- |
 | L5-1 | What L5 changes | (a) close L5 by evidence: rooms already share the authority and client libraries; rename `NetStudy` to a room client (`WakeRoom`), and record that the two glues differ by design (prediction-only private view against remote interpolation); (b) extract one shared view step (own boat, tick and presentation from a `BoatNetClient`) used by both glues, the rest stays room-only; (c) one client composition for every mode, a private or remote transport behind it, with mode adapters | (a): no behaviour or wire change, nothing to re-qualify in rooms; (b) touches multiplayer feel and needs human play to accept; (c) is a redesign |
+
+L5 closed by evidence, 2026-11-11 on `arch/ar7-rest`: `NetStudy` and its `net_study_*` calls
+are now the room client `WakeRoom` and `wake_room_*` (`tools/wake_velocity_net.[ch]`, whose
+header records why it stays separate from `wake_velocity_local.c`). No behaviour, wire or test
+change; the `boat_net_study_*` test names stay. Evidence (macOS 26.6.2, AppleClang Debug,
+2026-11-11): the 91 net, room, host, connect, combat and hunt tests pass; the browser game target
+builds clean. Hosted-room play is not re-qualified, as nothing it runs changed.
 
 ### AR8 — Move files into owning directories
 

@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     BoatWorldResources resources;
     if (!boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_BASIN)))
         return 1;
-    static NetStudy net;
+    static WakeRoom net;
     BoatFleet *f = &net.client.fleet;
     if (!boat_fleet_init(f, &resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f))
         return 1;
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
             (Rectangle) { 0, 0, 320, 200 }, (Vector2) { 0 }, 0, WHITE);
         if (!torpedo_view) {
             boat_hud_draw((BoatHudTelemetry) { .speed_mps = 12, .thrust = .5f }, 320, 200);
-            net_study_combat_hud(&net, 320, 200, &view, &presentation, &world, camera);
+            wake_room_combat_hud(&net, 320, 200, &view, &presentation, &world, camera);
             if (show_mirror)
                 boat_rearview_draw(&mirror, 320);
         }

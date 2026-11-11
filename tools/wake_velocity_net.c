@@ -20,7 +20,7 @@ static const char *phase_text(BoatNetClientPhase phase)
 }
 
 // Keep the reason for the title screen as well as the console.
-static void fail(NetStudy *net, const char *format, ...)
+static void fail(WakeRoom *net, const char *format, ...)
 {
     va_list arguments;
     va_start(arguments, format);
@@ -29,17 +29,17 @@ static void fail(NetStudy *net, const char *format, ...)
     fprintf(stderr, "%s\n", net->failure);
 }
 
-static void attach(NetStudy *net, BoatSession *session)
+static void attach(WakeRoom *net, BoatSession *session)
 {
     // The session draws the predicted water; its objects pointer borrows that pool.
     session->world = boat_fleet_world(boat_net_client_view(&net->client));
 }
 
-bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
+bool wake_room_connect(WakeRoom *net, const char *endpoint, const char *name, const char *token,
     const BoatWorldResources *worlds, BoatSession *session)
 {
     char error[160];
-    *net = (NetStudy) { 0 };
+    *net = (WakeRoom) { 0 };
     BoatNetTransport transport;
 #if defined(__EMSCRIPTEN__)
     if (!boat_net_web_connect(endpoint, error, sizeof(error))) {
@@ -99,7 +99,7 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
             if (boat_net_web_failure()[0])
                 fail(net, "%s", boat_net_web_failure());
 #endif
-            net_study_close(net);
+            wake_room_close(net);
             return false;
         }
 #if defined(__EMSCRIPTEN__)
@@ -123,7 +123,7 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
     return true;
 }
 
-bool net_study_ready(NetStudy *net)
+bool wake_room_ready(WakeRoom *net)
 {
     if (!boat_net_client_ready(&net->client)) {
         fail(net, "Cannot finish joining after initialization.");
@@ -133,7 +133,7 @@ bool net_study_ready(NetStudy *net)
 }
 
 // Fold the newest correction into the visual offsets, then decay them (about 95% in 120 ms).
-static void blend_corrections(NetStudy *net, float dt)
+static void blend_corrections(WakeRoom *net, float dt)
 {
     const BoatPrediction *p = &net->client.prediction;
     if (p->correction != net->correction) {
@@ -157,7 +157,7 @@ static void blend_corrections(NetStudy *net, float dt)
     }
 }
 
-static Boat shown(const NetStudy *net, unsigned slot)
+static Boat shown(const WakeRoom *net, unsigned slot)
 {
     Boat boat = boat_net_client_view(&net->client)->state.slots[slot].boat;
     const BoatPredictionError *o = &net->offset[slot];
@@ -169,7 +169,7 @@ static Boat shown(const NetStudy *net, unsigned slot)
     return boat;
 }
 
-bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float thrust_target,
+bool wake_room_frame(WakeRoom *net, BoatSession *session, BoatInput input, float thrust_target,
     float steering_target, bool active, bool reset)
 {
     BoatNetClient *c = &net->client;
@@ -271,9 +271,9 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
     return true;
 }
 
-unsigned net_study_skin(unsigned slot) { return slot % BOAT_SKIN_COUNTRIES; }
+unsigned wake_room_skin(unsigned slot) { return slot % BOAT_SKIN_COUNTRIES; }
 
-void net_study_rivals(const NetStudy *net, double time, BoatRivals *rivals)
+void wake_room_rivals(const WakeRoom *net, double time, BoatRivals *rivals)
 {
     rivals->count = 0;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS && rivals->count < WATERFRONT_RIVALS; ++i) {
@@ -282,7 +282,7 @@ void net_study_rivals(const NetStudy *net, double time, BoatRivals *rivals)
         BoatRival *r = &rivals->boats[rivals->count++];
         *r = (BoatRival) { .view = { .boat = net->shown[i], .time = time },
             .presentation = &net->presentations[i] };
-        r->view.skin = net_study_skin(i);
+        r->view.skin = wake_room_skin(i);
     }
 }
 
@@ -300,7 +300,7 @@ static const BoatNetFeedEntry *own_capsize(const BoatNetClient *c, uint32_t life
 
 // "CAPSIZED BY NAME / RESPAWN 2": the authority respawns a capsized boat by itself; a reset request
 // skips the rest of the wait after skip_ticks.
-static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_t life)
+static const char *capsize_notice(const WakeRoom *net, const Boat *boat, uint32_t life)
 {
     static char text[96];
     const BoatNetClient *c = &net->client;
@@ -324,7 +324,7 @@ static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_
 }
 
 // "CAPSIZED / RECOVERY 2 / HOLD BACKSPACE" while a race recovers the own boat by itself.
-static const char *race_capsize_notice(const NetStudy *net, const Boat *boat)
+static const char *race_capsize_notice(const WakeRoom *net, const Boat *boat)
 {
     static char text[64];
     const BoatNetClient *c = &net->client;
@@ -337,23 +337,23 @@ static const char *race_capsize_notice(const NetStudy *net, const Boat *boat)
     return text;
 }
 
-const char *net_study_notice(const NetStudy *net)
+const char *wake_room_notice(const WakeRoom *net)
 {
     static char text[80];
     double seconds;
     BoatNetResetState reset = boat_net_client_reset_state(&net->client, boat_net_clock(), &seconds);
-    if (!net->own_visible && net_study_race(net) && net->client.race.phase != BOAT_RACE_WAITING)
+    if (!net->own_visible && wake_room_race(net) && net->client.race.phase != BOAT_RACE_WAITING)
         return "RACE IN PROGRESS / YOU JOIN THE NEXT GRID";
     if (!net->own_visible)
         return "WAITING FOR A SAFE SPAWN";
-    if (net_study_race(net)) {
+    if (wake_room_race(net)) {
         const BoatFleetSlot *own
             = &boat_net_client_view(&net->client)->state.slots[net->client.slot];
         const char *capsized = race_capsize_notice(net, &own->boat);
         if (capsized)
             return capsized;
     }
-    if (net_study_deathmatch(net)) {
+    if (wake_room_deathmatch(net)) {
         const BoatFleetSlot *own
             = &boat_net_client_view(&net->client)->state.slots[net->client.slot];
         const char *capsized = capsize_notice(net, &own->boat, own->life);
@@ -369,13 +369,13 @@ const char *net_study_notice(const NetStudy *net)
     return text;
 }
 
-float net_study_fade(const NetStudy *net)
+float wake_room_fade(const WakeRoom *net)
 {
     double age = boat_net_clock() - net->respawned_at;
     return net->respawned_at > 0 && age < .35 ? (float)(1 - age / .35) : 0;
 }
 
-const char *net_study_status(const NetStudy *net)
+const char *wake_room_status(const WakeRoom *net)
 {
     static char text[160];
     const BoatNetClient *c = &net->client;
@@ -390,14 +390,14 @@ const char *net_study_status(const NetStudy *net)
     return text;
 }
 
-int net_study_draw_roster(const NetStudy *net, int right, int top)
+int wake_room_draw_roster(const WakeRoom *net, int right, int top)
 {
     const BoatNetClient *c = &net->client;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         if (c->roster.slots[i].state == BOAT_NET_ROSTER_EMPTY)
             continue;
         const char *line = TextFormat("%s %s%s", c->roster.slots[i].name,
-            TextToUpper(boat_skin_name(net_study_skin(i))), i == c->slot ? " (YOU)" : "");
+            TextToUpper(boat_skin_name(wake_room_skin(i))), i == c->slot ? " (YOU)" : "");
         int x = right - boat_ui_width(line, 12);
         DrawRectangle(x - 4, top - 2, right - x + 8, 15, Fade(BLACK, .45f));
         boat_ui_text(line, x, top, 12, i == c->slot ? RAYWHITE : LIGHTGRAY);
@@ -406,7 +406,7 @@ int net_study_draw_roster(const NetStudy *net, int right, int top)
     return top;
 }
 
-bool net_study_deathmatch(const NetStudy *net)
+bool wake_room_deathmatch(const WakeRoom *net)
 {
     return net->client.accept.mode == BOAT_NET_MODE_DEATHMATCH && net->client.match_valid;
 }
@@ -519,10 +519,10 @@ static void draw_scoreboard(const BoatNetClient *c, int width, int height, doubl
     }
 }
 
-void net_study_draw_match(
-    const NetStudy *net, int width, int height, int header_top, int feed_top, bool scoreboard)
+void wake_room_draw_match(
+    const WakeRoom *net, int width, int height, int header_top, int feed_top, bool scoreboard)
 {
-    if (!net_study_deathmatch(net))
+    if (!wake_room_deathmatch(net))
         return;
     const BoatNetClient *c = &net->client;
     const BoatNetMatchState *m = &c->match;
@@ -542,14 +542,14 @@ void net_study_draw_match(
         draw_scoreboard(c, width, height, server_tick);
 }
 
-bool net_study_race(const NetStudy *net)
+bool wake_room_race(const WakeRoom *net)
 {
     return net->client.accept.mode == BOAT_NET_MODE_RACE && net->client.race_valid;
 }
 
-void net_study_race_view(const NetStudy *net, BoatViewState *view)
+void wake_room_race_view(const WakeRoom *net, BoatViewState *view)
 {
-    if (!net_study_race(net))
+    if (!wake_room_race(net))
         return;
     const BoatRoomDefinition *room = boat_net_client_room(&net->client);
     if (!room)
@@ -560,13 +560,13 @@ void net_study_race_view(const NetStudy *net, BoatViewState *view)
     view->race.next_gate = row->current ? row->gates : 0;
 }
 
-void net_study_marks_view(const NetStudy *net, BoatViewState *view)
+void wake_room_marks_view(const WakeRoom *net, BoatViewState *view)
 {
     const BoatRoomDefinition *room = boat_net_client_room(&net->client);
     view->marks = room && room->marks.count ? &room->marks : NULL;
 }
 
-int net_study_draw_objective(const NetStudy *net, int right, int top)
+int wake_room_draw_objective(const WakeRoom *net, int right, int top)
 {
     const BoatNetClient *c = &net->client;
     if (!c->objective_valid)
@@ -664,7 +664,7 @@ static void draw_race_feed(const BoatNetClient *c, int right, int top, double no
 }
 
 static void draw_race_board(
-    const NetStudy *net, const BoatRace *race, int width, int height, double server_tick)
+    const WakeRoom *net, const BoatRace *race, int width, int height, double server_tick)
 {
     const BoatNetClient *c = &net->client;
     const BoatNetRaceState *s = &c->race;
@@ -716,9 +716,9 @@ static void draw_race_board(
     }
 }
 
-void net_study_draw_race(const NetStudy *net, int width, int height, int feed_top, bool board)
+void wake_room_draw_race(const WakeRoom *net, int width, int height, int feed_top, bool board)
 {
-    if (!net_study_race(net))
+    if (!wake_room_race(net))
         return;
     const BoatNetClient *c = &net->client;
     const BoatNetRaceState *s = &c->race;
@@ -774,7 +774,7 @@ void net_study_draw_race(const NetStudy *net, int width, int height, int feed_to
         draw_race_board(net, &race, width, height, server_tick);
 }
 
-void net_study_close(NetStudy *net)
+void wake_room_close(WakeRoom *net)
 {
     if (!net->transport_open)
         return;
@@ -821,7 +821,7 @@ void net_study_close(NetStudy *net)
     net->transport_open = false;
 }
 
-void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
+void wake_room_combat_hud(const WakeRoom *net, int width, int height, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera)
 {
     const BoatNetClient *c = &net->client;
