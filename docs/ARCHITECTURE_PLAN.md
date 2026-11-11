@@ -463,8 +463,8 @@ call waits, and state keeps its previous owner (free functions, rule 10):
 Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
 lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
 (`wake_velocity.c` had 14 for AR2b touch, mouse and viewport capabilities, now 0 and delisted; the
-native stage worker `tools/boat_plugin_stage_worker.c` 1; AR4's merge brought
-`src/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
+native stage worker `src/plugins/boat_plugin_stage_worker.c` 1; AR4's merge brought
+`src/plugins/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
 not reach a service's backends directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN
 branches or in the native test targets the check allowlists with a reason
 (`validate_boat_plugin_stage_web`, which compiles the browser staging backend against a C model of
@@ -492,7 +492,7 @@ Decisions (technical, recorded here):
   through page actions 2 or 8) compile under the seam but have no case, since starting one
   needs a staged revision with a changed objective.
 - EM_JS imports are called only inside their backend file, through C wrappers. Game and tools
-  bridges are named `wake_js_*`; the plugin stage backend (`src/boat_plugin_stage_web.c`, AR4)
+  bridges are named `wake_js_*`; the plugin stage backend (`src/plugins/boat_plugin_stage_web.c`, AR4)
   keeps its `browser_*` names, since renaming them would be churn.
 - AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
   wait and the deferred first CPU draw; the console's paste and notice before typed text and its
@@ -905,7 +905,7 @@ voyages and tours without an objective, and L1b, authoring and objectives on the
 (ledger L9 folded in). The first split had a separate L1b for the objective adapter; it was
 merged into the authoring step on 2026-11-11 (the user's choice) because a voyage objective exists only while
 authoring: the catalog generator refuses an objective on any bundled package except a free one
-(`tools/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
+(`src/plugins/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
 console has promoted can run one, and authoring stayed on the direct path.
 
 L1a (voyage state, events, weather and recover), implemented 2026-11-11:

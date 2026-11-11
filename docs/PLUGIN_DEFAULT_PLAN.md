@@ -109,7 +109,7 @@ Baseline measured 2026-10-31 on `e335b84`, Release, Apple Silicon/macOS, display
 of a three-second drive: compiled `outer` 0.80 s and `langedrag` 0.80 s (four runs each, within
 0.01 s), `harbor-life` 1.56 s (one run), so about +0.75 s. With `--start 2,170,90`, `harbor-life`
 took 4.90 s (four runs) against 4.17 s for compiled (one run), about +0.73 s. The traffic sweep at
-`src/boat_plugin.c:599` is the likely cause, but no profile has confirmed it.
+`src/plugins/boat_plugin.c:599` is the likely cause, but no profile has confirmed it.
 `check_scene_traffic` samples a 4,160 s horizon every 0.25 s. Build-time compilation should remove
 this cost from bundled launches; a console edit pays it in a worker while the game keeps running.
 
@@ -216,7 +216,7 @@ exactly as they do now. Rooms and the browser
 still use compiled content. A temporary `--no-plugins` restores the compiled path for parity.
 
 Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/boat_title.[ch]`,
-`src/boat_plugin.[ch]`, `src/boat_plugin_host.[ch]`, `src/boat_plugin_stage.c`,
+`src/plugins/boat_plugin.[ch]`, `src/plugins/boat_plugin_host.[ch]`, `src/plugins/boat_plugin_stage.c`,
 `src/core/boat_course.[ch]`, `src/render/boat_course_view.c`, `src/boat_replay.c`,
 `tools/boat_race_plugin.[ch]`.
 
@@ -231,13 +231,13 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
    "authoring" conditions. The F5–F7 help line, `wake_plugin_draw` and the browser control calls
    depend on authoring only. Static storage and the 1 MiB owner assertion stay.
 2. **Add the generator and catalog.**
-   - New `tools/boat_plugin_catalog_gen.c` links `proteus_plugins` and takes package directories. For
+   - New `src/plugins/boat_plugin_catalog_gen.c` links `proteus_plugins` and takes package directories. For
      each it evaluates the source, runs the same checks as staging (map, scene and the full traffic
      sweep), rejects objective callbacks, and writes a generated C file holding the decoded definition,
      manifest, source and digest as **byte arrays**, not string literals (MSVC limits literals).
-   - Reuse the fieldwise stage wire in `src/boat_plugin_stage.c` as the encoded form, extended to all
+   - Reuse the fieldwise stage wire in `src/plugins/boat_plugin_stage.c` as the encoded form, extended to all
      kinds. Producer and consumer come from one build, so it needs no compatibility promises.
-   - Avoid a link cycle: generated output and the lookup (`src/boat_plugin_catalog.[ch]`, by ID and by
+   - Avoid a link cycle: generated output and the lookup (`src/plugins/boat_plugin_catalog.[ch]`, by ID and by
      default for a kind and location) form a new static library, `proteus_plugin_catalog`, that depends
      on `proteus_plugins`. The generator must not link it.
    - Use `add_custom_command` with `$<TARGET_FILE:...>` so multi-config generators work. Rebuild when a
@@ -246,7 +246,7 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
      evaluating anything. Follow the checks and trust comment around `boat_plugin_host_stage_decoded`.
    - Do not cross-compile yet. Emscripten continues on compiled content until PD4.
 3. **Add the missing kinds.** Today only `voyage` on `outer` and `race` on `river` exist
-   (`src/boat_plugin.c:123`).
+   (`src/plugins/boat_plugin.c:123`).
    - `free`: location `basin` or `river`, capability `free.define`, descriptor
      `return { free = { version = 1 } }`, with an optional `scene` on `river` only if the river
      site passes the existing scene validation. Otherwise defer that scene option and record why.
@@ -311,7 +311,7 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
 **Implemented.** Native solo sessions open a build-time catalog entry through
 `boat_plugin_host_start_decoded`: no Lua state, file poll, staging worker, bridge or panel. The
 F5/F6/F7 controls, save polling, bridge and panel now belong to `--plugin DIR` only. The
-handwritten generator `tools/boat_plugin_catalog_gen.c` evaluates each package with the normal
+handwritten generator `src/plugins/boat_plugin_catalog_gen.c` evaluates each package with the normal
 loader, runs the staging checks (manifest, schema, map, scene and the full traffic sweep),
 rejects objective callbacks and writes `build/generated/boat_plugin_catalog_data.c` as byte
 arrays. `proteus_plugin_catalog` (lookup by ID and by kind/location default, plus decode) depends
@@ -386,8 +386,8 @@ progress. So this PR's core is a new live-apply policy, which also improves `--p
 Read first: [hot reload](PLUGIN_PLAN.md#hot-reload-is-the-normal-development-path), the
 [replacement rules](PLUGIN_API.md#replacement-restart-and-owner-lifetime), the
 [live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent),
-`tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity_bridge.c`, `src/boat_plugin_host.c`,
-`src/boat_plugin_stage.c`, `src/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
+`tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity_bridge.c`, `src/plugins/boat_plugin_host.c`,
+`src/plugins/boat_plugin_stage.c`, `src/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
 consumers in `src/core/boat.c`, `src/core/boat_combat.c`, `src/waterfront_*.c`, `src/render/boat_view.c`, `src/render/boat_gpu.c`.
 
 ### Language
@@ -944,7 +944,7 @@ and desktop browsers get the console. Imported voyages may carry scenes. Normal 
 
 Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 [browser source bundles](PLUGIN_API.md#browser-source-bundles-p43), `web/plugin_author.js`,
-`web/plugin_worker.js`, `src/boat_plugin_stage.c`, `tools/wake_velocity_plugin.c`, `cmake/Web.cmake`,
+`web/plugin_worker.js`, `src/plugins/boat_plugin_stage.c`, `tools/wake_velocity_plugin.c`, `cmake/Web.cmake`,
 `tools/package_web.py`, `tools/check_web_plugin_author.py`.
 
 ### Settled from the source and a trial, 2026-10-31

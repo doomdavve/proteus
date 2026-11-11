@@ -56,7 +56,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 ## Starting point in the code
 
 - **Objectives.** `BoatPluginObjective` and `boat_plugin_objective_step`
-  (`src/boat_plugin_state.h:80`) run `init`/`update` as a P3 transaction with a 12-tick cadence;
+  (`src/plugins/boat_plugin_state.h:80`) run `init`/`update` as a P3 transaction with a 12-tick cadence;
   the solo glue turns voyage notices into events (`tools/wake_velocity_plugin.c:371`).
 - **Free packages** have no objective grant unless they author work sites
   ([free schema](PLUGIN_API.md#free-schema)).

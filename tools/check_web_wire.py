@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args()
-    header = (args.root / 'src/boat_plugin_wire.h').read_text()
+    header = (args.root / 'src/plugins/boat_plugin_wire.h').read_text()
     match = re.search(r'^#define\s+BOAT_PLUGIN_WIRE_VERSION\s+\(?(0x[0-9a-fA-F]+)u?\)?',
                       header, re.MULTILINE)
     if not match:

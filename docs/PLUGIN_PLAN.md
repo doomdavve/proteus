@@ -118,8 +118,8 @@ superseded proposals; the source interfaces below are the integration reference.
 
 Keep the first addition small: a `proteus_plugins` static library with a private Lua dependency,
 a host owner, a bounded source/manifest loader and typed descriptor decoders. Proposed file
-names are `src/boat_plugin.[ch]`, `src/boat_plugin_lua.c` and
-`src/boat_plugin_io.[ch]`; add state/command files only when P3 needs them. Those names describe
+names are `src/plugins/boat_plugin.[ch]`, `src/plugins/boat_plugin_lua.c` and
+`src/plugins/boat_plugin_io.[ch]`; add state/command files only when P3 needs them. Those names describe
 planned files, not existing interfaces.
 
 `proteus_boat_core` and `proteus_boat_net` must continue to have no filesystem, socket, window,
@@ -541,10 +541,10 @@ Implemented on branch `plugin-p0`:
   `utf8` are not compiled, and a force-included header fixes the string-hash seed.
   `proteus_boat_core` and `proteus_boat_net` do not link it, and configure fails if they do.
   The boundary self-test also rejects a core `lua.h` or `boat_plugin.h` include.
-- **Host:** `src/boat_plugin.[ch]` holds the manifest, voyage validation, owned
-  `BoatPluginVoyage`, copy/rebind and FNV-1a digest. `src/boat_plugin_lua.[ch]` is the
+- **Host:** `src/plugins/boat_plugin.[ch]` holds the manifest, voyage validation, owned
+  `BoatPluginVoyage`, copy/rebind and FNV-1a digest. `src/plugins/boat_plugin_lua.[ch]` is the
   restricted state: counting allocator, 100-instruction count hook, text-only load, raw-access
-  decoder and a protected setup, so allocation failures never panic. `src/boat_plugin_io.[ch]`
+  decoder and a protected setup, so allocation failures never panic. `src/plugins/boat_plugin_io.[ch]`
   does the only file reads, with `O_NOFOLLOW`, regular files only and reads bounded by the
   limit. The manifest uses the vendored jsmn through helpers moved from the server directory
   into `src/json/boat_json.[ch]` (`proteus_json`); `boat_directory` still passes. Contract, schema,
@@ -657,7 +657,7 @@ keys and policy table are in [the plugin API](PLUGIN_API.md#playing-and-live-aut
   `boat_session_restart_voyage` begins a route at the current time. It uses the new
   `boat_voyage_restart`, which keeps the weather already met (`observed`, `weather`,
   `weather_started`), so the physical water does not change under a voyage restart.
-- **Host:** `src/boat_plugin_host.[ch]` (in `proteus_plugins`, no I/O or clock) owns revisions in
+- **Host:** `src/plugins/boat_plugin_host.[ch]` (in `proteus_plugins`, no I/O or clock) owns revisions in
   fixed slots: the active one, eight for Undo and one held candidate. Staging is load, then the
   map check, then `boat_plugin_classify`. The map check (`boat_plugin_check_location`, moved from
   the P0 validator) takes the session's location and compiled water. A commit is refused if its
@@ -864,7 +864,7 @@ continuous background reload. This milestone owns the first real behavior script
 #### P3.1 result, 2026-10-29
 
 P3 is split into reviewable steps. **P3.1 implements the isolated transaction foundation** in
-[`boat_plugin_state.[ch]`](../src/boat_plugin_state.h), exercised by
+[`boat_plugin_state.[ch]`](../src/plugins/boat_plugin_state.h), exercised by
 [`validate_boat_plugin_state`](../tools/validate_boat_plugin_state.c). P3 as a whole remains
 in progress. At this historical step no manifest capability or gameplay callback was enabled;
 P3.2 below adds that integration.

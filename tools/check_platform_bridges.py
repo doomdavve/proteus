@@ -37,7 +37,7 @@ NATIVE_WEB_TESTS = {
 
 # File -> (bridges allowed, owner of their extraction).
 LEGACY = {
-    "tools/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
+    "src/plugins/boat_plugin_stage_worker.c": (1, "AR4: plugin worker backends"),
 }
 
 # File -> forbidden patterns: the backends its services own.
@@ -150,7 +150,7 @@ def check(files):
 
 
 def self_test():
-    legacy = "tools/boat_plugin_stage_worker.c"  # Recorded with one bridge.
+    legacy = "src/plugins/boat_plugin_stage_worker.c"  # Recorded with one bridge.
     bridge = 'EM_JS(int, f, (void), { return 1; })\n'
     cases = [  # (files, cmake text, expected problem fragment)
         ({"tools/new_feature.c": bridge}, "", "put them in a CMake-selected"),
@@ -187,7 +187,7 @@ def self_test():
                          "else()\n  target_sources(x PRIVATE tools/x.c)\nendif()\n"
                          "# Comments may name tools/x_web.c.\n"
                          "add_executable(validate_boat_plugin_stage_web tools/v.c\n"
-                         "  src/boat_plugin_stage.c src/boat_plugin_stage_web.c)\n")
+                         "  src/plugins/boat_plugin_stage.c src/plugins/boat_plugin_stage_web.c)\n")
     if clean:
         failed.append(f"clean input flagged: {clean}")
     for failure in failed:
@@ -206,7 +206,7 @@ def main():
     if args.self_test:
         return self_test()
     files = {}
-    for directory in ("src", "tools"):
+    for directory in ("src", "apps", "tests", "tools"):
         for path in sorted((args.root / directory).rglob("*.[ch]")):
             files[path.relative_to(args.root).as_posix()] = path.read_text(errors="replace")
     for path in list(LEGACY) + list(MIGRATED):

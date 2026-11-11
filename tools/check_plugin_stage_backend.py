@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Keep the common plugin staging code free of platform and JavaScript bridges.
 
-src/boat_plugin_stage.c and its public and private headers are shared by every platform, so
+src/plugins/boat_plugin_stage.c and its public and private headers are shared by every platform, so
 they must not include OS headers or name OS/JavaScript identifiers. Platform worker code lives
 only in the posix, windows and web backends, each of which may include just its own headers.
 The private backend header stays private to the common file and the three backends, and
@@ -16,10 +16,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-COMMON_FILES = ("src/boat_plugin_stage.c", "src/boat_plugin_stage.h",
-                "src/boat_plugin_stage_backend.h")
-BACKEND_FILES = ("src/boat_plugin_stage_posix.c", "src/boat_plugin_stage_windows.c",
-                 "src/boat_plugin_stage_web.c")
+COMMON_FILES = ("src/plugins/boat_plugin_stage.c", "src/plugins/boat_plugin_stage.h",
+                "src/plugins/boat_plugin_stage_backend.h")
+BACKEND_FILES = ("src/plugins/boat_plugin_stage_posix.c", "src/plugins/boat_plugin_stage_windows.c",
+                 "src/plugins/boat_plugin_stage_web.c")
 PRIVATE_HEADER = "boat_plugin_stage_backend.h"
 PRIVATE_HEADER_ALLOWED = set(COMMON_FILES[:1]) | set(BACKEND_FILES) | {
     "tools/validate_boat_plugin_stage_web.c"}
@@ -37,27 +37,27 @@ POSIX_HEADERS = ("windows.h", "io.h", "emscripten.h")
 WINDOWS_HEADERS = ("spawn.h", "unistd.h", "signal.h", "sys/wait.h", "emscripten.h")
 WEB_HEADERS = ("windows.h", "io.h", "spawn.h", "unistd.h", "signal.h")
 BACKEND_HEADERS = {
-    "src/boat_plugin_stage_posix.c": POSIX_HEADERS,
-    "src/boat_plugin_stage_windows.c": WINDOWS_HEADERS,
-    "src/boat_plugin_stage_web.c": WEB_HEADERS,
+    "src/plugins/boat_plugin_stage_posix.c": POSIX_HEADERS,
+    "src/plugins/boat_plugin_stage_windows.c": WINDOWS_HEADERS,
+    "src/plugins/boat_plugin_stage_web.c": WEB_HEADERS,
 }
 
 SELF_TEST_APPENDS = (
-    ("src/boat_plugin_stage.c", '#include <unistd.h>'),
-    ("src/boat_plugin_stage.c", '#include <sys/wait.h>'),
-    ("src/boat_plugin_stage.c", "EM_ASYNC_JS(int, f, (void), {})"),
-    ("src/boat_plugin_stage.c", "static int x = emscripten_get_now;"),
-    ("src/boat_plugin_stage.c", "static void *p = CreateProcessW;"),
-    ("src/boat_plugin_stage.c", 'static int y(void) { return system("x"); }'),
-    ("src/boat_plugin_stage.c", 'static void *q(void) { return popen("x", "r"); }'),
-    ("src/boat_plugin_stage.c", "#if defined(__linux__)\n#endif"),
-    ("src/boat_plugin_stage.c", "#ifdef __APPLE__\n#endif"),
-    ("src/boat_plugin_stage.c", "#if _MSC_VER\n#endif"),
-    ("src/boat_plugin_stage.c", "#ifdef _WIN32\n#endif"),
-    ("src/boat_plugin_stage.c", "static pid_t z;"),
-    ("src/boat_plugin_stage_posix.c", '#include <windows.h>'),
-    ("src/boat_plugin_stage_windows.c", '#include <spawn.h>'),
-    ("src/boat_plugin_stage_web.c", '#include <sys/types.h>'),
+    ("src/plugins/boat_plugin_stage.c", '#include <unistd.h>'),
+    ("src/plugins/boat_plugin_stage.c", '#include <sys/wait.h>'),
+    ("src/plugins/boat_plugin_stage.c", "EM_ASYNC_JS(int, f, (void), {})"),
+    ("src/plugins/boat_plugin_stage.c", "static int x = emscripten_get_now;"),
+    ("src/plugins/boat_plugin_stage.c", "static void *p = CreateProcessW;"),
+    ("src/plugins/boat_plugin_stage.c", 'static int y(void) { return system("x"); }'),
+    ("src/plugins/boat_plugin_stage.c", 'static void *q(void) { return popen("x", "r"); }'),
+    ("src/plugins/boat_plugin_stage.c", "#if defined(__linux__)\n#endif"),
+    ("src/plugins/boat_plugin_stage.c", "#ifdef __APPLE__\n#endif"),
+    ("src/plugins/boat_plugin_stage.c", "#if _MSC_VER\n#endif"),
+    ("src/plugins/boat_plugin_stage.c", "#ifdef _WIN32\n#endif"),
+    ("src/plugins/boat_plugin_stage.c", "static pid_t z;"),
+    ("src/plugins/boat_plugin_stage_posix.c", '#include <windows.h>'),
+    ("src/plugins/boat_plugin_stage_windows.c", '#include <spawn.h>'),
+    ("src/plugins/boat_plugin_stage_web.c", '#include <sys/types.h>'),
 )
 
 SELF_TEST_ACCEPTED = ("// waitpid _WIN32 EM_JS\n"
@@ -146,7 +146,7 @@ def check_backends(root):
             continue
         code = strip_comments(path.read_text(encoding="utf-8"))
         for number, header in includes(name, code):
-            if header in forbidden or (name == "src/boat_plugin_stage_web.c" and
+            if header in forbidden or (name == "src/plugins/boat_plugin_stage_web.c" and
                                        header.startswith("sys/")):
                 problems.append(f"{name}:{number}: backend includes foreign header <{header}>")
     return problems
@@ -154,11 +154,11 @@ def check_backends(root):
 
 def check_private_header(root):
     problems = []
-    for directory in ("src", "tools"):
+    for directory in ("src", "apps", "tests", "tools"):
         base = root / directory
         if not base.is_dir():
             continue
-        for path in sorted(base.glob("*.c")) + sorted(base.glob("*.h")):
+        for path in sorted(base.rglob("*.c")) + sorted(base.rglob("*.h")):
             if not path.is_file():
                 continue
             name = path.relative_to(root).as_posix()
@@ -229,14 +229,16 @@ def self_test(root):
                   lambda destination, name=name, snippet=snippet:
                   append_text(destination / name, snippet))
                  for name, snippet in SELF_TEST_APPENDS]
-        cases.append(("src/other.c includes the private backend header",
-                      lambda destination: (destination / "src" / "other.c").write_text(
-                          '#include "boat_plugin_stage_backend.h"\n', encoding="utf-8")))
+        cases.append(("apps/x/other.c includes the private backend header",
+                      lambda destination: (
+                          (destination / "apps" / "x").mkdir(parents=True, exist_ok=True),
+                          (destination / "apps" / "x" / "other.c").write_text(
+                              '#include "boat_plugin_stage_backend.h"\n', encoding="utf-8"))))
         cases.append(("CMakeLists.txt duplicates the posix backend",
                       lambda destination: append_text(
                           destination / "CMakeLists.txt",
                           "target_sources(proteus_plugins PRIVATE "
-                          "src/boat_plugin_stage_posix.c)")))
+                          "src/plugins/boat_plugin_stage_posix.c)")))
 
         for index, (label, plant) in enumerate(cases):
             case = Path(temporary) / f"case{index}"
@@ -248,7 +250,7 @@ def self_test(root):
 
         accepted = Path(temporary) / "accepted"
         shutil.copytree(base, accepted)
-        append_text(accepted / "src" / "boat_plugin_stage.c", SELF_TEST_ACCEPTED)
+        append_text(accepted / "src" / "plugins" / "boat_plugin_stage.c", SELF_TEST_ACCEPTED)
         problems = check(accepted)
         if problems:
             print("plugin_stage_backend self-test failed: comment or string literal was rejected",

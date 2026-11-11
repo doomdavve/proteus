@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_PLUGIN_CATALOG_H
 #define PROTEUS_BOAT_PLUGIN_CATALOG_H
 
-// PD1: the bundled package catalog. tools/boat_plugin_catalog_gen.c evaluates each package at
+// PD1: the bundled package catalog. src/plugins/boat_plugin_catalog_gen.c evaluates each package at
 // build time, runs the same validation as staging and embeds the decoded definition. Runtime
 // sessions open an entry without a Lua VM. The generated table lives in this library.
 #include "boat_plugin_revision.h"

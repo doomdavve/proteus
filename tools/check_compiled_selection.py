@@ -40,8 +40,8 @@ PRODUCTION_SOURCES = (
     'tools/boat_server.c',
     'tools/boat_bot.c',
     'tools/boat_plugin_worker.c',
-    'tools/boat_plugin_catalog_gen.c',
-    'tools/boat_plugin_stage_worker.c',
+    'src/plugins/boat_plugin_catalog_gen.c',
+    'src/plugins/boat_plugin_stage_worker.c',
 )
 
 parser = argparse.ArgumentParser(description=__doc__)

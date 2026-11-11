@@ -20,12 +20,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-DATA_FILES = ("src/boat_plugin.c", "src/boat_plugin.h", "src/boat_plugin_decode.h",
-              "src/boat_plugin_revision.h", "src/boat_plugin_race.c",
-              "src/boat_plugin_objective.h", "src/boat_plugin_objective_codec.c",
-              "src/boat_plugin_wire.c", "src/boat_plugin_wire.h")
+DATA_FILES = ("src/plugins/boat_plugin.c", "src/plugins/boat_plugin.h", "src/plugins/boat_plugin_decode.h",
+              "src/plugins/boat_plugin_revision.h", "src/plugins/boat_plugin_race.c",
+              "src/plugins/boat_plugin_objective.h", "src/plugins/boat_plugin_objective_codec.c",
+              "src/plugins/boat_plugin_wire.c", "src/plugins/boat_plugin_wire.h")
 CONSUMER_FILES = ("src/boat_sandbox_save.c", "src/boat_sandbox_save.h",
-                  "src/boat_plugin_catalog.c", "src/boat_plugin_catalog.h",
+                  "src/plugins/boat_plugin_catalog.c", "src/plugins/boat_plugin_catalog.h",
                   "tools/validate_boat_plugin_data.c")
 FILES = DATA_FILES + CONSUMER_FILES
 MACHO = sys.platform == "darwin"
@@ -72,13 +72,13 @@ EXECUTION_SYMBOLS = re.compile(
     r"posix_spawn|emscripten_")
 
 SELF_TEST_APPENDS = (
-    ("src/boat_plugin.c", '#include "boat_plugin_lua.h"'),
-    ("src/boat_plugin_wire.c", "#include <unistd.h>"),
-    ("src/boat_plugin_race.c", "static lua_State *L;"),
+    ("src/plugins/boat_plugin.c", '#include "boat_plugin_lua.h"'),
+    ("src/plugins/boat_plugin_wire.c", "#include <unistd.h>"),
+    ("src/plugins/boat_plugin_race.c", "static lua_State *L;"),
     ("src/boat_sandbox_save.c", 'static void f(void) { fopen("x", "r"); }'),
-    ("src/boat_plugin_catalog.c",
+    ("src/plugins/boat_plugin_catalog.c",
      "static void g(void) { boat_plugin_load_voyage(0, 0, 0, 0); }"),
-    ("src/boat_plugin_objective_codec.c", "#ifdef __EMSCRIPTEN__\n#endif"),
+    ("src/plugins/boat_plugin_objective_codec.c", "#ifdef __EMSCRIPTEN__\n#endif"),
 )
 
 SELF_TEST_ACCEPTED = ('// lua_State fopen\nstatic const char *s = "lua_State fopen(";')
@@ -330,8 +330,8 @@ def run_self_test(root):
             path = destination / "CMakeLists.txt"
             text = path.read_text(encoding="utf-8")
             path.write_text(
-                text.replace("src/boat_plugin_wire.h)",
-                             "src/boat_plugin_wire.h src/boat_plugin_extra.c)", 1),
+                text.replace("src/plugins/boat_plugin_wire.h)",
+                             "src/plugins/boat_plugin_wire.h src/boat_plugin_extra.c)", 1),
                 encoding="utf-8")
 
         cases.append(("CMakeLists.txt adds an extra plugin data source", add_data_source))
@@ -406,7 +406,7 @@ def run_self_test(root):
 
         accepted = Path(temporary) / "accepted"
         shutil.copytree(base, accepted)
-        append_text(accepted / "src" / "boat_plugin.c", SELF_TEST_ACCEPTED)
+        append_text(accepted / "src" / "plugins" / "boat_plugin.c", SELF_TEST_ACCEPTED)
         problems = check(accepted)
         if problems:
             print("plugin_data_boundary self-test failed: comment or string literal was "

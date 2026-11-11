@@ -60,7 +60,8 @@ set(PROTEUS_TRANSITION_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/core ${CMAKE_CURRENT_SOURCE_DIR}/src/scenery
   ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
   ${CMAKE_CURRENT_SOURCE_DIR}/src/net
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/json)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/json
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins)
 include_directories(${PROTEUS_TRANSITION_INCLUDES})
 
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -151,29 +152,29 @@ endif()
 # AR5: plugin data and codecs. Manifest parsing, descriptor decoding and checks, digests, the
 # stage wire codec and the objective checkpoint codec over caller-owned bytes; no Lua, files,
 # processes or browser bridges (plugin_data_boundary). Data-only consumers link only this.
-add_library(proteus_plugin_data STATIC src/boat_plugin.c src/boat_plugin.h
-  src/boat_plugin_decode.h src/boat_plugin_revision.h src/boat_plugin_race.c
-  src/boat_plugin_objective.h src/boat_plugin_objective_codec.c src/boat_plugin_wire.c
-  src/boat_plugin_wire.h)
+add_library(proteus_plugin_data STATIC src/plugins/boat_plugin.c src/plugins/boat_plugin.h
+  src/plugins/boat_plugin_decode.h src/plugins/boat_plugin_revision.h src/plugins/boat_plugin_race.c
+  src/plugins/boat_plugin_objective.h src/plugins/boat_plugin_objective_codec.c src/plugins/boat_plugin_wire.c
+  src/plugins/boat_plugin_wire.h)
 target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
 target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
 
 # The plugin host: restricted Lua evaluation, revisions, objective transitions, isolated
 # staging and boat_plugin_io for reading a package directory. Core and net never link it.
-add_library(proteus_plugins STATIC src/boat_plugin_load.c src/boat_plugin_load.h
-  src/boat_plugin_lua.c src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h
-  src/boat_plugin_host.c src/boat_plugin_host.h src/boat_plugin_state.c src/boat_plugin_state.h)
+add_library(proteus_plugins STATIC src/plugins/boat_plugin_load.c src/plugins/boat_plugin_load.h
+  src/plugins/boat_plugin_lua.c src/plugins/boat_plugin_lua.h src/plugins/boat_plugin_io.c src/plugins/boat_plugin_io.h
+  src/plugins/boat_plugin_host.c src/plugins/boat_plugin_host.h src/plugins/boat_plugin_state.c src/plugins/boat_plugin_state.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_plugin_data PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
-target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
-  src/boat_plugin_stage_backend.h src/boat_plugin_eval.c src/boat_plugin_eval.h)
+target_sources(proteus_plugins PRIVATE src/plugins/boat_plugin_stage.c src/plugins/boat_plugin_stage.h
+  src/plugins/boat_plugin_stage_backend.h src/plugins/boat_plugin_eval.c src/plugins/boat_plugin_eval.h)
 # AR4: one isolated-worker backend per platform behind the private boat_plugin_stage_backend.h.
 if(EMSCRIPTEN)
-  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_web.c)
+  target_sources(proteus_plugins PRIVATE src/plugins/boat_plugin_stage_web.c)
 elseif(WIN32)
-  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_windows.c)
+  target_sources(proteus_plugins PRIVATE src/plugins/boat_plugin_stage_windows.c)
 else()
-  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage_posix.c)
+  target_sources(proteus_plugins PRIVATE src/plugins/boat_plugin_stage_posix.c)
 endif()
 
 # The voyage objective transaction shared by the direct path and the local authority (L1b).
@@ -206,7 +207,7 @@ foreach(package IN LISTS BOAT_PLUGIN_CATALOG_PACKAGES)
     ${CMAKE_CURRENT_SOURCE_DIR}/${package}/plugin.json
     ${CMAKE_CURRENT_SOURCE_DIR}/${package}/main.lua)
 endforeach()
-add_executable(boat_plugin_catalog_gen tools/boat_plugin_catalog_gen.c)
+add_executable(boat_plugin_catalog_gen src/plugins/boat_plugin_catalog_gen.c)
 target_link_libraries(boat_plugin_catalog_gen PRIVATE proteus_plugins)
 target_compile_options(boat_plugin_catalog_gen PRIVATE ${PROTEUS_WARNINGS})
 if(EMSCRIPTEN)
@@ -251,7 +252,7 @@ target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file
 target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
 add_library(proteus_plugin_catalog STATIC
-  src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
+  src/plugins/boat_plugin_catalog.c src/plugins/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
 # Lookup and decode of pre-evaluated wire bytes: plugin data only, no Lua.
 target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugin_data)
 target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
@@ -1085,7 +1086,7 @@ if(NOT EMSCRIPTEN)
   # AR4: the browser backend and common staging, compiled natively against a C model of the
   # page transport; the archive's own staging objects are not pulled in.
   add_executable(validate_boat_plugin_stage_web tools/validate_boat_plugin_stage_web.c
-    src/boat_plugin_stage.c src/boat_plugin_stage_web.c)
+    src/plugins/boat_plugin_stage.c src/plugins/boat_plugin_stage_web.c)
   target_link_libraries(validate_boat_plugin_stage_web PRIVATE proteus_plugins)
   target_compile_options(validate_boat_plugin_stage_web PRIVATE ${PROTEUS_WARNINGS})
   add_test(NAME boat_plugin_stage_web COMMAND validate_boat_plugin_stage_web)
