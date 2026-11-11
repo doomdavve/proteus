@@ -185,8 +185,9 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   `ARCHITECTURE.md`. The AR2–AR6 milestone (input and capabilities, platform services and the
   objective seam, plugin worker backends, the plugin data split and the AR6 local
   authority/client pilot) merged as PR #178 (2026-11-10); played on macOS by the user, with
-  browser and Windows checks still owed. AR7 in progress: L6 and L2 (the time trial, now on the
-  wake pool) merged as PR #181 (2026-11-10); next L1 with L9.
+  browser and Windows checks still owed. AR7's ledger is implemented (PRs #181, #184, #185 and
+  L4b authoring on `arch/l4b-authoring`, 2026-11-11): every shipped solo mode, native and
+  browser, runs on the local authority; manual checks owed; next AR8.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.
