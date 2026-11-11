@@ -11,8 +11,9 @@ tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualifica
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
 L1a (voyages and tours) and L1b (authoring and objectives on the authority, L9 folded in) are
-implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); windowed native checks owed.
-**Next:** the user's windowed L1a and L1b checks, then one PR for L1 (decision L1-4).
+implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); the user approved the L1 PR on
+2026-11-11 and defers windowed checks until every L* row is done.
+**Next:** the remaining AR7 rows (L3, L4, L5, L7, L8); the user's manual checks follow them.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1053,7 +1054,8 @@ fields; F7 on a migration takes effect a frame later than on the direct path; a 
 after a commit uses the new scene and storm only once the snapshot corrects it if the client's
 prediction differed; the browser and review tools keep the direct path until L4.
 
-Owed manual checks (windowed, native): `--plugin plugins/shelter-tour` with the panel HUD, a
+Owed manual checks (windowed, native; deferred by the user on 2026-11-11 until all L* rows
+are done): `--plugin plugins/shelter-tour` with the panel HUD, a
 save that stages a migration and F7 (MIGRATION IN PROGRESS for one frame, then applied), a
 failing migration, F6 Undo, a live route edit and a live marina layout edit, the console
 promoting a running bundled voyage to authoring, and `plugin_author.py live-inspect` against a
