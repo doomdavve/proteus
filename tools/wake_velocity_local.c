@@ -29,8 +29,10 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
         wake_course_destroy(&local->course);
     }
     local->voyage_active = !local->course_active && session->voyage.route;
+    local->objective = (WakeObjectiveView) { 0 };
     if (local->voyage_active) {
         wake_voyage_init(&local->voyage, session, 0);
+        wake_voyage_objective(&local->voyage, local->revision, local->generation, session->tick);
         config.rules = wake_voyage_rules(&local->voyage);
         config.weather = wake_voyage_weather;
         config.weather_context = (void *)session->voyage.route;
@@ -52,6 +54,13 @@ static void course_sync(WakeLocal *local, BoatSession *session)
         wake_course_view(state, size, session);
     else if (state)
         wake_voyage_view(state, size, session);
+    const BoatNetObjectiveState *hud = boat_local_objective(&local->local);
+    if (local->voyage_active && state && hud
+        && wake_voyage_objective_view(state, size, &local->objective)) {
+        local->objective.valid = true;
+        local->objective.suspended = hud->suspended;
+        local->objective.hud = *hud;
+    }
     if (local->course_active)
         wake_course_take(&local->course, &session->runs);
 }
@@ -187,4 +196,5 @@ void wake_local_close(WakeLocal *local)
     boat_local_stop(&local->local);
     wake_course_destroy(&local->course);
     local->active = local->course_active = local->voyage_active = false;
+    local->voyage.objective.trace_count = 0; // The session's inspection history ends with it.
 }

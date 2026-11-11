@@ -87,6 +87,10 @@ static Pilot pilots[2];
 static bool autopilot;
 // L1: both sessions carry a voyage; every frame compares voyage state and weather.
 static bool voyaging;
+// L1b: with a revision, the direct session's objective (REFERENCE, stepped as the direct path's
+// wake_plugin_before_tick/after_tick step it) beside the authority adapter's objective.
+static const BoatPluginRevision *objective_revision;
+static WakeObjective reference;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -183,6 +187,15 @@ static BoatInput pilot_script(void *context, const Boat *predicted, uint64_t tic
 static const BoatLocalScript PILOT = { &pilots[1], pilot_script };
 
 // The game's direct free-boating branch for one frame.
+// wake_plugin_after_tick's native path over the direct session's voyage events.
+static void reference_after_tick(void)
+{
+    const BoatSession *s = &direct.session;
+    if (reference.objective.initialized
+        && wake_objective_queue(&reference, objective_revision, s->tick, &s->voyage_events))
+        wake_objective_update(&reference, objective_revision, s->tick);
+}
+
 static void direct_frame(Frame f)
 {
     if (f.paused) {
@@ -193,6 +206,8 @@ static void direct_frame(Frame f)
     unsigned ticks = boat_time_grant(&direct.accumulator, UINT_MAX);
     for (unsigned i = 0; i < ticks; ++i) {
         BoatSession *s = &direct.session;
+        if (objective_revision)
+            wake_objective_before_tick(&reference);
         if (scripted)
             demo_step(s, (int)s->tick, NULL, NULL, &direct.objects);
         else if (autopilot)
@@ -202,6 +217,8 @@ static void direct_frame(Frame f)
                 boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
                     f.thrust_target, f.steering_target),
                 NULL, NULL, &direct.objects);
+        if (objective_revision)
+            reference_after_tick();
         if (expected_count < TRACE)
             expected[expected_count++] = (Expected) { s->tick, s->boat, s->presentation,
                 boat_net_wake_digest(object_study_wakes(&direct.objects)) };
@@ -305,6 +322,61 @@ static bool same_voyage(void)
         && !memcmp(storm, &lp->client.prediction.fleet.world.water.storm, sizeof(*storm));
 }
 
+static bool same_trace(const WakeObjective *a, const WakeObjective *b)
+{
+    if (a->trace_count != b->trace_count)
+        return false;
+    for (unsigned i = 0; i < a->trace_count; ++i) {
+        const WakePluginTrace *x = &a->trace[i], *y = &b->trace[i];
+        if (x->tick != y->tick || x->revision != y->revision || x->events != y->events
+            || x->transition != y->transition || x->status != y->status || x->before != y->before
+            || x->after != y->after || x->command_count != y->command_count)
+            return false;
+    }
+    return true;
+}
+
+// L1b: the authority's objective transaction equals the direct path's.
+static bool same_objective_authority(void)
+{
+    const WakeObjective *a = &reference, *b = &game.voyage.objective;
+    if (boat_plugin_objective_digest(&a->objective) != boat_plugin_objective_digest(&b->objective)
+        || a->objective.quarantined != b->objective.quarantined
+        || a->objective_pending != b->objective_pending
+        || (a->objective_pending
+            && boat_plugin_objective_digest(&a->staged_objective)
+                != boat_plugin_objective_digest(&b->staged_objective))
+        || a->event_count != b->event_count || a->sequence != b->sequence
+        || a->generation != b->generation || !same_trace(a, b)
+        || strcmp(a->objective_diagnostic.message, b->objective_diagnostic.message))
+        return false;
+    for (unsigned i = 0; i < a->event_count; ++i)
+        if (a->events[i].tick != b->events[i].tick || a->events[i].sequence != b->events[i].sequence
+            || strcmp(a->events[i].kind, b->events[i].kind)
+            || strcmp(a->events[i].id, b->events[i].id))
+            return false;
+    return true;
+}
+
+// ... and the client's view shows its HUD, generation and suspension.
+static bool same_objective(void)
+{
+    if (!same_objective_authority())
+        return false;
+    const WakeObjective *a = &reference;
+    const WakeObjectiveView *v = &game.objective;
+    const BoatPluginObjective *o = &a->objective;
+    if (!v->valid || v->generation != a->generation || v->suspended != o->quarantined
+        || v->hud.row_count != o->hud_count
+        || strcmp(v->message, o->quarantined ? a->objective_diagnostic.message : ""))
+        return false;
+    for (unsigned i = 0; i < o->hud_count; ++i)
+        if (strcmp(v->hud.rows[i].id, o->hud[i].id) || strcmp(v->hud.rows[i].label, o->hud[i].label)
+            || v->hud.rows[i].value != o->hud[i].value)
+            return false;
+    return true;
+}
+
 // Run FRAMES of SCRIPT through both paths; compare at every tick and after every frame.
 static int drive(Script script, unsigned frames)
 {
@@ -341,6 +413,8 @@ static int drive(Script script, unsigned frames)
         CHECK(same_authority());
         if (voyaging)
             CHECK(same_voyage());
+        if (objective_revision)
+            CHECK(same_objective());
         if (autopilot) {
             CHECK(same_course());
             // The frame's storage service: both flush (an empty best path fails the save).
@@ -1186,8 +1260,17 @@ static int open_voyage(World w, bool ordered)
     voyage_open(&direct);
     voyage_open(&play);
     voyaging = true;
+    game.revision = objective_revision;
+    game.generation = 1;
+    if (objective_revision) {
+        memset(&reference, 0, sizeof(reference));
+        if (wake_objective_clear(&reference, objective_revision, 0))
+            wake_objective_init(&reference, objective_revision, 0);
+    }
     CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
     CHECK(game.voyage_active && !game.course_active && same_authority() && same_voyage());
+    // The client's view arrives with the first frame's state.
+    CHECK(!objective_revision || same_objective_authority());
     // The straight line ahead is open water as far as the destination.
     for (float d = 0; d <= 320; d += 5) {
         Vector2 at = Vector2Add(test_route.shelters[0].position,
@@ -1219,6 +1302,8 @@ static Frame ahead_8x(unsigned n)
 static int recover_both(void)
 {
     boat_session_recover(&direct.session);
+    if (objective_revision)
+        reference_after_tick();
     direct.accumulator = 0;
     uint64_t recoveries = lp->server.stats.recoveries;
     CHECK(wake_local_recover(&game, &play.session, &play.objects));
@@ -1286,6 +1371,107 @@ static int tour_trace(void)
         return 1;
     CHECK(play.session.voyage.shelter == 1 && lp->generation == 2);
     return clean_commands();
+}
+
+// L1b: a voyage revision over the test route whose objective counts the voyage's events in its
+// HUD and re-arms a timer; FAILING raises an error at the first weather event instead.
+static BoatPluginRevision objective_test_revision;
+
+static const BoatPluginRevision *objective_test(bool failing)
+{
+    BoatPluginRevision *r = &objective_test_revision;
+    memset(r, 0, sizeof(*r));
+    r->number = 1;
+    r->manifest
+        = (BoatPluginManifest) { .api = 1, .state_version = 1, .objective = true, .timers = true };
+    snprintf(r->manifest.kind, sizeof(r->manifest.kind), "voyage");
+    r->voyage.manifest = r->manifest;
+    static const char *const ids[] = { "start", "ahead", "near_storm", "end" };
+    for (unsigned i = 0; i < 4; ++i)
+        snprintf(r->voyage.shelter_ids[i], sizeof(r->voyage.shelter_ids[i]), "%s", ids[i]);
+    int n = snprintf(r->source, sizeof(r->source),
+        "local function hud(c, s)\n"
+        "  return {{kind='hud.set', generation=c.generation, id='reached', label='REACHED',"
+        " value=s.reached},\n"
+        "    {kind='hud.set', generation=c.generation, id='recovered', label='RECOVERED',"
+        " value=s.recovered},\n"
+        "    {kind='hud.set', generation=c.generation, id='timer', label='TIMER', value=s.fired}}\n"
+        "end\n"
+        "local function arm(c, commands)\n"
+        "  commands[#commands + 1] = {kind='timer.set', generation=c.generation, id='tick',"
+        " tick=c.tick + 300}\n"
+        "  return commands\n"
+        "end\n"
+        "return {\n"
+        "  init = function(c)\n"
+        "    local s = {reached=0, recovered=0, fired=0}\n"
+        "    return s, arm(c, hud(c, s))\n"
+        "  end,\n"
+        "  update = function(c, s)\n"
+        "    for _, e in ipairs(c.events) do\n"
+        "      if e.kind == 'voyage.shelter_reached' then s.reached = s.reached + 1 end\n"
+        "      if e.kind == 'voyage.recovered' then s.recovered = s.recovered + 1 end\n"
+        "      if %s and e.kind == 'voyage.weather' then error('storm in the objective') end\n"
+        "    end\n"
+        "    s.fired = s.fired + #c.timers\n"
+        "    local commands = hud(c, s)\n"
+        "    if #c.timers > 0 then arm(c, commands) end\n"
+        "    return s, commands\n"
+        "  end\n"
+        "}\n",
+        failing ? "true" : "false");
+    r->source_size = (size_t)n;
+    return r;
+}
+
+// Equal objective transactions from the same commands: the objective's checkpoint, queue,
+// staged batch, generation and trace on the authority equal the direct path's after every frame
+// through a shelter, the weather, a recovery and arrival, and again after a restart (a new
+// generation); the client shows its HUD.
+static int objective_trace(void)
+{
+    objective_revision = objective_test(false);
+    int failed = open_voyage(OUTER, false) || voyage_until(ahead, past_ahead, 2000)
+        || voyage_until(ahead, weather_begun, 2000) || voyage_until(ahead, exposed, 2000)
+        || recover_both() || voyage_until(ahead_8x, arrived, 4000) || drive(ahead, 30);
+    if (!failed) {
+        CHECK(game.objective.hud.row_count == 3 && game.objective.hud.rows[1].value == 1);
+        CHECK(game.objective.hud.rows[0].value >= 1 && game.objective.hud.rows[2].value >= 1);
+        CHECK(reference.trace_count > 4 && !reference.objective.quarantined);
+        // A restart: both start the objective over as generation 2.
+        play_restart(&direct);
+        play_restart(&play);
+        if (wake_objective_clear(&reference, objective_revision, 0))
+            wake_objective_init(&reference, objective_revision, 0);
+        game.generation = 2;
+        CHECK(wake_local_restart(&game, &play.session, &play.objects, now));
+        CHECK(same_objective_authority());
+        failed = voyage_until(ahead, past_ahead, 2000) || drive(ahead, 30);
+        CHECK(!failed && game.objective.generation == 2 && game.objective.hud.rows[0].value == 1);
+    }
+    printf("objective: %u trace entries, HUD reached %lld, recovered %lld, timer %lld\n",
+        reference.trace_count, (long long)game.objective.hud.rows[0].value,
+        (long long)game.objective.hud.rows[1].value, (long long)game.objective.hud.rows[2].value);
+    objective_revision = NULL;
+    game.revision = NULL;
+    return failed;
+}
+
+// A failing callback quarantines the objective on both paths at the same boundary; the voyage
+// keeps running and the client shows the suspension and its text.
+static int objective_quarantine(void)
+{
+    objective_revision = objective_test(true);
+    int failed
+        = open_voyage(OUTER, false) || voyage_until(ahead, weather_begun, 2000) || drive(ahead, 30);
+    if (!failed) {
+        CHECK(reference.objective.quarantined && game.objective.suspended);
+        CHECK(strstr(game.objective.message, "storm in the objective"));
+        failed = voyage_until(ahead_8x, arrived, 4000);
+    }
+    objective_revision = NULL;
+    game.revision = NULL;
+    return failed;
 }
 
 // The voyage codec round-trips and rejects malformed bytes; the recover request is private.
@@ -1442,6 +1628,8 @@ int main(int argc, char **argv)
         TEST_CASE(private_state_rejected),
         SLOW_CASE(voyage_trace),
         SLOW_CASE(tour_trace),
+        SLOW_CASE(objective_trace),
+        SLOW_CASE(objective_quarantine),
         TEST_CASE(voyage_state),
         TEST_CASE(recover_ignored),
     };

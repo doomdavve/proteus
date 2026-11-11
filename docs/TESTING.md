@@ -793,7 +793,14 @@ straight ahead at full throttle: `voyage_trace` (1x with 0.1 s frames past the s
 weather's start and exposed water, a recovery between frames back to the shelter, then 8x to
 arrival: voyage state, the client's and authority's storm and every predicted tick equal the
 direct session's) and `tour_trace` (the same stops as an ordered tour at 8x, a restart that keeps
-no voyage progress, then a recovery), both slow; `voyage_state` (the voyage codec, its weather
+no voyage progress, then a recovery), both slow; the L1b objective cases on the same route with
+a test revision whose objective counts shelters, recoveries and a re-armed timer in its HUD:
+`objective_trace` (the voyage_trace drive, then a restart as generation 2: the authority's
+checkpoint, queue, staged batch, generation, diagnostic and trace equal the direct path's
+objective after every frame, and the client's view shows its HUD, generation and suspension) and
+`objective_quarantine` (an update that raises at the weather event quarantines both at the same
+boundary; the client shows the suspension and its text, and the voyage still arrives), both
+slow; `voyage_state` (the voyage codec, its weather
 reader and the PrivateRecover message, which the v14 and input decoders reject); and
 `recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
 next snapshot corrects the client; a client refuses a request for another tick). Each

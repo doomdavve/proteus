@@ -447,7 +447,8 @@ if(NOT EMSCRIPTEN)
     tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
     tools/wake_velocity_voyage.h)
   target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
-  target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net)
+  target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
+    proteus_wake_objective)
   target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
   find_package(CURL REQUIRED)

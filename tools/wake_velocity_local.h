@@ -21,6 +21,12 @@ typedef struct {
     // L1: a voyage or tour (the session has a voyage route) runs its voyage on the authority.
     bool voyage_active;
     WakeVoyageAuthority voyage;
+    // L1b: the active plugin revision whose objective the authority runs (borrowed; NULL for
+    // none) and the generation the next open or restart starts it as. Set by the game.
+    const BoatPluginRevision *revision;
+    unsigned generation;
+    // L1b: the client's view of the authority's objective after each frame.
+    WakeObjectiveView objective;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
     void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
     void *traced_context;

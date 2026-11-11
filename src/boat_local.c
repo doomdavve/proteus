@@ -228,3 +228,8 @@ const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *
     *tick = c->private_state_tick;
     return c->private_state_size ? c->private_state : NULL;
 }
+
+const BoatNetObjectiveState *boat_local_objective(const BoatLocal *local)
+{
+    return local->client.objective_valid ? &local->client.objective : NULL;
+}
