@@ -210,7 +210,7 @@ def verify(root, args, commit):
         raise RuntimeError(f'Unexpected running release: {health}')
     directory = json.loads(run('curl', '-fsS', '--max-time', '30', HOSTED + 'servers.json'))
     protocol = int(re.search(r'#define BOAT_NET_VERSION (\d+)',
-                            (root / 'src/boat_net_protocol.h').read_text())[1])
+                            (root / 'src/net/boat_net_protocol.h').read_text())[1])
     physics = int(re.search(r'#define BOAT_PHYSICS_REVISION (\d+)',
                            (root / 'src/core/boat.h').read_text())[1])
     room = next((s for s in directory['servers'] if s['name'] == 'Winterfell'), None)

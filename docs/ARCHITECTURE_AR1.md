@@ -69,12 +69,12 @@ stage calls the opposite endpoint, so delivery is never reentrant.
    of 12 (the objective cadence) or at the end of the grant. Per chunk, in this order:
    1. **Client intake:** produce the chunk's commands, addressed to authority ticks
       `N+1 .. N+k` (`k <= 12`), recomputing target-derived rates per tick from the predicted
-      boat as the net client does (`src/boat_net_client.c:723-788`); record them in prediction;
+      boat as the net client does (`src/net/boat_net_client.c:723-788`); record them in prediction;
       send. A chunk therefore stays within the 12 commands one batch repeats
-      (`src/boat_net_protocol.h:29`), the authority's 24-tick future window
-      (`src/boat_net_protocol.h:30`, `src/boat_net_server.c:418`) and prediction's 32-tick lead
-      (`src/boat_prediction.h:11`). The client normally sends a batch only every
-      `input_ticks` commands (2, `src/boat_net_protocol.h:28`, `src/boat_net_client.c:780`), so
+      (`src/net/boat_net_protocol.h:29`), the authority's 24-tick future window
+      (`src/net/boat_net_protocol.h:30`, `src/net/boat_net_server.c:418`) and prediction's 32-tick lead
+      (`src/net/boat_prediction.h:11`). The client normally sends a batch only every
+      `input_ticks` commands (2, `src/net/boat_net_protocol.h:28`, `src/net/boat_net_client.c:780`), so
       an odd chunk would hold back its last command and the authority would repeat the previous
       one. **Private mode flushes one batch at every chunk end**, carrying the chunk's
       commands (≤ 12, one packet). Chosen over `input_ticks = 1` because it sends one message
@@ -86,7 +86,7 @@ stage calls the opposite endpoint, so delivery is never reentrant.
       An objective dispatched at the chunk's last tick T in the browser stops the grant there
       and the remainder is discarded, as the frame loop does today
       (`tools/wake_velocity.c:2107-2110`). No command past T was sent, so none has to be
-      withdrawn (received commands are immutable, `src/boat_net_server.c:421-424`).
+      withdrawn (received commands are immutable, `src/net/boat_net_server.c:421-424`).
    3. **Client service:** handle at most 128 messages: snapshots/state, births, objective and
       private state; reconcile prediction once. This advances the mirror so the next chunk's
       prediction stays inside its lead cap.
@@ -123,15 +123,15 @@ version stay v14. Candidates, each tied to its ledger row:
 | Handling class per slot | Fleet steps every slot with `boat_step` (`src/core/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/boat_session.c:148-149`). |
 | Current and crossing water | Rooms use calm water without them (`tools/wake_velocity.c:365-371`). |
 | Restart session (new generation) | SpawnRequest respawns one boat; solo reset sets the tick back to 0 (`src/boat_session.c:20`) and restarts water and wakes. See [restart](#restart-and-session-generations). |
-| Full-precision commands | v14 rates are `int8` ×127 (`src/boat_net_protocol.h:141`, `src/boat_net_protocol.c:1109-1121`); see D4 and the hosted-path risk below. |
+| Full-precision commands | v14 rates are `int8` ×127 (`src/net/boat_net_protocol.h:141`, `src/net/boat_net_protocol.c:1109-1121`); see D4 and the hosted-path risk below. |
 | Voyage state and recover | Route, shelter, exposure, weather and voyage events are session-only. |
 | Course state and run results | Gates, elapsed, splits, finish and practice are session-only; race state is the room race. |
 | Work commands and state | Crane axes per tick, hook/lash/moor/recover/view/aim/brake/return-crate actions; crane, crate, site, lighting, notice and job HUD state. |
 | Storage acks surfaced to the client | SAVED mark, best-saved and save-failure notices. |
 
 **Hosted-path risk.** Full precision is more than a message range: the server's command ring
-and missing-input policy (`src/boat_net_server.c:425`) and the prediction history
-(`src/boat_prediction.h:45`, `:53`) store `int8` `BoatNetCommand` values, and handling class
+and missing-input policy (`src/net/boat_net_server.c:425`) and the prediction history
+(`src/net/boat_prediction.h:45`, `:53`) store `int8` `BoatNetCommand` values, and handling class
 and current/crossing water need fleet/core changes that prediction also runs. These touch code
 hosted rooms use, so L0 gates include the net golden bytes and the net regression suite.
 
@@ -145,7 +145,7 @@ product work with a protocol version change.
 ### Restart and session generations
 
 Net code assumes ticks only increase within a session: the checkpoint install rule
-(`src/boat_net_client.c:188`), the finalized-tick checks (`src/boat_net_server.c:410-418`) and
+(`src/net/boat_net_client.c:188`), the finalized-tick checks (`src/net/boat_net_server.c:410-418`) and
 the tick-indexed input ring. **Selected: a restart recreates both endpoints** (new authority at
 tick 0 with a new epoch, new client, fresh transport pair), rather than keeping ticks increasing
 with an offset. Tick 0 keeps today's water phase and trace, so restart traces stay comparable
@@ -186,7 +186,7 @@ solo without client prediction.
 
 | Option | Ownership and synchronization | Queues, backpressure, fairness | Latency and cadence | Late results | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| **T1 in-process, single thread, queued** | Separate authority and client structs, one owner each; no locks. | Memory transport, 256 messages per direction (`src/boat_net_transport.h:65`); unreliable overflow drops, reliable overflow disconnects (treated as endpoint failure, not silent). Fixed order per chunk: client intake (≤ 12 commands) → authority (≤ 12 ticks, ≤ 128 messages) → client (≤ 128 messages); at most 9 chunks per frame (8 when the grant starts on a cadence boundary). | Same frame as solo; one snapshot per 4 ticks, births per 12. | Commands for finalized ticks rejected (firm, unchanged); explicit addressing makes them a test failure, not an expected path. Stale snapshots ignored; superseded storage acks ignored by identity. | **Selected.** Proxy measurement below. |
+| **T1 in-process, single thread, queued** | Separate authority and client structs, one owner each; no locks. | Memory transport, 256 messages per direction (`src/net/boat_net_transport.h:65`); unreliable overflow drops, reliable overflow disconnects (treated as endpoint failure, not silent). Fixed order per chunk: client intake (≤ 12 commands) → authority (≤ 12 ticks, ≤ 128 messages) → client (≤ 128 messages); at most 9 chunks per frame (8 when the grant starts on a cadence boundary). | Same frame as solo; one snapshot per 4 ticks, births per 12. | Commands for finalized ticks rejected (firm, unchanged); explicit addressing makes them a test failure, not an expected path. Stale snapshots ignored; superseded storage acks ignored by identity. | **Selected.** Proxy measurement below. |
 | T2 authority thread | Needs SPSC queues, atomics, join on shutdown and a rule for capture while ticking; raylib stays on the client thread. | As T1 plus cross-thread wakeups. | Overlaps rendering; adds a hand-off per frame. | As T1. | Not needed at the proxy-measured cost; browser would need Wasm threads, which the web build does not enable. Reopen only with a measured frame-budget miss. |
 | T3 child process (existing `--host`) | Process isolation; ENet loopback. | ENet queues. | Elapsed-time server: no pause or scaling. | Server policies. | Kept for hosted rooms only; violates private pause/scaling. |
 | T4 browser authority Worker | Separate Wasm with its own world resources and lifecycle. | `postMessage` queues to bound. | At least one event-loop hop per exchange. | Needs deadlines/epochs. | Deferred (section 7). |
@@ -216,9 +216,9 @@ any hardware. AR6 measures the selected scheme on named hardware, including `G =
 
 Today the server derives due ticks from elapsed `now`, runs at most 8 per service call and
 flags overload after a backlog above 60 ticks lasts over a second
-(`src/boat_net_server.c:945-981`); input and spawn token buckets refill from elapsed `now`
+(`src/net/boat_net_server.c:945-981`); input and spawn token buckets refill from elapsed `now`
 (`:440-447`); peer liveness uses `now` (`:953-964`). The client paces commands from `now`
-(`src/boat_net_client.c:866-872`) and targets `floor(now × 120 + offset) + lead` (`:757`); its
+(`src/net/boat_net_client.c:866-872`) and targets `floor(now × 120 + offset) + lead` (`:757`); its
 snapshot-stall resync fires after 1 s of elapsed time (`:846-856`).
 
 **Selected: a private schedule mode for both endpoints.** Policies split by clock:
@@ -228,10 +228,10 @@ snapshot-stall resync fires after 1 s of elapsed time (`:846-856`).
 | Ticks to run | Due from elapsed `now`, ≤ 8 per call, overload flag | Exactly the host grant `G` (≤ 96 per frame) in chunks of ≤ 12; no backlog, so no overload flag; frame-work measurement replaces it |
 | Command tick addressing | `now`, offset and lead | The chunk's ticks; no lead |
 | Input rate limit | 120 packets/s from elapsed time | Refill per granted tick (same 1× rate), so 8× is not rate-limited |
-| Snapshot-stall resync | 1 s elapsed without a snapshot (`src/boat_net_client.c:846-847`) | Granted ticks past the last snapshot cadence, so pauses never resync |
-| Snapshot-silence close | 10 s elapsed without an applied state (`src/boat_net_client.c:826`) | Disabled in-process; a missing state after granted ticks is the stall resync above, and repeated failure is an endpoint failure (D10) |
-| Wake-mismatch resync | Digest mismatch older than 1 s (`src/boat_net_client.c:843`) | Mismatch older than 120 granted ticks |
-| Prediction hold for missing births | 0.1 s (`src/boat_net_client.c:860`, `BOAT_NET_HOLD_INCOMPLETE`) | 12 granted ticks (one birth batch) |
+| Snapshot-stall resync | 1 s elapsed without a snapshot (`src/net/boat_net_client.c:846-847`) | Granted ticks past the last snapshot cadence, so pauses never resync |
+| Snapshot-silence close | 10 s elapsed without an applied state (`src/net/boat_net_client.c:826`) | Disabled in-process; a missing state after granted ticks is the stall resync above, and repeated failure is an endpoint failure (D10) |
+| Wake-mismatch resync | Digest mismatch older than 1 s (`src/net/boat_net_client.c:843`) | Mismatch older than 120 granted ticks |
+| Prediction hold for missing births | 0.1 s (`src/net/boat_net_client.c:860`, `BOAT_NET_HOLD_INCOMPLETE`) | 12 granted ticks (one birth batch) |
 | Peer liveness, handshake | 5 s / 10 s elapsed | Disabled: both endpoints are serviced by the same host frame; failure is an explicit endpoint result. Startup has a bounded failure deadline on the elapsed clock. |
 | Ping/RTT, resync and reset rate limits, objective-worker deadline, save attempts | Elapsed | Elapsed (operational, rule 5) |
 
@@ -240,12 +240,12 @@ menu/help/focus pause and replay grant 0; ¼×–8× scaling, the 0.1 s clamp an
 from the same functions; the work session's over-1 s suspension rule is its grant function;
 browser suspension resumes through the same clamp. Hosted rooms keep running when a client
 pauses: its commands carry the inactive flag and the authority eases that boat's controls to
-neutral (`src/boat_net_server.c:632`).
+neutral (`src/net/boat_net_server.c:632`).
 
 Total work per host frame is bounded by `G`, the 128-message caps and one correction replay
-(≤ 32 ticks, `src/boat_prediction.h:10-12`), plus the AR0-recorded unbounded-wall-time gaps
+(≤ 32 ticks, `src/net/boat_prediction.h:10-12`), plus the AR0-recorded unbounded-wall-time gaps
 (objective callbacks, file I/O) that remain with AR3/AR5. `tick_limit`
-(`src/boat_net_server.h:144`) is precedent for an externally bounded tick count, not the
+(`src/net/boat_net_server.h:144`) is precedent for an externally bounded tick count, not the
 mechanism.
 
 Rejected: scaled or frozen `now` (trips catch-up/overload at 8×, scales timeouts and rate

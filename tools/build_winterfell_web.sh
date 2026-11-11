@@ -42,7 +42,7 @@ source, output, commit = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 def constant(file, name):
     return int(re.search(r'^#define ' + name + r' (\d+)$', (source / file).read_text(), re.M)[1])
 metadata = {'commit': commit,
-            'protocol': constant('src/boat_net_protocol.h', 'BOAT_NET_VERSION'),
+            'protocol': constant('src/net/boat_net_protocol.h', 'BOAT_NET_VERSION'),
             'physics': constant('src/core/boat.h', 'BOAT_PHYSICS_REVISION')}
 (output / 'deployment.json').write_text(json.dumps(metadata, indent=2) + '\n')
 PY

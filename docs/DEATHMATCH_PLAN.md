@@ -401,13 +401,13 @@ pending credit to them is dropped. Ties share first place.
   filled from the solver's accumulated impulses; physics never reads it.
 - `src/core/boat_wake_objects.[ch]`: read-only `boat_wake_objects_query_emitter`, the ordinary
   evaluation restricted to one emitter's 32 slots.
-- `src/boat_net_server.[ch]`: room mode and rules in `BoatNetServerConfig`, a `BoatMatch`
+- `src/net/boat_net_server.[ch]`: room mode and rules in `BoatNetServerConfig`, a `BoatMatch`
   beside the fleet, automatic respawns and bailouts through the spawn request handler.
 - Protocol v2 ([protocol](MULTIPLAYER_PROTOCOL.md)): reliable control messages
   `MATCH_STATE` (mode, phase, phase end tick, round, per-slot rows; also sent during bootstrap
   for join-in-progress) and `MATCH_EVENT` (tick, kind, victim, victim life, attacker, cause),
   with golden, round-trip, truncation and invalid-field fixtures.
-- `src/boat_net_client.[ch]`: latest match state and a six-entry event ring.
+- `src/net/boat_net_client.[ch]`: latest match state and a six-entry event ring.
 - `tools/wake_velocity.c`, `src/render/boat_hud.c`: in deathmatch only, round timer and own score, a
   four-line kill feed (5 s per entry, roster names), a Tab-held scoreboard also shown during
   intermission, and `CAPSIZED BY <name> / RESPAWN n`. Free mode HUD unchanged.

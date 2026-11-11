@@ -815,7 +815,7 @@ scripted drives, time trials and voyages) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
 glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
-with the arcade wake pool) beside a private local session (`src/boat_local.c`: one authority and
+with the arcade wake pool) beside a private local session (`src/net/boat_local.c`: one authority and
 one predicting client over the memory transport, driven by host grants) fed the same scripted
 frames through the glue, and requires bit-identical boats, presentations and wake pools at every
 predicted tick and at each frame's authority tick. Cases: `basin_1x`, `basin_quarter`, `basin_8x`, `outer_1x` and `outer_8x`
@@ -1041,7 +1041,7 @@ Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `CMakeLis
 Presentation, GPU, session/replay and the wake_velocity drive/profile code live in the
 `proteus_render`, `proteus_gpu`, `proteus_boat_session` and `proteus_boat_drive` libraries.
 Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES` and
-obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
+obey the same rules (`boat_net_boundary`); only `src/net/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 
 The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-free data library
@@ -1058,7 +1058,7 @@ archives or allowlisted libc/libm/raymath symbols.
 entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or
 `proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
 or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
-for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).
+for the server directory and plugin manifests lives in `proteus_json` (`src/json/boat_json.c`).
 
 ## Long-session clock gate
 

@@ -707,7 +707,7 @@ played the fleet crossing rival on 2026-10-23. Details, deviations and evidence 
 
 ### M3 — protocol, transport and process boundary
 
-Depends on M2. Likely new `src/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
+Depends on M2. Likely new `src/net/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
 `boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `tools/boat_server.c`,
 `tools/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
 warnings. Implement handshake/version rejection, bounded queues, input/snapshot/control codec,
@@ -1296,7 +1296,7 @@ Started from `c547f92` (M3 committed). The untracked `docs/TITLE_SCREEN_PLAN.md`
 | --- | --- | --- | --- |
 | `boat_prediction` speculative fleet with own-command history, correction and replay; predicting `BoatNetClient`; `wake_velocity --connect` draws the predicted fleet with blended corrections | `boat_net` (replay exactness, three predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | 2026-10-24: the user drove `wake_velocity --connect` beside `boat_bot`, interacting with its wakes: "Works really well!" |
 
-**Module.** `src/boat_prediction.[ch]` is in `proteus_boat_net` and obeys the core boundary. A
+**Module.** `src/net/boat_prediction.[ch]` is in `proteus_boat_net` and obeys the core boundary. A
 `BoatPrediction` holds a speculative `BoatFleet` (its tick is the predicted tick), the own
 commands of the last 240 ticks keyed by tick and life, and the rates the authority last used
 for each remote slot. `boat_prediction_advance` steps it toward the newest command's target
@@ -1439,7 +1439,7 @@ Started from `55c1ce1`. The title-screen row in `docs/README.md` and the untrack
 | --- | --- | --- | --- |
 | `boat_remote_view` snapshot history, interpolation/extrapolation and proximity blend; `wake_velocity --connect` draws the other boat with it | `boat_net` (`remote_view` fixture, gated predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
 
-**Module.** `src/boat_remote_view.[ch]` is in `proteus_boat_net` (core boundary). The client keeps
+**Module.** `src/net/boat_remote_view.[ch]` is in `proteus_boat_net` (core boundary). The client keeps
 the last 16 authoritative snapshots' slots (`BoatNetClient.remotes`, about 0.5 s) and exposes
 `boat_net_client_server_tick()`. `boat_remote_history_pose` returns a slot's pose at a fractional
 tick: interpolated between the bracketing snapshots (heading the short way round, pitch and roll

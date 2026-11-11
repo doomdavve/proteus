@@ -471,7 +471,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
 
 **Edit:** `src/core/boat_world.[ch]`, `src/boat_session.[ch]`, `src/core/boat.c`,
 `src/core/boat_fleet.[ch]`, affected prediction/net client/server initialization,
-`src/boat_net_protocol.c`, `tools/wake_velocity*.c`, server/bot/review tools and validators.
+`src/net/boat_net_protocol.c`, `tools/wake_velocity*.c`, server/bot/review tools and validators.
 Use A0.1's caller inventory; these are entry points, not an exhaustive filename list.
 
 1. Introduce the resource owner above and bind its read-only map to each `BoatWorld`.

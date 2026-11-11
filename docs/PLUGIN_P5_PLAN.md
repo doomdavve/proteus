@@ -63,10 +63,10 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 - **Rooms.** `BoatRoomDefinition` (`src/core/boat_room_definition.h:32`) carries mode, location, course,
   rules and an optional scene; modes are free, deathmatch and race. `boat_room_package_load`
   (`tools/boat_room_package.h:20`) builds it on the authority. The server observes match or race
-  rules after each fleet step (`src/boat_net_server.c`).
+  rules after each fleet step (`src/net/boat_net_server.c`).
 - **Boundaries.** `proteus_boat_net` may not link Lua or the plugin host (`CMakeLists.txt`);
   `tools/boat_server.c` links `proteus_plugins` and can.
-- **Wire.** Protocol v12 before P5c, v13 after it (`src/boat_net_protocol.h`), message types up to
+- **Wire.** Protocol v12 before P5c, v13 after it (`src/net/boat_net_protocol.h`), message types up to
   `BOAT_NET_DEFINITION_END` (24); reliable control channel for match and race state.
 
 ## Design
@@ -190,7 +190,7 @@ The rules adapter in `BoatNetServerConfig`, called from the server tick; its imp
 `tools/boat_server.c` over `BoatPluginObjective`; join/leave events; quarantine.
 `boat_room_package_load` accepts the hunt package for free rooms (marks stay server-side until
 v13). `boat_server --scripted --package outer-hunt` drives scripted boats and prints the HUD.
-Files: `src/boat_net_server.[ch]`, `tools/boat_server.c`, `tools/boat_room_package.[ch]`.
+Files: `src/net/boat_net_server.[ch]`, `tools/boat_server.c`, `tools/boat_room_package.[ch]`.
 Tests: scripted one- and two-crew hunts produce the expected HUD per tick; an injected script
 error quarantines the objective while boats keep moving; join/leave rows appear and disappear;
 `proteus_boat_net` still links no Lua.
@@ -214,8 +214,8 @@ on leave; full suite results are in the PR.
 
 Room definition v4 with marks; ObjectiveState; version bump; client stores the HUD; `boat_bot`
 prints it.
-Files: `src/boat_net_protocol.[ch]`, `src/core/boat_room_definition.[ch]`, `src/boat_net_server.c`,
-`src/boat_net_client.[ch]`, `tools/boat_bot.c`, `tools/validate_boat_net.c`,
+Files: `src/net/boat_net_protocol.[ch]`, `src/core/boat_room_definition.[ch]`, `src/net/boat_net_server.c`,
+`src/net/boat_net_client.[ch]`, `tools/boat_bot.c`, `tools/validate_boat_net.c`,
 `docs/MULTIPLAYER_PROTOCOL.md` (v13).
 Tests: golden bytes and round trips; every truncation; v12 Hello rejected; definition and
 message sizes within the budget; on the memory transport two bots hunt and both see identical
@@ -322,8 +322,8 @@ within about a second and keep their counts.
 
 RevisionBegin/Page/End, RevisionReady, the commit tick and the `REVISION` leave reason, in all
 modes, committing at round boundaries (race, deathmatch) or empty free rooms.
-Files: `src/boat_net_protocol.[ch]`, `src/boat_net_server.c`, `src/boat_net_client.c`,
-`src/boat_prediction.c`, `tools/boat_server.c`, `docs/MULTIPLAYER_PROTOCOL.md` (v14).
+Files: `src/net/boat_net_protocol.[ch]`, `src/net/boat_net_server.c`, `src/net/boat_net_client.c`,
+`src/net/boat_prediction.c`, `tools/boat_server.c`, `docs/MULTIPLAYER_PROTOCOL.md` (v14).
 Tests: success; a joiner mid-download; a missing readiness disconnects only that client; an
 invalid candidate keeps the running revision; duplicate and stale announcements; a commit exactly
 on a round boundary; prediction history never crosses a commit.

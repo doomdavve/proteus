@@ -1,4 +1,4 @@
-/* AR6 (ledger L0) gates for the private local session (src/boat_local.[ch]): the authority and
+/* AR6 (ledger L0) gates for the private local session (src/net/boat_local.[ch]): the authority and
  * client in one process over the memory transport, driven by host grants. Every scenario runs the
  * game's direct free-boating path (BoatSession stepped by timed_boat_step with the arcade wake
  * pool) beside a local session fed the same frames, and requires bit-identical boats and wake

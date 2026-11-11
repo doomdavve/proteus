@@ -625,14 +625,14 @@ evaluated by the authority and sent as data. A client with no knowledge of an ed
 join and predict it bit for bit. Protocol v9. Scenes remain compiled until PD3.
 
 Read first: [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md) (handshake, world checkpoint, version
-rules), `src/boat_net_protocol.[ch]`, `src/boat_net_server.[ch]`, `src/boat_net_client.[ch]`,
-`src/boat_prediction.[ch]`, `tools/boat_server.c`, `tools/boat_bot.c`, `tools/wake_velocity_net.c`,
+rules), `src/net/boat_net_protocol.[ch]`, `src/net/boat_net_server.[ch]`, `src/net/boat_net_client.[ch]`,
+`src/net/boat_prediction.[ch]`, `tools/boat_server.c`, `tools/boat_bot.c`, `tools/wake_velocity_net.c`,
 `tools/wake_velocity_host.c`, and [ROOM_CONTENT_PLAN.md](ROOM_CONTENT_PLAN.md).
 
 Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server.c:421` and `:699`,
-`boat_net_race_bind` (`src/boat_net_protocol.c:1494`), `tools/wake_velocity_net.c:574`,
+`boat_net_race_bind` (`src/net/boat_net_protocol.c:1494`), `tools/wake_velocity_net.c:574`,
 `src/render/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
-`src/boat_net_protocol.c:1086`.
+`src/net/boat_net_protocol.c:1086`.
 
 ### Settled from the source, 2026-10-31
 
@@ -782,7 +782,7 @@ enough until the HOST row and room console arrive.
 machine, and a room can move to a new package revision between rounds. Physical harbor data leaves
 the handshake digest.
 
-Read first: `src/core/boat_world.[ch]`, `src/core/boat_fleet.[ch]`, `src/boat_prediction.[ch]`,
+Read first: `src/core/boat_world.[ch]`, `src/core/boat_fleet.[ch]`, `src/net/boat_prediction.[ch]`,
 `src/core/boat_scene_definition.[ch]`, `src/core/waterfront_harbor.[ch]`, `src/core/waterfront_traffic.[ch]`,
 the [scene contract](PLUGIN_API.md#location-life-scene-contract-planned-l11) and
 [multiplayer prediction contract](PLUGIN_PLAN.md#multiplayer-prediction-and-recording).
@@ -795,7 +795,7 @@ Checked on `4e11c2a`, which narrows the risk:
 - **Where the pointer must be bound.** Hull and projectile contacts (`src/core/boat.c:123`, `:183`,
   `src/core/boat_combat.c:279`) read `world->scene`. `boat_fleet_world` and `boat_prediction_reset` copy the
   fleet's world by value, so they carry the pointer. The sites to change are `boat_net_server_init`, and
-  `install` in `src/boat_net_client.c`, which builds a new fleet with `boat_fleet_init` at each bootstrap.
+  `install` in `src/net/boat_net_client.c`, which builds a new fleet with `boat_fleet_init` at each bootstrap.
   Confirm this with a test, not by inspection.
 - **Clock.** Physics poses use `boat_fleet_time`, which is `tick` seconds and so already shared. Check
   only the presentation path.
@@ -1141,7 +1141,7 @@ definition equality against the fixtures. See task 4.
 
 Other findings:
 
-- **Definitions:** Hello's location digest loop (`src/boat_net_protocol.c:1122`) reads named fields and not
+- **Definitions:** Hello's location digest loop (`src/net/boat_net_protocol.c:1122`) reads named fields and not
   `voyage`, so removing that field should leave the content digest unchanged and needs no protocol bump. Prove it.
 - **Equality cases:** they live in `tools/validate_boat_plugin_catalog.c:129-147`, not in the generator as this
   plan first said. The generator links only `proteus_plugins`, so it stays clean.

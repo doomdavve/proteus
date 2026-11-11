@@ -47,7 +47,7 @@ Do not add a general rigid-body engine, a new weapon, difficulty menus or hostin
 | Boat pairs | Whole-boat transformed vertical intervals reject separated boats, then heading-only rectangles choose a **horizontal** separation/impulse. A cabin corner can make intervals overlap even where hulls clear. No vertical pair response. | `src/core/boat.c`: `hull_vertical_bounds`, `boat_pair_*`; `src/core/boat.h`: `BoatPairContact`; `src/core/boat_fleet.c`: `boat_fleet_solve` |
 | Projectile hits | Moving-position slab sweep uses final heading and one box; pitch/roll are ignored. “3D” here means a height slab, not full-pose collision. | `src/core/boat_combat.c`: `hull_hit` |
 | Defeats | Match observation hard-codes hull destruction with a killer as **torpedo**. Grenade attribution currently comes from wave exposure. New grenade hull damage needs a real cause path. | `src/core/boat_match.c`: `touches`, `boat_match_observe`; `src/core/boat_match.h` |
-| Compatibility | Physics revision 9 / protocol 8 at this baseline. Default combat rules enter `boat_net_content_digest` through checkpoint encoding. Combat has full and compact codecs with fixed capacities. | `src/core/boat.h`, `src/core/boat_combat.[ch]`, `src/boat_net_protocol.[ch]`, `src/boat_prediction.c` |
+| Compatibility | Physics revision 9 / protocol 8 at this baseline. Default combat rules enter `boat_net_content_digest` through checkpoint encoding. Combat has full and compact codecs with fixed capacities. | `src/core/boat.h`, `src/core/boat_combat.[ch]`, `src/net/boat_net_protocol.[ch]`, `src/net/boat_prediction.c` |
 
 ## Step 0 — reproducible encounter baseline
 

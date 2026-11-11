@@ -9,7 +9,7 @@
 #ifndef BOAT_JSON_IMPLEMENTATION
 #define JSMN_HEADER
 #endif
-#include "../third_party/jsmn/jsmn.h"
+#include "../../third_party/jsmn/jsmn.h"
 
 // Validate the whole document's syntax (jsmn does not enforce separators), then tokenize it into
 // TOKENS. Returns the token count, or -1 unless it is exactly one object without embedded NULs.

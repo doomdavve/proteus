@@ -58,7 +58,9 @@ endif()
 # path for every target defined below, so flat includes keep resolving and moves stay renames.
 set(PROTEUS_TRANSITION_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/core ${CMAKE_CURRENT_SOURCE_DIR}/src/scenery
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/net
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/json)
 include_directories(${PROTEUS_TRANSITION_INCLUDES})
 
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -112,7 +114,7 @@ target_compile_options(proteus_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
 
 # Strict, bounded JSON over the vendored jsmn tokenizer (MIT, third_party/jsmn/LICENSE): the
 # server directory and plugin manifests.
-add_library(proteus_json STATIC src/boat_json.c src/boat_json.h)
+add_library(proteus_json STATIC src/json/boat_json.c src/json/boat_json.h)
 target_include_directories(proteus_json PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(proteus_json PRIVATE ${PROTEUS_WARNINGS})
 
@@ -392,11 +394,11 @@ target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 # transports obey the core boundary. Native ENet, optional native WebRTC and the browser
 # bridge own platform networking separately.
 set(PROTEUS_BOAT_NET_SOURCES
-  src/boat_net_mux.c src/boat_net_mux.h
-  src/boat_net_client.c src/boat_net_client.h src/boat_net_memory.c src/boat_net_protocol.c
-  src/boat_net_protocol.h src/boat_net_server.c src/boat_net_server.h src/boat_net_transport.h
-  src/boat_net_private.c src/boat_net_private.h src/boat_local.c src/boat_local.h
-  src/boat_prediction.c src/boat_prediction.h src/boat_remote_view.c src/boat_remote_view.h)
+  src/net/boat_net_mux.c src/net/boat_net_mux.h
+  src/net/boat_net_client.c src/net/boat_net_client.h src/net/boat_net_memory.c src/net/boat_net_protocol.c
+  src/net/boat_net_protocol.h src/net/boat_net_server.c src/net/boat_net_server.h src/net/boat_net_transport.h
+  src/net/boat_net_private.c src/net/boat_net_private.h src/net/boat_local.c src/net/boat_local.h
+  src/net/boat_prediction.c src/net/boat_prediction.h src/net/boat_remote_view.c src/net/boat_remote_view.h)
 add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
 target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
 target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
@@ -455,7 +457,7 @@ if(NOT EMSCRIPTEN)
   endif()
   target_compile_options(proteus_enet PRIVATE $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-w>)
 
-  add_library(proteus_boat_net_enet STATIC src/boat_net_enet.c src/boat_net_enet.h)
+  add_library(proteus_boat_net_enet STATIC src/net/boat_net_enet.c src/net/boat_net_enet.h)
   target_link_libraries(proteus_boat_net_enet PUBLIC proteus_boat_net PRIVATE proteus_enet)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
@@ -509,7 +511,7 @@ endif()
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c
+  target_sources(wake_velocity PRIVATE src/net/boat_net_web.c tools/wake_velocity_net.c
     tools/wake_velocity_servers_web.c tools/wake_velocity_plugin_web.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.

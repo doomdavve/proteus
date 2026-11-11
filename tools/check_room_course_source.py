@@ -7,9 +7,9 @@ import pathlib
 import sys
 
 FILES = (
-    "src/boat_net_client.c",
-    "src/boat_net_protocol.c",
-    "src/boat_prediction.c",
+    "src/net/boat_net_client.c",
+    "src/net/boat_net_protocol.c",
+    "src/net/boat_prediction.c",
     "src/render/boat_view.c",
     "tools/wake_velocity_net.c",
     "tools/boat_bot.c",
@@ -27,7 +27,7 @@ def main() -> int:
     if failures:
         print("compiled river course referenced by: " + ", ".join(failures))
         return 1
-    digest = (root / "src/boat_net_protocol.c").read_text(encoding="utf-8")
+    digest = (root / "src/net/boat_net_protocol.c").read_text(encoding="utf-8")
     for needle in ("waterfront_harbor_berths", "waterfront_harbor_ferry"):
         if needle in digest:
             print(f"engine digest still reads {needle}")

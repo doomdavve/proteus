@@ -129,7 +129,7 @@ Read-only source review on 2026-11-08 against `e25b47a`, macOS (historical; AR0 
 
 - Core and networking have source and archive-symbol boundary checks in
   [check_core_boundary.py](../tools/check_core_boundary.py).
-- [BoatNetTransport](../src/boat_net_transport.h) is an existing small backend interface.
+- [BoatNetTransport](../src/net/boat_net_transport.h) is an existing small backend interface.
 - The root [CMakeLists.txt](../CMakeLists.txt) exports the entire `src` include directory from
   core. The flat tree obscures ownership and private headers.
 - `tools/` mixes production glue, platform services and presentation with validators and
@@ -673,7 +673,7 @@ browser authority.
 
 Implemented (ledger row L0):
 
-- `src/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
+- `src/net/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
   predicting `BoatNetClient` and an unimpaired memory transport in the game's thread. Start runs
   the handshake in bounded service rounds (3 in practice, at most 8) at tick 0; a frame's grant
   runs in chunks of at most 12 ticks ending on multiples of 12 (at most 9 per frame): the client
@@ -686,7 +686,7 @@ Implemented (ledger row L0):
   without a snapshot), wake-mismatch resync (120) and the prediction hold (12) in granted ticks,
   with no peer timeout, snapshot-silence close or ping. Hosted service is unchanged.
 - Full-precision commands (D4): in-memory float rates on `BoatNetCommand`, carried by the
-  private range's PrivateInputBatch (`src/boat_net_private.[ch]`, type 0xC0, rejected by hosted
+  private range's PrivateInputBatch (`src/net/boat_net_private.[ch]`, type 0xC0, rejected by hosted
   rooms). The v14 codec and golden bytes are unchanged.
 - Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
 - Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
@@ -794,7 +794,7 @@ change.
 
 L6 (scripted demos and captures) and L0's removal point, implemented:
 
-- Scripted command source: `boat_local_frame_scripted` (`src/boat_local.[ch]`) takes each tick's
+- Scripted command source: `boat_local_frame_scripted` (`src/net/boat_local.[ch]`) takes each tick's
   helm from a `BoatLocalScript` callback given the predicted boat the authority will step; its
   rates are sent as they are. `demo_input` (`tools/wake_velocity_drive.[ch]`) is the scripted
   drive's helm, shared by `demo_step` and the glue's `wake_local_scripted_frame` (`--demo` in

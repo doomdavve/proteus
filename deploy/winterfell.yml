@@ -83,7 +83,7 @@
       ansible.builtin.slurp:
         src: "{{ wake_source }}/{{ item }}"
       loop:
-        - src/boat_net_protocol.h
+        - src/net/boat_net_protocol.h
         - src/core/boat.h
       register: wake_headers
 

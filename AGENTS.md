@@ -42,7 +42,7 @@ playground for iterating on effects, timing, audio, and presentation.
   `tools/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
   validators only; production targets never link it. See `docs/TESTING.md` for the libraries and
   test labels.
-- `src/boat_net_*.[ch]`, `src/boat_prediction.[ch]`, `src/boat_remote_view.[ch]`: multiplayer
+- `src/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
   protocol codec, authority/client sessions, client prediction, remote boat view and transports.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
   ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
