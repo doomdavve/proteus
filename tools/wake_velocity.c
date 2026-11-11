@@ -1373,6 +1373,11 @@ static int study(int argc, char **argv)
             fprintf(stderr, "The scripted landing delivery did not complete.\n");
             goto cleanup;
         }
+        // L3: the capture presents the local authority's checkpoint of the scripted session.
+        if (!wake_work_start(&work, &session, 0)) {
+            fprintf(stderr, "Working harbour could not start: %s.\n", work.local.failure);
+            goto cleanup;
+        }
     } else if (screenshot) {
         bool scripted_local = false;
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
@@ -1606,8 +1611,17 @@ static int study(int argc, char **argv)
         }
     }
     result = 0;
-    if (work_mode)
+    if (work_mode) {
         wake_work_autosave(&work, true);
+        // L3: a capture's work session already started (after its scripted drive).
+        if (!work.local.running && !wake_work_start(&work, &session, GetTime())) {
+            snprintf(study_failure, sizeof(study_failure), "Working harbour could not start: %s.",
+                work.local.failure);
+            fprintf(stderr, "%s\n", study_failure);
+            result = 1;
+            goto cleanup;
+        }
+    }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     // A capture's local session already ran its scripted drive (L6).
     if (!local.active && LOCAL_ELIGIBLE()) {
@@ -1971,10 +1985,14 @@ static int study(int argc, char **argv)
         }
         double simulation_started_at = boat_profile_time(true);
         bool work_active = active || console_simulating;
-        // The work session's key actions run once per frame and its crane axes drive each tick.
-        WakeWorkDrive work_drive = { 0 };
+        // L3: the work session's keys and helm targets for this frame, which its local authority
+        // applies before the frame's ticks. Sent with the grant below, or alone (grant zero) on a
+        // paused frame; a restart frame drops them, as the reset discarded their effects.
+        BoatWorkFrame work_frame = { 0 };
+        bool work_frame_sent = !work_mode;
         if (work_mode)
-            work_drive = wake_work_frame_input(&work, active && !demo);
+            work_frame = wake_work_frame_input(
+                &work, active && !demo, demo, steering_target, steering_rate, thrust_target);
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
             BoatInput input = { 0 };
@@ -2034,8 +2052,15 @@ static int study(int argc, char **argv)
                 select_course_best(&session, data_dir, waves);
                 boat_replay_runs_reset(&session.runs);
             }
-            if (work_mode)
-                wake_work_reset(&work, &session);
+            work_frame_sent = true;
+            if (work_mode && !wake_work_reset(&work, &session, GetTime())) {
+                // D10: back to the title; the leave-time save below still runs.
+                snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                    work.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
             if (wake) {
                 boat_wake_player_reset(wake);
                 session.world.wake_field = boat_wake_player_field(wake);
@@ -2093,6 +2118,17 @@ static int study(int argc, char **argv)
             accumulator += work_mode
                 ? boat_time_work_frame_seconds(raw_active_delta, time_speed_index, work_was_active)
                 : boat_time_frame_seconds(raw_active_delta, time_speed_index);
+            if (work_mode) {
+                // L3: the frame's keys and its grant run on the work session's local authority.
+                work_frame_sent = true;
+                if (!wake_work_frame(&work, &session, &accumulator, &work_frame, GetTime())) {
+                    snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                        work.local.failure);
+                    fprintf(stderr, "%s\n", study_failure);
+                    result = 1;
+                    break;
+                }
+            }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
             // The grant is the same accumulator arithmetic; the client derives each tick's rates
             // from its predicted boat as the loop below does from the session's.
@@ -2115,28 +2151,14 @@ static int study(int argc, char **argv)
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
             // L0's removal point: a local session's ticks never fall back to the direct path;
             // a grant above BOAT_LOCAL_MAX_GRANT waits in the accumulator for the next frame.
-            bool direct_ticks = !local.active;
+            bool direct_ticks = !local.active && !work_mode;
 #else
-            bool direct_ticks = true;
+            bool direct_ticks = !work_mode;
 #endif
             while (direct_ticks && accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
-                if (work_mode) {
-                    // The helm is the game's own (throttle, wheel, mouse); the crane view and a
-                    // brake take it over.
-                    const BoatWorkSession *w = &work.session;
-                    BoatInput helm = { 0 };
-                    if (!w->crane_view && !demo) {
-                        helm.steering_rate = isfinite(steering_target)
-                            ? boat_steering_rate(w->boat.wheel, steering_target)
-                            : steering_rate;
-                        helm.throttle_rate
-                            = w->braking ? 0 : boat_throttle_rate(w->boat.throttle, thrust_target);
-                    }
-                    wake_work_tick(
-                        &work, &session, work_drive.slew, work_drive.reach, work_drive.hoist, helm);
-                } else if (demo)
+                if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else
                     timed_boat_step(&session,
@@ -2152,6 +2174,17 @@ static int study(int argc, char **argv)
             }
         } else {
             accumulator = 0;
+        }
+        if (!work_frame_sent) {
+            // A paused frame still delivers its actions (RETURN CRATE, the released brake).
+            double none = 0;
+            if (!wake_work_frame(&work, &session, &none, &work_frame, GetTime())) {
+                snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
+                    work.local.failure);
+                fprintf(stderr, "%s\n", study_failure);
+                result = 1;
+                break;
+            }
         }
         if (work_mode)
             work_was_active = work_active;
@@ -2549,10 +2582,10 @@ static int study(int argc, char **argv)
                 = objects && objects->traffic_enabled ? objects->traffic.live : 0;
             boat_capture_add(&capture, &sample);
             if (work_clock_report)
-                wake_lighting_review_frame(&lighting_review, &sample, work.session.tick,
-                    work.session.lighting_hours, work.session.lighting_cycle_seconds,
-                    boat_time_rate(time_speed_index), work.lighting_cycle,
-                    gpu_enabled ? NULL : &renderer);
+                wake_lighting_review_frame(&lighting_review, &sample, wake_work_view(&work)->tick,
+                    wake_work_view(&work)->lighting_hours,
+                    wake_work_view(&work)->lighting_cycle_seconds, boat_time_rate(time_speed_index),
+                    work.lighting_cycle, gpu_enabled ? NULL : &renderer);
             previous_performance_start = current_frame_started_at;
             boat_gpu_timer_poll(
                 &performance_timer, performance_query_complete, &performance_query, false);
@@ -2608,8 +2641,10 @@ static int study(int argc, char **argv)
         }
 #endif
     }
-    if (work_mode)
+    if (work_mode) {
         wake_work_save_leave(&work); // Quitting, closing the window or returning to the title.
+        wake_work_stop(&work);
+    }
     if (performance_report) {
         if (!performance_capture || !capture.count) {
             fprintf(stderr, "No performance samples were captured; the report was not written.\n");
@@ -2648,6 +2683,7 @@ static int study(int argc, char **argv)
         }
     }
 cleanup:
+    wake_work_stop(&work); // Idempotent; the window loop's exit already stopped it.
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (local.local.stats.frames)
         fprintf(stdout,

@@ -890,6 +890,17 @@ scripted value, never wall time. `./build/validate_boat_local --bench` (not a te
 processor time per frame through the glue (with presentation) at 8x on `outer` for 16-tick frames
 and 96-tick grants, and the direct path with presentation for both.
 
+`boat_work_local` (ledger L3, labels `core;cpu`) runs `validate_boat_work_local` on the bundled
+outer work package: `codec` (frame, motion, status and trail round trips, malformed and
+non-finite bytes, a trail append across its end, the private range) and `failures` (an
+over-bound grant, a stopped session, generation zero), quick; `trace` (crane work, every action,
+both steering inputs, the brake, inactive frames and grants from 0 to 96 on a direct session and
+the local endpoint: after every frame the authority's save bytes, objective digest, events and
+presented state equal the direct session's, the client's mirror equals it in everything the game
+presents, and per-tick presentation steps equally), `restart` (the landing-delivery fixture and a
+job reset as host management, then a new generation whose checkpoint matches) and `resume` (a
+saved session resumed into the authority), slow.
+
 Developer studies (ledger L8, decision D6) run in `wake_study`, the game's sources built with
 `WAKE_VELOCITY_STUDY`: `boat_player_wake_screenshot` (and its GPU variants), the
 `wake_objects_*_rejected` and `wake_candidate_*_rejected` checks drive it, and

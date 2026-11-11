@@ -4,6 +4,7 @@
 #include "boat_file.h"
 #include "boat_plugin_catalog.h"
 #include "boat_presentation.h"
+#include "boat_time_control.h"
 #include "boat_title.h"
 #include "boat_ui.h"
 #include "boat_work_menu.h"
@@ -43,15 +44,41 @@ bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources 
     return true;
 }
 
-void wake_work_reset(WakeWork *work, BoatSession *game)
+// The session host management changes: the authority's once started, else the host's own.
+static BoatWorkSession *authority(WakeWork *work)
 {
-    boat_work_session_reset(&work->session);
+    return work->local.running ? boat_work_local_authority(&work->local) : &work->session;
+}
+
+const BoatWorkSession *wake_work_view(const WakeWork *work)
+{
+    return work->local.running ? boat_work_local_view(&work->local) : &work->session;
+}
+
+bool wake_work_start(WakeWork *work, BoatSession *game, double now)
+{
+    work->local = (BoatWorkLocal) { 0 };
+    if (!boat_work_local_start(&work->local, &work->session, 1, now))
+        return false;
+    wake_work_sync(work, game);
+    return true;
+}
+
+void wake_work_stop(WakeWork *work) { boat_work_local_stop(&work->local); }
+
+bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
+{
+    BoatWorkSession *s = authority(work);
+    boat_work_session_reset(s);
     // A reset returns the tick to zero. Mark the reset as a save milestone so an old last-write
     // tick cannot postpone the periodic write behind the new, lower tick.
     if (work->save.enabled)
-        boat_autosave_note(&work->save.autosave, work->session.tick, true, true);
+        boat_autosave_note(&work->save.autosave, s->tick, true, true);
     boat_presentation_reset(&game->presentation);
+    work->actions = 0;
+    bool ok = !work->local.running || boat_work_local_restart(&work->local, now);
     wake_work_sync(work, game);
+    return ok;
 }
 
 bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
@@ -64,8 +91,12 @@ bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
         boat_work_hook_action(s);
         if (s->sandbox.cargo.state != BOAT_CARGO_HANGING)
             return false;
-        for (int i = 0; i < 360; ++i)
-            wake_work_tick(work, game, .7f, .5f, 1, (BoatInput) { 0 });
+        for (int i = 0; i < 360; ++i) {
+            boat_work_session_tick(s, .7f, .5f, 1, (BoatInput) { 0 });
+            if (game->presentation_enabled)
+                boat_presentation_step(
+                    &game->presentation, &s->boat, &s->world, boat_tick_seconds(s->tick));
+        }
         ok = true;
     } else if (!strcmp(pose, "deck")) {
         ok = boat_work_script_load_and_lash(s, 2);
@@ -86,14 +117,22 @@ bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
     return true;
 }
 
-void wake_work_tick(
-    WakeWork *work, BoatSession *game, float slew, float reach, float hoist, BoatInput input)
+static void present_tick(void *context, const BoatWorkSession *view)
 {
-    BoatWorkSession *s = &work->session;
-    boat_work_session_tick(s, slew, reach, hoist, input);
+    BoatSession *game = context;
     if (game->presentation_enabled)
         boat_presentation_step(
-            &game->presentation, &s->boat, &s->world, boat_tick_seconds(s->tick));
+            &game->presentation, &view->boat, &view->world, boat_tick_seconds(view->tick));
+}
+
+bool wake_work_frame(
+    WakeWork *work, BoatSession *game, double *accumulator, const BoatWorkFrame *frame, double now)
+{
+    unsigned grant = boat_time_grant(accumulator, BOAT_WORK_LOCAL_MAX_GRANT);
+    BoatWorkObserver observer = { game, present_tick };
+    bool ok = boat_work_local_frame(&work->local, now, grant, frame, &observer);
+    wake_work_sync(work, game);
+    return ok;
 }
 
 bool wake_work_script(WakeWork *work, BoatSession *game, uint64_t ticks)
@@ -114,7 +153,7 @@ bool wake_work_script(WakeWork *work, BoatSession *game, uint64_t ticks)
 
 void wake_work_sync(WakeWork *work, BoatSession *game)
 {
-    const BoatWorkSession *s = &work->session;
+    const BoatWorkSession *s = wake_work_view(work);
     game->boat = s->boat;
     game->tick = s->tick;
     game->world = s->world;
@@ -122,7 +161,7 @@ void wake_work_sync(WakeWork *work, BoatSession *game)
 
 const BoatViewProps *wake_work_props(WakeWork *work)
 {
-    const BoatWorkSession *s = &work->session;
+    const BoatWorkSession *s = wake_work_view(work);
     BoatCargoView view = { .sandbox = &s->sandbox,
         .boat = &s->boat,
         .world = &s->world,
@@ -166,58 +205,56 @@ void wake_work_save_frame(WakeWork *work, bool paused, bool focused)
 {
     if (work->save.autosaving)
         boat_work_save_frame(
-            &work->session, &work->save, &work->watch, paused, focused, (int64_t)time(NULL));
+            authority(work), &work->save, &work->watch, paused, focused, (int64_t)time(NULL));
 }
 
 bool wake_work_save_now(WakeWork *work)
 {
-    bool ok = work->save.enabled
-        && boat_work_save_write(&work->session, &work->save, (int64_t)time(NULL));
+    BoatWorkSession *s = authority(work);
+    bool ok = work->save.enabled && boat_work_save_write(s, &work->save, (int64_t)time(NULL));
     printf("%s %s at tick %llu\n", ok ? "Wrote save" : "Could not write save", work->save.path,
-        (unsigned long long)work->session.tick);
+        (unsigned long long)s->tick);
     return ok;
 }
 
 bool wake_work_save_leave(WakeWork *work)
 {
     return !work->save.autosaving
-        || boat_work_save_leave(&work->session, &work->save, (int64_t)time(NULL));
+        || boat_work_save_leave(authority(work), &work->save, (int64_t)time(NULL));
 }
 
-WakeWorkDrive wake_work_frame_input(WakeWork *work, bool active)
+BoatWorkFrame wake_work_frame_input(WakeWork *work, bool active, bool demo, float steering_target,
+    float steering_rate, float thrust_target)
 {
-    BoatWorkSession *s = &work->session;
-    WakeWorkDrive drive = { 0 };
-    s->braking = false;
+    BoatWorkFrame frame = { .actions = work->actions,
+        .active = active,
+        .demo = demo,
+        .steering_target = steering_target,
+        .steering_rate = steering_rate,
+        .thrust_target = thrust_target };
+    work->actions = 0;
     if (!active)
-        return drive;
-    if (IsKeyPressed(KEY_F))
-        boat_work_hook_action(s);
-    if (IsKeyPressed(KEY_L))
-        boat_work_lash_action(s);
-    if (IsKeyPressed(KEY_G))
-        boat_work_moor_action(s);
-    if (IsKeyPressed(KEY_TAB))
-        boat_work_view_action(s);
-    if (s->crane_view && s->sandbox.moored)
-        for (int i = 1; i <= 3; ++i)
-            if (IsKeyPressed(KEY_ONE + i - 1))
-                s->aim = i;
-    if (IsKeyPressed(KEY_J) && !s->sandbox.moored && !s->sandbox.mooring)
-        s->target = boat_work_next_site(s, s->target);
-    if (IsKeyDown(KEY_SPACE) && !s->crane_view) {
-        s->boat.throttle = 0;
-        s->braking = !s->sandbox.moored && !s->sandbox.mooring;
-    }
-    if (s->crane_view) {
-        drive.slew = (float)(IsKeyDown(KEY_D) - IsKeyDown(KEY_A));
-        drive.reach = (float)(IsKeyDown(KEY_W) - IsKeyDown(KEY_S));
-        drive.hoist = (float)(IsKeyDown(KEY_Q) - IsKeyDown(KEY_E));
-    }
-    return drive;
+        return frame;
+    static const struct {
+        int key;
+        unsigned action;
+    } presses[] = { { KEY_F, BOAT_WORK_HOOK }, { KEY_L, BOAT_WORK_LASH }, { KEY_G, BOAT_WORK_MOOR },
+        { KEY_TAB, BOAT_WORK_VIEW }, { KEY_J, BOAT_WORK_NEXT_TARGET } };
+    for (size_t i = 0; i < sizeof(presses) / sizeof(presses[0]); ++i)
+        if (IsKeyPressed(presses[i].key))
+            frame.actions |= presses[i].action;
+    if (IsKeyDown(KEY_SPACE))
+        frame.actions |= BOAT_WORK_BRAKE;
+    for (unsigned i = 1; i <= 3; ++i)
+        if (IsKeyPressed(KEY_ONE + (int)i - 1))
+            frame.aim = i; // The highest pressed, as the keys were read in order.
+    frame.slew = (float)(IsKeyDown(KEY_D) - IsKeyDown(KEY_A));
+    frame.reach = (float)(IsKeyDown(KEY_W) - IsKeyDown(KEY_S));
+    frame.hoist = (float)(IsKeyDown(KEY_Q) - IsKeyDown(KEY_E));
+    return frame;
 }
 
-void wake_work_return_crate(WakeWork *work) { boat_work_recover_action(&work->session); }
+void wake_work_return_crate(WakeWork *work) { work->actions |= BOAT_WORK_RETURN_CRATE; }
 
 static void label(const char *text, int x, int y, Color color)
 {
@@ -230,7 +267,7 @@ static void label(const char *text, int x, int y, Color color)
 // site can be found from the helm.
 static void target_marker(const WakeWork *work, const WakeWorkProjection *p, int width, int height)
 {
-    const BoatWorkSession *s = &work->session;
+    const BoatWorkSession *s = wake_work_view(work);
     Vector3 berth = boat_cargo_site_point(&s->sandbox.cranes[s->target], (Vector3) { 0, 4, 0 });
     Vector2 at = { 0 };
     bool visible = boat_view_project(
@@ -255,7 +292,7 @@ static void target_marker(const WakeWork *work, const WakeWorkProjection *p, int
 
 void wake_work_hud(WakeWork *work, const WakeWorkProjection *projection, int width, int height)
 {
-    const BoatWorkSession *s = &work->session;
+    const BoatWorkSession *s = wake_work_view(work);
     const BoatCargo *c = &s->sandbox.cargo;
     Color yellow = { 241, 183, 57, 255 }, green = { 99, 216, 156, 255 },
           text = { 218, 223, 202, 255 }, red = { 232, 106, 84, 255 };

@@ -514,6 +514,37 @@ to 1024 bytes of the text, at most 32 KiB in all. Chunks arrive in order on the 
 the client starts a text at index 0 and keeps the newest whole one. A chunk out of order is a
 decode error and drops the partial text.
 
+**Working harbour endpoint (L3).** The working harbour's private session (`src/boat_work_local.h`)
+is not a fleet room: its authority owns a `BoatWorkSession` and its client a mirror with no
+prediction. It shares the header, the reliable control channel and the memory transport, and its
+payloads are opaque to the protocol (`boat_net_private_encode_payload`); the work endpoint's own
+codec reads them. Floats are IEEE-754 bits big-endian, as above, and must be finite unless stated.
+
+- `0xC6` WorkFrame (client to server, once per host frame, header tick the authority's tick):
+  `u8` actions (bit 0 return crate, 1 hook, 2 lash, 3 moor, 4 view, 5 next target, 6 brake held),
+  `u8` aim (0–3), `u8` active, `u8` demo, then `f32` slew, reach and hoist (−1..1), steering
+  target (non-finite: steer by rate), steering rate and thrust target (28 bytes). The authority
+  applies the actions before the frame's first tick and derives each tick's helm from its own boat.
+- `0xC7` WorkMotion (server to client, after each committed tick; header tick that tick): `u8`
+  refresh (1 for a checkpoint or a frame's actions without ticks, which presents the same tick
+  again), `u8` crane view, braking, moored, mooring, aim, target site, active site and source
+  site; `f64` lighting hours and seconds per day; the boat (25 `f32`, `u8` motion state, `u32`
+  landings); the crate (state, four vectors, settle time, pad, contact, delivered, receivers,
+  support, load, wet, rest); `u8` crane count and per crane its origin, heading, slew, reach, rope,
+  preset and hidden flag; `u8` trail next and count, then `u8` n trail segments appended during
+  the tick, each `u8` index, position, direction, `f64` emission time, length, amplitude and
+  inverse speed.
+- `0xC8` WorkStatus (server to client, after a chunk when it changed, and in every checkpoint):
+  `u8` suspended, `u8` guide site, `u8` HUD rows (0–8), each id, label (length-prefixed, at most
+  23 bytes) and `i64` value; the notice (length-prefixed, at most 127 bytes), `u8` waiting
+  present and its text.
+- `0xC9` WorkTrail (server to client, in every checkpoint): `u8` first segment, `u8` n (at most
+  24), then the segments without indices.
+
+A (re)start's checkpoint is one refresh WorkMotion, the whole trail in three WorkTrail pages and a
+WorkStatus; the client presents nothing before it. A motion for any tick other than the next one
+after the checkpoint, a malformed payload or another generation's epoch fails the session.
+
 ### Other control messages
 
 - SpawnRequest: `u32` request ID, `u32` life to reset. It is honoured only while the slot is on

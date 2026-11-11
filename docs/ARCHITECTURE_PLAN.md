@@ -11,9 +11,10 @@ tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualifica
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
 L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
-([L1 status](#l1b-status)). L7 and L8 implemented on `arch/ar7-rest` ([status](#l7-l8-status)).
-The user defers windowed checks until every L* row is done.
-**Next:** L3 (working harbour), then L5 and L4, on `arch/ar7-rest`.
+([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
+([L7/L8](#l7-l8-status), [L3](#l3-status)). The user defers windowed checks until every L* row
+is done.
+**Next:** L5 (hosted rooms join the common client), then L4 (browser), on `arch/ar7-rest`.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1083,6 +1084,47 @@ captures byte-identical to the L1 build's `wake_velocity` for `--player-wake`,
 `wake_velocity_study_rejected.<option>` tests; `ctest --preset full -j8` passed 531/531 (13
 disabled). Not verified: the `--replay` restart in a window (no scripted restart exists), any
 browser or Windows build.
+
+<a id="l3-status"></a>L3 (working harbour), implemented 2026-11-11 on `arch/ar7-rest`, as AR1
+designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), work mode):
+
+- Endpoint: `src/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
+  part of `proteus_boat_net`). The authority owns a `BoatWorkSession`; the client owns a mirror
+  filled only from its messages over the memory transport, with no prediction. The client sends
+  each frame's actions, helm targets and crane axes (`0xC6`); the authority applies them before
+  the frame's first tick and derives each tick's helm from its own boat
+  (`boat_work_apply_frame`, `boat_work_helm`: the game's former expressions, moved). It sends each
+  committed tick's motion with the trail segments the tick appended (`0xC7`), the job's HUD,
+  notice and waiting text after a chunk when they changed (`0xC8`), and on every (re)start a
+  checkpoint with the whole trail (`0xC9`)
+  ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)). Presentation steps
+  per applied tick from the mirror. Grants and chunks follow L0 (at most 96 ticks, chunks of 12).
+- Host management, as L2's course take: resume, the fixture scripts (`--screenshot` drive,
+  `--work-review-pose`, `--save-now`) prepare the session before the endpoints start; the menu's
+  RESTART JOB resets the authority's session and starts a new generation; autosave, the
+  leave-time save and `--save-now` capture from the authority's session between frames through
+  the unchanged `BoatWorkSave`. RETURN CRATE travels as an action with the next frame; a paused
+  frame still sends its actions with a zero grant. An endpoint failure returns to the title
+  after the leave-time save (D10).
+- The game's direct work tick loop is removed (`tools/wake_velocity.c`); `cargo_sandbox` stays a
+  direct developer tool.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_work_local` cases `codec`, `failures` (quick), `trace`, `restart`, `resume` (slow)
+  ([cases](TESTING.md#network-checks)). Negative check: dropping trail segments from the motion
+  fails `trace`.
+- Captures byte-identical to a build of `main` at `aaafd8d`: `--location outer --work` at
+  `--time` 3, 12, 14, 30 and 60, the `swing`, `deck` and `approach` review poses, and basin
+  `--work` at 3 and with `swing`. The plain outer capture is unchanged too. (L7/L8's captures
+  above were compared with the L1 build, which predates `main`'s cloud-deck changes; they were
+  basin captures, which those changes leave equal.)
+- The 69 work, cargo, sandbox and title-start tests pass, including `--save-now`, resume and
+  set-aside.
+
+Not verified: the window loop (no display was available to this session, even outside the
+sandbox): keys, crane and helm feel, autosave while playing, RESTART JOB and RETURN CRATE from
+the menu, pause and focus loss. Browser: working harbour stays native-only (D7).
 
 ### AR8 — Move files into owning directories
 

@@ -346,7 +346,7 @@ else()
   target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c
     tools/wake_velocity_scenery.c tools/wake_velocity_app.c tools/wake_console_bridge.c
     tools/wake_velocity_controls.c)
-  target_link_libraries(wake_velocity PRIVATE proteus_work_session)
+  target_link_libraries(wake_velocity PRIVATE proteus_work_session proteus_work_local)
 endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
