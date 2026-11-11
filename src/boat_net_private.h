@@ -21,6 +21,13 @@ typedef struct {
     Boat spawn; // Authority only: the accepted player's boat, placed before its checkpoint.
 } BoatNetPrivateSession;
 
+// L1b: what a private commit changes besides the adapter's own state.
+typedef struct {
+    Boat boat;
+    bool moved, rescene;
+    const BoatSceneDefinition *scene;
+} BoatNetCommitResult;
+
 #define BOAT_NET_PRIVATE_FIRST 0xc0 // First type of the reserved private range.
 #define BOAT_NET_PRIVATE_INPUT_BATCH 0xc0 // C->S: an InputBatch with full-precision rates (D4).
 // S->C on the reliable control channel (L2): the private rules adapter's state after a grant, as

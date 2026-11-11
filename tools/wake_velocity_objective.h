@@ -46,7 +46,8 @@ typedef enum {
 typedef struct {
     bool valid; // A HUD and the private state's objective tail have arrived.
     unsigned generation, revision; // The objective's generation and the authority's revision.
-    unsigned commit; // The latest commit request's revision number, and its result.
+    unsigned commit, commits; // The latest commit request's revision number, requests handled,
+    // and the latest one's result.
     WakeCommitStatus commit_status;
     bool suspended;
     // The suspension's, or a failed migration's, diagnostic text.

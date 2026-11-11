@@ -516,17 +516,18 @@ static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *
         return;
     }
     BoatFleetSlot *slot = &s->fleet.state.slots[p->slot];
-    Boat boat = slot->boat;
-    bool moved = false;
+    BoatNetCommitResult result = { .boat = slot->boat };
     if (p->phase != BOAT_NET_PEER_READY || !slot->active || header.tick != s->fleet.state.tick
         || !s->config.rules.commit
         || !s->config.rules.commit(
-            s->config.rules.context, header.tick, p->slot, revision, change, &boat, &moved)) {
+            s->config.rules.context, header.tick, p->slot, revision, change, &result)) {
         ++s->stats.commits_ignored;
         return;
     }
-    if (moved)
-        boat_fleet_relocate(&s->fleet, p->slot, boat);
+    if (result.moved)
+        boat_fleet_relocate(&s->fleet, p->slot, result.boat);
+    if (result.rescene)
+        s->fleet.world.scene = result.scene;
     BoatStorm storm;
     if (s->config.rules.weather && s->config.rules.weather(s->config.rules.context, &storm))
         s->fleet.world.water.storm = storm;

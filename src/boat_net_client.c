@@ -1039,8 +1039,8 @@ bool boat_net_client_private_inspect(BoatNetClient *c)
     return true;
 }
 
-bool boat_net_client_private_commit(
-    BoatNetClient *c, uint64_t tick, uint32_t revision, uint8_t change, const Boat *pose)
+bool boat_net_client_private_commit(BoatNetClient *c, uint64_t tick, uint32_t revision,
+    uint8_t change, const BoatNetCommitResult *predicted)
 {
     if (!c->local.enabled || !c->predict || !boat_net_client_own(c)
         || c->prediction.fleet.state.tick != tick || c->command_count)
@@ -1052,8 +1052,10 @@ bool boat_net_client_private_commit(
     if (!boat_net_send(&c->transport, 0, BOAT_NET_CONTROL, bytes, size))
         return false;
     ++c->sequence[BOAT_NET_CONTROL];
-    if (pose)
-        boat_fleet_relocate(&c->prediction.fleet, c->slot, *pose);
+    if (predicted->moved)
+        boat_fleet_relocate(&c->prediction.fleet, c->slot, predicted->boat);
+    if (predicted->rescene)
+        c->fleet.world.scene = c->prediction.fleet.world.scene = predicted->scene;
     ++c->stats.commits;
     return true;
 }

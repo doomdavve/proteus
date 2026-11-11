@@ -20,6 +20,10 @@ typedef struct {
     char pending[WAKE_BRIDGE_ID + 1];
     unsigned pending_requests;
     char last_response[WAKE_BRIDGE_ID + 1]; // Removed when the next one is written.
+    // L1b: an inspect request answered when the local authority's inspection arrives (the frame
+    // after it was asked for), and the inspection count when it was.
+    char inspecting[WAKE_BRIDGE_ID + 1];
+    uint64_t inspect_after;
     bool open;
     // PC: the same command layer the console uses. NULL in a session without a console.
     WakeCommand *commands;

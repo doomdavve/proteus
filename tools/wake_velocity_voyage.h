@@ -22,8 +22,9 @@
 
 #define WAKE_VOYAGE_STATE_BYTES 40
 // The objective's tail after the voyage's bytes: generation (4), active revision (4), the latest
-// commit's revision (4) and status (1), diagnostic text length (1) and that many bytes of text.
-#define WAKE_VOYAGE_OBJECTIVE_BYTES 14
+// commit's revision (4), commits handled (4), the latest commit's status (1), diagnostic text
+// length (1) and that many bytes of text.
+#define WAKE_VOYAGE_OBJECTIVE_BYTES 18
 
 // The adapter's commit codes on the wire.
 typedef enum {
@@ -46,7 +47,8 @@ typedef struct {
     WakeObjective objective;
     WakeVoyageResolve resolve;
     void *resolve_context;
-    unsigned commit; // The latest commit request's revision, its result and failure text.
+    unsigned commit, commits; // The latest commit request's revision, requests handled,
+    // its result and failure text.
     WakeCommitStatus commit_status;
     char commit_message[sizeof(((BoatPluginDiagnostic *)0)->message)];
     BoatNetObjectiveState reported; // The HUD last reported through rules.state.

@@ -102,17 +102,21 @@ static bool recover(void *context, uint64_t tick, unsigned slot, Boat *boat)
 // The host's commit of a held revision, as the direct path's commit applies it to the session and
 // objective (tools/wake_velocity_plugin.c). A failed migration keeps everything and reports why.
 static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t number, uint8_t change,
-    Boat *boat, bool *moved)
+    BoatNetCommitResult *result)
 {
     WakeVoyageAuthority *v = context;
     const BoatPluginRevision *previous = v->revision;
     const BoatPluginRevision *next
         = v->resolve && previous ? v->resolve(v->resolve_context, number) : NULL;
-    if (slot != v->slot || !next || !v->voyage.route || change < WAKE_VOYAGE_REBIND
-        || change > WAKE_VOYAGE_RESTART)
+    if (slot != v->slot || !next || strcmp(next->manifest.kind, "voyage") || !v->voyage.route
+        || change < WAKE_VOYAGE_REBIND || change > WAKE_VOYAGE_RESTART)
         return false;
     const BoatVoyageRoute *route = &next->voyage.route;
+    // The world borrows the active revision's scene, as the direct path's bind_scene does.
+    result->rescene = true;
+    result->scene = next->voyage.has_scene ? &next->voyage.scene : NULL;
     v->commit = number;
+    ++v->commits;
     v->commit_status = WAKE_COMMIT_APPLIED;
     v->commit_message[0] = 0;
     switch ((WakeVoyageCommit)change) {
@@ -137,6 +141,7 @@ static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t number,
             v->commit_status = WAKE_COMMIT_FAILED;
             snprintf(v->commit_message, sizeof(v->commit_message), "%s",
                 v->objective.objective_diagnostic.message);
+            result->rescene = false;
             return true; // Handled: the revision stays the previous one.
         }
         wake_objective_adopt(&v->objective, number, &migrated);
@@ -147,10 +152,10 @@ static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t number,
         boat_voyage_restart(&v->voyage, route, boat_tick_seconds(tick));
         if (route->ordered) {
             // boat_session_restart_voyage's tour start.
-            boat_reset(boat);
-            boat->position = route->shelters[0].position;
-            boat->heading = route->shelters[0].heading;
-            *moved = true;
+            boat_reset(&result->boat);
+            result->boat.position = route->shelters[0].position;
+            result->boat.heading = route->shelters[0].heading;
+            result->moved = true;
         }
         v->revision = next;
         if (wake_objective_clear(&v->objective, next, tick))
@@ -221,6 +226,7 @@ static size_t private_state(void *context, uint8_t *out)
     put32(&p, v->objective.generation);
     put32(&p, v->revision->number);
     put32(&p, v->commit);
+    put32(&p, v->commits);
     *p++ = (uint8_t)v->commit_status;
     const char *message = v->objective.objective.quarantined
         ? v->objective.objective_diagnostic.message
@@ -275,6 +281,7 @@ bool wake_voyage_objective_view(
     next.generation = get32(&p);
     next.revision = get32(&p);
     next.commit = get32(&p);
+    next.commits = get32(&p);
     next.commit_status = (WakeCommitStatus)*p++;
     size_t length = *p++;
     memcpy(next.message, p, length);

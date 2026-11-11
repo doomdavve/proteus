@@ -804,7 +804,12 @@ boundary; the client shows the suspension and its text, and the voyage still arr
 `objective_commits` (test revisions committed between frames on both paths: a rebind, a live
 route edit that moves the reached shelter's index, a migration that fails and one that succeeds,
 and a voyage restart onto an ordered tour that moves the boat; the voyage, storm, boats and
-objective stay equal, and the host hears each migration's result a frame later), all slow;
+objective stay equal, and the host hears each migration's result a frame later) and `authoring_trace` (Shelter tour
+authored through the game's own `WakePlugin` glue on two hosts, one direct and one attached to the
+local authority, from the same controls: a migration staged and applied with F7, which the local
+host commits a frame later, a failing migration both keep their revision through, F6 Discard, and
+Undo back to revision 1 as a voyage restart; every frame the objective, revision, generation and
+HUD agree, and `wake_plugin_inspect` prints the same text on both), all slow;
 `voyage_state` (the voyage codec, its weather
 reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect and
 PrivateInspection messages, which the v14 and
@@ -1137,8 +1142,10 @@ the fake process in `boat_plugin_author`. See [frame capture](PLUGIN_API.md#fram
 
 P4.6 adds `wake_velocity_bridge` (native, CPU lane): `validate_wake_bridge` drives the game's
 bridge over request files on a virtual clock (authentication, pins, deferred isolated staging,
-Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement, and the PC `console`
-operation). `boat_plugin_author`
+Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement, the PC `console`
+operation, and L1b's deferred inspection: with a local authority attached, `inspect` asks it and
+answers on the frame after its inspection arrives, with its objective lines, and an authority
+that cannot be asked fails the request). `boat_plugin_author`
 gains client checks against a fake game and an end-to-end CLI run against
 `validate_wake_bridge --serve` (`--bridge-server`). Its loops await external process/file events;
 CTest supplies the deadline. See [live tool bridge](PLUGIN_API.md#live-tool-bridge-p46).

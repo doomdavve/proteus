@@ -3,6 +3,16 @@
 #include "raylib.h"
 
 #include <math.h>
+#include <string.h>
+
+// The course definition of the host's course revision NUMBER.
+static const BoatCourseDefinition *course_revision(void *context, unsigned number)
+{
+    const WakeLocal *local = context;
+    const BoatPluginRevision *r
+        = local->resolve ? local->resolve(local->resolve_context, number) : NULL;
+    return r && !strcmp(r->manifest.kind, "course") ? &r->course.course : NULL;
+}
 
 // The configuration of a new generation; a time trial's course adapter starts over with it.
 static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
@@ -24,6 +34,8 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
         // one player in slot zero.
         config.world.handling = &boat_handling_speedboat;
         wake_course_init(&local->course, session, 0);
+        local->course.resolve = course_revision;
+        local->course.resolve_context = local;
         config.rules = wake_course_rules(&local->course);
     } else {
         wake_course_destroy(&local->course);
@@ -191,14 +203,26 @@ bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *obj
 bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     const BoatPluginRevision *revision, BoatPluginChange change, bool moved)
 {
-    if (!local->voyage_active || !session->voyage.route)
-        return true;
-    uint8_t code = change == BOAT_PLUGIN_LIVE  ? WAKE_VOYAGE_LIVE
-        : change == BOAT_PLUGIN_MIGRATE        ? WAKE_VOYAGE_MIGRATE
-        : change == BOAT_PLUGIN_RESTART_VOYAGE ? WAKE_VOYAGE_RESTART
-                                               : WAKE_VOYAGE_REBIND;
-    if (!boat_local_commit(&local->local, revision->number, code, moved ? &session->boat : NULL,
-            session->world.water.storm)) {
+    uint8_t code;
+    BoatNetCommitResult predicted = { 0 };
+    if (local->voyage_active && session->voyage.route) {
+        code = change == BOAT_PLUGIN_LIVE          ? WAKE_VOYAGE_LIVE
+            : change == BOAT_PLUGIN_MIGRATE        ? WAKE_VOYAGE_MIGRATE
+            : change == BOAT_PLUGIN_RESTART_VOYAGE ? WAKE_VOYAGE_RESTART
+                                                   : WAKE_VOYAGE_REBIND;
+        // The session already shows the commit: its boat when it moved and the bound scene.
+        predicted = (BoatNetCommitResult) { .boat = session->boat,
+            .moved = moved,
+            .rescene = change != BOAT_PLUGIN_MIGRATE,
+            .scene = session->world.scene };
+    } else if (local->course_active
+        && (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)) {
+        code = WAKE_COURSE_REBIND;
+    } else {
+        return true; // Nothing on the authority borrows this revision.
+    }
+    if (!boat_local_commit(
+            &local->local, revision->number, code, &predicted, session->world.water.storm)) {
         local->active = false;
         return false;
     }

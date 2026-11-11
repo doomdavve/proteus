@@ -98,11 +98,12 @@ bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
 // the client could not send the request.
 bool boat_local_recover(BoatLocal *local, Boat pose);
 // L1b: between frames, ask the authority to install definition REVISION with CHANGE (its rules
-// adapter's codes), predicting POSE when the commit moves the boat and STORM as the water's storm
-// from the next tick. The authority applies it at the next frame's start, before its first tick.
-// False with failure text when the client could not send the request.
-bool boat_local_commit(
-    BoatLocal *local, uint32_t revision, uint8_t change, const Boat *pose, BoatStorm storm);
+// adapter's codes), predicting PREDICTED (the boat when the commit moves it, the scene when it
+// changes) and STORM as the water's storm from the next tick. The authority applies it at the
+// next frame's start, before its first tick. False with failure text when the client could not
+// send the request.
+bool boat_local_commit(BoatLocal *local, uint32_t revision, uint8_t change,
+    const BoatNetCommitResult *predicted, BoatStorm storm);
 // The client's view: the predicted fleet, at the authority's tick after a frame.
 const BoatFleet *boat_local_view(const BoatLocal *local);
 // The player's slot in the view.

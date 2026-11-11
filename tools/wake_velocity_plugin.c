@@ -268,7 +268,9 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
     const BoatPluginRevision *r = plugin->host.depth && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
         ? boat_plugin_host_active(&plugin->host)
         : NULL;
-    if (!wake_objective_clear(&plugin->run, r, session->tick))
+    // With a local authority the counter still advances here, and the authority starts the same
+    // generation when the game restarts it.
+    if (!wake_objective_clear(&plugin->run, r, session->tick) || plugin->authority)
         return;
 #if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_INIT, (int64_t)session->tick, r)) {
@@ -283,11 +285,15 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
 #endif
 }
 
-void wake_plugin_before_tick(WakePlugin *plugin) { wake_objective_before_tick(&plugin->run); }
+void wake_plugin_before_tick(WakePlugin *plugin)
+{
+    if (!plugin->authority)
+        wake_objective_before_tick(&plugin->run);
+}
 
 void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
 {
-    if (!plugin->run.objective.initialized)
+    if (!plugin->run.objective.initialized || plugin->authority)
         return;
     const BoatPluginRevision *r = boat_plugin_host_active(&plugin->host);
     if (!wake_objective_queue(&plugin->run, r, session->tick, &session->voyage_events))
@@ -434,6 +440,34 @@ bool wake_plugin_open_catalog(
     return true;
 }
 
+// L1b: the local authority installs what the host just committed into SESSION.
+static void forward(WakePlugin *plugin, BoatSession *session, const BoatPluginRevision *revision,
+    BoatPluginChange change, bool moved)
+{
+    WakePluginAuthority *a = plugin->authority;
+    if (a && !a->commit(a->context, session, revision, change, moved))
+        a->failed = true;
+}
+
+void wake_plugin_attach(WakePlugin *plugin, WakePluginAuthority *authority)
+{
+    plugin->authority = authority;
+    WakeObjective *run = &plugin->run;
+    run->objective = (BoatPluginObjective) { .generation = run->generation };
+    run->objective_pending = false;
+    run->event_count = 0;
+}
+
+const BoatPluginRevision *wake_plugin_revision(const WakePlugin *plugin, unsigned number)
+{
+    const BoatPluginHost *host = &plugin->host;
+    for (unsigned i = 0; i < host->depth; ++i)
+        if (host->slots[host->history[i]].number == number)
+            return &host->slots[host->history[i]];
+    const BoatPluginRevision *held = boat_plugin_host_held(host);
+    return held && held->number == number ? held : NULL;
+}
+
 // Install the held candidate under its policy. True when the session must restart.
 static bool commit(WakePlugin *plugin, BoatSession *session)
 {
@@ -452,9 +486,26 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         }
         plugin->evaluation_migrated = false;
 #else
+        WakePluginAuthority *a = plugin->authority;
+        if (a && a->migrating != held->number) {
+            // L1-1: the authority runs the migration; the host commits once it has (next frame).
+            if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
+                return false;
+            if (!a->commit(a->context, session, held, BOAT_PLUGIN_MIGRATE, false)) {
+                a->failed = true;
+                return false;
+            }
+            a->migrating = held->number;
+            a->migrate_seen = a->view.commits;
+            report(plugin, "migrating", false, "ACTIVE REVISION KEEPS RUNNING",
+                "R%u MIGRATING STATE", held->number);
+            return false;
+        }
         BoatPluginObjective migrated;
-        if (!wake_objective_migrate(&plugin->run, held,
-                boat_plugin_host_active(&plugin->host)->number, session->tick, &migrated)) {
+        if (a) {
+            // The authority migrated it: commit the host's table to the same revision.
+        } else if (!wake_objective_migrate(&plugin->run, held,
+                       boat_plugin_host_active(&plugin->host)->number, session->tick, &migrated)) {
             report(plugin, "migration_failed", true, plugin->run.objective_diagnostic.message,
                 "MIGRATION FAILED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
             return false;
@@ -462,7 +513,8 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         // Commit below cannot fail once the base has been checked.
         if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
             return false;
-        plugin->run.staged_objective = migrated;
+        if (!a)
+            plugin->run.staged_objective = migrated;
 #endif
     }
     bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
@@ -487,6 +539,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     case BOAT_PLUGIN_UNCHANGED:
     case BOAT_PLUGIN_RENAMED:
         boat_session_rebind_voyage(session, route);
+        forward(plugin, session, revision, change, false);
         report(plugin, "applied", false, "PROGRESS KEPT", "R%u %s, %s", revision->number, how,
             boat_plugin_change_name(change));
         return false;
@@ -499,12 +552,18 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
             ids[i] = revision->voyage.shelter_ids[i];
         if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE)
             boat_session_rebind_voyage_live(session, route, shelter_id, ids, count);
+        forward(plugin, session, revision, change, false);
         report(plugin, "applied", false, "BOAT KEPT", "R%u %s, %s", revision->number, how,
             boat_plugin_change_name(change));
         return false;
     }
     case BOAT_PLUGIN_MIGRATE:
-        wake_objective_adopt(&plugin->run, revision->number, &plugin->run.staged_objective);
+        if (plugin->authority) {
+            ++plugin->run.generation; // The authority adopted the next generation.
+            plugin->authority->migrating = 0;
+        } else {
+            wake_objective_adopt(&plugin->run, revision->number, &plugin->run.staged_objective);
+        }
         boat_session_rebind_voyage(session, route);
         report(plugin, "applied", false, "STATE MIGRATED; NATIVE PROGRESS KEPT", "R%u %s",
             revision->number, how);
@@ -512,6 +571,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     case BOAT_PLUGIN_RESTART_VOYAGE:
         boat_session_restart_voyage(session, route);
         wake_plugin_reset_objective(plugin, session);
+        forward(plugin, session, revision, change, route && route->ordered);
         report(plugin, "applied", false, "VOYAGE RESTARTED AT THE START SHELTER", "R%u %s",
             revision->number, how);
         return false;
@@ -568,6 +628,10 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
 
 static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double now)
 {
+    if (plugin->authority && plugin->authority->migrating) {
+        report(plugin, "busy", false, "RETRY WHEN THE MIGRATION FINISHES", "MIGRATION IN PROGRESS");
+        return false;
+    }
     ++plugin->requests;
     close_stage(plugin); // Superseding a request also reaps its worker.
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
@@ -946,6 +1010,25 @@ bool wake_plugin_frame(
     if (!plugin->authoring)
         return false;
     plugin->frame_now = now;
+    WakePluginAuthority *a = plugin->authority;
+    if (a && a->migrating) {
+        const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
+        if (!held || held->number != a->migrating) {
+            a->migrating = 0; // The host dropped it; the authority keeps whatever it reported.
+        } else if (a->view.commits == a->migrate_seen || a->view.commit != a->migrating) {
+            if (reload || undo || apply)
+                report(plugin, "busy", false, "RETRY WHEN THE MIGRATION FINISHES",
+                    "MIGRATION IN PROGRESS");
+            return false;
+        } else if (a->view.commit_status == WAKE_COMMIT_APPLIED) {
+            return commit(plugin, session);
+        } else {
+            a->migrating = 0;
+            report(plugin, "migration_failed", true, a->view.message,
+                "MIGRATION FAILED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
+            return false;
+        }
+    }
 #if WAKE_PLUGIN_ISOLATED_OBJECTIVE
     unsigned actions = wake_web_plugin_actions();
     if (plugin->evaluation
@@ -1040,12 +1123,25 @@ void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom)
     const Color accent = { 90, 240, 255, 255 }, warning = { 255, 161, 0, 255 };
     char objective_lines[BOAT_PLUGIN_HUD][192] = { 0 };
     char *objective_line = objective_lines[0];
-    if (plugin->run.objective.quarantined)
-        snprintf(objective_line, sizeof(objective_lines[0]), "OBJECTIVE SUSPENDED: %.150s",
-            plugin->run.objective_diagnostic.message);
+    // L1b: a local authority's objective shows as its client last received it.
+    const WakePluginAuthority *a = plugin->authority;
+    static BoatPluginObjective shown;
+    const BoatPluginObjective *objective = &plugin->run.objective;
+    bool suspended = objective->quarantined;
+    const char *message = plugin->run.objective_diagnostic.message;
+    if (a) {
+        shown = (BoatPluginObjective) { .hud_count = a->view.valid ? a->view.hud_count : 0 };
+        memcpy(shown.hud, a->view.hud, sizeof(shown.hud));
+        objective = &shown;
+        suspended = a->view.valid && a->view.suspended;
+        message = a->view.message;
+    }
+    if (suspended)
+        snprintf(
+            objective_line, sizeof(objective_lines[0]), "OBJECTIVE SUSPENDED: %.150s", message);
     else {
-        BoatPluginHudOwner owner = { boat_plugin_host_active(&plugin->host)->voyage.manifest.id,
-            &plugin->run.objective };
+        BoatPluginHudOwner owner
+            = { boat_plugin_host_active(&plugin->host)->voyage.manifest.id, objective };
         BoatPluginHudRow rows[BOAT_PLUGIN_HUD];
         unsigned count = 0;
         boat_plugin_hud_compose(&owner, 1, rows, BOAT_PLUGIN_HUD, &count);
@@ -1188,8 +1284,18 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
     const BoatPluginRevision *active = boat_plugin_host_active(&p->host);
     // The objective's lines, with the host's scene line after its revision line.
     static char text[1 << 16];
-    size_t first = 0;
-    size_t size = wake_objective_inspect(&p->run, active->number, text, sizeof(text), &first);
+    size_t first = 0, size = 0;
+    if (p->authority) {
+        // L1b: the authority's lines from its latest inspection, when one has arrived.
+        size = p->authority->inspection ? p->authority->inspection_size : 0;
+        if (size > sizeof(text))
+            size = sizeof(text);
+        memcpy(text, p->authority->inspection ? p->authority->inspection : "", size);
+        const char *end = memchr(text, '\n', size);
+        first = end ? (size_t)(end - text) + 1 : size;
+    } else {
+        size = wake_objective_inspect(&p->run, active->number, text, sizeof(text), &first);
+    }
     fwrite(text, 1, first, output);
     fprintf(output,
         "scene present=%u version=%u digest=%016llx content=%u berths=%u modules=%u "

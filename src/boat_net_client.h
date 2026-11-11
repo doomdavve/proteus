@@ -259,10 +259,11 @@ bool boat_net_client_private_recover(BoatNetClient *client, uint64_t tick, Boat 
 // be sent.
 bool boat_net_client_private_inspect(BoatNetClient *client);
 // L1b, private sessions only: between frames, when the prediction stands at TICK (the authority's
-// tick), ask the authority to install REVISION with CHANGE, and predict POSE when the commit moves
-// the boat (NULL when it does not). False when it could not be sent.
-bool boat_net_client_private_commit(
-    BoatNetClient *client, uint64_t tick, uint32_t revision, uint8_t change, const Boat *pose);
+// tick), ask the authority to install REVISION with CHANGE, and predict what the authority's
+// adapter will report in PREDICTED (the boat when it moved, the scene when it changed) in the
+// mirror and prediction. False when it could not be sent.
+bool boat_net_client_private_commit(BoatNetClient *client, uint64_t tick, uint32_t revision,
+    uint8_t change, const BoatNetCommitResult *predicted);
 // L1: the storm the private world's water carries now, in the mirror and the prediction, as the
 // authority's rules adapter reported it in private state.
 void boat_net_client_private_storm(BoatNetClient *client, BoatStorm storm);

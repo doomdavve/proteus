@@ -1205,9 +1205,13 @@ target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 # AR6 (L0): the private local session against the game's direct free-boating path.
-add_executable(validate_boat_local tools/validate_boat_local.c)
-target_link_libraries(validate_boat_local PRIVATE proteus_local_drive proteus_boat_fixtures)
+add_executable(validate_boat_local tools/validate_boat_local.c tools/wake_velocity_plugin.c)
+target_link_libraries(validate_boat_local PRIVATE proteus_local_drive proteus_boat_fixtures
+  proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
+# authoring_trace opens plugins/shelter-tour; the saves case writes in the build directory.
+target_compile_definitions(validate_boat_local PRIVATE
+  BOAT_LOCAL_PLUGIN="${CMAKE_CURRENT_SOURCE_DIR}/plugins/shelter-tour")
 proteus_add_case_tests(boat_local validate_boat_local LABELS core cpu)
 
 add_executable(validate_boat_net tools/validate_boat_net.c)

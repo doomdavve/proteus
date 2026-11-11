@@ -59,11 +59,12 @@ typedef struct {
     // without it a request is ignored.
     bool (*recover)(void *context, uint64_t tick, unsigned slot, Boat *boat);
     // L1b, private sessions only: the client asked to install definition REVISION with CHANGE (the
-    // adapter's codes) at a frame boundary after TICK. BOAT holds SLOT's boat; true with *MOVED
-    // places the adapter's pose there in the same life, and the water's storm is read again
-    // (weather) before the next tick. False ignores the request. Optional.
+    // adapter's codes) at a frame boundary after TICK. RESULT holds SLOT's boat; true installs
+    // it: with RESULT->moved the boat is placed there in the same life, with RESULT->rescene the
+    // world's scene becomes RESULT->scene (an immutable resource, borrowed), and the water's storm
+    // is read again (weather) before the next tick. False ignores the request. Optional.
     bool (*commit)(void *context, uint64_t tick, unsigned slot, uint32_t revision, uint8_t change,
-        Boat *boat, bool *moved);
+        BoatNetCommitResult *result);
     // L1b, private sessions only: the adapter's inspection text, written into OUT (at most
     // CAPACITY bytes); the client asked for it. Returns its length. Optional.
     size_t (*inspect)(void *context, char *out, size_t capacity);

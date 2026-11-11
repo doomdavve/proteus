@@ -974,6 +974,15 @@ change is held for F7. A new revision after an Undo discards the undone ones (no
 Progress is never inferred from an old shelter index: a live route edit maps it by shelter ID,
 while a restart begins at shelter 0.
 
+In the native game the objective runs on the in-process local authority, and every commit
+reaches it before the next tick. A migration runs there: F7 (or `live-apply`) reports
+`migrating` while the active revision keeps running, and the result arrives on the next frame,
+either `applied` under the candidate's number or `migration_failed` with the active revision
+kept. Until then staging, Undo and F7 answer `busy` (MIGRATION IN PROGRESS). The objective's
+inspection lines come from the authority and answer `live-inspect` on the frame after it is
+asked; they can be a frame older than the owner fields. The browser runs the objective in its
+isolated worker instead.
+
 ## Live console and command layer (PC)
 
 Native solo free boating and voyages, and desktop browsers with a physical keyboard, release builds
@@ -1679,8 +1688,8 @@ failed), `stale` (a pin no longer matches), `busy`, `conflict` (for example, not
 Owner fields: `plugin`, active `revision`, `epoch`, gameplay `digest`, `undo_depth`, `staging`,
 `held_revision` (0 when nothing is held) with `held_change` (`renamed`, `live`, `migrate`,
 `restart_voyage`, `restart_session`, ...), `held_undo` and `held_base`; `outcome` (`staging`,
-`applied`, `held`, `unchanged`, `incompatible`, `rejected`, `migration_failed`, `canceled`,
-`discarded`, `nothing_to_undo`), the panel's `message`/`detail`/`alert`, any staging diagnostic
+`applied`, `held`, `unchanged`, `incompatible`, `rejected`, `migrating`, `migration_failed`,
+`busy`, `canceled`, `discarded`, `nothing_to_undo`), the panel's `message`/`detail`/`alert`, any staging diagnostic
 (`diagnostic_status`, `_file`, `_line`, `_field`, `_message`), and the session's `tick`, `boat_x`,
 `boat_z`, `heading`, `shelter`, `exposed` and `arrived`. Stage responses add the client's
 `bundle_id`; every response echoes `pins`, `request_id` and `session`.

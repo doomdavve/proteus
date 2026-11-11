@@ -480,9 +480,10 @@ then `f64` weather start, start, arrival and latest event time (40 bytes, big-en
 course's). The client derives the storm its water carries from these bytes and the route, which
 both endpoints borrow as an immutable resource. A voyage with a plugin revision appends its
 objective's tail: `u32` generation, `u32` the authority's active revision, `u32` the latest
-commit request's revision, `u8` its status (0 none, 1 applied, 2 migration failed), `u8` text
-length (at most 159), then that many bytes of text: the suspension's diagnostic when the objective
-is suspended, else a failed migration's (54 bytes plus the text). The objective's HUD and
+commit request's revision, `u32` commit requests handled, `u8` the latest one's status (0 none, 1
+applied, 2 migration failed), `u8` text length (at most 159), then that many bytes of text: the
+suspension's diagnostic when the objective is suspended, else a failed migration's (58 bytes plus
+the text). The objective's HUD and
 suspension travel as ObjectiveState, as a room objective's do; Lua state never leaves the
 authority.
 
@@ -496,10 +497,12 @@ whose adapter has no recovery is counted and ignored.
 opaque to the protocol. Sent at a frame boundary with the header tick equal to the authority's
 tick: the rules adapter (`BoatNetRules.commit`) resolves the host-managed revision by number and
 installs it before the next tick, the authority reads the water's storm again, and a commit that
-moves the boat relocates it in the same life, which the client predicts. The voyage adapter's
-changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's `migrate` runs on the
-authority; a failure keeps the active revision and reports it in PrivateState) and 4 restart the
-voyage. A request for another tick, from a peer that is not ready, for an unknown revision or to
+moves the boat relocates it in the same life; a commit that brings a new scene (the revision's
+borrowed scenery) installs it on the authority's world. The client predicts the relocation and the
+scene. The voyage adapter's changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's
+`migrate` runs on the authority; a failure keeps the active revision and its scene, and reports
+it in PrivateState) and 4 restart the voyage; the course adapter's only change is 1 rebind (an
+unchanged or renamed course). A request for another tick, from a peer that is not ready, for an unknown revision or to
 a server whose adapter has no commit is counted and ignored.
 
 `0xC4` PrivateInspect (channel 0, client to server): header only. The rules adapter

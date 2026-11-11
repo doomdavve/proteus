@@ -18,6 +18,7 @@
 #include "boat_test_world.h"
 #include "boat_time_control.h"
 #include "wake_velocity_local.h"
+#include "wake_velocity_plugin.h"
 
 #include "raymath.h"
 
@@ -93,6 +94,10 @@ static const BoatPluginRevision *objective_revision;
 static WakeObjective reference;
 // The frame after a migration request: the host rebinds its view only when the result arrives.
 static bool route_lag;
+// L1b authoring: the same package opened by a direct host (stepped as the game's direct path
+// steps its plugin) and by a host whose objective and commits run on the local authority.
+static WakePlugin *direct_plugin, *local_plugin;
+static WakePluginAuthority authority;
 static unsigned expected_count, observed, mismatches;
 static unsigned chunk_sizes[16], chunk_starts_mid, odd_chunks;
 
@@ -210,6 +215,8 @@ static void direct_frame(Frame f)
         BoatSession *s = &direct.session;
         if (objective_revision)
             wake_objective_before_tick(&reference);
+        if (direct_plugin)
+            wake_plugin_before_tick(direct_plugin);
         if (scripted)
             demo_step(s, (int)s->tick, NULL, NULL, &direct.objects);
         else if (autopilot)
@@ -221,6 +228,8 @@ static void direct_frame(Frame f)
                 NULL, NULL, &direct.objects);
         if (objective_revision)
             reference_after_tick();
+        if (direct_plugin)
+            wake_plugin_after_tick(direct_plugin, s);
         if (expected_count < TRACE)
             expected[expected_count++] = (Expected) { s->tick, s->boat, s->presentation,
                 boat_net_wake_digest(object_study_wakes(&direct.objects)) };
@@ -264,12 +273,22 @@ static bool local_frame(Frame f, double at)
         play.accumulator = 0;
     else
         play.accumulator += boat_time_frame_seconds(f.seconds, f.speed);
-    if (scripted || autopilot)
-        return wake_local_scripted_frame(
-            &game, &play.session, &play.objects, &play.accumulator, at, NULL);
-    return wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
-        (BoatInput) { .steering_rate = f.steering_rate }, f.thrust_target, f.steering_target, at,
-        NULL);
+    bool ok = scripted || autopilot
+        ? wake_local_scripted_frame(
+              &game, &play.session, &play.objects, &play.accumulator, at, NULL)
+        : wake_local_frame(&game, &play.session, &play.objects, &play.accumulator,
+              (BoatInput) { .steering_rate = f.steering_rate }, f.thrust_target, f.steering_target,
+              at, NULL);
+    if (ok && local_plugin) {
+        // The game's local_view: what the host's panel, inspection and migration wait read.
+        authority.view = game.objective;
+        size_t size;
+        uint64_t count;
+        authority.inspection = boat_local_inspection(lp, &size, &count);
+        authority.inspection_size = size;
+        authority.inspections = count;
+    }
+    return ok;
 }
 
 static bool same_text(const char *a, const char *b) { return a == b || (a && b && !strcmp(a, b)); }
@@ -310,6 +329,17 @@ static bool same_course(void)
 
 // L1: the client's voyage view and storm, and the authority adapter's voyage and the authority's
 // storm, equal the direct session's.
+// The route the local path borrows: the direct session's, or with two plugin hosts the local
+// host's active revision's (the same content in its own storage) once any migration has landed.
+static const BoatVoyageRoute *local_route(void)
+{
+    if (!local_plugin)
+        return direct.session.voyage.route;
+    if (local_plugin->authority->migrating)
+        return game.voyage.voyage.route;
+    return &boat_plugin_host_active(&local_plugin->host)->voyage.route;
+}
+
 static bool same_voyage(void)
 {
     uint8_t a[WAKE_VOYAGE_STATE_BYTES], b[WAKE_VOYAGE_STATE_BYTES], c[WAKE_VOYAGE_STATE_BYTES];
@@ -318,8 +348,9 @@ static bool same_voyage(void)
     wake_voyage_encode(&game.voyage.voyage, c);
     const BoatStorm *storm = &direct.session.world.water.storm;
     return !memcmp(a, b, sizeof(a)) && !memcmp(a, c, sizeof(a))
-        && (route_lag || play.session.voyage.route == direct.session.voyage.route)
-        && game.voyage.voyage.route == direct.session.voyage.route
+        && (route_lag || (local_plugin && local_plugin->authority->migrating)
+            || play.session.voyage.route == local_route())
+        && game.voyage.voyage.route == local_route()
         && !memcmp(storm, &play.session.world.water.storm, sizeof(*storm))
         && !memcmp(storm, &lp->server.fleet.world.water.storm, sizeof(*storm))
         && !memcmp(storm, &lp->client.prediction.fleet.world.water.storm, sizeof(*storm));
@@ -381,6 +412,33 @@ static bool same_objective(void)
     return true;
 }
 
+// L1b authoring: the direct host's objective equals the authority's, both hosts hold the same
+// revision and generation, and the local host's view shows the direct host's HUD.
+static bool same_authoring(void)
+{
+    const WakeObjective *a = &direct_plugin->run, *b = &game.voyage.objective;
+    const BoatPluginRevision *x = boat_plugin_host_active(&direct_plugin->host),
+                             *y = boat_plugin_host_active(&local_plugin->host);
+    if (boat_plugin_objective_digest(&a->objective) != boat_plugin_objective_digest(&b->objective)
+        || a->objective.quarantined != b->objective.quarantined
+        || a->objective_pending != b->objective_pending || a->event_count != b->event_count
+        || a->generation != b->generation || !same_trace(a, b))
+        return false;
+    // The frame a migration runs, the local host still holds the previous revision and generation.
+    const WakeObjectiveView *v = &authority.view;
+    if (!local_plugin->authority->migrating
+        && (local_plugin->run.generation != a->generation || x->number != y->number
+            || game.voyage.revision != y || v->revision != y->number))
+        return false;
+    if (!v->valid || v->revision != x->number || v->hud_count != a->objective.hud_count)
+        return false;
+    for (unsigned i = 0; i < v->hud_count; ++i)
+        if (strcmp(v->hud[i].label, a->objective.hud[i].label)
+            || v->hud[i].value != a->objective.hud[i].value)
+            return false;
+    return true;
+}
+
 // Run FRAMES of SCRIPT through both paths; compare at every tick and after every frame.
 static int drive(Script script, unsigned frames)
 {
@@ -419,6 +477,8 @@ static int drive(Script script, unsigned frames)
             CHECK(same_voyage());
         if (objective_revision)
             CHECK(same_objective());
+        if (direct_plugin)
+            CHECK(same_authoring());
         if (autopilot) {
             CHECK(same_course());
             // The frame's storage service: both flush (an empty best path fails the save).
@@ -1606,7 +1666,7 @@ static int objective_commits(void)
                 BOAT_PLUGIN_MIGRATE)
             || drive(ahead, 1))
             failed = 1;
-        CHECK(!failed && game.objective.commit == 4
+        CHECK(!failed && game.objective.commit == 4 && game.objective.commits == 3
             && game.objective.commit_status == WAKE_COMMIT_FAILED
             && strstr(game.objective.message, "no migrate") && game.objective.revision == 3
             && game.voyage.revision == r3 && reference.generation == 1
@@ -1645,6 +1705,135 @@ static int objective_commits(void)
     objective_revision = NULL;
     game.revision = NULL;
     game.resolve = NULL;
+    return failed;
+}
+
+// L1b authoring through the game's own glue (tools/wake_velocity_plugin.c): the hooks the game
+// gives a host whose objective and commits run on the local authority.
+static bool authoring_commit(void *context, BoatSession *session,
+    const BoatPluginRevision *revision, BoatPluginChange change, bool moved)
+{
+    (void)context;
+    return wake_local_commit(&game, session, &play.objects, revision, change, moved);
+}
+
+static bool authoring_inspect(void *context)
+{
+    (void)context;
+    return wake_local_inspect(&game);
+}
+
+static const BoatPluginRevision *authoring_revision(void *context, unsigned number)
+{
+    return wake_plugin_revision(context, number);
+}
+
+// Both hosts take the same controls between frames, as the game's wake_plugin_frame does.
+static int both_frame(bool undo, bool apply)
+{
+    bool a = wake_plugin_frame(direct_plugin, &direct.session, false, undo, apply, now);
+    bool b = wake_plugin_frame(local_plugin, &play.session, false, undo, apply, now);
+    CHECK(a == b && !authority.failed);
+    return 0;
+}
+
+// Stage SOURCE (appended to the package's table) with the package's manifest on both hosts.
+static int both_stage(const BoatPluginFiles *base, const char *source)
+{
+    static BoatPluginFiles files;
+    files = *base;
+    int n = snprintf(files.source, sizeof(files.source),
+        "local p=(function() %.*s\nend)(); %s; return p", (int)base->source_size, base->source,
+        source);
+    CHECK(n > 0 && (size_t)n < sizeof(files.source));
+    files.source_size = (size_t)n;
+    bool a = wake_plugin_stage_files(direct_plugin, &direct.session, &files, now);
+    bool b = wake_plugin_stage_files(local_plugin, &play.session, &files, now);
+    CHECK(a == b && direct_plugin->host.change == local_plugin->host.change);
+    return 0;
+}
+
+// Shelter tour authored on both paths: a migration applied with F7 (the local host commits a
+// frame later, once the authority has migrated), a failing migration (both keep their revision
+// and report it), and Undo back to revision 1 (a voyage restart with a new objective); every frame
+// the objective, revision, generation and HUD agree, and the inspection matches the direct host's.
+static int authoring_trace(void)
+{
+    static WakePlugin a, b;
+    static BoatPluginFiles base;
+    if (open_world(OUTER))
+        return 1;
+    wake_local_close(&game);
+    play_open(&direct);
+    play_open(&play);
+    CHECK(wake_plugin_open(&a, BOAT_LOCAL_PLUGIN, &direct.session, 0));
+    CHECK(wake_plugin_open(&b, BOAT_LOCAL_PLUGIN, &play.session, 0));
+    base = a.files;
+    authority = (WakePluginAuthority) { .commit = authoring_commit, .inspect = authoring_inspect };
+    direct_plugin = &a;
+    local_plugin = &b;
+    game.revision = boat_plugin_host_active(&b.host);
+    game.generation = b.run.generation;
+    game.resolve = authoring_revision;
+    game.resolve_context = &b;
+    wake_plugin_attach(&b, &authority);
+    voyaging = true;
+    CHECK(wake_local_open(&game, &play.session, &play.objects, worlds(), now));
+    int failed = drive(ahead, 40);
+    if (!failed) {
+        // A migration: the direct host commits at once; the local host waits for the authority.
+        failed = both_stage(&base,
+            "p.migrate=function(c,s) return s, {{kind='hud.set', generation=c.generation,"
+            " id='tour', label='MIGRATED', value=7}} end");
+        CHECK(!failed && a.host.change == BOAT_PLUGIN_MIGRATE);
+        failed = both_frame(false, true) || drive(ahead, 1);
+        CHECK(!failed && b.authority->migrating && !strcmp(b.outcome, "migrating"));
+        failed = both_frame(false, false);
+        CHECK(!failed && !b.authority->migrating && !strcmp(a.outcome, b.outcome));
+        failed = drive(ahead, 20);
+        CHECK(!failed && a.run.generation == 2 && b.run.generation == 2
+            && authority.view.generation == 2);
+        // A failing migration: nothing changes on either path.
+        failed = both_stage(&base, "p.migrate=function(c,s) error('refused') end")
+            || both_frame(false, true) || drive(ahead, 1) || both_frame(false, false);
+        CHECK(!failed && !strcmp(a.outcome, "migration_failed")
+            && !strcmp(b.outcome, "migration_failed") && strstr(b.detail, "refused"));
+        failed = both_frame(true, false) || drive(ahead, 10); // F6 discards the held candidate.
+        // Undo back to revision 1 and apply it.
+        failed = failed || both_frame(true, false);
+        CHECK(!failed && a.host.change == b.host.change);
+        failed = both_frame(false, true) || drive(ahead, 1) || both_frame(false, false)
+            || drive(ahead, 20);
+        CHECK(!failed && boat_plugin_host_active(&b.host)->number == 1);
+        // Inspection: the local host's text, with the authority's lines that arrive a frame
+        // later, equals the direct host's when it was asked.
+        static char want[1 << 16], got[1 << 16];
+        FILE *stream = tmpfile();
+        CHECK(stream);
+        wake_plugin_inspect(&a, stream);
+        size_t want_size = (size_t)ftell(stream);
+        rewind(stream);
+        CHECK(fread(want, 1, want_size, stream) == want_size);
+        fclose(stream);
+        CHECK(authoring_inspect(NULL) && !drive(ahead, 1) && authority.inspections == 1);
+        stream = tmpfile();
+        CHECK(stream);
+        wake_plugin_inspect(&b, stream);
+        size_t got_size = (size_t)ftell(stream);
+        rewind(stream);
+        CHECK(fread(got, 1, got_size, stream) == got_size);
+        fclose(stream);
+        CHECK(got_size == want_size && !memcmp(got, want, want_size));
+    }
+    printf("authoring: revision %u, generation %u, outcome %s\n",
+        boat_plugin_host_active(&b.host)->number, b.run.generation, b.outcome);
+    direct_plugin = local_plugin = NULL;
+    voyaging = false;
+    wake_local_close(&game);
+    game.revision = NULL;
+    game.resolve = NULL;
+    wake_plugin_close(&a, &direct.session);
+    wake_plugin_close(&b, &play.session);
     return failed;
 }
 
@@ -1729,6 +1918,7 @@ static int voyage_state(void)
     authority.revision = &tail_revision;
     authority.objective.generation = 9;
     authority.commit = 3;
+    authority.commits = 2;
     authority.commit_status = WAKE_COMMIT_FAILED;
     snprintf(authority.commit_message, sizeof(authority.commit_message), "bad migrate");
     BoatNetRules rules = wake_voyage_rules(&authority);
@@ -1738,8 +1928,8 @@ static int voyage_state(void)
     BoatNetObjectiveState hud = { .row_count = 1, .rows = { { "a", "ROW", 4 } } };
     CHECK(wake_voyage_objective_view(bytes, size, &hud, &view));
     CHECK(view.valid && view.generation == 9 && view.revision == 3 && view.commit == 3
-        && view.commit_status == WAKE_COMMIT_FAILED && !strcmp(view.message, "bad migrate")
-        && view.hud_count == 1 && view.hud[0].value == 4);
+        && view.commits == 2 && view.commit_status == WAKE_COMMIT_FAILED
+        && !strcmp(view.message, "bad migrate") && view.hud_count == 1 && view.hud[0].value == 4);
     CHECK(wake_voyage_decode(bytes, size, &back)); // The voyage reads its own bytes.
     CHECK(!wake_voyage_objective_view(bytes, size - 1, &hud, &view));
     CHECK(!wake_voyage_objective_view(bytes, WAKE_VOYAGE_STATE_BYTES, &hud, &view));
@@ -1857,6 +2047,7 @@ int main(int argc, char **argv)
         SLOW_CASE(objective_trace),
         SLOW_CASE(objective_quarantine),
         SLOW_CASE(objective_commits),
+        SLOW_CASE(authoring_trace),
         TEST_CASE(voyage_state),
         TEST_CASE(recover_ignored),
     };

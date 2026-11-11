@@ -153,6 +153,16 @@ static bool frame(WakeBridge *bridge, WakePlugin *plugin, BoatSession *session, 
     return wake_plugin_frame(plugin, session, false, false, false, now) || restart;
 }
 
+// L1b: a fake local authority that counts inspection requests and answers when the test says.
+static unsigned asked;
+static bool reachable = true;
+static bool fake_inspect(void *context)
+{
+    (void)context;
+    ++asked;
+    return reachable;
+}
+
 static int serve(WakePlugin *plugin, BoatSession *session, const char *stage)
 {
     static WakeBridge bridge;
@@ -211,7 +221,7 @@ int main(int argc, char **argv)
         "response-b2", "response-b3", "response-c1", "response-c2", "response-d1", "response-d2",
         "response-d3", "response-d4", "response-e1", "response-e2", "response-e3", "response-e4",
         "response-e5", "response-f1", "response-f2", "response-f3", "response-f4", "response-f5",
-        "response-a3", "response-d5", "response-c3", "response-c4" };
+        "response-a3", "response-d5", "response-c3", "response-c4", "response-d6", "response-d7" };
     for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
         join(path, sizeof(path), names[i]);
         remove(path);
@@ -386,6 +396,32 @@ int main(int argc, char **argv)
     for (unsigned i = 0; i < 8; ++i)
         CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(plugin.requests == requests && boat_plugin_host_held(&plugin.host));
+
+    // L1b: with a local authority the inspection is deferred until the authority's next one
+    // arrives, and its objective lines replace the host's.
+    static WakePluginAuthority authority = { .inspect = fake_inspect };
+    wake_plugin_attach(&plugin, &authority);
+    CHECK(send("d6", "operation=inspect\n", NULL));
+    CHECK(!frame(&bridge, &plugin, &session, now += .3));
+    CHECK(asked == 1 && !answered("d6"));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(!answered("d6")); // Still waiting for the authority.
+    static const char remote[] = "revision=5 schema=9 generation=3 tick=24 pending=0 "
+                                 "suspended=0\nrng=42 acknowledged=1 queued=0 diagnostic=\n";
+    authority.inspection = remote;
+    authority.inspection_size = sizeof(remote) - 1;
+    ++authority.inspections;
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("d6") && is("status", "ok"));
+    CHECK(strstr(response, "\ninspect=revision=5 schema=9 generation=3 tick=24 "));
+    CHECK(strstr(response, "\ninspect=rng=42 acknowledged=1 "));
+    CHECK(asked == 1);
+    // An authority that cannot be asked fails the request and stops the session.
+    reachable = false;
+    CHECK(send("d7", "operation=inspect\n", NULL));
+    CHECK(!frame(&bridge, &plugin, &session, now += .3));
+    CHECK(answered("d7") && is("status", "failed") && authority.failed);
+    wake_plugin_attach(&plugin, NULL);
 
     // Closing withdraws the session.
     wake_bridge_close(&bridge);

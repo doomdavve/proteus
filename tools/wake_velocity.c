@@ -520,6 +520,56 @@ static bool apply_screen_layout(BoatGpu *gpu, BoatScreenLayout layout)
             &gpu->scene, layout.reflection_width, layout.reflection_height);
 }
 
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+// L1b: the plugin's local authority. The host commits revisions and asks for inspections through
+// these; the authority resolves revisions in the host's table.
+typedef struct {
+    WakeLocal *local;
+    ObjectStudy *objects;
+} LocalAuthority;
+
+static bool local_commit(void *context, BoatSession *session, const BoatPluginRevision *revision,
+    BoatPluginChange change, bool moved)
+{
+    LocalAuthority *a = context;
+    return wake_local_commit(a->local, session, a->objects, revision, change, moved);
+}
+
+static bool local_inspect(void *context)
+{
+    LocalAuthority *a = context;
+    return wake_local_inspect(a->local);
+}
+
+static const BoatPluginRevision *local_revision(void *context, unsigned number)
+{
+    return wake_plugin_revision(context, number);
+}
+
+// Before an open or restart: the plugin's active voyage revision runs on the authority as the
+// generation the host has reached.
+static void local_plugin(WakeLocal *local, const WakePlugin *plugin, bool active)
+{
+    local->revision = active && plugin->host.depth && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
+        ? boat_plugin_host_active(&plugin->host)
+        : NULL;
+    local->generation = plugin->run.generation;
+    local->resolve = active ? local_revision : NULL;
+    local->resolve_context = (void *)plugin;
+}
+
+// After a local frame: the authority's objective and inspection as the client received them.
+static void local_view(WakePluginAuthority *authority, const WakeLocal *local)
+{
+    authority->view = local->objective;
+    size_t size;
+    uint64_t count;
+    authority->inspection = boat_local_inspection(&local->local, &size, &count);
+    authority->inspection_size = size;
+    authority->inspections = count;
+}
+#endif
+
 static int study(int argc, char **argv)
 {
     WakeLightingReview lighting_review = { 0 };
@@ -1255,15 +1305,22 @@ static int study(int argc, char **argv)
         goto cleanup;
     }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-    // AR6 (L0), L6, L2 and L1: plain free boating, the time trial (bundled or a course package)
-    // and voyages and tours without an objective, live, scripted (`--demo`) or captured, run as a
-    // local authority and client. Objectives, plugin authoring, the working harbour, rooms,
-    // replay viewing and the developer studies keep the direct path until their ledger rows
-    // migrate them.
+    // AR6 (L0), L6, L2, L1 and L1b: plain free boating, the time trial (bundled or a course
+    // package), voyages and tours with or without an objective, and `--plugin` authoring of each,
+    // live, scripted (`--demo`) or captured, run as a local authority and client. The working
+    // harbour, rooms, replay viewing and the developer studies keep the direct path until their
+    // ledger rows migrate them.
     static WakeLocal local;
+    // L1b: the plugin's objective and commits run on the local authority while it is active.
+    static WakePluginAuthority plugin_authority;
+    static LocalAuthority local_authority;
+    local_authority = (LocalAuthority) { &local, objects };
+    plugin_authority = (WakePluginAuthority) {
+        .context = &local_authority, .commit = local_commit, .inspect = local_inspect
+    };
 #define LOCAL_ELIGIBLE()                                                                           \
     (!networked && !work_mode && objects && !objects->crossing && !wake && !session.runs.playing   \
-        && plugin_active && !plugin.authoring && !plugin.run.objective.initialized                 \
+        && plugin_active                                                                           \
         && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
                     || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))
@@ -1295,6 +1352,10 @@ static int study(int argc, char **argv)
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
         // L6: the capture's scripted drive runs through the local session on virtual time.
         scripted_local = LOCAL_ELIGIBLE();
+        if (scripted_local) {
+            local_plugin(&local, &plugin, plugin_active);
+            wake_plugin_attach(&plugin, &plugin_authority);
+        }
         if (scripted_local
             && (!wake_local_open(&local, &session, objects, worlds, 0)
                 || !wake_local_scripted_drive(
@@ -1302,6 +1363,8 @@ static int study(int argc, char **argv)
             fprintf(stderr, "Single player could not start: %s.\n", local.local.failure);
             goto cleanup;
         }
+        if (scripted_local)
+            local_view(&plugin_authority, &local);
 #endif
         for (int tick = 0; !scripted_local && tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
             if (plugin_active)
@@ -1521,13 +1584,16 @@ static int study(int argc, char **argv)
         wake_work_autosave(&work, true);
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     // A capture's local session already ran its scripted drive (L6).
-    if (!local.active && LOCAL_ELIGIBLE()
-        && !wake_local_open(&local, &session, objects, worlds, GetTime())) {
-        snprintf(study_failure, sizeof(study_failure), "Single player could not start: %s.",
-            local.local.failure);
-        fprintf(stderr, "%s\n", study_failure);
-        result = 1;
-        goto cleanup;
+    if (!local.active && LOCAL_ELIGIBLE()) {
+        local_plugin(&local, &plugin, plugin_active);
+        wake_plugin_attach(&plugin, &plugin_authority);
+        if (!wake_local_open(&local, &session, objects, worlds, GetTime())) {
+            snprintf(study_failure, sizeof(study_failure), "Single player could not start: %s.",
+                local.local.failure);
+            fprintf(stderr, "%s\n", study_failure);
+            result = 1;
+            goto cleanup;
+        }
     }
 #endif
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
@@ -1852,11 +1918,15 @@ static int study(int argc, char **argv)
         if (plugin_active)
             plugin_restart |= wake_command_frame(&command, &plugin, &session, wake_app_now());
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
-        // L1: a session that stops being eligible between frames (the console promoted its plugin
-        // to authoring) continues on the direct path from the client's view, which holds the
-        // boat, clock, voyage, storm and wake pool, before any authoring change reaches it.
-        if (local.active && !LOCAL_ELIGIBLE())
-            wake_local_close(&local);
+        // L1b: authoring runs on the local authority too; a request it could not take stops the
+        // session (D10).
+        if (plugin_authority.failed) {
+            snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
+                local.local.failure);
+            fprintf(stderr, "%s\n", study_failure);
+            result = 1;
+            break;
+        }
 #endif
         if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
@@ -1952,9 +2022,12 @@ static int study(int argc, char **argv)
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
             // A restart recreates both endpoints with a new generation; a revision that is no
             // longer plain free boating continues on the direct path from the reset session.
-            if (local.active && !LOCAL_ELIGIBLE())
+            if (local.active)
+                local_plugin(&local, &plugin, plugin_active); // The revision may be new.
+            if (local.active && !LOCAL_ELIGIBLE()) {
                 wake_local_close(&local);
-            else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
+                wake_plugin_attach(&plugin, NULL);
+            } else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
                 snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
                     local.local.failure);
                 fprintf(stderr, "%s\n", study_failure);
@@ -1998,6 +2071,8 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
+            if (local.active)
+                local_view(&plugin_authority, &local);
 #endif
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
             // L0's removal point: a local session's ticks never fall back to the direct path;
@@ -2544,6 +2619,8 @@ cleanup:
             (unsigned long long)local.local.stats.chunks, local.local.stats.max_chunks,
             (unsigned long long)local.local.stats.restarts);
     wake_local_close(&local);
+    if (plugin.authority)
+        wake_plugin_attach(&plugin, NULL);
     local.local.stats = (BoatLocalStats) { 0 };
 #endif
     if (lighting_review.state) {

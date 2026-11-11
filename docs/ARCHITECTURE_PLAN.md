@@ -10,10 +10,9 @@ browser-built or Windows-built.
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-L1a (voyages and tours without an objective on the local authority) is implemented on
-`arch/l1-voyages`; native voyage manual check owed.
-**Next:** L1b (authoring and objectives on the authority, L9 folded in); design and
-decisions L1-1 to L1-4 accepted 2026-11-11.
+L1a (voyages and tours) and L1b (authoring and objectives on the authority, L9 folded in) are
+implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); windowed native checks owed.
+**Next:** the user's windowed L1a and L1b checks, then one PR for L1 (decision L1-4).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1013,6 +1012,52 @@ L1b (authoring and objectives on the authority), design 2026-11-11; the user acc
 | L1-2 | Objective inspection (live-inspect, `--inspect`) | (a) a private inspect request the authority answers in reliable chunks (the state can be 16 KiB); (b) a summary only (tick, digests, queue, HUD, trace), with state bytes from the review tool; (c) the glue reads the adapter directly, a documented exception to rule 2 for developer inspection | (a): keeps rule 2 and today's output |
 | L1-3 | Staging while a commit is in flight | (a) hold staging, Undo and F7 for that frame; (b) let a new stage replace the candidate and cancel the request | (a): one frame, never visible to the player |
 | L1-4 | Branch and PR | (a) L1a and L1b in one PR (the milestone); (b) open the L1a PR now and L1b as the next milestone | (a), after your windowed L1a check |
+
+<a id="l1b-status"></a>L1b implemented 2026-11-11 (steps: objective transaction extracted to
+`tools/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
+PrivateInspect/Inspection, then the game's wiring):
+
+- The objective transaction (`WakeObjective`: checkpoint, event queue, sequence, staged batch,
+  generation, diagnostic, trace) is one module used by the direct path (browser, review tools)
+  and the voyage adapter. The client sees it as `WakeObjectiveView`: the HUD via ObjectiveState
+  and an 18-byte tail plus text in PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)).
+- Commits: `BoatNetRules.commit` returns `BoatNetCommitResult` (relocated boat, new scene); the
+  server installs the scene and relocation and reads the storm again, the client predicts both.
+  The voyage adapter handles rebind, live, migrate (two-phase, L1-1) and restart voyage; the
+  course adapter rebinds an unchanged or renamed course. Session restarts stay new local
+  generations.
+- The game (`tools/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
+  (`wake_plugin_attach`) forwards every host commit; a migration holds staging, Undo and F7 with
+  `busy` until its result arrives (L1-3), then commits or reports `migration_failed`.
+  `wake_plugin_inspect` and the bridge's `inspect` take the objective's lines from the
+  authority's latest inspection (L1-2). `LOCAL_ELIGIBLE` admits authoring and objectives; L1a's
+  hand-back on promotion is gone, and an authority that cannot be asked stops the session
+  ("Single player stopped").
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_local` gains `objective_trace`, `objective_quarantine`, `objective_commits` and
+  `authoring_trace` (slow) and extends `voyage_state`; `wake_velocity_bridge` checks the
+  deferred inspection with a fake authority ([cases](TESTING.md#network-checks)).
+  `wake_plugin_inspect` on the local path prints the same text as the direct host
+  (`authoring_trace`) and as a `main` build through `boat_plugin_review`.
+- Captures byte-identical to a build of `190f17b` (L1a): `outer` and `basin` at `--time` 3, 20
+  and 60, `--course` at 3 and 25, `--location outer` with `--package proteus.harbor-life` and
+  `proteus.grodan --skin grodan` at 5 and 40, and `--plugin` Shelter tour (now local),
+  Långedrag, Harbor life, Time trial and Basin free at 5 and 40. Captures do not draw the
+  authoring panel.
+- `ctest --preset full -j8` passed 526/526 (13 disabled). No browser or Windows build.
+
+Limitations: the objective's inspection lines can be one frame older than the host's owner
+fields; F7 on a migration takes effect a frame later than on the direct path; a predicted tick
+after a commit uses the new scene and storm only once the snapshot corrects it if the client's
+prediction differed; the browser and review tools keep the direct path until L4.
+
+Owed manual checks (windowed, native): `--plugin plugins/shelter-tour` with the panel HUD, a
+save that stages a migration and F7 (MIGRATION IN PROGRESS for one frame, then applied), a
+failing migration, F6 Undo, a live route edit and a live marina layout edit, the console
+promoting a running bundled voyage to authoring, and `plugin_author.py live-inspect` against a
+running game; plus L1a's owed voyage and tour checks.
 
 ### AR8 — Move files into owning directories
 
