@@ -174,6 +174,14 @@ static bool run_frame(BoatLocal *local, double now, unsigned grant, BoatInput in
             local->running = false;
             return false;
         }
+        uint64_t states = client->stats.private_states;
+        if (local->config.weather && states != local->weather_states) {
+            local->weather_states = states;
+            BoatStorm storm;
+            if (local->config.weather(local->config.weather_context, client->private_state,
+                    client->private_state_size, &storm))
+                boat_net_client_private_storm(client, storm);
+        }
         remaining -= count;
         ++chunks;
     }
@@ -200,6 +208,28 @@ bool boat_local_frame_scripted(BoatLocal *local, double now, unsigned grant,
     return run_frame(local, now, grant, (BoatInput) { 0 }, NAN, NAN, script, observer);
 }
 
+bool boat_local_recover(BoatLocal *local, Boat pose)
+{
+    if (!local->running || !boat_net_client_private_recover(&local->client, local->tick, pose)) {
+        fail(local, "the local client could not recover its boat");
+        return false;
+    }
+    return true;
+}
+
+bool boat_local_commit(BoatLocal *local, uint32_t revision, uint8_t change,
+    const BoatNetCommitResult *predicted, BoatStorm storm)
+{
+    if (!local->running
+        || !boat_net_client_private_commit(
+            &local->client, local->tick, revision, change, predicted)) {
+        fail(local, "the local client could not commit a revision");
+        return false;
+    }
+    boat_net_client_private_storm(&local->client, storm);
+    return true;
+}
+
 const BoatFleet *boat_local_view(const BoatLocal *local) { return &local->client.prediction.fleet; }
 
 unsigned boat_local_slot(const BoatLocal *local) { return local->client.slot; }
@@ -210,4 +240,26 @@ const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *
     *size = c->private_state_size;
     *tick = c->private_state_tick;
     return c->private_state_size ? c->private_state : NULL;
+}
+
+const BoatNetObjectiveState *boat_local_objective(const BoatLocal *local)
+{
+    return local->client.objective_valid ? &local->client.objective : NULL;
+}
+
+bool boat_local_inspect(BoatLocal *local)
+{
+    if (!local->running || !boat_net_client_private_inspect(&local->client)) {
+        fail(local, "the local client could not request an inspection");
+        return false;
+    }
+    return true;
+}
+
+const char *boat_local_inspection(const BoatLocal *local, size_t *size, uint64_t *count)
+{
+    const BoatNetClient *c = &local->client;
+    *size = c->inspection_size;
+    *count = c->stats.inspections;
+    return c->stats.inspections ? c->inspection : NULL;
 }

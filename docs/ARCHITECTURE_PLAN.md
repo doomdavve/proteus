@@ -1,16 +1,19 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
+**Status, 2026-11-11:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
 [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). AR2–AR6 milestone
-(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. The user played it on macOS (see the
-[AR3 status](#ar3-status)); nothing browser-built or Windows-built.
+(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. AR7's L6, L0's removal and L2 (time
+trial on the wake pool and the local authority, [D11](ARCHITECTURE_AR1.md#product-decisions))
+merged as PR #181 ([AR7 status](#ar7-status)). The user played both on macOS; nothing
+browser-built or Windows-built.
 **Open:** remaining manual native, browser and Windows checks per step; the menu-gated touch
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** L6, L0's removal and L2 (time trial on the wake pool and the local authority) are
-implemented on `arch/l6-scripted-drives` ([AR7 status](#ar7-status)); then L1 with L9 (voyages,
-objectives and plugin authoring).
+L1a (voyages and tours) and L1b (authoring and objectives on the authority, L9 folded in) are
+implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); the user approved the L1 PR on
+2026-11-11 and defers windowed checks until every L* row is done.
+**Next:** the remaining AR7 rows (L3, L4, L5, L7, L8); the user's manual checks follow them.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -791,7 +794,7 @@ change.
 
 #### AR7 status
 
-2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178), not pushed.
+2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178); merged as PR #181.
 
 L6 (scripted demos and captures) and L0's removal point, implemented:
 
@@ -900,6 +903,163 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10):
 Owed manual checks: a native windowed time trial (feel on the wake pool, finish, new best saved
 and loaded as the ghost on the next launch, practice at altered time, restart), plus the L0 items
 still open from AR6. Browser and Windows: nothing run.
+
+L1 is split into two steps on branch `arch/l1-voyages` (from `main` after PR #181): L1a
+voyages and tours without an objective, and L1b, authoring and objectives on the authority
+(ledger L9 folded in). The first split had a separate L1b for the objective adapter; it was
+merged into the authoring step on 2026-11-11 (the user's choice) because a voyage objective exists only while
+authoring: the catalog generator refuses an objective on any bundled package except a free one
+(`tools/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
+console has promoted can run one, and authoring stayed on the direct path.
+
+L1a (voyage state, events, weather and recover), implemented 2026-11-11:
+
+- Authority adapter: `tools/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
+  authority's `BoatNetRules` for a session with a voyage route. `committed` steps the voyage from
+  the committed boat as `boat_session_step` does. Two new optional private-only callbacks:
+  `weather` (the storm the world's water carries from the next tick; the server writes it into
+  its fleet's water) and `recover`. Voyage state reaches the client as PrivateState (40 bytes,
+  [protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)); the glue decodes
+  it into the session's voyage and storm after each frame. The route is an immutable resource
+  both sides borrow.
+- Weather on the client: `BoatLocalConfig.weather` reads each new private state after a chunk and
+  sets the storm in the client's mirror and prediction (`boat_net_client_private_storm`). Ticks
+  predicted between the weather's start and the end of that chunk use the previous storm; the
+  chunk's snapshot corrects them. Shipped voyages start the weather 2.5 km from a storm of 700 m
+  radius, so the hull never meets that difference, and the validator finds every predicted tick
+  equal.
+- Recover: new private type `0xC2` PrivateRecover (client to server, header only). Between
+  frames the glue computes the recovery from the client's voyage view, the client predicts it and
+  sends the request, and the authority's adapter places its own pose before the next frame's
+  first tick (`boat_fleet_relocate`: the same life, so in-flight commands stay valid; the wake
+  span restarts). The session shows the recovered boat, voyage and presentation at once, as
+  `boat_session_recover` does.
+- The game: `LOCAL_ELIGIBLE` admits voyage packages with a route and no objective (the bundled
+  Långedrag voyage, Harbor life and the Grodan and canal tours). A session that stops being
+  eligible between frames (the console promoted its plugin to authoring) closes the local session
+  and continues on the direct path from the client's view, before an authoring change reaches it.
+  Voyages with an objective (Shelter tour) and `--plugin` authoring keep the direct path until
+  L1b.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_local` gains `voyage_trace` (about 0.7 s) and `tour_trace` (about 0.14 s), slow lane, and
+  `voyage_state` and `recover_ignored`, quick ([cases](TESTING.md#network-checks)). Negative
+  checks during development: a server that ignores the adapter's storm fails `voyage_trace`
+  (`same_voyage`), and one that ignores the recovery fails it (`same_authority`).
+- Captures byte-identical to a build of `dba5bc1` (the direct path): `outer` at `--time` 3, 20
+  and 60 (the Långedrag voyage, now local), `basin` at 3, 20 and 60, `--course` at 3 and 25,
+  `--package proteus.harbor-life` and `--package proteus.grodan --skin grodan` at 5 and 40 (local),
+  and `--plugin plugins/shelter-tour` at 5 and 40 (direct path).
+- `ctest --preset full -j8` passed 522/522 (13 disabled). No browser or Windows build.
+
+Owed manual checks: a native windowed voyage and tour (recover after passing a shelter by holding
+Backspace, the weather building near the storm, arrival, restart), and promoting a running
+voyage to authoring from the console.
+
+L1b (authoring and objectives on the authority), design 2026-11-11; the user accepted
+[L1-1 to L1-4](#l1b-decisions) as recommended on 2026-11-11:
+
+- Scope: native `--plugin DIR` sessions of every solo kind (voyage, course, free) and runtime
+  packages the console promotes. The browser keeps its authoring and isolated objective on the
+  direct path until L4. The developer review tools (`boat_plugin_review`, `boat_plugin_worker`
+  preview checkpoints and seeks) stay on the direct path as isolated tools, like the studies.
+- Ownership. Host management, in the glue (`WakePlugin`), unchanged: files, save polling, the
+  staging workers, the revision table and Undo, the held candidate and its policy (offer, F7,
+  the live-ready check from the client's view), the console, the bridge and the status text.
+  Immutable resources: a committed revision (route, shelter ids, objective source, scene,
+  course) is borrowed by the authority; the host keeps `BOAT_PLUGIN_UNDO + 2` slots and only a
+  later commit reuses one, after the authority has moved its borrow. The authority's adapter
+  (the voyage adapter, extended): voyage progress and the objective transaction (checkpoint,
+  event queue, sequence, the batch staged for T+1, timers, quarantine and diagnostic), as the
+  room objective does (`tools/boat_room_objective.c`). Lua runs on the native authority, as in
+  hosted rooms.
+- The objective on the authority: after each committed tick the adapter queues the voyage's
+  events and, every 12 ticks, runs the update; the batch commits before the next tick
+  (`wake_plugin_before_tick`/`after_tick` semantics, moved, not reinvented). A recovery
+  queues `voyage.recovered` at once, as the direct path does after `boat_session_recover`.
+- To the client: the HUD rows and suspension through the existing ObjectiveState message
+  (8 rows of 24-byte ids and labels fit the plugin HUD exactly; `rules.state`); the suspension
+  text (160 bytes) joins the voyage's 40 bytes of PrivateState. The authoring panel draws from
+  these instead of `plugin.objective`.
+- Commit: the host decides as today; between frames the glue sends a new private request
+  (`0xC3` PrivateCommit: the candidate's revision number and change) and holds the candidate.
+  The authority applies it before the next tick: unchanged or renamed rebind the route; live
+  remaps the current shelter by id; restart voyage restarts the voyage and starts a new
+  objective generation; migrate runs the candidate's `migrate` on the authority's checkpoint.
+  The result returns in PrivateState and the host commits its table (or reports "MIGRATION
+  FAILED; KEEPING Rn") on the next frame, so the host's active revision is always the
+  authority's. While a commit is in flight, staging, Undo and F7 wait one frame. A session
+  restart (new water or marina layout) and every course or free commit that changes the session
+  are a new local generation (`wake_local_restart`), as plain restarts are.
+- Inspection: `wake_plugin_inspect` and the bridge's live-inspect keep the host's lines
+  (revision, scene, memory) and take the objective's (tick, digests, queue, HUD, timers, state
+  bytes, trace) from the authority (decision L1-2).
+- The direct path keeps no authoring role in the native game: L1a's hand-back on promotion is
+  removed, and `LOCAL_ELIGIBLE` admits authoring and objectives. `wake_plugin_before_tick` and
+  `after_tick` remain for the browser (L4) and the review tools.
+- Tests: an objective trace (`boat_local`) that runs Shelter tour on the direct path and the
+  local session from the same commands and requires equal objective digests, events, HUD and
+  quarantine on every tick; one per commit kind (unchanged, live, migrate accepted and refused,
+  restart voyage, restart session) landing between the same ticks as the direct path; Undo;
+  a failing callback quarantining on both; the existing plugin session, stage, console and
+  bridge validators passing unchanged; Shelter tour captures byte-identical.
+
+<a id="l1b-decisions"></a>Decisions (all accepted as recommended, 2026-11-11):
+
+| ID | Question | Options | Recommendation |
+| --- | --- | --- | --- |
+| L1-1 | When a migrate runs | (a) on the authority, two-phase: the host commits a frame later; (b) the host commits first and the authority runs migrate, rolling the host back on failure | (a): the host's active revision never differs from the authority's |
+| L1-2 | Objective inspection (live-inspect, `--inspect`) | (a) a private inspect request the authority answers in reliable chunks (the state can be 16 KiB); (b) a summary only (tick, digests, queue, HUD, trace), with state bytes from the review tool; (c) the glue reads the adapter directly, a documented exception to rule 2 for developer inspection | (a): keeps rule 2 and today's output |
+| L1-3 | Staging while a commit is in flight | (a) hold staging, Undo and F7 for that frame; (b) let a new stage replace the candidate and cancel the request | (a): one frame, never visible to the player |
+| L1-4 | Branch and PR | (a) L1a and L1b in one PR (the milestone); (b) open the L1a PR now and L1b as the next milestone | (a), after your windowed L1a check |
+
+<a id="l1b-status"></a>L1b implemented 2026-11-11 (steps: objective transaction extracted to
+`tools/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
+PrivateInspect/Inspection, then the game's wiring):
+
+- The objective transaction (`WakeObjective`: checkpoint, event queue, sequence, staged batch,
+  generation, diagnostic, trace) is one module used by the direct path (browser, review tools)
+  and the voyage adapter. The client sees it as `WakeObjectiveView`: the HUD via ObjectiveState
+  and an 18-byte tail plus text in PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)).
+- Commits: `BoatNetRules.commit` returns `BoatNetCommitResult` (relocated boat, new scene); the
+  server installs the scene and relocation and reads the storm again, the client predicts both.
+  The voyage adapter handles rebind, live, migrate (two-phase, L1-1) and restart voyage; the
+  course adapter rebinds an unchanged or renamed course. Session restarts stay new local
+  generations.
+- The game (`tools/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
+  (`wake_plugin_attach`) forwards every host commit; a migration holds staging, Undo and F7 with
+  `busy` until its result arrives (L1-3), then commits or reports `migration_failed`.
+  `wake_plugin_inspect` and the bridge's `inspect` take the objective's lines from the
+  authority's latest inspection (L1-2). `LOCAL_ELIGIBLE` admits authoring and objectives; L1a's
+  hand-back on promotion is gone, and an authority that cannot be asked stops the session
+  ("Single player stopped").
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
+
+- `boat_local` gains `objective_trace`, `objective_quarantine`, `objective_commits` and
+  `authoring_trace` (slow) and extends `voyage_state`; `wake_velocity_bridge` checks the
+  deferred inspection with a fake authority ([cases](TESTING.md#network-checks)).
+  `wake_plugin_inspect` on the local path prints the same text as the direct host
+  (`authoring_trace`) and as a `main` build through `boat_plugin_review`.
+- Captures byte-identical to a build of `190f17b` (L1a): `outer` and `basin` at `--time` 3, 20
+  and 60, `--course` at 3 and 25, `--location outer` with `--package proteus.harbor-life` and
+  `proteus.grodan --skin grodan` at 5 and 40, and `--plugin` Shelter tour (now local),
+  Långedrag, Harbor life, Time trial and Basin free at 5 and 40. Captures do not draw the
+  authoring panel.
+- `ctest --preset full -j8` passed 526/526 (13 disabled). No browser or Windows build.
+
+Limitations: the objective's inspection lines can be one frame older than the host's owner
+fields; F7 on a migration takes effect a frame later than on the direct path; a predicted tick
+after a commit uses the new scene and storm only once the snapshot corrects it if the client's
+prediction differed; the browser and review tools keep the direct path until L4.
+
+Owed manual checks (windowed, native; deferred by the user on 2026-11-11 until all L* rows
+are done): `--plugin plugins/shelter-tour` with the panel HUD, a
+save that stages a migration and F7 (MIGRATION IN PROGRESS for one frame, then applied), a
+failing migration, F6 Undo, a live route edit and a live marina layout edit, the console
+promoting a running bundled voyage to authoring, and `plugin_author.py live-inspect` against a
+running game; plus L1a's owed voyage and tour checks.
 
 ### AR8 — Move files into owning directories
 

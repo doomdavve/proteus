@@ -9,6 +9,7 @@
 #include "boat_profile.h"
 #include "wake_velocity_course.h"
 #include "wake_velocity_drive.h"
+#include "wake_velocity_voyage.h"
 
 // Zero-initialize.
 typedef struct {
@@ -17,6 +18,18 @@ typedef struct {
     // L2: a time trial (the session's course is enabled) runs its course on the authority.
     bool course_active;
     WakeCourseAuthority course;
+    // L1: a voyage or tour (the session has a voyage route) runs its voyage on the authority.
+    bool voyage_active;
+    WakeVoyageAuthority voyage;
+    // L1b: the active plugin revision whose objective the authority runs (borrowed; NULL for
+    // none) and the generation the next open or restart starts it as. Set by the game.
+    const BoatPluginRevision *revision;
+    unsigned generation;
+    // L1b: the host's revision table, through which the authority resolves a commit's revision.
+    WakeVoyageResolve resolve;
+    void *resolve_context;
+    // L1b: the client's view of the authority's objective after each frame.
+    WakeObjectiveView objective;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
     void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
     void *traced_context;
@@ -27,7 +40,8 @@ typedef struct {
 // Start a session from SESSION's location, water, scene, handling and boat and OBJECTS' pool
 // recipe. WORLDS is the game's location table. A session with its course enabled is a time trial
 // (L2): speedboat handling and the course adapter on the authority, recording when SESSION
-// records runs, against its best. False with LOCAL's failure text.
+// records runs, against its best. A session with a voyage route runs the voyage adapter (L1).
+// False with LOCAL's failure text.
 bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectStudy *objects,
     const BoatWorldResources *worlds, double now);
 // After the game restarted SESSION and OBJECTS: a new generation from their reset state.
@@ -49,6 +63,20 @@ bool wake_local_scripted_frame(WakeLocal *local, BoatSession *session, ObjectStu
 // BOAT_LOCAL_MAX_GRANT on virtual time (each grant at its starting tick's time).
 bool wake_local_scripted_drive(
     WakeLocal *local, BoatSession *session, ObjectStudy *objects, uint64_t ticks);
+// L1: between frames, recover the boat to the voyage's latest shelter, as boat_session_recover
+// does: SESSION shows the recovered boat, presentation and voyage at once, and the authority
+// applies the same recovery before the next frame's first tick. False on an endpoint failure.
+bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *objects);
+// L1b: between frames, after the host committed REVISION with CHANGE into SESSION (its view: the
+// voyage rebound or restarted, the boat at the tour start when MOVED), the authority installs
+// the same revision before the next frame's first tick. A migration's outcome arrives in
+// LOCAL's objective view after that frame (its commit and commit_status); until then SESSION's
+// revision must not change. False on an endpoint failure.
+bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    const BoatPluginRevision *revision, BoatPluginChange change, bool moved);
+// L1b: ask the authority for its objective's inspection lines; they arrive within the next frame
+// (boat_local_inspection). False on an endpoint failure.
+bool wake_local_inspect(WakeLocal *local);
 void wake_local_close(WakeLocal *local);
 
 #endif

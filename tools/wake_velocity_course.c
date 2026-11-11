@@ -121,10 +121,29 @@ static size_t private_state(void *context, uint8_t *out)
     return wake_course_encode(context, out);
 }
 
+// L1b: an unchanged or renamed course revision: the same gates in the new revision's storage, so
+// the authority never borrows a revision the host may reuse.
+static bool commit(void *context, uint64_t tick, unsigned slot, uint32_t revision, uint8_t change,
+    BoatNetCommitResult *result)
+{
+    (void)tick;
+    (void)result;
+    WakeCourseAuthority *c = context;
+    const BoatCourseDefinition *definition = c->resolve && change == WAKE_COURSE_REBIND
+        ? c->resolve(c->resolve_context, revision)
+        : NULL;
+    if (slot != c->slot || !definition)
+        return false;
+    c->definition = definition;
+    c->course.definition = definition;
+    return true;
+}
+
 BoatNetRules wake_course_rules(WakeCourseAuthority *course)
 {
-    return (
-        BoatNetRules) { .context = course, .committed = committed, .private_state = private_state };
+    return (BoatNetRules) {
+        .context = course, .committed = committed, .private_state = private_state, .commit = commit
+    };
 }
 
 void wake_course_practice(WakeCourseAuthority *course)

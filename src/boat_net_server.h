@@ -51,6 +51,23 @@ typedef struct {
     // BOAT_NET_PRIVATE_STATE_BYTES); zero for none. Called at the end of every grant; the state is
     // sent to each ready peer (BOAT_NET_PRIVATE_STATE) when it differs from the last one sent.
     size_t (*private_state)(void *context, uint8_t *out);
+    // L1, private sessions only: the storm the world's water carries from the next tick, after
+    // committed. False leaves the water as it is. Optional.
+    bool (*weather)(void *context, BoatStorm *storm);
+    // L1, private sessions only: the client asked to recover SLOT at a frame boundary after TICK.
+    // BOAT holds its current boat; true places the adapter's pose there in the same life. Optional;
+    // without it a request is ignored.
+    bool (*recover)(void *context, uint64_t tick, unsigned slot, Boat *boat);
+    // L1b, private sessions only: the client asked to install definition REVISION with CHANGE (the
+    // adapter's codes) at a frame boundary after TICK. RESULT holds SLOT's boat; true installs
+    // it: with RESULT->moved the boat is placed there in the same life, with RESULT->rescene the
+    // world's scene becomes RESULT->scene (an immutable resource, borrowed), and the water's storm
+    // is read again (weather) before the next tick. False ignores the request. Optional.
+    bool (*commit)(void *context, uint64_t tick, unsigned slot, uint32_t revision, uint8_t change,
+        BoatNetCommitResult *result);
+    // L1b, private sessions only: the adapter's inspection text, written into OUT (at most
+    // CAPACITY bytes); the client asked for it. Returns its length. Optional.
+    size_t (*inspect)(void *context, char *out, size_t capacity);
 } BoatNetRules;
 
 typedef struct {
@@ -122,6 +139,9 @@ typedef struct {
     uint32_t revision; // The running definition's revision (1 at start).
     uint64_t spawn_requests, resyncs, output_faults, emission_failures, births_truncated;
     uint64_t private_states; // Private state messages sent (L2).
+    uint64_t recoveries, recoveries_ignored; // Private recover requests (L1).
+    uint64_t commits, commits_ignored; // Private commit requests (L1b).
+    uint64_t inspections; // Private inspection texts sent (L1b).
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
 

@@ -31,13 +31,21 @@ typedef struct {
     // The pending finish request: one run, moved to the host by wake_course_take.
     bool pending, pending_faster, pending_practice;
     BoatReplay run;
+    // L1b: a renamed or unchanged course revision's definition by number (the host's table),
+    // which a commit rebinds to. NULL ignores commits.
+    const BoatCourseDefinition *(*resolve)(void *context, unsigned revision);
+    void *resolve_context;
 } WakeCourseAuthority;
+
+// The course adapter's commit code: the same course in another revision's storage.
+#define WAKE_COURSE_REBIND 1
 
 // A new generation at the course start: SESSION's course definition, boat (the spawn), water,
 // presentation and runs (its best and record_runs). Releases any earlier recording.
 void wake_course_init(WakeCourseAuthority *course, const BoatSession *session, unsigned slot);
 void wake_course_destroy(WakeCourseAuthority *course);
-// The rules adapter for the local authority: committed ticks and private state.
+// The rules adapter for the local authority: committed ticks, private state and rebinding
+// commits.
 BoatNetRules wake_course_rules(WakeCourseAuthority *course);
 // Host management before a frame's ticks: latch practice for the attempt (no effect once
 // finished), as altered time or console use does.

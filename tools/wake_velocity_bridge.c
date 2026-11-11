@@ -240,7 +240,8 @@ static void respond(WakeBridge *bridge, const char *id, const char *status, cons
 }
 
 bool wake_bridge_open(WakeBridge *bridge, const char *directory, double now)
-{    memset(bridge, 0, sizeof(*bridge));
+{
+    memset(bridge, 0, sizeof(*bridge));
     if (strlen(directory) >= sizeof(bridge->directory) - 64 || !private_directory(directory)) {
         fprintf(stderr, "Plugin bridge: cannot use directory %s\n", directory);
         return false;
@@ -278,7 +279,8 @@ void wake_bridge_commands(WakeBridge *bridge, WakeCommand *commands)
 }
 
 void wake_bridge_close(WakeBridge *bridge)
-{    if (!bridge->open)
+{
+    if (!bridge->open)
         return;
     if (bridge->pending[0])
         respond(bridge, bridge->pending, "cancelled", "the game closed", NULL, NULL, false);
@@ -421,8 +423,8 @@ static bool handle(
             return false;
         }
         if (!bridge->commands) {
-            respond(bridge, q->id, "bad_request", "no console in this session", plugin, session,
-                false);
+            respond(
+                bridge, q->id, "bad_request", "no console in this session", plugin, session, false);
             return false;
         }
         if (!q->payload_size || q->payload_size >= WAKE_COMMAND_LINE
@@ -443,6 +445,19 @@ static bool handle(
         return restart;
     }
     if (!strcmp(op, "inspect")) {
+        WakePluginAuthority *a = plugin->authority;
+        if (a) {
+            // L1b: the objective's lines come from the authority, answered next frame.
+            if (!a->inspect(a->context)) {
+                a->failed = true;
+                respond(bridge, q->id, "failed", "the local authority could not be asked", plugin,
+                    session, false);
+                return false;
+            }
+            snprintf(bridge->inspecting, sizeof(bridge->inspecting), "%s", q->id);
+            bridge->inspect_after = a->inspections;
+            return false;
+        }
         respond(bridge, q->id, "ok", NULL, plugin, session, true);
         return false;
     }
@@ -503,6 +518,11 @@ bool wake_bridge_frame(WakeBridge *bridge, WakePlugin *plugin, BoatSession *sess
 {
     if (!bridge->open)
         return false;
+    if (bridge->inspecting[0]
+        && (!plugin->authority || plugin->authority->inspections > bridge->inspect_after)) {
+        respond(bridge, bridge->inspecting, "ok", NULL, plugin, session, true);
+        bridge->inspecting[0] = 0;
+    }
     if (bridge->pending[0] && (plugin->requests != bridge->pending_requests || !plugin->staging)) {
         // Superseded by a save, F5 or cancellation, or finished: the outcome says which.
         bool superseded = plugin->requests != bridge->pending_requests;

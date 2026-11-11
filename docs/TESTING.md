@@ -813,8 +813,8 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 ## Network checks
 
-`boat_local` (AR6 ledger rows L0, L6 and L2, labels `core;cpu`; quick except the slow-lane
-scripted drives and time trials) runs
+`boat_local` (AR6 ledger rows L0, L6, L2 and L1, labels `core;cpu`; quick except the slow-lane
+scripted drives, time trials and voyages) runs
 `tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
 glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
@@ -854,7 +854,36 @@ frame's flush under the working directory's `boat-local-saves`, selected on a fr
 raced as the ghost; an equal finish is not a best), all slow; `course_state` (the time trial's
 state codec and the PrivateState message, which the v14 and input decoders reject); and
 `private_state_rejected` (a hosted server counts PrivateState as malformed and rejects the
-sender; a playing hosted client counts it as a decode error and keeps no state). Each
+sender; a playing hosted client counts it as a decode error and keeps no state); and the L1
+voyage cases on a test route laid along the outer spawn's heading (a shelter 40 m ahead, weather
+that begins 110 m from a storm 160 m ahead, the destination 300 m ahead), where both paths drive
+straight ahead at full throttle: `voyage_trace` (1x with 0.1 s frames past the shelter, the
+weather's start and exposed water, a recovery between frames back to the shelter, then 8x to
+arrival: voyage state, the client's and authority's storm and every predicted tick equal the
+direct session's) and `tour_trace` (the same stops as an ordered tour at 8x, a restart that keeps
+no voyage progress, then a recovery), both slow; the L1b objective cases on the same route with
+a test revision whose objective counts shelters, recoveries and a re-armed timer in its HUD:
+`objective_trace` (the voyage_trace drive, then a restart as generation 2: the authority's
+checkpoint, queue, staged batch, generation, diagnostic and trace equal the direct path's
+objective after every frame, the client's view shows its HUD, generation and suspension, and an
+inspection request returns the direct path's inspection text in several chunks) and
+`objective_quarantine` (an update that raises at the weather event quarantines both at the same
+boundary; the client shows the suspension and its text, and the voyage still arrives) and
+`objective_commits` (test revisions committed between frames on both paths: a rebind, a live
+route edit that moves the reached shelter's index, a migration that fails and one that succeeds,
+and a voyage restart onto an ordered tour that moves the boat; the voyage, storm, boats and
+objective stay equal, and the host hears each migration's result a frame later) and `authoring_trace` (Shelter tour
+authored through the game's own `WakePlugin` glue on two hosts, one direct and one attached to the
+local authority, from the same controls: a migration staged and applied with F7, which the local
+host commits a frame later, a failing migration both keep their revision through, F6 Discard, and
+Undo back to revision 1 as a voyage restart; every frame the objective, revision, generation and
+HUD agree, and `wake_plugin_inspect` prints the same text on both), all slow;
+`voyage_state` (the voyage codec, its weather
+reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect and
+PrivateInspection messages, which the v14 and
+input decoders reject); and
+`recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
+next snapshot corrects the client; a client refuses a request for another tick). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
@@ -1181,8 +1210,10 @@ the fake process in `boat_plugin_author`. See [frame capture](PLUGIN_API.md#fram
 
 P4.6 adds `wake_velocity_bridge` (native, CPU lane): `validate_wake_bridge` drives the game's
 bridge over request files on a virtual clock (authentication, pins, deferred isolated staging,
-Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement, and the PC `console`
-operation). `boat_plugin_author`
+Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement, the PC `console`
+operation, and L1b's deferred inspection: with a local authority attached, `inspect` asks it and
+answers on the frame after its inspection arrives, with its objective lines, and an authority
+that cannot be asked fails the request). `boat_plugin_author`
 gains client checks against a fake game and an end-to-end CLI run against
 `validate_wake_bridge --serve` (`--bridge-server`). Its loops await external process/file events;
 CTest supplies the deadline. See [live tool bridge](PLUGIN_API.md#live-tool-bridge-p46).

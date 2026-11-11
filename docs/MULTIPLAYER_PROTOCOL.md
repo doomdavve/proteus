@@ -474,6 +474,45 @@ grant only when it differs from the last one sent; the client keeps the newest o
 bytes belong to the adapter's own codec: the time trial's (`tools/wake_velocity_course.c`) is
 `u8` next gate, `u8` flags (1 practice, 2 finished, 4 recording stopped), then `f64` elapsed,
 four `f64` splits and four `f64` crossings (74 bytes).
+The voyage's (`tools/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
+4 too fast, 8 observed, 16 weather begun), `u8` latest event, `u8` its shelter, `u32` recoveries,
+then `f64` weather start, start, arrival and latest event time (40 bytes, big-endian like the
+course's). The client derives the storm its water carries from these bytes and the route, which
+both endpoints borrow as an immutable resource. A voyage with a plugin revision appends its
+objective's tail: `u32` generation, `u32` the authority's active revision, `u32` the latest
+commit request's revision, `u32` commit requests handled, `u8` the latest one's status (0 none, 1
+applied, 2 migration failed), `u8` text length (at most 159), then that many bytes of text: the
+suspension's diagnostic when the objective is suspended, else a failed migration's (58 bytes plus
+the text). The objective's HUD and
+suspension travel as ObjectiveState, as a room objective's do; Lua state never leaves the
+authority.
+
+`0xC2` PrivateRecover (channel 0, client to server): header only (no payload). Sent at a frame
+boundary with the header tick equal to the authority's tick: the authority's rules adapter places
+its recovery pose in the same life before the next tick (`BoatNetRules.recover`), and the client
+predicts the same pose. A request for another tick, from a peer that is not ready, or to a server
+whose adapter has no recovery is counted and ignored.
+
+`0xC3` PrivateCommit (channel 0, client to server): `u32` revision, `u8` change (5 bytes), both
+opaque to the protocol. Sent at a frame boundary with the header tick equal to the authority's
+tick: the rules adapter (`BoatNetRules.commit`) resolves the host-managed revision by number and
+installs it before the next tick, the authority reads the water's storm again, and a commit that
+moves the boat relocates it in the same life; a commit that brings a new scene (the revision's
+borrowed scenery) installs it on the authority's world. The client predicts the relocation and the
+scene. The voyage adapter's changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's
+`migrate` runs on the authority; a failure keeps the active revision and its scene, and reports
+it in PrivateState) and 4 restart the voyage; the course adapter's only change is 1 rebind (an
+unchanged or renamed course). A request for another tick, from a peer that is not ready, for an unknown revision or to
+a server whose adapter has no commit is counted and ignored.
+
+`0xC4` PrivateInspect (channel 0, client to server): header only. The rules adapter
+(`BoatNetRules.inspect`) writes its inspection text (the voyage objective's lines, as
+`wake_plugin_inspect` prints them), which the authority sends back at once.
+
+`0xC5` PrivateInspection (channel 0, server to client): `u16` index, `u16` count (1–32), then up
+to 1024 bytes of the text, at most 32 KiB in all. Chunks arrive in order on the reliable channel;
+the client starts a text at index 0 and keeps the newest whole one. A chunk out of order is a
+decode error and drops the partial text.
 
 ### Other control messages
 

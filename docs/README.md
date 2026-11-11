@@ -186,7 +186,7 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   objective seam, plugin worker backends, the plugin data split and the AR6 local
   authority/client pilot) merged as PR #178 (2026-11-10); played on macOS by the user, with
   browser and Windows checks still owed. AR7 in progress: L6 and L2 (the time trial, now on the
-  wake pool) are implemented locally; next L1 with L9.
+  wake pool) merged as PR #181 (2026-11-10); next L1 with L9.
 - [Architecture review](ARCHITECTURE_REVIEW.md): historical 2026-10-19 growth assessment,
   subsumed by the restructuring plan. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md)
   retains its unfinished tasks until explicitly reconciled; gameplay stays with feature plans.

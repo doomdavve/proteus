@@ -70,6 +70,9 @@ typedef struct {
     // does not answer READY and will be dropped); ignored as duplicate or stale.
     uint64_t revisions, revisions_invalid, revisions_ignored;
     uint64_t private_states; // Private state messages installed (L2).
+    uint64_t recoveries; // Private recover requests sent (L1).
+    uint64_t commits; // Private commit requests sent (L1b).
+    uint64_t inspections; // Private inspection texts received whole (L1b).
 } BoatNetClientStats;
 
 // A deathmatch event as received, with the roster names of that moment (leavers keep theirs).
@@ -207,6 +210,11 @@ typedef struct {
     // L2, private sessions: the newest private state (BOAT_NET_PRIVATE_STATE) and its authority
     // tick; size zero before the first. Opaque bytes for the host's rules codec.
     uint8_t private_state[BOAT_NET_PRIVATE_STATE_BYTES];
+    // L1b: the newest whole inspection text and the one being assembled (chunks so far).
+    char inspection[BOAT_NET_PRIVATE_INSPECTION_BYTES],
+        inspection_part[BOAT_NET_PRIVATE_INSPECTION_BYTES];
+    size_t inspection_size, assembled_size;
+    unsigned assembled_chunks;
     size_t private_state_size;
     uint64_t private_state_tick;
 } BoatNetClient;
@@ -241,6 +249,24 @@ bool boat_net_client_flush(BoatNetClient *client);
 // is no peer timeout, snapshot-silence close or ping. NOW only bounds startup
 // (BOAT_NET_HANDSHAKE_TIMEOUT). False once rejected, closed or timed out joining.
 bool boat_net_client_local_service(BoatNetClient *client, double now);
+// L1: at the frame boundary TICK (the authority's tick, the prediction's too), ask the authority to
+// recover the own boat, and predict POSE: the same recovery the authority's rules adapter makes
+// from the voyage state this client last received. False (nothing sent) when the client has no
+// boat, the prediction is not at TICK or the transport refused the request.
+bool boat_net_client_private_recover(BoatNetClient *client, uint64_t tick, Boat pose);
+// L1b, private sessions only: ask the authority's rules adapter for its inspection text; the
+// newest whole text is kept in INSPECTION (stats.inspections counts them). False when it could not
+// be sent.
+bool boat_net_client_private_inspect(BoatNetClient *client);
+// L1b, private sessions only: between frames, when the prediction stands at TICK (the authority's
+// tick), ask the authority to install REVISION with CHANGE, and predict what the authority's
+// adapter will report in PREDICTED (the boat when it moved, the scene when it changed) in the
+// mirror and prediction. False when it could not be sent.
+bool boat_net_client_private_commit(BoatNetClient *client, uint64_t tick, uint32_t revision,
+    uint8_t change, const BoatNetCommitResult *predicted);
+// L1: the storm the private world's water carries now, in the mirror and the prediction, as the
+// authority's rules adapter reported it in private state.
+void boat_net_client_private_storm(BoatNetClient *client, BoatStorm storm);
 // Ask the authority for a new life at a safe spawn (menu action or held Backspace).
 void boat_net_client_request_reset(BoatNetClient *client);
 // Progress of the latest reset request; SECONDS (may be NULL) receives its age.

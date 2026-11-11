@@ -6,19 +6,30 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_stage.h"
 #include "boat_session.h"
+#include "wake_velocity_objective.h"
 #include <stdio.h>
 
-#define WAKE_PLUGIN_TRACE 16
-
-typedef struct {
-    int64_t tick;
-    unsigned revision, events;
-    BoatPluginTransition transition;
-    BoatPluginStatus status;
-    uint64_t before, after;
-    BoatPluginCommand commands[BOAT_PLUGIN_COMMANDS];
-    unsigned command_count;
-} WakePluginTrace;
+// L1b: the native game's local authority runs the objective and installs every commit. The
+// game sets it (wake_plugin_attach) while a local session runs this plugin and fills VIEW and the
+// inspection after each frame; NULL on the direct path (the browser, the review tools).
+typedef struct WakePluginAuthority {
+    void *context;
+    // After the host committed REVISION with CHANGE into SESSION (MOVED: the boat went to a tour's
+    // start), or, for a migration, before it does: ask the authority to install it before the next
+    // tick. False on an endpoint failure.
+    bool (*commit)(void *context, BoatSession *session, const BoatPluginRevision *revision,
+        BoatPluginChange change, bool moved);
+    // Ask for a fresh inspection; it arrives within the next frame. False on an endpoint failure.
+    bool (*inspect)(void *context);
+    WakeObjectiveView view; // The authority's objective after the latest frame.
+    const char *inspection; // The newest inspection text (borrowed), its size and count.
+    size_t inspection_size;
+    uint64_t inspections;
+    // A migration the authority is running: the held candidate's number and VIEW.commits when the
+    // request was sent. Staging, Undo and Apply wait until its result arrives (L1-3).
+    unsigned migrating, migrate_seen;
+    bool failed; // A request could not be sent; the game stops the session.
+} WakePluginAuthority;
 
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
@@ -37,14 +48,8 @@ typedef struct {
     bool alert;
     const char *outcome; // Machine word for the latest status: "staging", "held", "applied", ...
     unsigned requests; // Staging requests begun, by saves, F5 or the tool bridge.
-    BoatPluginObjective objective, staged_objective;
-    BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
-    unsigned event_count, generation;
-    int64_t sequence;
-    bool objective_pending;
-    BoatPluginDiagnostic objective_diagnostic;
-    WakePluginTrace trace[WAKE_PLUGIN_TRACE]; // Oldest first; bounded inspection history.
-    unsigned trace_count;
+    WakeObjective run; // The objective transaction on the direct path.
+    WakePluginAuthority *authority; // L1b: set while a local authority runs the objective.
 } WakePlugin;
 
 // Persistent native owner (all revision slots, file buffers, state/pending output, events,
@@ -77,6 +82,13 @@ bool wake_plugin_frame(
 // byte-pinned request; same return as wake_plugin_frame.
 bool wake_plugin_stage_files(
     WakePlugin *plugin, BoatSession *session, const BoatPluginFiles *files, double now);
+// L1b: hand the objective and commits to AUTHORITY (NULL returns them to the direct path, whose
+// objective then starts empty at the current generation). The host's own checkpoint is cleared:
+// no Lua state stays here while an authority runs it.
+void wake_plugin_attach(WakePlugin *plugin, WakePluginAuthority *authority);
+// L1b: the host's revision NUMBER (active, in the Undo history or held), or NULL. The authority
+// resolves commits through it; a revision never moves while it is borrowed.
+const BoatPluginRevision *wake_plugin_revision(const WakePlugin *plugin, unsigned number);
 // Tick adapter: publish T's output before T+1; capture all output immediately after a step
 // or recovery. Reset only alongside a new native voyage/session, never beside a moving world.
 void wake_plugin_before_tick(WakePlugin *plugin);

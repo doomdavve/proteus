@@ -208,11 +208,11 @@ int main(int argc, char **argv)
     // Worker syntax errors retain committed state, source and native route.
     memcpy(files->source, "return !!!", 10);
     files->source_size = 10;
-    uint64_t objective = boat_plugin_objective_digest(&plugin->objective);
+    uint64_t objective = boat_plugin_objective_digest(&plugin->run.objective);
     job = boat_plugin_stage_start(argv[0], host, files, 0);
     CHECK(job && completed(job, host) == -1 && host->diagnostic.status == BOAT_PLUGIN_SYNTAX);
     CHECK(boat_plugin_host_active(host)->number == active);
-    CHECK(boat_plugin_objective_digest(&plugin->objective) == objective);
+    CHECK(boat_plugin_objective_digest(&plugin->run.objective) == objective);
     boat_plugin_stage_close(job);
     CHECK(!boat_plugin_stage_start("/missing/worker", host, files, 0));
     CHECK(!boat_plugin_stage_start(argv[0], host, files, NAN));
@@ -277,7 +277,7 @@ int main(int argc, char **argv)
         CHECK(!wake_plugin_frame(plugin, &session, false, false, false, .25));
     CHECK(!plugin->alert && boat_plugin_host_active(host)->number != active);
     CHECK(session.voyage.route == &boat_plugin_host_active(host)->voyage.route);
-    CHECK(boat_plugin_objective_digest(&plugin->objective) == objective && session.tick == 2);
+    CHECK(boat_plugin_objective_digest(&plugin->run.objective) == objective && session.tick == 2);
     boat_session_destroy(&session);
     boat_world_resources_destroy(&resources);
     free(checkpoint);

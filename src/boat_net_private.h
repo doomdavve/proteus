@@ -21,12 +21,38 @@ typedef struct {
     Boat spawn; // Authority only: the accepted player's boat, placed before its checkpoint.
 } BoatNetPrivateSession;
 
+// L1b: what a private commit changes besides the adapter's own state.
+typedef struct {
+    Boat boat;
+    bool moved, rescene;
+    const BoatSceneDefinition *scene;
+} BoatNetCommitResult;
+
 #define BOAT_NET_PRIVATE_FIRST 0xc0 // First type of the reserved private range.
 #define BOAT_NET_PRIVATE_INPUT_BATCH 0xc0 // C->S: an InputBatch with full-precision rates (D4).
 // S->C on the reliable control channel (L2): the private rules adapter's state after a grant, as
 // opaque bytes the adapter's own codec reads; HEADER.tick is the authority's tick.
 #define BOAT_NET_PRIVATE_STATE 0xc1
 #define BOAT_NET_PRIVATE_STATE_BYTES 256 // The largest private state.
+// C->S on the reliable control channel (L1): recover the client's boat to the rules adapter's
+// recovery pose at a frame boundary; HEADER.tick is the authority's tick it applies after. No
+// payload.
+#define BOAT_NET_PRIVATE_RECOVER 0xc2
+// C->S on the reliable control channel (L1b): install a host-managed definition revision at a
+// frame boundary; HEADER.tick is the authority's tick it applies after. Payload: the revision
+// number (u32) and a change code (u8), both opaque to the protocol; the rules adapter resolves
+// and interprets them.
+#define BOAT_NET_PRIVATE_COMMIT 0xc3
+#define BOAT_NET_PRIVATE_COMMIT_BYTES 5
+// C->S on the reliable control channel (L1b): ask the rules adapter for its inspection text. No
+// payload. Answered by BOAT_NET_PRIVATE_INSPECTION chunks.
+#define BOAT_NET_PRIVATE_INSPECT 0xc4
+// S->C on the reliable control channel (L1b): one chunk of the inspection text: u16 index, u16
+// count, then up to BOAT_NET_PRIVATE_INSPECTION_CHUNK bytes. The text is at most
+// BOAT_NET_PRIVATE_INSPECTION_BYTES.
+#define BOAT_NET_PRIVATE_INSPECTION 0xc5
+#define BOAT_NET_PRIVATE_INSPECTION_CHUNK 1024
+#define BOAT_NET_PRIVATE_INSPECTION_BYTES 32768
 
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
@@ -46,5 +72,34 @@ size_t boat_net_private_encode_state(const BoatNetHeader *header, const uint8_t 
 // Decode a private state message into STATE and *STATE_SIZE. Never writes them on failure.
 BoatNetError boat_net_private_decode_state(const uint8_t *data, size_t size, BoatNetHeader *header,
     uint8_t state[BOAT_NET_PRIVATE_STATE_BYTES], size_t *state_size);
+
+// A private recover request; HEADER's type is ignored. Always BOAT_NET_HEADER_BYTES.
+size_t boat_net_private_encode_recover(
+    const BoatNetHeader *header, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// The private type of DATA (an encoded private message), or zero when it carries none.
+uint8_t boat_net_private_type(const uint8_t *data, size_t size);
+// Decode a private recover request. Never writes HEADER on failure.
+BoatNetError boat_net_private_decode_recover(
+    const uint8_t *data, size_t size, BoatNetHeader *header);
+
+// A private inspect request; HEADER's type is ignored. Always BOAT_NET_HEADER_BYTES.
+size_t boat_net_private_encode_inspect(
+    const BoatNetHeader *header, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+BoatNetError boat_net_private_decode_inspect(
+    const uint8_t *data, size_t size, BoatNetHeader *header);
+// Chunk INDEX of COUNT (1..32) of an inspection text, SIZE (at most
+// BOAT_NET_PRIVATE_INSPECTION_CHUNK) bytes of TEXT. Zero for invalid arguments.
+size_t boat_net_private_encode_inspection(const BoatNetHeader *header, unsigned index,
+    unsigned count, const char *text, size_t size, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode an inspection chunk into INDEX, COUNT, TEXT and *SIZE. Never writes them on failure.
+BoatNetError boat_net_private_decode_inspection(const uint8_t *data, size_t size,
+    BoatNetHeader *header, unsigned *index, unsigned *count,
+    char text[BOAT_NET_PRIVATE_INSPECTION_CHUNK], size_t *text_size);
+// A private commit request; HEADER's type is ignored.
+size_t boat_net_private_encode_commit(const BoatNetHeader *header, uint32_t revision,
+    uint8_t change, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode a private commit request. Never writes the destinations on failure.
+BoatNetError boat_net_private_decode_commit(
+    const uint8_t *data, size_t size, BoatNetHeader *header, uint32_t *revision, uint8_t *change);
 
 #endif

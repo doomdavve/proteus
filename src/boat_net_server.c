@@ -462,8 +462,137 @@ static void refill(BoatNetServerPeer *p, double now)
 
 // AR6: the private range, accepted only by a private session (a hosted room's decoder counts it
 // as malformed like any unknown type).
+// L1: a recover request at the frame boundary it names; any other tick is ignored.
+static void private_recover(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    if (boat_net_private_decode_recover(event->data, event->size, &header) != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch) {
+        ++s->stats.stale_packets;
+        return;
+    }
+    BoatFleetSlot *slot = &s->fleet.state.slots[p->slot];
+    Boat boat = slot->boat;
+    if (p->phase != BOAT_NET_PEER_READY || !slot->active || header.tick != s->fleet.state.tick
+        || !s->config.rules.recover
+        || !s->config.rules.recover(s->config.rules.context, header.tick, p->slot, &boat)) {
+        ++s->stats.recoveries_ignored;
+        return;
+    }
+    boat_fleet_relocate(&s->fleet, p->slot, boat);
+    ++s->stats.recoveries;
+}
+
+// L1b: a commit request at the frame boundary it names; any other tick is ignored.
+static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    uint32_t revision;
+    uint8_t change;
+    if (boat_net_private_decode_commit(event->data, event->size, &header, &revision, &change)
+            != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch) {
+        ++s->stats.stale_packets;
+        return;
+    }
+    BoatFleetSlot *slot = &s->fleet.state.slots[p->slot];
+    BoatNetCommitResult result = { .boat = slot->boat };
+    if (p->phase != BOAT_NET_PEER_READY || !slot->active || header.tick != s->fleet.state.tick
+        || !s->config.rules.commit
+        || !s->config.rules.commit(
+            s->config.rules.context, header.tick, p->slot, revision, change, &result)) {
+        ++s->stats.commits_ignored;
+        return;
+    }
+    if (result.moved)
+        boat_fleet_relocate(&s->fleet, p->slot, result.boat);
+    if (result.rescene)
+        s->fleet.world.scene = result.scene;
+    BoatStorm storm;
+    if (s->config.rules.weather && s->config.rules.weather(s->config.rules.context, &storm))
+        s->fleet.world.water.storm = storm;
+    ++s->stats.commits;
+}
+
+// L1b: the rules adapter's inspection text in reliable chunks, in order.
+static void private_inspect(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    if (boat_net_private_decode_inspect(event->data, event->size, &header) != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch || p->phase != BOAT_NET_PEER_READY
+        || !s->config.rules.inspect)
+        return;
+    static char text[BOAT_NET_PRIVATE_INSPECTION_BYTES];
+    size_t size = s->config.rules.inspect(s->config.rules.context, text, sizeof(text));
+    if (size > sizeof(text))
+        size = sizeof(text);
+    unsigned count = size ? (unsigned)((size + BOAT_NET_PRIVATE_INSPECTION_CHUNK - 1)
+                                / BOAT_NET_PRIVATE_INSPECTION_CHUNK)
+                          : 1;
+    for (unsigned i = 0; i < count; ++i) {
+        size_t at = (size_t)i * BOAT_NET_PRIVATE_INSPECTION_CHUNK;
+        size_t chunk = size - at < BOAT_NET_PRIVATE_INSPECTION_CHUNK
+            ? size - at
+            : BOAT_NET_PRIVATE_INSPECTION_CHUNK;
+        BoatNetHeader out = { .epoch = s->config.epoch,
+            .sequence = p->sequence[BOAT_NET_CONTROL]++,
+            .tick = s->fleet.state.tick };
+        uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+        size_t length = boat_net_private_encode_inspection(
+            &out, i, count, size ? text + at : NULL, size ? chunk : 0, bytes);
+        if (!length) {
+            ++s->stats.output_faults;
+            return;
+        }
+        boat_net_send(&s->transport, peer, BOAT_NET_CONTROL, bytes, length);
+    }
+    ++s->stats.inspections;
+}
+
 static void private_message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_INSPECT) {
+        private_inspect(s, peer, event, now);
+        return;
+    }
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_RECOVER) {
+        private_recover(s, peer, event, now);
+        return;
+    }
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_COMMIT) {
+        private_commit(s, peer, event, now);
+        return;
+    }
     BoatNetServerPeer *p = &s->peers[peer];
     BoatNetHeader header;
     BoatNetInputBatch batch;
@@ -985,6 +1114,10 @@ static void tick(BoatNetServer *s)
     }
     if (s->config.local.enabled && s->config.rules.committed)
         s->config.rules.committed(s->config.rules.context, next, &s->fleet);
+    BoatStorm storm;
+    if (s->config.local.enabled && s->config.rules.weather
+        && s->config.rules.weather(s->config.rules.context, &storm))
+        s->fleet.world.water.storm = storm;
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
     objective_poll(s);

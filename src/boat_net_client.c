@@ -820,6 +820,40 @@ static void private_state(BoatNetClient *c, const BoatNetEvent *event, double no
     ++c->stats.private_states;
 }
 
+// L1b: one chunk of an inspection text; chunk zero starts a new text, the last completes it.
+static void private_inspection(BoatNetClient *c, const BoatNetEvent *event, double now)
+{
+    BoatNetHeader header;
+    unsigned index, count;
+    static char chunk[BOAT_NET_PRIVATE_INSPECTION_CHUNK];
+    size_t size;
+    if (event->channel != BOAT_NET_CONTROL
+        || boat_net_private_decode_inspection(
+               event->data, event->size, &header, &index, &count, chunk, &size)
+            != BOAT_NET_OK
+        || (index && index != c->assembled_chunks)) {
+        ++c->stats.decode_errors;
+        c->assembled_chunks = 0;
+        return;
+    }
+    if (c->phase < BOAT_NET_CLIENT_BOOTSTRAP || header.epoch != c->epoch) {
+        ++c->stats.stale_packets;
+        return;
+    }
+    c->heard_at = now;
+    if (!index)
+        c->assembled_size = 0;
+    memcpy(c->inspection_part + c->assembled_size, chunk, size);
+    c->assembled_size += size;
+    c->assembled_chunks = index + 1;
+    if (index + 1 == count) {
+        memcpy(c->inspection, c->inspection_part, c->assembled_size);
+        c->inspection_size = c->assembled_size;
+        c->assembled_chunks = 0;
+        ++c->stats.inspections;
+    }
+}
+
 static bool handle_events(BoatNetClient *c, double now)
 {
     BoatNetEvent event;
@@ -840,7 +874,10 @@ static bool handle_events(BoatNetClient *c, double now)
                 c->phase = BOAT_NET_CLIENT_CLOSED;
         } else if (event.kind == BOAT_NET_EVENT_MESSAGE && c->local.enabled
             && boat_net_private_message(event.data, event.size)) {
-            private_state(c, &event, now);
+            if (boat_net_private_type(event.data, event.size) == BOAT_NET_PRIVATE_INSPECTION)
+                private_inspection(c, &event, now);
+            else
+                private_state(c, &event, now);
         } else if (event.kind == BOAT_NET_EVENT_MESSAGE) {
             message(c, &event, now);
         }
@@ -968,6 +1005,65 @@ bool boat_net_client_command(
     boat_prediction_record(&c->prediction, tick, own->life, next);
     boat_prediction_advance(&c->prediction, tick);
     return c->prediction.fleet.state.tick == tick;
+}
+
+bool boat_net_client_private_recover(BoatNetClient *c, uint64_t tick, Boat pose)
+{
+    if (!c->local.enabled || !c->predict || !boat_net_client_own(c)
+        || c->prediction.fleet.state.tick != tick || c->command_count)
+        return false;
+    BoatNetHeader header
+        = { .epoch = c->epoch, .sequence = c->sequence[BOAT_NET_CONTROL], .tick = tick };
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    size_t size = boat_net_private_encode_recover(&header, bytes);
+    if (!boat_net_send(&c->transport, 0, BOAT_NET_CONTROL, bytes, size))
+        return false;
+    ++c->sequence[BOAT_NET_CONTROL];
+    boat_fleet_relocate(&c->prediction.fleet, c->slot, pose);
+    ++c->stats.recoveries;
+    return true;
+}
+
+bool boat_net_client_private_inspect(BoatNetClient *c)
+{
+    if (!c->local.enabled || c->phase != BOAT_NET_CLIENT_PLAYING)
+        return false;
+    BoatNetHeader header = { .epoch = c->epoch,
+        .sequence = c->sequence[BOAT_NET_CONTROL],
+        .tick = c->prediction.fleet.state.tick };
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    size_t size = boat_net_private_encode_inspect(&header, bytes);
+    if (!boat_net_send(&c->transport, 0, BOAT_NET_CONTROL, bytes, size))
+        return false;
+    ++c->sequence[BOAT_NET_CONTROL];
+    return true;
+}
+
+bool boat_net_client_private_commit(BoatNetClient *c, uint64_t tick, uint32_t revision,
+    uint8_t change, const BoatNetCommitResult *predicted)
+{
+    if (!c->local.enabled || !c->predict || !boat_net_client_own(c)
+        || c->prediction.fleet.state.tick != tick || c->command_count)
+        return false;
+    BoatNetHeader header
+        = { .epoch = c->epoch, .sequence = c->sequence[BOAT_NET_CONTROL], .tick = tick };
+    uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+    size_t size = boat_net_private_encode_commit(&header, revision, change, bytes);
+    if (!boat_net_send(&c->transport, 0, BOAT_NET_CONTROL, bytes, size))
+        return false;
+    ++c->sequence[BOAT_NET_CONTROL];
+    if (predicted->moved)
+        boat_fleet_relocate(&c->prediction.fleet, c->slot, predicted->boat);
+    if (predicted->rescene)
+        c->fleet.world.scene = c->prediction.fleet.world.scene = predicted->scene;
+    ++c->stats.commits;
+    return true;
+}
+
+void boat_net_client_private_storm(BoatNetClient *c, BoatStorm storm)
+{
+    c->fleet.world.water.storm = storm;
+    c->prediction.fleet.world.water.storm = storm;
 }
 
 bool boat_net_client_flush(BoatNetClient *c)
