@@ -1186,9 +1186,11 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
         sizeof(*p) + boat_plugin_default_limits.memory_bytes, sizeof(WakePluginPreview),
         boat_plugin_stage_bytes(p->staging));
     const BoatPluginRevision *active = boat_plugin_host_active(&p->host);
-    fprintf(output, "revision=%u schema=%u generation=%u tick=%lld pending=%u suspended=%u\n",
-        active->number, p->run.objective.state_version, p->run.generation,
-        (long long)p->run.objective.tick, p->run.objective_pending, p->run.objective.quarantined);
+    // The objective's lines, with the host's scene line after its revision line.
+    static char text[1 << 16];
+    size_t first = 0;
+    size_t size = wake_objective_inspect(&p->run, active->number, text, sizeof(text), &first);
+    fwrite(text, 1, first, output);
     fprintf(output,
         "scene present=%u version=%u digest=%016llx content=%u berths=%u modules=%u "
         "entrance=%u vessels=%u flocks=%u\n",
@@ -1197,37 +1199,5 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
         boat_scene_has_content(&active->voyage.scene), active->voyage.scene.berth_count,
         active->voyage.scene.module_count, active->voyage.scene.entrance_present,
         active->voyage.scene.traffic.actor_count, active->voyage.scene.gulls.flock_count);
-    fprintf(output, "rng=%u acknowledged=%lld queued=%u diagnostic=%s\n", p->run.objective.rng,
-        (long long)p->run.objective.acknowledged, p->run.event_count,
-        p->run.objective_diagnostic.message);
-    if (p->run.objective_pending)
-        fprintf(output, "pending_tick=%lld pending_digest=%016llx\n",
-            (long long)p->run.staged_objective.tick,
-            (unsigned long long)boat_plugin_objective_digest(&p->run.staged_objective));
-    for (unsigned i = 0; i < p->run.objective.hud_count; ++i)
-        fprintf(output, "hud id=%s label=%s value=%lld\n", p->run.objective.hud[i].id,
-            p->run.objective.hud[i].label, (long long)p->run.objective.hud[i].value);
-    for (unsigned i = 0; i < p->run.objective.timer_count; ++i)
-        fprintf(output, "timer id=%s tick=%lld\n", p->run.objective.timers[i].id,
-            (long long)p->run.objective.timers[i].tick);
-    fprintf(output, "state=");
-    for (unsigned i = 0; i < p->run.objective.state.size; ++i)
-        fprintf(output, "%02x", p->run.objective.state.bytes[i]);
-    fprintf(output, "\n");
-    for (unsigned i = 0; i < p->run.event_count; ++i)
-        fprintf(output, "event tick=%lld sequence=%lld kind=%s id=%s\n",
-            (long long)p->run.events[i].tick, (long long)p->run.events[i].sequence,
-            p->run.events[i].kind, p->run.events[i].id);
-    for (unsigned i = 0; i < p->run.trace_count; ++i) {
-        const WakePluginTrace *t = &p->run.trace[i];
-        fprintf(output,
-            "trace tick=%lld revision=%u action=%u status=%u events=%u %016llx->%016llx\n",
-            (long long)t->tick, t->revision, t->transition, t->status, t->events,
-            (unsigned long long)t->before, (unsigned long long)t->after);
-        for (unsigned j = 0; j < t->command_count; ++j) {
-            const BoatPluginCommand *cmd = &t->commands[j];
-            fprintf(output, "command %s generation=%u id=%s label=%s value=%lld\n", cmd->kind,
-                cmd->generation, cmd->id, cmd->label, (long long)cmd->value);
-        }
-    }
+    fwrite(text + first, 1, size - first, output);
 }

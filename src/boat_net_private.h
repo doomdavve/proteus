@@ -37,6 +37,15 @@ typedef struct {
 // and interprets them.
 #define BOAT_NET_PRIVATE_COMMIT 0xc3
 #define BOAT_NET_PRIVATE_COMMIT_BYTES 5
+// C->S on the reliable control channel (L1b): ask the rules adapter for its inspection text. No
+// payload. Answered by BOAT_NET_PRIVATE_INSPECTION chunks.
+#define BOAT_NET_PRIVATE_INSPECT 0xc4
+// S->C on the reliable control channel (L1b): one chunk of the inspection text: u16 index, u16
+// count, then up to BOAT_NET_PRIVATE_INSPECTION_CHUNK bytes. The text is at most
+// BOAT_NET_PRIVATE_INSPECTION_BYTES.
+#define BOAT_NET_PRIVATE_INSPECTION 0xc5
+#define BOAT_NET_PRIVATE_INSPECTION_CHUNK 1024
+#define BOAT_NET_PRIVATE_INSPECTION_BYTES 32768
 
 // True when DATA carries a v14 header whose type lies in the private range.
 bool boat_net_private_message(const uint8_t *data, size_t size);
@@ -66,6 +75,19 @@ uint8_t boat_net_private_type(const uint8_t *data, size_t size);
 BoatNetError boat_net_private_decode_recover(
     const uint8_t *data, size_t size, BoatNetHeader *header);
 
+// A private inspect request; HEADER's type is ignored. Always BOAT_NET_HEADER_BYTES.
+size_t boat_net_private_encode_inspect(
+    const BoatNetHeader *header, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+BoatNetError boat_net_private_decode_inspect(
+    const uint8_t *data, size_t size, BoatNetHeader *header);
+// Chunk INDEX of COUNT (1..32) of an inspection text, SIZE (at most
+// BOAT_NET_PRIVATE_INSPECTION_CHUNK) bytes of TEXT. Zero for invalid arguments.
+size_t boat_net_private_encode_inspection(const BoatNetHeader *header, unsigned index,
+    unsigned count, const char *text, size_t size, uint8_t out[BOAT_NET_MAX_MESSAGE]);
+// Decode an inspection chunk into INDEX, COUNT, TEXT and *SIZE. Never writes them on failure.
+BoatNetError boat_net_private_decode_inspection(const uint8_t *data, size_t size,
+    BoatNetHeader *header, unsigned *index, unsigned *count,
+    char text[BOAT_NET_PRIVATE_INSPECTION_CHUNK], size_t *text_size);
 // A private commit request; HEADER's type is ignored.
 size_t boat_net_private_encode_commit(const BoatNetHeader *header, uint32_t revision,
     uint8_t change, uint8_t out[BOAT_NET_MAX_MESSAGE]);

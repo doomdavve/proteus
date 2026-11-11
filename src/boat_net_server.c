@@ -533,8 +533,57 @@ static void private_commit(BoatNetServer *s, unsigned peer, const BoatNetEvent *
     ++s->stats.commits;
 }
 
+// L1b: the rules adapter's inspection text in reliable chunks, in order.
+static void private_inspect(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
+{
+    BoatNetServerPeer *p = &s->peers[peer];
+    BoatNetHeader header;
+    if (boat_net_private_decode_inspect(event->data, event->size, &header) != BOAT_NET_OK
+        || event->channel != BOAT_NET_CONTROL || p->phase == BOAT_NET_PEER_HANDSHAKE) {
+        ++s->stats.malformed;
+        if (p->phase == BOAT_NET_PEER_HANDSHAKE)
+            reject(s, peer, BOAT_NET_REJECT_MALFORMED);
+        else
+            misbehaved(s, peer);
+        return;
+    }
+    p->heard_at = now;
+    if (header.epoch != s->config.epoch || p->phase != BOAT_NET_PEER_READY
+        || !s->config.rules.inspect)
+        return;
+    static char text[BOAT_NET_PRIVATE_INSPECTION_BYTES];
+    size_t size = s->config.rules.inspect(s->config.rules.context, text, sizeof(text));
+    if (size > sizeof(text))
+        size = sizeof(text);
+    unsigned count = size ? (unsigned)((size + BOAT_NET_PRIVATE_INSPECTION_CHUNK - 1)
+                                / BOAT_NET_PRIVATE_INSPECTION_CHUNK)
+                          : 1;
+    for (unsigned i = 0; i < count; ++i) {
+        size_t at = (size_t)i * BOAT_NET_PRIVATE_INSPECTION_CHUNK;
+        size_t chunk = size - at < BOAT_NET_PRIVATE_INSPECTION_CHUNK
+            ? size - at
+            : BOAT_NET_PRIVATE_INSPECTION_CHUNK;
+        BoatNetHeader out = { .epoch = s->config.epoch,
+            .sequence = p->sequence[BOAT_NET_CONTROL]++,
+            .tick = s->fleet.state.tick };
+        uint8_t bytes[BOAT_NET_MAX_MESSAGE];
+        size_t length = boat_net_private_encode_inspection(
+            &out, i, count, size ? text + at : NULL, size ? chunk : 0, bytes);
+        if (!length) {
+            ++s->stats.output_faults;
+            return;
+        }
+        boat_net_send(&s->transport, peer, BOAT_NET_CONTROL, bytes, length);
+    }
+    ++s->stats.inspections;
+}
+
 static void private_message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, double now)
 {
+    if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_INSPECT) {
+        private_inspect(s, peer, event, now);
+        return;
+    }
     if (boat_net_private_type(event->data, event->size) == BOAT_NET_PRIVATE_RECOVER) {
         private_recover(s, peer, event, now);
         return;

@@ -64,6 +64,9 @@ typedef struct {
     // (weather) before the next tick. False ignores the request. Optional.
     bool (*commit)(void *context, uint64_t tick, unsigned slot, uint32_t revision, uint8_t change,
         Boat *boat, bool *moved);
+    // L1b, private sessions only: the adapter's inspection text, written into OUT (at most
+    // CAPACITY bytes); the client asked for it. Returns its length. Optional.
+    size_t (*inspect)(void *context, char *out, size_t capacity);
 } BoatNetRules;
 
 typedef struct {
@@ -137,6 +140,7 @@ typedef struct {
     uint64_t private_states; // Private state messages sent (L2).
     uint64_t recoveries, recoveries_ignored; // Private recover requests (L1).
     uint64_t commits, commits_ignored; // Private commit requests (L1b).
+    uint64_t inspections; // Private inspection texts sent (L1b).
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
 

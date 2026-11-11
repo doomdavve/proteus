@@ -110,6 +110,12 @@ unsigned boat_local_slot(const BoatLocal *local);
 // L2: the newest private state the client received (NULL before the first), with its size and
 // the authority tick it describes.
 const uint8_t *boat_local_state(const BoatLocal *local, size_t *size, uint64_t *tick);
+// L1b: ask the authority's rules adapter for its inspection text, answered within the next frame.
+// False with failure text when the request could not be sent.
+bool boat_local_inspect(BoatLocal *local);
+// L1b: the newest whole inspection text (NULL before the first), its size, and how many have
+// arrived.
+const char *boat_local_inspection(const BoatLocal *local, size_t *size, uint64_t *count);
 // L1b: the newest objective HUD the client received (NULL before the first).
 const BoatNetObjectiveState *boat_local_objective(const BoatLocal *local);
 

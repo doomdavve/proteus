@@ -232,6 +232,16 @@ static size_t private_state(void *context, uint8_t *out)
     return size + WAKE_VOYAGE_OBJECTIVE_BYTES + length;
 }
 
+// The objective's inspection lines (wake_plugin_inspect's, without the host's).
+static size_t inspect(void *context, char *out, size_t capacity)
+{
+    const WakeVoyageAuthority *v = context;
+    if (!v->revision)
+        return 0;
+    size_t first;
+    return wake_objective_inspect(&v->objective, v->revision->number, out, capacity, &first);
+}
+
 BoatNetRules wake_voyage_rules(WakeVoyageAuthority *voyage)
 {
     return (BoatNetRules) { .context = voyage,
@@ -239,6 +249,7 @@ BoatNetRules wake_voyage_rules(WakeVoyageAuthority *voyage)
         .private_state = private_state,
         .state = state,
         .commit = commit,
+        .inspect = inspect,
         .weather = weather,
         .recover = recover };
 }

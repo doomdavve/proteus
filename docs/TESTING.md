@@ -797,7 +797,8 @@ no voyage progress, then a recovery), both slow; the L1b objective cases on the 
 a test revision whose objective counts shelters, recoveries and a re-armed timer in its HUD:
 `objective_trace` (the voyage_trace drive, then a restart as generation 2: the authority's
 checkpoint, queue, staged batch, generation, diagnostic and trace equal the direct path's
-objective after every frame, and the client's view shows its HUD, generation and suspension) and
+objective after every frame, the client's view shows its HUD, generation and suspension, and an
+inspection request returns the direct path's inspection text in several chunks) and
 `objective_quarantine` (an update that raises at the weather event quarantines both at the same
 boundary; the client shows the suspension and its text, and the voyage still arrives) and
 `objective_commits` (test revisions committed between frames on both paths: a rebind, a live
@@ -805,7 +806,8 @@ route edit that moves the reached shelter's index, a migration that fails and on
 and a voyage restart onto an ordered tour that moves the boat; the voyage, storm, boats and
 objective stay equal, and the host hears each migration's result a frame later), all slow;
 `voyage_state` (the voyage codec, its weather
-reader, the objective tail and the PrivateRecover and PrivateCommit messages, which the v14 and
+reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect and
+PrivateInspection messages, which the v14 and
 input decoders reject); and
 `recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
 next snapshot corrects the client; a client refuses a request for another tick). Each

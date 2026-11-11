@@ -207,6 +207,12 @@ bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *obje
     return true;
 }
 
+bool wake_local_inspect(WakeLocal *local)
+{
+    local->active = boat_local_inspect(&local->local);
+    return local->active;
+}
+
 void wake_local_close(WakeLocal *local)
 {
     boat_local_stop(&local->local);

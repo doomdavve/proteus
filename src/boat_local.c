@@ -245,3 +245,20 @@ const BoatNetObjectiveState *boat_local_objective(const BoatLocal *local)
 {
     return local->client.objective_valid ? &local->client.objective : NULL;
 }
+
+bool boat_local_inspect(BoatLocal *local)
+{
+    if (!local->running || !boat_net_client_private_inspect(&local->client)) {
+        fail(local, "the local client could not request an inspection");
+        return false;
+    }
+    return true;
+}
+
+const char *boat_local_inspection(const BoatLocal *local, size_t *size, uint64_t *count)
+{
+    const BoatNetClient *c = &local->client;
+    *size = c->inspection_size;
+    *count = c->stats.inspections;
+    return c->stats.inspections ? c->inspection : NULL;
+}

@@ -79,6 +79,12 @@ void wake_objective_update(WakeObjective *run, const BoatPluginRevision *revisio
 bool wake_objective_migrate(WakeObjective *run, const BoatPluginRevision *candidate,
     unsigned active, uint64_t tick, BoatPluginObjective *migrated);
 #endif
+// The objective's inspection text under REVISION (the active revision's number) into OUT (at most
+// CAPACITY bytes, terminated): its revision line, then (from *FIRST, the revision line's length)
+// its rng, pending batch, HUD, timers, state bytes, queued events and trace. Returns the length
+// written; a text that does not fit ends early at a line boundary.
+size_t wake_objective_inspect(
+    const WakeObjective *run, unsigned revision, char *out, size_t capacity, size_t *first);
 // Commit MIGRATED under the new revision number REVISION: it becomes the objective, its
 // generation the counter's, and any pending batch is dropped. Queued events stay for its next
 // update.

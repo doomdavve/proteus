@@ -317,3 +317,108 @@ BoatNetError boat_net_private_decode_commit(
     *header = h;
     return BOAT_NET_OK;
 }
+
+// The v14 header of a private message of TYPE with PAYLOAD bytes.
+static void private_header(uint8_t **p, const BoatNetHeader *header, uint8_t type, uint16_t payload)
+{
+    put32(p, BOAT_NET_MAGIC);
+    put16(p, BOAT_NET_VERSION);
+    put8(p, type);
+    put8(p, 0);
+    put32(p, header->epoch);
+    put32(p, header->sequence);
+    put64(p, header->tick);
+    put16(p, payload);
+    put16(p, 0);
+    put32(p, 0);
+}
+
+// Read a private header of TYPE whose payload is the rest of SIZE.
+static BoatNetError read_private_header(
+    const uint8_t **p, const uint8_t *data, size_t size, uint8_t type, BoatNetHeader *out)
+{
+    if (!data || size < BOAT_NET_HEADER_BYTES)
+        return BOAT_NET_TRUNCATED;
+    *p = data;
+    if (get32(p) != BOAT_NET_MAGIC)
+        return BOAT_NET_BAD_MAGIC;
+    if (get16(p) != BOAT_NET_VERSION)
+        return BOAT_NET_BAD_VERSION;
+    BoatNetHeader h = { 0 };
+    h.type = get8(p);
+    h.flags = get8(p);
+    h.epoch = get32(p);
+    h.sequence = get32(p);
+    h.tick = get64(p);
+    h.payload = get16(p);
+    uint16_t reserved16 = get16(p);
+    uint32_t reserved32 = get32(p);
+    if (h.flags || reserved16 || reserved32)
+        return BOAT_NET_BAD_HEADER;
+    if (h.type != type)
+        return BOAT_NET_BAD_TYPE;
+    if (size != BOAT_NET_HEADER_BYTES + (size_t)h.payload)
+        return BOAT_NET_BAD_LENGTH;
+    *out = h;
+    return BOAT_NET_OK;
+}
+
+size_t boat_net_private_encode_inspect(
+    const BoatNetHeader *header, uint8_t out[BOAT_NET_MAX_MESSAGE])
+{
+    uint8_t *p = out;
+    private_header(&p, header, BOAT_NET_PRIVATE_INSPECT, 0);
+    return (size_t)(p - out);
+}
+
+BoatNetError boat_net_private_decode_inspect(
+    const uint8_t *data, size_t size, BoatNetHeader *header)
+{
+    const uint8_t *p;
+    BoatNetHeader h;
+    BoatNetError error = read_private_header(&p, data, size, BOAT_NET_PRIVATE_INSPECT, &h);
+    if (error != BOAT_NET_OK)
+        return error;
+    if (h.payload)
+        return BOAT_NET_BAD_LENGTH;
+    *header = h;
+    return BOAT_NET_OK;
+}
+
+enum { INSPECTION_CHUNKS = BOAT_NET_PRIVATE_INSPECTION_BYTES / BOAT_NET_PRIVATE_INSPECTION_CHUNK };
+
+size_t boat_net_private_encode_inspection(const BoatNetHeader *header, unsigned index,
+    unsigned count, const char *text, size_t size, uint8_t out[BOAT_NET_MAX_MESSAGE])
+{
+    if (!count || count > INSPECTION_CHUNKS || index >= count
+        || size > BOAT_NET_PRIVATE_INSPECTION_CHUNK || (size && !text))
+        return 0;
+    uint8_t *p = out;
+    private_header(&p, header, BOAT_NET_PRIVATE_INSPECTION, (uint16_t)(4 + size));
+    put16(&p, (uint16_t)index);
+    put16(&p, (uint16_t)count);
+    memcpy(p, text, size);
+    return (size_t)(p - out) + size;
+}
+
+BoatNetError boat_net_private_decode_inspection(const uint8_t *data, size_t size,
+    BoatNetHeader *header, unsigned *index, unsigned *count,
+    char text[BOAT_NET_PRIVATE_INSPECTION_CHUNK], size_t *text_size)
+{
+    const uint8_t *p;
+    BoatNetHeader h;
+    BoatNetError error = read_private_header(&p, data, size, BOAT_NET_PRIVATE_INSPECTION, &h);
+    if (error != BOAT_NET_OK)
+        return error;
+    if (h.payload < 4 || h.payload > 4 + BOAT_NET_PRIVATE_INSPECTION_CHUNK)
+        return BOAT_NET_BAD_LENGTH;
+    unsigned i = get16(&p), n = get16(&p);
+    if (!n || n > INSPECTION_CHUNKS || i >= n)
+        return BOAT_NET_BAD_LENGTH;
+    *index = i;
+    *count = n;
+    *text_size = h.payload - 4u;
+    memcpy(text, p, *text_size);
+    *header = h;
+    return BOAT_NET_OK;
+}

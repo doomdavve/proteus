@@ -1442,6 +1442,19 @@ static int objective_trace(void)
         CHECK(game.objective.hud_count == 3 && game.objective.hud[1].value == 1);
         CHECK(game.objective.hud[0].value >= 1 && game.objective.hud[2].value >= 1);
         CHECK(reference.trace_count > 4 && !reference.objective.quarantined);
+        // Inspection: the authority answers within the next frame, from its state before the
+        // frame's first tick, in the direct path's text.
+        static char want[BOAT_NET_PRIVATE_INSPECTION_BYTES];
+        size_t first,
+            size = wake_objective_inspect(
+                &reference, objective_revision->number, want, sizeof(want), &first);
+        uint64_t count;
+        size_t got = 0;
+        CHECK(!boat_local_inspection(lp, &got, &count) && count == 0);
+        CHECK(wake_local_inspect(&game) && !drive(ahead, 1));
+        const char *text = boat_local_inspection(lp, &got, &count);
+        CHECK(text && count == 1 && got == size && !memcmp(text, want, size));
+        CHECK(lp->server.stats.inspections == 1 && size > BOAT_NET_PRIVATE_INSPECTION_CHUNK);
         // A restart: both start the objective over as generation 2.
         play_restart(&direct);
         play_restart(&play);
@@ -1691,6 +1704,23 @@ static int voyage_state(void)
     CHECK(revision == 7 && change == WAKE_VOYAGE_LIVE && read.tick == 48);
     CHECK(boat_net_private_decode_commit(message, length - 1, &read, &revision, &change)
         != BOAT_NET_OK);
+    // The inspect request and an inspection chunk (L1b).
+    length = boat_net_private_encode_inspect(&header, message);
+    CHECK(length == BOAT_NET_HEADER_BYTES
+        && boat_net_private_type(message, length) == BOAT_NET_PRIVATE_INSPECT);
+    CHECK(boat_net_private_decode_inspect(message, length, &read) == BOAT_NET_OK);
+    CHECK(boat_net_private_decode_commit(message, length, &read, &revision, &change)
+        == BOAT_NET_BAD_TYPE);
+    length = boat_net_private_encode_inspection(&header, 1, 3, "abc", 3, message);
+    unsigned index = 0, count = 0;
+    char chunk[BOAT_NET_PRIVATE_INSPECTION_CHUNK];
+    size_t got = 0;
+    CHECK(boat_net_private_decode_inspection(message, length, &read, &index, &count, chunk, &got)
+            == BOAT_NET_OK
+        && index == 1 && count == 3 && got == 3 && !memcmp(chunk, "abc", 3));
+    CHECK(!boat_net_private_encode_inspection(&header, 3, 3, "abc", 3, message));
+    CHECK(!boat_net_private_encode_inspection(&header, 0, 33, "abc", 3, message));
+    CHECK(boat_net_decode(message, length, &decoded) == BOAT_NET_BAD_TYPE);
     // The objective tail after the voyage's bytes.
     static WakeVoyageAuthority authority;
     static BoatPluginRevision tail_revision;

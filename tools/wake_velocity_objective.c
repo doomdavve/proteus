@@ -1,6 +1,7 @@
 #include "wake_velocity_objective.h"
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -155,4 +156,72 @@ void wake_objective_adopt(
         run->objective = *migrated;
     run->generation = run->objective.generation;
     run->objective_pending = false;
+}
+
+typedef struct {
+    char *out;
+    size_t capacity, size;
+    bool full;
+} Text;
+
+// Append one formatted line, or nothing (and stop) when it does not fit.
+static void line(Text *text, const char *format, ...)
+{
+    if (text->full)
+        return;
+    va_list arguments;
+    va_start(arguments, format);
+    int n = vsnprintf(text->out + text->size, text->capacity - text->size, format, arguments);
+    va_end(arguments);
+    if (n < 0 || (size_t)n >= text->capacity - text->size) {
+        text->full = true;
+        text->out[text->size] = 0;
+        return;
+    }
+    text->size += (size_t)n;
+}
+
+size_t wake_objective_inspect(
+    const WakeObjective *run, unsigned revision, char *out, size_t capacity, size_t *first)
+{
+    Text text = { out, capacity, 0, capacity == 0 };
+    if (capacity)
+        out[0] = 0;
+    const BoatPluginObjective *o = &run->objective;
+    line(&text, "revision=%u schema=%u generation=%u tick=%lld pending=%u suspended=%u\n", revision,
+        o->state_version, run->generation, (long long)o->tick, run->objective_pending,
+        o->quarantined);
+    *first = text.size;
+    line(&text, "rng=%u acknowledged=%lld queued=%u diagnostic=%s\n", o->rng,
+        (long long)o->acknowledged, run->event_count, run->objective_diagnostic.message);
+    if (run->objective_pending)
+        line(&text, "pending_tick=%lld pending_digest=%016llx\n",
+            (long long)run->staged_objective.tick,
+            (unsigned long long)boat_plugin_objective_digest(&run->staged_objective));
+    for (unsigned i = 0; i < o->hud_count; ++i)
+        line(&text, "hud id=%s label=%s value=%lld\n", o->hud[i].id, o->hud[i].label,
+            (long long)o->hud[i].value);
+    for (unsigned i = 0; i < o->timer_count; ++i)
+        line(&text, "timer id=%s tick=%lld\n", o->timers[i].id, (long long)o->timers[i].tick);
+    // The state bytes as one line of hex.
+    static char hex[2 * BOAT_PLUGIN_STATE_BYTES + 1];
+    for (unsigned i = 0; i < o->state.size; ++i)
+        snprintf(hex + 2 * i, 3, "%02x", o->state.bytes[i]);
+    hex[2 * o->state.size] = 0;
+    line(&text, "state=%s\n", hex);
+    for (unsigned i = 0; i < run->event_count; ++i)
+        line(&text, "event tick=%lld sequence=%lld kind=%s id=%s\n", (long long)run->events[i].tick,
+            (long long)run->events[i].sequence, run->events[i].kind, run->events[i].id);
+    for (unsigned i = 0; i < run->trace_count; ++i) {
+        const WakePluginTrace *t = &run->trace[i];
+        line(&text, "trace tick=%lld revision=%u action=%u status=%u events=%u %016llx->%016llx\n",
+            (long long)t->tick, t->revision, t->transition, t->status, t->events,
+            (unsigned long long)t->before, (unsigned long long)t->after);
+        for (unsigned j = 0; j < t->command_count; ++j) {
+            const BoatPluginCommand *cmd = &t->commands[j];
+            line(&text, "command %s generation=%u id=%s label=%s value=%lld\n", cmd->kind,
+                cmd->generation, cmd->id, cmd->label, (long long)cmd->value);
+        }
+    }
+    return text.size;
 }

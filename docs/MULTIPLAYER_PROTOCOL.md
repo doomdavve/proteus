@@ -502,6 +502,15 @@ authority; a failure keeps the active revision and reports it in PrivateState) a
 voyage. A request for another tick, from a peer that is not ready, for an unknown revision or to
 a server whose adapter has no commit is counted and ignored.
 
+`0xC4` PrivateInspect (channel 0, client to server): header only. The rules adapter
+(`BoatNetRules.inspect`) writes its inspection text (the voyage objective's lines, as
+`wake_plugin_inspect` prints them), which the authority sends back at once.
+
+`0xC5` PrivateInspection (channel 0, server to client): `u16` index, `u16` count (1–32), then up
+to 1024 bytes of the text, at most 32 KiB in all. Chunks arrive in order on the reliable channel;
+the client starts a text at index 0 and keeps the newest whole one. A chunk out of order is a
+decode error and drops the partial text.
+
 ### Other control messages
 
 - SpawnRequest: `u32` request ID, `u32` life to reset. It is honoured only while the slot is on

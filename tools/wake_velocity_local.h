@@ -74,6 +74,9 @@ bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *obj
 // revision must not change. False on an endpoint failure.
 bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     const BoatPluginRevision *revision, BoatPluginChange change, bool moved);
+// L1b: ask the authority for its objective's inspection lines; they arrive within the next frame
+// (boat_local_inspection). False on an endpoint failure.
+bool wake_local_inspect(WakeLocal *local);
 void wake_local_close(WakeLocal *local);
 
 #endif
