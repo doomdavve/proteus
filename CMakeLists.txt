@@ -12,6 +12,11 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(PROTEUS_WEBRTC "Build the optional native browser multiplayer endpoint" OFF)
+# Enable C++ before creating targets in module/application subdirectories so their link
+# rules inherit the runtime required by the static libdatachannel dependency.
+if(PROTEUS_WEBRTC)
+  enable_language(CXX)
+endif()
 
 option(PROTEUS_GPU_TESTS "Enable GPU-context CTest cases" OFF)
 option(PROTEUS_WAKE_FIELD_TESTS "Enable retired physical wake-field and prototype experiments" OFF)

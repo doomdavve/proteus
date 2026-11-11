@@ -1,5 +1,4 @@
 # Optional native endpoint for the browser transport. Normal native builds stay ENet-only.
-enable_language(CXX)
 set(NO_MEDIA ON CACHE BOOL "" FORCE)
 set(NO_EXAMPLES ON CACHE BOOL "" FORCE)
 set(NO_TESTS ON CACHE BOOL "" FORCE)

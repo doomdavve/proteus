@@ -1810,3 +1810,27 @@ and the accepted decisions; this plan keeps only the step status (header and
   including the new `platform_bridges` and `platform_bridges_detects`; rerun after the review
   fixes and AR3f, again 494 of 494. No windowed, browser,
   Windows/Linux or GPU check. See the [AR3 status](#ar3-status).
+
+## WebRTC build follow-up — 2026-11-11
+
+The AR8 module split created application targets in subdirectories before C++ was enabled.
+Those directories lacked CMake's C++ language setup when consuming static libdatachannel;
+Winterfell deployment supplied `CMAKE_C_STANDARD_LIBRARIES=-lstdc++` as a workaround.
+C++ is now enabled at the root immediately after `PROTEUS_WEBRTC` is selected, before any
+module/application subdirectory. CMake selects the platform compiler and runtime for consumers.
+The optional dependency setup remains in `cmake/WebRTC.cmake`.
+
+Scope defers the Open loops board's platform/browser acceptance, AR10 closure and unrelated
+gameplay work. The hosting header-layout compatibility fix remains a hosting concern.
+Verification, 2026-11-11, Apple Silicon/macOS, Debug, `PROTEUS_WEBRTC=ON`, GPU tests off:
+full configure/build passed without `CMAKE_C_STANDARD_LIBRARIES`. The released source
+generated `cc` link commands for `boat_server` and `wake_velocity`; the fixed source generates
+`c++` commands and both link successfully. `boat_rtc_echo --fixture` passed. All 537 enabled
+checks in `ctest --preset full` passed across the initial run and an unsandboxed rerun of
+13 socket-dependent failures (13 retired tests disabled). A separate default/WebRTC-off
+configure and `git diff --check` passed. Dependencies emitted existing stb_vorbis/OpenSSL
+warnings; no project-source warning was observed. No visual behavior changed.
+
+This build follow-up is complete. Next: remove the hosting override when deploying a release
+containing this change. Linux linking, live deployment, browser joins and human playback were
+not verified. The build contract is in [WebRTC rooms](WEB_BUILD.md#webrtc-rooms).
