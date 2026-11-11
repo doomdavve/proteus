@@ -12,7 +12,8 @@ tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualifica
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
 L1a (voyages and tours without an objective on the local authority) is implemented on
 `arch/l1-voyages`; native voyage manual check owed.
-**Next:** L1b, the plugin objective adapter on the authority; then L1c (L9, plugin authoring).
+**Next:** L1b (authoring and objectives on the authority, L9 folded in): design proposed,
+decisions L1-1 to L1-4 await the user.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -903,9 +904,13 @@ Owed manual checks: a native windowed time trial (feel on the wake pool, finish,
 and loaded as the ghost on the next launch, practice at altered time, restart), plus the L0 items
 still open from AR6. Browser and Windows: nothing run.
 
-L1 is split into three steps on branch `arch/l1-voyages` (from `main` after PR #181): L1a
-voyages and tours without an objective; L1b the plugin objective adapter on the authority; L1c
-(ledger L9) plugin authoring, staging and commit at the authority's tick boundary.
+L1 is split into two steps on branch `arch/l1-voyages` (from `main` after PR #181): L1a
+voyages and tours without an objective, and L1b, authoring and objectives on the authority
+(ledger L9 folded in). The first split had a separate L1b for the objective adapter; it was
+merged into the authoring step on 2026-11-11 (the user's choice) because a voyage objective exists only while
+authoring: the catalog generator refuses an objective on any bundled package except a free one
+(`tools/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
+console has promoted can run one, and authoring stayed on the direct path.
 
 L1a (voyage state, events, weather and recover), implemented 2026-11-11:
 
@@ -934,7 +939,7 @@ L1a (voyage state, events, weather and recover), implemented 2026-11-11:
   eligible between frames (the console promoted its plugin to authoring) closes the local session
   and continues on the direct path from the client's view, before an authoring change reaches it.
   Voyages with an objective (Shelter tour) and `--plugin` authoring keep the direct path until
-  L1b and L1c.
+  L1b.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
 
@@ -951,6 +956,63 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
 Owed manual checks: a native windowed voyage and tour (recover after passing a shelter by holding
 Backspace, the weather building near the storm, arrival, restart), and promoting a running
 voyage to authoring from the console.
+
+L1b (authoring and objectives on the authority), design proposed 2026-11-11, decisions
+[L1-1 to L1-4](#l1b-decisions) awaiting the user:
+
+- Scope: native `--plugin DIR` sessions of every solo kind (voyage, course, free) and runtime
+  packages the console promotes. The browser keeps its authoring and isolated objective on the
+  direct path until L4. The developer review tools (`boat_plugin_review`, `boat_plugin_worker`
+  preview checkpoints and seeks) stay on the direct path as isolated tools, like the studies.
+- Ownership. Host management, in the glue (`WakePlugin`), unchanged: files, save polling, the
+  staging workers, the revision table and Undo, the held candidate and its policy (offer, F7,
+  the live-ready check from the client's view), the console, the bridge and the status text.
+  Immutable resources: a committed revision (route, shelter ids, objective source, scene,
+  course) is borrowed by the authority; the host keeps `BOAT_PLUGIN_UNDO + 2` slots and only a
+  later commit reuses one, after the authority has moved its borrow. The authority's adapter
+  (the voyage adapter, extended): voyage progress and the objective transaction (checkpoint,
+  event queue, sequence, the batch staged for T+1, timers, quarantine and diagnostic), as the
+  room objective does (`tools/boat_room_objective.c`). Lua runs on the native authority, as in
+  hosted rooms.
+- The objective on the authority: after each committed tick the adapter queues the voyage's
+  events and, every 12 ticks, runs the update; the batch commits before the next tick
+  (`wake_plugin_before_tick`/`after_tick` semantics, moved, not reinvented). A recovery
+  queues `voyage.recovered` at once, as the direct path does after `boat_session_recover`.
+- To the client: the HUD rows and suspension through the existing ObjectiveState message
+  (8 rows of 24-byte ids and labels fit the plugin HUD exactly; `rules.state`); the suspension
+  text (160 bytes) joins the voyage's 40 bytes of PrivateState. The authoring panel draws from
+  these instead of `plugin.objective`.
+- Commit: the host decides as today; between frames the glue sends a new private request
+  (`0xC3` PrivateCommit: the candidate's revision number and change) and holds the candidate.
+  The authority applies it before the next tick: unchanged or renamed rebind the route; live
+  remaps the current shelter by id; restart voyage restarts the voyage and starts a new
+  objective generation; migrate runs the candidate's `migrate` on the authority's checkpoint.
+  The result returns in PrivateState and the host commits its table (or reports "MIGRATION
+  FAILED; KEEPING Rn") on the next frame, so the host's active revision is always the
+  authority's. While a commit is in flight, staging, Undo and F7 wait one frame. A session
+  restart (new water or marina layout) and every course or free commit that changes the session
+  are a new local generation (`wake_local_restart`), as plain restarts are.
+- Inspection: `wake_plugin_inspect` and the bridge's live-inspect keep the host's lines
+  (revision, scene, memory) and take the objective's (tick, digests, queue, HUD, timers, state
+  bytes, trace) from the authority (decision L1-2).
+- The direct path keeps no authoring role in the native game: L1a's hand-back on promotion is
+  removed, and `LOCAL_ELIGIBLE` admits authoring and objectives. `wake_plugin_before_tick` and
+  `after_tick` remain for the browser (L4) and the review tools.
+- Tests: an objective trace (`boat_local`) that runs Shelter tour on the direct path and the
+  local session from the same commands and requires equal objective digests, events, HUD and
+  quarantine on every tick; one per commit kind (unchanged, live, migrate accepted and refused,
+  restart voyage, restart session) landing between the same ticks as the direct path; Undo;
+  a failing callback quarantining on both; the existing plugin session, stage, console and
+  bridge validators passing unchanged; Shelter tour captures byte-identical.
+
+<a id="l1b-decisions"></a>Decisions for the user:
+
+| ID | Question | Options | Recommendation |
+| --- | --- | --- | --- |
+| L1-1 | When a migrate runs | (a) on the authority, two-phase: the host commits a frame later; (b) the host commits first and the authority runs migrate, rolling the host back on failure | (a): the host's active revision never differs from the authority's |
+| L1-2 | Objective inspection (live-inspect, `--inspect`) | (a) a private inspect request the authority answers in reliable chunks (the state can be 16 KiB); (b) a summary only (tick, digests, queue, HUD, trace), with state bytes from the review tool; (c) the glue reads the adapter directly, a documented exception to rule 2 for developer inspection | (a): keeps rule 2 and today's output |
+| L1-3 | Staging while a commit is in flight | (a) hold staging, Undo and F7 for that frame; (b) let a new stage replace the candidate and cancel the request | (a): one frame, never visible to the player |
+| L1-4 | Branch and PR | (a) L1a and L1b in one PR (the milestone); (b) open the L1a PR now and L1b as the next milestone | (a), after your windowed L1a check |
 
 ### AR8 — Move files into owning directories
 
