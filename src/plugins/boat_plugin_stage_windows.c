@@ -1,7 +1,7 @@
 // Windows staging backend: CreateProcessA of the executable with inheritable duplicates of the
 // request/response temporary files as stdin/stdout, exit-code polling, and TerminateProcess plus
 // a wait on close.
-#include "boat_plugin_stage_backend.h"
+#include "plugins/boat_plugin_stage_backend.h"
 
 #include <stdlib.h>
 #include <string.h>

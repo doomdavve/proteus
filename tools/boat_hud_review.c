@@ -1,7 +1,7 @@
-#include "boat_fixtures.h"
-#include "boat_hud.h"
-#include "boat_voyage_view.h"
 #include "raylib.h"
+#include "render/boat_hud.h"
+#include "render/boat_voyage_view.h"
+#include "support/boat_fixtures.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,13 +1,13 @@
 // PC (docs/PLUGIN_DEFAULT_PLAN.md): headless acceptance for the live console's command layer.
 // Every case uses a virtual clock and the real isolated worker, spawned from this test binary.
-#include "boat_plugin_catalog.h"
-#include "boat_plugin_lua.h"
-#include "boat_plugin_stage.h"
-#include "boat_session.h"
-#include "wake_command.h"
-#include "wake_console.h"
-#include "wake_velocity_plugin.h"
-#include "waterfront_harbor.h"
+#include "core/waterfront_harbor.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "plugins/boat_plugin_lua.h"
+#include "plugins/boat_plugin_stage.h"
+#include "session/boat_session.h"
+#include "wake_velocity/wake_command.h"
+#include "wake_velocity/wake_console.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #include "raylib.h"
 

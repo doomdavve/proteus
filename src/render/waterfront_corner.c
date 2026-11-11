@@ -1,9 +1,10 @@
-#include "waterfront_corner.h"
+#include "render/waterfront_corner.h"
 
-#include "boat_scenery.h"
-#include "waterfront_city.h"
-#include "waterfront_scene.h"
+#include "core/waterfront_city.h"
+#include "render/waterfront_scene.h"
+#include "scenery/boat_scenery.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

@@ -1,5 +1,5 @@
-#include "boat_scenery.h"
-#include "wake_velocity_scenery.h"
+#include "scenery/boat_scenery.h"
+#include "wake_velocity/wake_velocity_scenery.h"
 #include <emscripten/emscripten.h>
 
 EM_JS(void, wake_js_scenery_start, (const char *name, const char *path),

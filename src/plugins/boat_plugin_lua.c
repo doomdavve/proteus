@@ -1,4 +1,4 @@
-#include "boat_plugin_lua.h"
+#include "plugins/boat_plugin_lua.h"
 
 #include "lauxlib.h"
 #include "lua.h"

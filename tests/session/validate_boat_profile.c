@@ -1,7 +1,7 @@
-#include "boat.h"
-#include "boat_profile.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
+#include "core/boat.h"
+#include "render/boat_view.h"
+#include "support/boat_test_session.h"
+#include "wake_velocity/boat_profile.h"
 
 #include <math.h>
 #include <stdio.h>

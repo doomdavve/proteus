@@ -1,7 +1,7 @@
 #ifndef PROTEUS_RENDERER3D_H
 #define PROTEUS_RENDERER3D_H
 
-#include "geometry3d.h"
+#include "core/geometry3d.h"
 
 #include <stdbool.h>
 #include <stddef.h>

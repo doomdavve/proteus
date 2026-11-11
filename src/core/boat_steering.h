@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_STEERING_H
 #define PROTEUS_BOAT_STEERING_H
 
-#include "boat.h"
+#include "core/boat.h"
 #include <math.h>
 
 // Shared with the integrator so target control respects faster countersteering.

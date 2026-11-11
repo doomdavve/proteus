@@ -1,10 +1,10 @@
 #ifndef PROTEUS_BOAT_WATER_H
 #define PROTEUS_BOAT_WATER_H
 
-#include "boat_vessel_wake.h"
-#include "boat_wake.h"
-#include "boat_wake_objects.h"
-#include "geometry3d.h"
+#include "core/boat_vessel_wake.h"
+#include "core/boat_wake.h"
+#include "core/boat_wake_objects.h"
+#include "core/geometry3d.h"
 
 typedef struct {
     // Zero initialization selects perfectly flat, still water. Direction is simulation X/Z.

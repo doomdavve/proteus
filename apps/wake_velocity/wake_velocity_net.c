@@ -1,9 +1,9 @@
-#include "wake_velocity_net.h"
-#include "boat_hud.h"
-#include "boat_skin.h"
-#include "boat_ui.h"
+#include "wake_velocity/wake_velocity_net.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "render/boat_hud.h"
+#include "render/boat_skin.h"
+#include "render/boat_ui.h"
 #include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>

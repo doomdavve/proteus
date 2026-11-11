@@ -1,9 +1,9 @@
-#include "boat_plugin_stage.h"
-#include "boat_plugin_lua.h"
-#include "boat_plugin_stage_backend.h"
-#include "boat_plugin_wire.h"
-#include "boat_scene_definition.h"
-#include "boat_world.h"
+#include "plugins/boat_plugin_stage.h"
+#include "core/boat_scene_definition.h"
+#include "core/boat_world.h"
+#include "plugins/boat_plugin_lua.h"
+#include "plugins/boat_plugin_stage_backend.h"
+#include "plugins/boat_plugin_wire.h"
 
 #include <math.h>
 #include <stdio.h>

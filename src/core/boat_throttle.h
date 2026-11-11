@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_THROTTLE_H
 #define PROTEUS_BOAT_THROTTLE_H
 
-#include "boat.h"
+#include "core/boat.h"
 #include <math.h>
 #include <stdbool.h>
 

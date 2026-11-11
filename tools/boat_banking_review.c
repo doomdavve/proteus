@@ -1,9 +1,10 @@
 // Deterministic banking presentation audit, sharing free-drive inputs with the dynamics validator.
-#include "boat_banking_fixture.h"
-#include "boat_gpu.h"
-#include "boat_test_scenery.h"
-#include "boat_test_session.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
+#include "support/boat_banking_fixture.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

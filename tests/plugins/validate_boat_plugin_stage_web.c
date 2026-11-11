@@ -2,10 +2,10 @@
 // boat_plugin_stage_web.c, compiled natively, against a C model of the page's Transport
 // (web/plugin_author.js). Workers run in process through the private stream entry points, and
 // every deadline uses supplied virtual time.
-#include "boat_plugin_io.h"
-#include "boat_plugin_stage.h"
-#include "boat_plugin_stage_backend.h"
-#include "boat_world.h"
+#include "core/boat_world.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_stage.h"
+#include "plugins/boat_plugin_stage_backend.h"
 
 #include <stdio.h>
 #include <stdlib.h>

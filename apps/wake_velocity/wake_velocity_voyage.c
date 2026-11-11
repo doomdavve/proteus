@@ -1,4 +1,4 @@
-#include "wake_velocity_voyage.h"
+#include "wake_velocity/wake_velocity_voyage.h"
 
 #include <math.h>
 #include <stdio.h>

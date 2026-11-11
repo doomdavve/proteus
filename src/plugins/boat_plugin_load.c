@@ -1,8 +1,8 @@
 // Plugin evaluation: each load parses and bounds the bundle, runs its Lua entry in the restricted
 // evaluator, then hands the copied result to the Lua-free decoders in boat_plugin.c and
 // boat_plugin_race.c.
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
+#include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_lua.h"
 
 #include <stdio.h>
 #include <string.h>

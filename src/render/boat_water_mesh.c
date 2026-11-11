@@ -1,4 +1,5 @@
-#include "boat_water_mesh.h"
+#include "render/boat_water_mesh.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <limits.h>

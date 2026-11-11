@@ -1,7 +1,7 @@
 /* G0w capture and export contract: bounded ring ordering, percentiles, segmentation, serial
  * lookup after eviction, missing GPU samples, and portable directory/ZIP bundles. */
-#include "boat_capture.h"
-#include "wake_velocity_performance.h"
+#include "platform/boat_capture.h"
+#include "wake_velocity/wake_velocity_performance.h"
 
 #include <errno.h>
 #include <stdio.h>

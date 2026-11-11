@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_COMBAT_H
 #define PROTEUS_BOAT_COMBAT_H
 
-#include "boat.h"
+#include "core/boat.h"
 
 #define BOAT_COMBAT_BULLETS 40 // Short-lived water packets.
 #define BOAT_COMBAT_TORPEDOES 8

@@ -1,7 +1,7 @@
 # The voyage objective transaction shared by the direct path and the local authority (L1b).
 add_library(proteus_wake_objective STATIC wake_velocity_objective.c
   wake_velocity_objective.h)
-target_include_directories(proteus_wake_objective PUBLIC ${PROJECT_SOURCE_DIR}/tools)
+target_include_directories(proteus_wake_objective PUBLIC ${PROJECT_SOURCE_DIR}/apps)
 target_link_libraries(proteus_wake_objective PUBLIC proteus_plugins)
 target_compile_options(proteus_wake_objective PRIVATE ${PROTEUS_WARNINGS})
 
@@ -9,6 +9,7 @@ target_compile_options(proteus_wake_objective PRIVATE ${PROTEUS_WARNINGS})
 # validators; executable-specific audio, music and asset paths stay with their consumers.
 add_library(proteus_boat_drive STATIC
   wake_velocity_drive.c wake_velocity_state.c boat_profile.c)
+target_include_directories(proteus_boat_drive PUBLIC ${PROJECT_SOURCE_DIR}/apps)
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
@@ -82,7 +83,7 @@ target_include_directories(wake_velocity PRIVATE "${PROJECT_BINARY_DIR}/generate
 add_library(proteus_local_drive STATIC wake_velocity_local.c wake_velocity_local.h
   wake_velocity_course.c wake_velocity_course.h wake_velocity_voyage.c
   wake_velocity_voyage.h)
-target_include_directories(proteus_local_drive PUBLIC ${PROJECT_SOURCE_DIR}/tools)
+target_include_directories(proteus_local_drive PUBLIC ${PROJECT_SOURCE_DIR}/apps)
 target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
   proteus_wake_objective)
 target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})

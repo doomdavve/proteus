@@ -2,11 +2,11 @@
 #define WAKE_VELOCITY_PLUGIN_H
 // Lua plugin P1: the solo session's opt-in voyage plugin (--plugin), its Reload/Undo keys, save
 // polling and authoring panel. Definitions change only between ticks, through wake_plugin_frame.
-#include "boat_plugin_catalog.h"
-#include "boat_plugin_host.h"
-#include "boat_plugin_stage.h"
-#include "boat_session.h"
-#include "wake_velocity_objective.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_stage.h"
+#include "session/boat_session.h"
+#include "wake_velocity/wake_velocity_objective.h"
 #include <stdio.h>
 
 // L1b: the game's local authority runs the objective and installs every commit. The

@@ -1,8 +1,9 @@
-#include "boat_gpu.h"
-#include "boat_assets.h"
+#include "render/boat_gpu.h"
+#include "platform/boat_assets.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/waterfront_grade.h"
 #include "rlgl.h"
-#include "waterfront_grade.h"
 
 #include <math.h>
 #include <stdio.h>

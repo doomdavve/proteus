@@ -1,5 +1,5 @@
-#include "boat_plugin_host.h"
-#include "boat_plugin_load.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_load.h"
 
 #include <string.h>
 

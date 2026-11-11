@@ -1,7 +1,7 @@
 // jsmn's definitions live here; other users include only its declarations through boat_json.h.
 #define BOAT_JSON_IMPLEMENTATION
 #define JSMN_STRICT
-#include "boat_json.h"
+#include "json/boat_json.h"
 
 #include <stdlib.h>
 #include <string.h>

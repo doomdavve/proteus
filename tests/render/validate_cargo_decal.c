@@ -1,6 +1,7 @@
-#include "boat_cargo_view.h"
-#include "boat_pose.h"
+#include "core/boat_pose.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_cargo_view.h"
 
 #include <math.h>
 #include <stdio.h>

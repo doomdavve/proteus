@@ -1,10 +1,10 @@
 #ifndef PROTEUS_BOAT_H
 #define PROTEUS_BOAT_H
 
-#include "boat_clock.h"
-#include "boat_input.h"
-#include "boat_wake_player.h"
-#include "boat_world.h"
+#include "core/boat_clock.h"
+#include "core/boat_input.h"
+#include "core/boat_wake_player.h"
+#include "core/boat_world.h"
 
 #define BOAT_STEP (1.0f / BOAT_TICK_HZ)
 #define BOAT_LIMIT_X (BOAT_BASIN_HALF_X - 2.5f)

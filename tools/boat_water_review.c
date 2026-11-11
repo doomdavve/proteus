@@ -1,20 +1,21 @@
 // Deterministic boat-level water audit. Uses the playable simulation, not a camera spline.
-#include "boat_test_scenery.h"
 #include "external/glad.h"
+#include "support/boat_test_scenery.h"
 
-#include "boat_assets.h"
-#include "boat_fleet.h"
-#include "boat_gpu.h"
-#include "boat_map.h"
-#include "boat_profile.h"
-#include "boat_rearview.h"
-#include "boat_screen.h"
-#include "boat_test_maps.h"
-#include "boat_test_session.h"
-#include "frame_pacer.h"
+#include "core/boat_fleet.h"
+#include "core/boat_map.h"
+#include "core/waterfront_traffic.h"
+#include "platform/boat_assets.h"
+#include "platform/frame_pacer.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
+#include "render/boat_rearview.h"
+#include "render/boat_screen.h"
 #include "rlgl.h"
-#include "waterfront_traffic.h"
+#include "support/boat_test_maps.h"
+#include "support/boat_test_session.h"
+#include "wake_velocity/boat_profile.h"
 
 #include <math.h>
 #include <stdio.h>

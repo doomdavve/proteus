@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_PLUGIN_STATE_H
 #define PROTEUS_BOAT_PLUGIN_STATE_H
 
-#include "boat_plugin_objective.h"
+#include "plugins/boat_plugin_objective.h"
 
 typedef enum {
     BOAT_PLUGIN_OBJECTIVE_INIT,

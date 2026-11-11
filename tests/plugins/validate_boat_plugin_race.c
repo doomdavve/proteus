@@ -1,13 +1,14 @@
 /* P2 descriptor, lifecycle and physical parity checks. Time is always virtual. */
-#include "boat_fleet_bots.h"
-#include "boat_plugin_host.h"
-#include "boat_plugin_load.h"
-#include "boat_race_plugin.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_load.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "room/boat_fleet_bots.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
+#include "tools/boat_race_plugin.h"
 
-#include "boat_fixtures.h"
+#include "support/boat_fixtures.h"
 #include <stdio.h>
 #include <string.h>
 

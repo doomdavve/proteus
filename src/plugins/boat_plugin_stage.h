@@ -2,7 +2,7 @@
 #define PROTEUS_BOAT_PLUGIN_STAGE_H
 // Disposable descriptor staging: native process or browser Web Worker. Private, versioned
 // wire data carries no native pointers or struct layouts. Restricted Lua is not an OS sandbox.
-#include "boat_plugin_host.h"
+#include "plugins/boat_plugin_host.h"
 
 typedef struct BoatPluginStageJob BoatPluginStageJob;
 // Native EXECUTABLE implements --plugin-stage-worker before opening window/audio. Input acquisition

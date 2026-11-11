@@ -1,6 +1,6 @@
-#include "boat_work_menu.h"
+#include "session/boat_work_menu.h"
 
-#include "boat_file.h"
+#include "platform/boat_file.h"
 
 #include <ctype.h>
 #include <stdio.h>

@@ -1,10 +1,10 @@
-#include "boat_title.h"
+#include "wake_velocity/boat_title.h"
 
-#include "boat_location.h"
-#include "boat_music.h"
-#include "boat_replay.h"
-#include "boat_skin.h"
-#include "wake_velocity_servers.h"
+#include "core/boat_location.h"
+#include "render/boat_skin.h"
+#include "session/boat_replay.h"
+#include "wake_velocity/boat_music.h"
+#include "wake_velocity/wake_velocity_servers.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,9 +1,10 @@
 #ifndef PROTEUS_BOAT_BANKING_FIXTURE_H
 #define PROTEUS_BOAT_BANKING_FIXTURE_H
 
-#include "boat_session.h"
-#include "boat_test_world.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "session/boat_session.h"
+#include "support/boat_test_world.h"
 
 // Shared free-drive inputs for numerical measurements and presentation captures. Each
 // fixture session owns a calm basin world and starts its clock at zero.

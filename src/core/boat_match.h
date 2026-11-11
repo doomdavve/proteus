@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_MATCH_H
 #define PROTEUS_BOAT_MATCH_H
 
-#include "boat_fleet.h"
+#include "core/boat_fleet.h"
 
 // Capsize deathmatch rules (docs/DEATHMATCH_PLAN.md). Authority only: the match observes the
 // committed fleet after each step and never changes physics, the fleet hash or prediction.

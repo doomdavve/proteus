@@ -1,7 +1,7 @@
-#include "boat_minimap.h"
-#include "boat_hud.h"
-#include "boat_scenery.h"
-#include "waterfront_harbor.h"
+#include "render/boat_minimap.h"
+#include "core/waterfront_harbor.h"
+#include "render/boat_hud.h"
+#include "scenery/boat_scenery.h"
 
 #include <float.h>
 #include <math.h>

@@ -1,5 +1,5 @@
-#include "boat_room_definition.h"
-#include "boat_location.h"
+#include "core/boat_room_definition.h"
+#include "core/boat_location.h"
 
 #include <math.h>
 #include <string.h>

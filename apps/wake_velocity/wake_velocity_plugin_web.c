@@ -1,4 +1,4 @@
-#include "wake_velocity_plugin_web.h"
+#include "wake_velocity/wake_velocity_plugin_web.h"
 #include <emscripten.h>
 
 // The JavaScript bodies are private to this file; the C wrappers below are the backend's API.

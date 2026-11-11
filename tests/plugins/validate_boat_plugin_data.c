@@ -1,8 +1,8 @@
 // AR5 data-only consumer: links proteus_plugin_catalog and proteus_plugin_data only, with no Lua,
 // package I/O or worker, and opens every bundled package from its pre-evaluated wire bytes. A
 // link of this program is the evidence that the data contract needs no evaluation library.
-#include "boat_plugin_catalog.h"
-#include "boat_plugin_objective.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "plugins/boat_plugin_objective.h"
 
 #include <stdio.h>
 #include <stdlib.h>

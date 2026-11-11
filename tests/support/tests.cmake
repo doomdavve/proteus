@@ -3,7 +3,7 @@
 # Fixture data for validators and review tools: the shipped voyage, course, race course and rule
 # values that packages replace. Production targets never link this library.
 add_library(proteus_boat_fixtures STATIC tests/support/boat_fixtures.c tests/support/boat_fixtures.h)
-target_include_directories(proteus_boat_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_include_directories(proteus_boat_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(proteus_boat_fixtures PUBLIC proteus_boat_core)
 target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 foreach(target validate_boat validate_boat_banking validate_boat_turn_entry validate_boat_replay

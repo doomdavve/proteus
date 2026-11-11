@@ -1,9 +1,9 @@
 // Private P4 worker: immutable framed bytes in, bounded JSON evidence out. No package paths.
-#include "boat_plugin_host.h"
-#include "boat_plugin_stage.h"
-#include "boat_world.h"
-#include "wake_velocity_plugin.h"
-#include "waterfront_traffic.h"
+#include "core/boat_world.h"
+#include "core/waterfront_traffic.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_stage.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 #include <errno.h>
 #include <math.h>
 #include <string.h>

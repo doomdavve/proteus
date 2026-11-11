@@ -6,9 +6,9 @@
  * Review: --screenshot FILE [--mode corner|chart] [--location outer]
  * [--background SCENE.png] [--at X,Z,HEADING] [--shelter N] [--scale N] writes one composition,
  * over a 320x200 scene capture when given and nearest-scaled N times, without opening a window. */
-#include "boat_fixtures.h"
-#include "boat_minimap.h"
-#include "boat_test_scenery.h"
+#include "render/boat_minimap.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_scenery.h"
 
 #include <stdio.h>
 #include <stdlib.h>

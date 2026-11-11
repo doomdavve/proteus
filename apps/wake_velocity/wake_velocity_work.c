@@ -1,14 +1,15 @@
-#include "wake_velocity_work.h"
+#include "wake_velocity/wake_velocity_work.h"
 
-#include "boat_cargo_view.h"
-#include "boat_file.h"
-#include "boat_plugin_catalog.h"
-#include "boat_presentation.h"
-#include "boat_time_control.h"
-#include "boat_title.h"
-#include "boat_ui.h"
-#include "boat_work_menu.h"
+#include "platform/boat_file.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "render/boat_cargo_view.h"
+#include "render/boat_presentation.h"
+#include "render/boat_ui.h"
+#include "session/boat_time_control.h"
+#include "session/boat_work_menu.h"
+#include "wake_velocity/boat_title.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

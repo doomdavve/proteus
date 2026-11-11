@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_MAP_TILES_H
 #define PROTEUS_BOAT_MAP_TILES_H
 
-#include "boat_map.h"
+#include "core/boat_map.h"
 
 // One square tile of a map, in map east/Z. Seams are bookkeeping only: they add no shore edges.
 // Water triangles and shore edges are listed in every tile they overlap, so queries near a seam

@@ -1473,6 +1473,24 @@ the browser build, `check_web_wasm.py` and `check_web_plugin_author.py`; `packag
 **Defers** (Open loops): manual checks owed by AR7 rows, impaired-delivery qualification,
 the touch tap and pinned `saved_at` stay open; AR8 changes no behaviour.
 
+### AR8/AR9 implementation status — 2026-11-11
+
+Steps 1–6 are committed (module/application/test moves); step 7 localizes CMake and moves
+`boat_profile` beside its drive library. Step 8 qualifies project includes and removes the
+transition paths. Generated catalog output changes only its header include. Explicit raylib
+includes preserve vector type declaration order after include sorting.
+
+Native Debug build passes; full CTest with socket/process access passes 537/537 enabled tests
+(13 disabled), including the two pending step-9 module guards. Basin and outer CPU captures
+match a fresh build of `7f56188` byte for byte; catalog data matches apart from the include.
+Browser game/worker build and Wasm Lua check pass. Step 9 boundary enforcement and step 10
+closing documentation are next. No new manual playback or user acceptance is claimed.
+
+Step 7 deviations: `proteus_audio` and `proteus_room` are deferred. Their sources are compiled
+by executables with different definitions (including server WebRTC selection); merging them
+into a library would change behavior. `boat_profile` stays in `proteus_boat_drive`, moved to
+its owning application directory. This milestone preserves targets and behavior.
+
 ### AR10 — Close the plan as the architecture specification
 
 Rewrite this file as `docs/ARCHITECTURE.md`: implemented modules, dependency graph,

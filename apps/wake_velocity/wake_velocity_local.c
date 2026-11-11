@@ -1,6 +1,6 @@
-#include "wake_velocity_local.h"
-#include "boat_time_control.h"
+#include "wake_velocity/wake_velocity_local.h"
 #include "raylib.h"
+#include "session/boat_time_control.h"
 
 #include <math.h>
 #include <string.h>

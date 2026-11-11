@@ -1,5 +1,5 @@
 // Explicit performance experiment, outside CTest: no sleeps or timing-based assertions.
-#include "wake_velocity_plugin.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #include <stdio.h>
 #include <stdlib.h>

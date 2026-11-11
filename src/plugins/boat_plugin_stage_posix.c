@@ -3,7 +3,7 @@
 #endif
 // POSIX staging backend: posix_spawn of the executable with request/response temporary files as
 // stdin/stdout, non-blocking waitpid polling, and SIGKILL plus reaping on close.
-#include "boat_plugin_stage_backend.h"
+#include "plugins/boat_plugin_stage_backend.h"
 
 #include <errno.h>
 #include <fcntl.h>

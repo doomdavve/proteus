@@ -1,8 +1,9 @@
-#include "boat_cargo_view.h"
-#include "boat_cargo.h"
-#include "boat_water_mesh.h"
+#include "render/boat_cargo_view.h"
+#include "core/boat_cargo.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront.h"
+#include "render/boat_water_mesh.h"
+#include "render/waterfront.h"
 
 #include <math.h>
 #include <string.h>

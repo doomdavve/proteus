@@ -54,24 +54,6 @@ if(APPLE)
   link_libraries("-framework Accelerate") # Double cosine backend; portable FFT elsewhere.
 endif()
 
-# AR8 transition: until every include is qualified (AR8-1), each moved directory is an include
-# path for every target defined below, so flat includes keep resolving and moves stay renames.
-set(PROTEUS_TRANSITION_INCLUDES
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/core ${CMAKE_CURRENT_SOURCE_DIR}/src/scenery
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/net
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/json
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/session
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/room
-  ${CMAKE_CURRENT_SOURCE_DIR}/apps/wake_velocity
-  ${CMAKE_CURRENT_SOURCE_DIR}/apps/boat_server
-  ${CMAKE_CURRENT_SOURCE_DIR}/apps/cargo_sandbox
-  ${CMAKE_CURRENT_SOURCE_DIR}/apps/dance_study
-  ${CMAKE_CURRENT_SOURCE_DIR}/tests/support)
-include_directories(${PROTEUS_TRANSITION_INCLUDES})
-
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 
 # Imported targets are directory-scoped: find them here so the game and its tests see them.

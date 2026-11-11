@@ -1,13 +1,13 @@
 #ifndef PROTEUS_BOAT_VIEW_H
 #define PROTEUS_BOAT_VIEW_H
 
-#include "boat_presentation.h"
-#include "boat_view_state.h"
-#include "boat_water_mesh.h"
-#include "renderer3d.h"
-#include "waterfront_corner.h"
-#include "waterfront_harbor_view.h"
-#include "waterfront_scene.h"
+#include "core/boat_view_state.h"
+#include "render/boat_presentation.h"
+#include "render/boat_water_mesh.h"
+#include "render/renderer3d.h"
+#include "render/waterfront_corner.h"
+#include "render/waterfront_harbor_view.h"
+#include "render/waterfront_scene.h"
 
 #define BOAT_CAMERA_DEFAULT ((BoatCamera) { .distance = 20, .height = 14 })
 

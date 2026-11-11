@@ -1,4 +1,4 @@
-#include "waterfront_city.h"
+#include "core/waterfront_city.h"
 
 #include "../../assets/geometry/river/water.h"
 

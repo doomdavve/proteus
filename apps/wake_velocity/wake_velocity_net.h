@@ -1,13 +1,13 @@
 #ifndef WAKE_VELOCITY_NET_H
 #define WAKE_VELOCITY_NET_H
-#include "boat_net_client.h"
+#include "net/boat_net_client.h"
 #if defined(__EMSCRIPTEN__)
-#include "boat_net_web.h"
+#include "net/boat_net_web.h"
 #else
-#include "boat_net_enet.h"
+#include "net/boat_net_enet.h"
 #endif
-#include "boat_session.h"
-#include "boat_view.h"
+#include "render/boat_view.h"
+#include "session/boat_session.h"
 
 // The room client of wake_velocity --connect and --host: a BoatNetClient of a hosted authority.
 // Private sessions use the same client library through wake_velocity_local.c, which presents only

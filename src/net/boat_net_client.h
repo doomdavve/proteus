@@ -1,10 +1,10 @@
 #ifndef PROTEUS_BOAT_NET_CLIENT_H
 #define PROTEUS_BOAT_NET_CLIENT_H
 
-#include "boat_net_private.h"
-#include "boat_net_transport.h"
-#include "boat_prediction.h"
-#include "boat_remote_view.h"
+#include "net/boat_net_private.h"
+#include "net/boat_net_transport.h"
+#include "net/boat_prediction.h"
+#include "net/boat_remote_view.h"
 
 #define BOAT_NET_PENDING_BIRTHS 64 // Births held until their tick's snapshot or the baseline.
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.

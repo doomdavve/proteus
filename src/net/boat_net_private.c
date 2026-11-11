@@ -1,4 +1,4 @@
-#include "boat_net_private.h"
+#include "net/boat_net_private.h"
 
 #include <math.h>
 #include <string.h>

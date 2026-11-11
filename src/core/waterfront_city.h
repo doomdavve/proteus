@@ -1,8 +1,8 @@
 #ifndef PROTEUS_WATERFRONT_CITY_H
 #define PROTEUS_WATERFRONT_CITY_H
 
-#include "boat_map.h"
-#include "geometry3d.h"
+#include "core/boat_map.h"
+#include "core/geometry3d.h"
 
 #include <stdbool.h>
 

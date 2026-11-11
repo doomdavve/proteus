@@ -8,7 +8,7 @@
 // boat_work_save_leave when it stops. It takes the wall-clock time for display from the caller,
 // reads no clock and draws nothing.
 
-#include "boat_work_session.h"
+#include "session/boat_work_session.h"
 
 #include <stdbool.h>
 #include <stdint.h>

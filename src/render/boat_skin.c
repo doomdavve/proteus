@@ -1,8 +1,9 @@
-#include "boat_skin.h"
-#include "boat_cabin.h"
-#include "boat_flag.h"
-#include "boat_grodan.h"
+#include "render/boat_skin.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_cabin.h"
+#include "render/boat_flag.h"
+#include "render/boat_grodan.h"
 
 #include <string.h>
 

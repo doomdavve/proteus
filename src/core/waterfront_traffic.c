@@ -1,9 +1,10 @@
-#include "waterfront_traffic.h"
+#include "core/waterfront_traffic.h"
 
-#include "boat_scene_definition.h"
+#include "core/boat_scene_definition.h"
+#include "core/waterfront_route.h"
+#include "core/waterfront_upstream.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_route.h"
-#include "waterfront_upstream.h"
 
 #include <math.h>
 

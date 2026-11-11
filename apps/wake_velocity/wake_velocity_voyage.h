@@ -16,9 +16,9 @@
 // private state. Lua state never leaves the authority. A commit request (rules.commit) installs
 // a host-managed revision, which the adapter resolves by number and borrows: a rebind, a live
 // route edit, a migration of the objective, or a voyage restart.
-#include "boat_net_server.h"
-#include "boat_session.h"
-#include "wake_velocity_objective.h"
+#include "net/boat_net_server.h"
+#include "session/boat_session.h"
+#include "wake_velocity/wake_velocity_objective.h"
 
 #define WAKE_VOYAGE_STATE_BYTES 40
 // The objective's tail after the voyage's bytes: generation (4), active revision (4), the latest

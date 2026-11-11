@@ -2,7 +2,7 @@
 #define PROTEUS_BOAT_PLUGIN_DECODE_H
 
 // Plugin data: descriptor data as an evaluator returned it, and its Lua-free checks and decoders.
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 typedef struct {
     char id[BOAT_PLUGIN_TEXT], name[BOAT_PLUGIN_TEXT];

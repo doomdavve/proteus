@@ -1,4 +1,4 @@
-#include "boat_net_mux.h"
+#include "net/boat_net_mux.h"
 #include <string.h>
 static bool poll_event(void *context, BoatNetEvent *event)
 {

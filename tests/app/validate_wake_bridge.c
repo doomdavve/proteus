@@ -4,7 +4,7 @@
 // P4.6 live tool bridge: authentication, revision/epoch pins, deferred isolated staging, Apply,
 // Undo and Discard through request files on a virtual clock. --serve DIR runs the same bridge
 // over a still session for tests/tools/test_plugin_author.py's end-to-end client checks.
-#include "wake_velocity_bridge.h"
+#include "wake_velocity/wake_velocity_bridge.h"
 
 #include <stdio.h>
 #include <stdlib.h>

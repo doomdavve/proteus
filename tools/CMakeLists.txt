@@ -1,7 +1,7 @@
 # Race R0: measured shortened river route, source contracts, captures and playable trial.
 add_executable(boat_race_trial boat_race_trial.c boat_vessel_wake_gpu.c
   boat_race_plugin.c boat_race_plugin.h)
-target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
+target_include_directories(boat_race_trial PRIVATE ${PROJECT_SOURCE_DIR} ${raylib_SOURCE_DIR}/src)
 target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins
   proteus_plugin_catalog)
 target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
@@ -147,3 +147,9 @@ target_link_libraries(harbor_review PRIVATE proteus_gpu)
 target_compile_options(harbor_review PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 endif()
+
+# Offline utilities consume validator fixtures without exposing them to applications.
+get_property(PROTEUS_TOOL_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(target IN LISTS PROTEUS_TOOL_TARGETS)
+  target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/tests ${PROJECT_SOURCE_DIR}/apps)
+endforeach()

@@ -1,7 +1,8 @@
-#include "waterfront_route.h"
+#include "core/waterfront_route.h"
 
+#include "core/waterfront_upstream.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_upstream.h"
 
 #include <math.h>
 #include <string.h>

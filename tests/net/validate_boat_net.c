@@ -6,19 +6,20 @@
  * timeouts and that a client mirror reproduces the authority's state hash. Prediction replays
  * from mid-flight and capsized checkpoints reproduce the authority bit for bit, and predicting
  * clients on virtual links report their correction sizes and replay cost. */
-#include "boat_fleet_bots.h"
-#include "boat_map.h"
-#include "boat_net_client.h"
+#include "core/boat_map.h"
+#include "net/boat_net_client.h"
+#include "room/boat_fleet_bots.h"
 #ifdef BOAT_NET_TEST_ENET
-#include "boat_net_enet.h"
+#include "net/boat_net_enet.h"
 #endif
-#include "boat_net_server.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
-#include "boat_throttle.h"
+#include "core/boat_throttle.h"
+#include "net/boat_net_server.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
 
-#include "boat_fixtures.h"
+#include "support/boat_fixtures.h"
 #include <inttypes.h>
 #include <limits.h>
 #include <math.h>

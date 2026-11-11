@@ -1,5 +1,5 @@
-#include "boat_net_rtc.h"
-#include "boat_net_enet.h" // Monotonic scheduling, shared with the native authority.
+#include "net/boat_net_rtc.h"
+#include "net/boat_net_enet.h" // Monotonic scheduling, shared with the native authority.
 #include <rtc/rtc.h>
 #include <stdatomic.h>
 #include <stdio.h>

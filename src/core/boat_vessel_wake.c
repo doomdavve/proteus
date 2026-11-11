@@ -1,4 +1,5 @@
-#include "boat_vessel_wake.h"
+#include "core/boat_vessel_wake.h"
+#include "raylib.h"
 #include "raymath.h"
 #include <math.h>
 

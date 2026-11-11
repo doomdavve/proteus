@@ -1,11 +1,12 @@
-#include "boat_map.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
-#include "waterfront_harbor.h"
-#include "waterfront_route.h"
-#include "waterfront_traffic.h"
-#include "waterfront_upstream.h"
+#include "core/boat_map.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_route.h"
+#include "core/waterfront_traffic.h"
+#include "core/waterfront_upstream.h"
+#include "render/boat_view.h"
+#include "support/boat_test_session.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

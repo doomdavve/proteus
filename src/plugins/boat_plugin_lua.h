@@ -3,7 +3,7 @@
 
 // Private to proteus_plugins: the restricted Lua evaluation that produces descriptor data.
 // Values are copied as Lua gave them; boat_plugin.c checks their meaning.
-#include "boat_plugin_decode.h"
+#include "plugins/boat_plugin_decode.h"
 
 BoatPluginStatus boat_plugin_lua_free(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginFreeData *out, BoatPluginDiagnostic *diagnostic);

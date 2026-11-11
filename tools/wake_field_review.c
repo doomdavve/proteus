@@ -1,5 +1,5 @@
 /* W2.1b: independently reconstruct modal packets; compare bounded C domains. */
-#include "boat_wake.h"
+#include "core/boat_wake.h"
 
 #include <math.h>
 #include <stdio.h>

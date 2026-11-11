@@ -1,7 +1,7 @@
 #ifndef PROTEUS_WATERFRONT_OUTER_H
 #define PROTEUS_WATERFRONT_OUTER_H
 
-#include "boat_map.h"
+#include "core/boat_map.h"
 
 // Compiled first outer-river slice (the river crop plus the Långedrag run): its water triangles
 // alone, for collision, the server and the content digest. Immutable process-lifetime data in

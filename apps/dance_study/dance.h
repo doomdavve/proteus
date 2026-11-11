@@ -1,7 +1,7 @@
 #ifndef PROTEUS_DANCE_H
 #define PROTEUS_DANCE_H
 
-#include "renderer3d.h"
+#include "render/renderer3d.h"
 
 enum {
     DANCE_PELVIS,

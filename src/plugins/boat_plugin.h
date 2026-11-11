@@ -5,13 +5,13 @@
 // evaluates one plugin's manifest and Lua entry text and decodes its voyage into owned native
 // data. Input is immutable bytes; nothing here touches files (boat_plugin_io.h acquires them).
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
-#include "boat_course.h"
-#include "boat_location.h"
-#include "boat_marks.h"
-#include "boat_match.h"
-#include "boat_race.h"
-#include "boat_scene_definition.h"
-#include "boat_voyage.h"
+#include "core/boat_course.h"
+#include "core/boat_location.h"
+#include "core/boat_marks.h"
+#include "core/boat_match.h"
+#include "core/boat_race.h"
+#include "core/boat_scene_definition.h"
+#include "core/boat_voyage.h"
 
 #include <stddef.h>
 #include <stdint.h>

@@ -1,4 +1,4 @@
-#include "boat_scene_definition.h"
+#include "core/boat_scene_definition.h"
 
 #include <math.h>
 #include <string.h>

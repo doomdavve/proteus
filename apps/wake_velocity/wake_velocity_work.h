@@ -12,13 +12,13 @@
 // client's mirror (wake_work_view), sends each frame's keys (wake_work_frame), and changes the
 // authority's session only as host management (reset, saving).
 
-#include "boat_model.h"
-#include "boat_session.h"
-#include "boat_view.h"
-#include "boat_view_state.h"
-#include "boat_work_local.h"
-#include "boat_work_save.h"
-#include "boat_work_session.h"
+#include "core/boat_model.h"
+#include "core/boat_view_state.h"
+#include "render/boat_view.h"
+#include "session/boat_session.h"
+#include "session/boat_work_local.h"
+#include "session/boat_work_save.h"
+#include "session/boat_work_session.h"
 
 typedef struct {
     BoatWorkSession session;

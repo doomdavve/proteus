@@ -1,6 +1,7 @@
-#include "boat_cargo.h"
+#include "core/boat_cargo.h"
+#include "core/waterfront_traffic.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_traffic.h"
 
 #include <math.h>
 #include <stdio.h>

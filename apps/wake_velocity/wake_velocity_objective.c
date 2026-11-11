@@ -1,4 +1,4 @@
-#include "wake_velocity_objective.h"
+#include "wake_velocity/wake_velocity_objective.h"
 
 #include <limits.h>
 #include <math.h>

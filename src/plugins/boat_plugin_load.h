@@ -2,7 +2,7 @@
 #define PROTEUS_BOAT_PLUGIN_LOAD_H
 
 // Plugin evaluation: load a bundle by running its Lua entry, then decode and check it.
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);

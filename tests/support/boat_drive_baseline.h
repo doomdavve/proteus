@@ -1,6 +1,7 @@
-#include "boat_test_world.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "wake_velocity_drive.h"
+#include "support/boat_test_world.h"
+#include "wake_velocity/wake_velocity_drive.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

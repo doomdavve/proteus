@@ -1,8 +1,8 @@
 #ifndef BOAT_TEST_SCENERY_H
 #define BOAT_TEST_SCENERY_H
-#include "boat_assets.h"
-#include "boat_scenery.h"
-#include "boat_test_location.h"
+#include "platform/boat_assets.h"
+#include "scenery/boat_scenery.h"
+#include "support/boat_test_location.h"
 
 #include <stdio.h>
 #include <stdlib.h>

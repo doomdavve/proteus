@@ -1,4 +1,4 @@
-#include "boat_course.h"
+#include "core/boat_course.h"
 
 #include <math.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#include "renderer3d.h"
-#include "waterfront.h"
+#include "render/renderer3d.h"
+#include "render/waterfront.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -6,19 +6,19 @@
  * Otherwise (M3) it listens for wake_velocity/boat_bot clients over ENet and runs the room at
  * 120 Hz wall-clock time until --ticks/--seconds elapse or it is interrupted. The same entry
  * point is the game's `--serve` mode (boat_server.h). */
-#include "boat_server.h"
-#include "boat_fleet.h"
-#include "boat_fleet_bots.h"
-#include "boat_match.h"
-#include "boat_net_enet.h"
+#include "room/boat_server.h"
+#include "core/boat_fleet.h"
+#include "core/boat_match.h"
+#include "net/boat_net_enet.h"
+#include "room/boat_fleet_bots.h"
 #ifdef PROTEUS_WEBRTC
-#include "boat_net_mux.h"
-#include "boat_net_rtc.h"
+#include "net/boat_net_mux.h"
+#include "net/boat_net_rtc.h"
 #endif
-#include "boat_net_server.h"
-#include "boat_room_objective.h"
-#include "boat_room_package.h"
-#include "cli_usage.h"
+#include "net/boat_net_server.h"
+#include "platform/cli_usage.h"
+#include "room/boat_room_objective.h"
+#include "room/boat_room_package.h"
 
 #include <inttypes.h>
 #include <signal.h>

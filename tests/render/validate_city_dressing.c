@@ -1,9 +1,9 @@
-#include "boat_test_maps.h"
-#include "boat_test_scenery.h"
-#include "waterfront_city.h"
-#include "waterfront_corner.h"
-#include "waterfront_outer.h"
-#include "waterfront_scene.h"
+#include "core/waterfront_city.h"
+#include "core/waterfront_outer.h"
+#include "render/waterfront_corner.h"
+#include "render/waterfront_scene.h"
+#include "support/boat_test_maps.h"
+#include "support/boat_test_scenery.h"
 
 #include <math.h>
 #include <stdint.h>

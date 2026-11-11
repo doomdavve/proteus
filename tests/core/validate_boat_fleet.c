@@ -3,11 +3,12 @@
  * isolated pair reproduces boat_collide_pair, that checkpoints resume bit-identically, and the
  * contact solver, spawn and wake-pool contracts. Cross-compiler results are compared by
  * invariants and tolerances, never by bitwise identity across platforms. */
-#include "boat_fleet.h"
-#include "boat_fleet_bots.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
+#include "core/boat_fleet.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "room/boat_fleet_bots.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -1,4 +1,4 @@
-#include "wake_velocity_servers.h"
+#include "wake_velocity/wake_velocity_servers.h"
 #include <emscripten.h>
 
 // clang-format off

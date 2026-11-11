@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_SKIN_H
 #define PROTEUS_BOAT_SKIN_H
 
-#include "boat_model.h"
+#include "core/boat_model.h"
 
 // Appearance IDs are local presentation choices,
 // not protocol values. The four countries colour room slots. The explorer, cabin and

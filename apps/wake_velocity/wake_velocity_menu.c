@@ -1,6 +1,6 @@
-#include "wake_velocity_menu.h"
-#include "boat_ui.h"
-#include "wake_velocity_input.h"
+#include "wake_velocity/wake_velocity_menu.h"
+#include "render/boat_ui.h"
+#include "wake_velocity/wake_velocity_input.h"
 
 #include <stddef.h>
 

@@ -1,9 +1,9 @@
 #ifndef PROTEUS_BOAT_MINIMAP_H
 #define PROTEUS_BOAT_MINIMAP_H
 
-#include "boat_location.h"
-#include "boat_marks.h"
-#include "boat_voyage.h"
+#include "core/boat_location.h"
+#include "core/boat_marks.h"
+#include "core/boat_voyage.h"
 
 // North-up nautical chart of a mapped location: the whole map baked once in paper-chart colours
 // (buff land, built-up tint, black coastline, white water with a blue nearshore band) inside a

@@ -2,14 +2,15 @@
  * draw, open a window or audio, or reach session/replay persistence; it steps boats through
  * boat_step and the course sweep exactly as BoatSession orders them (validate_boat_world checks
  * that order against the session). */
-#include "boat.h"
-#include "boat_course.h"
-#include "boat_fixtures.h"
-#include "boat_map.h"
-#include "boat_test_world.h"
+#include "core/boat.h"
+#include "core/boat_course.h"
+#include "core/boat_map.h"
+#include "core/waterfront_city.h"
+#include "core/waterfront_harbor.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_city.h"
-#include "waterfront_harbor.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_world.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -5,10 +5,10 @@
 // and sends this value; clients decode and validate it without Lua, files or the compiled race and
 // harbour defaults. It belongs to proteus_boat_core: physics, prediction and presentation read the
 // same copied values.
-#include "boat_marks.h"
-#include "boat_match.h"
-#include "boat_race.h"
-#include "boat_scene_definition.h"
+#include "core/boat_marks.h"
+#include "core/boat_match.h"
+#include "core/boat_race.h"
+#include "core/boat_scene_definition.h"
 
 #define BOAT_ROOM_VERSION 4
 #define BOAT_ROOM_ID_BYTES 64

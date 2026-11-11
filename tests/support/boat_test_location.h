@@ -1,7 +1,7 @@
 #ifndef BOAT_TEST_LOCATION_H
 #define BOAT_TEST_LOCATION_H
-#include "boat_location.h"
-#include "waterfront_city.h"
+#include "core/boat_location.h"
+#include "core/waterfront_city.h"
 
 // The Eriksberg river crop as a validator's small mapped fixture. It was the river location
 // before that retired into the outer map, which holds the same water in the same frame; its

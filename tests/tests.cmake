@@ -28,3 +28,13 @@ set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_
 
 set_tests_properties(boat_river_location_retired boat_server_river_location_retired PROPERTIES
   PASS_REGULAR_EXPRESSION "location is retired; --location outer")
+
+# Test and application headers used by validators are private to those consumers.
+get_property(PROTEUS_ROOT_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(target IN LISTS PROTEUS_ROOT_TARGETS)
+  get_target_property(kind ${target} TYPE)
+  if(kind STREQUAL "EXECUTABLE")
+    target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/tests ${PROJECT_SOURCE_DIR}/apps)
+  endif()
+endforeach()
+target_include_directories(validate_boat_plugin_race PRIVATE ${PROJECT_SOURCE_DIR})

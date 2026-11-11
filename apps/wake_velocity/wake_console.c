@@ -1,14 +1,13 @@
-#include "wake_console.h"
+#include "wake_velocity/wake_console.h"
 
-#include "boat_ui.h"
 #include "raylib.h"
-#include "wake_command.h"
-#include "wake_console_bridge.h"
+#include "render/boat_ui.h"
+#include "wake_velocity/wake_command.h"
+#include "wake_velocity/wake_console_bridge.h"
 #include <limits.h>
 
 #include <stdio.h>
 #include <string.h>
-
 
 // Use the small face's natural advances for prose; only the ASCII drawing uses six-pixel cells.
 // Nine-pixel rows leave room for descenders and a visible block cursor.

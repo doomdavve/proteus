@@ -12,16 +12,17 @@
  * of the browser's worker beside the native authority, tick for tick. Frame time is a scripted
  * value, never wall time. `--bench` reports per-frame cost (not a test).
  */
-#include "boat_fixtures.h"
-#include "boat_helm.h"
-#include "boat_local.h"
-#include "boat_plugin_eval.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
-#include "boat_time_control.h"
-#include "wake_velocity_local.h"
-#include "wake_velocity_plugin.h"
+#include "core/boat_helm.h"
+#include "net/boat_local.h"
+#include "plugins/boat_plugin_eval.h"
+#include "session/boat_time_control.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
+#include "wake_velocity/wake_velocity_local.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <inttypes.h>

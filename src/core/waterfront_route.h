@@ -1,8 +1,8 @@
 #ifndef PROTEUS_WATERFRONT_ROUTE_H
 #define PROTEUS_WATERFRONT_ROUTE_H
 
-#include "boat_model.h"
-#include "waterfront_traffic.h"
+#include "core/boat_model.h"
+#include "core/waterfront_traffic.h"
 
 #include <stdbool.h>
 #include <stdint.h>

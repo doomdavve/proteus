@@ -1,10 +1,10 @@
 /* The work session's native daylight clock: fixed ticks, not frame time; rate scaling through
  * the existing virtual frame scheduler; wraps and seeks; reset/recovery; save/resume; and the
  * idle clock dirtying automatic saving. Real bundled basin work resources, no window or files. */
-#include "boat_location.h"
-#include "boat_plugin_catalog.h"
-#include "boat_time_control.h"
-#include "boat_work_session.h"
+#include "core/boat_location.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "session/boat_time_control.h"
+#include "session/boat_work_session.h"
 
 #include <math.h>
 #include <stdio.h>

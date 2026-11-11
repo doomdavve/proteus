@@ -1,6 +1,6 @@
 #ifndef PROTEUS_BOAT_GRODAN_H
 #define PROTEUS_BOAT_GRODAN_H
-#include "boat_model.h"
+#include "core/boat_model.h"
 // GH3: the Grodan canal tour boat's visual recipe. HULL selects the hull (with its painted name);
 // otherwise the open deck: benches, passengers, windscreen and helm. Bow toward -Z, waterline Y=0.
 bool boat_grodan_generate(BoatModel *model, bool hull);

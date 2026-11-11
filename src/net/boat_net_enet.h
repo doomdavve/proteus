@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_NET_ENET_H
 #define PROTEUS_BOAT_NET_ENET_H
 
-#include "boat_net_transport.h"
+#include "net/boat_net_transport.h"
 
 // ENet adapter for the transport boundary: IPv4 only, five channels mapped from the delivery
 // classes, a 1200-byte UDP payload MTU and bounded packet/waiting-data allocations. ENet types

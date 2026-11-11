@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_SESSION_H
 #define PROTEUS_BOAT_SESSION_H
 
-#include "boat_replay.h"
-#include "boat_voyage.h"
+#include "core/boat_voyage.h"
+#include "session/boat_replay.h"
 
 // Single-player owner: one world, one boat with its presentation, the only live clock, course
 // progress and the race-session runs. Assignment clones a session whose runs hold no

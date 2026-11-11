@@ -1,4 +1,4 @@
-#include "boat_water_atlas.h"
+#include "scenery/boat_water_atlas.h"
 
 #include <math.h>
 #include <stdio.h>

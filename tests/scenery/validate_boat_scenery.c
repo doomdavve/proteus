@@ -1,12 +1,12 @@
 /* Scenery packs (A3.5i): each mapped location's pack loads once, holds exactly its compiled
  * water before the land, and is what the renderers draw; a missing, malformed or mismatched pack
  * loads nothing, and a compiled map without its pack draws nothing rather than bare water. */
-#include "boat_ambient.h"
-#include "boat_test_scenery.h"
-#include "boat_water_atlas.h"
-#include "waterfront_city.h"
-#include "waterfront_corner.h"
-#include "waterfront_outer.h"
+#include "core/waterfront_city.h"
+#include "core/waterfront_outer.h"
+#include "render/waterfront_corner.h"
+#include "scenery/boat_ambient.h"
+#include "scenery/boat_water_atlas.h"
+#include "support/boat_test_scenery.h"
 
 #include <stdint.h>
 #include <stdio.h>

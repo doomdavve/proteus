@@ -1,4 +1,4 @@
-#include "boat_net_server.h"
+#include "net/boat_net_server.h"
 
 #include <math.h>
 #include <string.h>

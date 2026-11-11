@@ -167,7 +167,7 @@ def check_sources(root):
         code = strip_code(text)
         is_test = name == TEST_PROGRAM
         for number, header in quoted_includes(commented):
-            if header in EXECUTION_HEADERS:
+            if Path(header).name in EXECUTION_HEADERS:
                 problems.append(f"{name}:{number}: data code includes runtime header "
                                 f"\"{header}\"")
         for number, header in system_includes(commented):
@@ -327,6 +327,11 @@ def run_self_test(root):
                   lambda destination, name=name, snippet=snippet:
                   append_text(destination / name, snippet))
                  for name, snippet in SELF_TEST_APPENDS]
+        cases += [(f"{name}: qualified runtime header",
+                   lambda destination, name=name, snippet=snippet:
+                   append_text(destination / name, snippet.replace('#include "boat_',
+                                                                '#include "plugins/boat_')))
+                  for name, snippet in SELF_TEST_APPENDS if '#include "boat_' in snippet]
         cases.append(("CMakeLists.txt links the plugin host",
                       lambda destination: append_text(
                           destination / "src" / "session" / "CMakeLists.txt",

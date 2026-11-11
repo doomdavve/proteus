@@ -1,4 +1,4 @@
-#include "wake_velocity_app.h"
+#include "wake_velocity/wake_velocity_app.h"
 
 #include "raylib.h"
 

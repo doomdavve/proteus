@@ -1,6 +1,7 @@
-#include "boat_cabin.h"
-#include "boat_flag.h"
+#include "render/boat_cabin.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_flag.h"
 
 // Historic cabin craft, retained in its original local hull and cabin coordinates.
 static void player_box(Vector3 *vertices, Triangle3D *triangles, int *count, Vector3 position,

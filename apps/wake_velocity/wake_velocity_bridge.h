@@ -6,8 +6,8 @@
 // only the owner of the private DIR can read. Each mutation is pinned to the active revision and
 // commit epoch; everything happens between ticks through the same transactions as F5-F7.
 // docs/PLUGIN_API.md owns the request and response format.
-#include "wake_command.h"
-#include "wake_velocity_plugin.h"
+#include "wake_velocity/wake_command.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #define WAKE_BRIDGE_PROTOCOL 1
 #define WAKE_BRIDGE_ID 32 // Request ids: 1..32 lowercase hex digits.

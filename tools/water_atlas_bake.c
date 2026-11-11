@@ -7,11 +7,11 @@
  *     water_atlas_bake --map river|outer --check FILE
  *     water_atlas_bake --map river|outer --preview PNG   # the four channels side by side
  */
-#include "boat_location.h"
-#include "boat_map.h"
-#include "boat_test_location.h"
-#include "boat_water_atlas.h"
+#include "core/boat_location.h"
+#include "core/boat_map.h"
 #include "raylib.h"
+#include "scenery/boat_water_atlas.h"
+#include "support/boat_test_location.h"
 
 #include <math.h>
 #include <stdio.h>

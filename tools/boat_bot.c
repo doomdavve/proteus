@@ -6,10 +6,10 @@
  * prints each round's results as received.
  * --discover lists the rooms that answer a LAN search instead. Headless; for process smoke tests.
  */
-#include "boat_fleet_bots.h"
-#include "boat_net_client.h"
-#include "boat_net_enet.h"
-#include "cli_usage.h"
+#include "net/boat_net_client.h"
+#include "net/boat_net_enet.h"
+#include "platform/cli_usage.h"
+#include "room/boat_fleet_bots.h"
 
 #include <inttypes.h>
 #include <stdio.h>

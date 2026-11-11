@@ -44,8 +44,8 @@ LEGACY = {
 # File -> forbidden patterns: the backends its services own.
 MIGRATED = {
     "apps/wake_velocity/boat_title.c": [
-        r"#\s*include\s*[<\"]emscripten", r"#\s*include\s*\"boat_directory\.h\"",
-        r"#\s*include\s*\"boat_net_enet\.h\"", r"\bboat_directory_\w+\s*\(",
+        r"#\s*include\s*[<\"]emscripten", r"#\s*include\s*\"(?:wake_velocity/)?boat_directory\.h\"",
+        r"#\s*include\s*\"(?:net/)?boat_net_enet\.h\"", r"\bboat_directory_\w+\s*\(",
         r"\bboat_net_enet_\w+\s*\(", r"\bboat_net_lan_(search|query|receive|close)\s*\(",
         r"boatServers",
     ],

@@ -6,8 +6,8 @@
 // impairment. The host owns both endpoints and their schedule (docs/ARCHITECTURE_AR1.md
 // sections 2, 3 and 5); neither endpoint reads the other's state, and a send only enqueues.
 // No drawing, input, files or Lua: proteus_boat_net's boundary applies.
-#include "boat_net_client.h"
-#include "boat_net_server.h"
+#include "net/boat_net_client.h"
+#include "net/boat_net_server.h"
 
 #define BOAT_LOCAL_CHUNK_TICKS 12 // Ticks per chunk at most; chunks end on multiples of 12.
 #define BOAT_LOCAL_STARTUP_ROUNDS 8 // Service rounds a start may take before it fails.

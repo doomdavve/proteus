@@ -5,9 +5,9 @@
 // It belongs to proteus_boat_core: physics, presentation and validation read the same copied
 // values. It never points at Lua, files or a plugin host. Simulation x/z coordinates and renderer
 // headings follow the voyage API; a renderer converts x once at its boundary.
-#include "boat_model.h"
-#include "waterfront_flock.h"
-#include "waterfront_route.h"
+#include "core/boat_model.h"
+#include "core/waterfront_flock.h"
+#include "core/waterfront_route.h"
 
 #include <stdbool.h>
 #include <stdint.h>

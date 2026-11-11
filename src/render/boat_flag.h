@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_FLAG_H
 #define PROTEUS_BOAT_FLAG_H
 
-#include "renderer3d.h"
+#include "render/renderer3d.h"
 
 #define BOAT_FLAG_COLS 9
 #define BOAT_FLAG_ROWS 6

@@ -5,10 +5,10 @@
 // revisions. It stages a candidate from immutable bytes, classifies it against the active revision,
 // holds it until the application commits it between ticks, and keeps prior revisions for Undo.
 // Nothing here reads files or the clock: the application acquires bytes and passes the time.
-#include "boat_plugin.h"
-#include "boat_plugin_io.h"
-#include "boat_plugin_revision.h"
-#include "boat_plugin_state.h"
+#include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_revision.h"
+#include "plugins/boat_plugin_state.h"
 
 #define BOAT_PLUGIN_UNDO 8 // Prior revisions that Undo can reinstall.
 #define BOAT_PLUGIN_POLL 0.25 // Seconds between save polls.

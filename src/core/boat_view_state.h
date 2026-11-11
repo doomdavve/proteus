@@ -1,11 +1,11 @@
 #ifndef PROTEUS_BOAT_VIEW_STATE_H
 #define PROTEUS_BOAT_VIEW_STATE_H
 
-#include "boat.h"
-#include "boat_course.h"
-#include "boat_marks.h"
-#include "boat_scene_definition.h"
-#include "geometry3d.h"
+#include "core/boat.h"
+#include "core/boat_course.h"
+#include "core/boat_marks.h"
+#include "core/boat_scene_definition.h"
+#include "core/geometry3d.h"
 
 struct BoatRaceCourse;
 

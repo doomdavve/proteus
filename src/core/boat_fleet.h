@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_FLEET_H
 #define PROTEUS_BOAT_FLEET_H
 
-#include "boat.h"
-#include "boat_combat.h"
+#include "core/boat.h"
+#include "core/boat_combat.h"
 
 // Multiplayer M2: one authority's local fleet. Slot index is the stable player ID and also the
 // slot's wake emitter. Every boat uses normalized mass BOAT_FLEET_MASS.

@@ -1,15 +1,16 @@
 // L4.3 first-playable harbor qualification fixture. It loads the real package, drives the
 // validated marina approach/idle/departure inputs, checks the combined actors, and measures a
 // CPU frame distribution for the compiled and populated scenes at one camera/time sweep.
-#include "boat_map.h"
-#include "boat_plugin_host.h"
-#include "boat_plugin_io.h"
-#include "boat_session.h"
-#include "boat_test_scenery.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
+#include "core/boat_map.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_io.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_scene.h"
+#include "render/boat_view.h"
+#include "render/waterfront_scene.h"
+#include "session/boat_session.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

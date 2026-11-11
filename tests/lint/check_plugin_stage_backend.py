@@ -164,7 +164,7 @@ def check_private_header(root):
             name = path.relative_to(root).as_posix()
             code = strip_comments(path.read_text(encoding="utf-8"))
             for number, header in includes(name, code):
-                if header != PRIVATE_HEADER:
+                if Path(header).name != PRIVATE_HEADER:
                     continue
                 if name not in PRIVATE_HEADER_ALLOWED:
                     problems.append(f"{name}:{number}: includes the private plugin staging "
@@ -234,6 +234,11 @@ def self_test(root):
                   lambda destination, name=name, snippet=snippet:
                   append_text(destination / name, snippet))
                  for name, snippet in SELF_TEST_APPENDS]
+        cases += [(f"{name}: qualified runtime header",
+                   lambda destination, name=name, snippet=snippet:
+                   append_text(destination / name, snippet.replace('#include "boat_',
+                                                                '#include "plugins/boat_')))
+                  for name, snippet in SELF_TEST_APPENDS if '#include "boat_' in snippet]
         cases.append(("apps/x/other.c includes the private backend header",
                       lambda destination: (
                           (destination / "apps" / "x").mkdir(parents=True, exist_ok=True),

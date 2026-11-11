@@ -1,4 +1,4 @@
-#include "wake_velocity_performance.h"
+#include "wake_velocity/wake_velocity_performance.h"
 
 #include "boat_version.h"
 #if defined(__EMSCRIPTEN__)

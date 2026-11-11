@@ -3,7 +3,7 @@
 
 // Acquire a plugin directory's plugin.json and its entry as immutable bytes. The only plugin code
 // that touches the filesystem; boat_plugin.h evaluates what it read.
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 typedef struct {
     char manifest[BOAT_PLUGIN_MANIFEST_MAX];

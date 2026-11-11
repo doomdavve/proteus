@@ -1,8 +1,9 @@
-#include "boat_fixtures.h"
-#include "boat_replay.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_view.h"
+#include "session/boat_replay.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -1,6 +1,6 @@
 // Sample both production shader recipes through an RGBA32F framebuffer.
-#include "boat_vessel_wake.h"
-#include "boat_water.h"
+#include "core/boat_vessel_wake.h"
+#include "core/boat_water.h"
 #if !defined(__EMSCRIPTEN__)
 #include "external/glad.h"
 #include "rlgl.h"

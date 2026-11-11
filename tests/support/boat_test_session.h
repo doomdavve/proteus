@@ -1,7 +1,7 @@
 #ifndef BOAT_TEST_SESSION_H
 #define BOAT_TEST_SESSION_H
-#include "boat_session.h"
-#include "boat_test_world.h"
+#include "session/boat_session.h"
+#include "support/boat_test_world.h"
 
 // The live view of *SESSION for one draw or scene call (block-scoped compound literal).
 #define SESSION_VIEW(session)                                                                      \

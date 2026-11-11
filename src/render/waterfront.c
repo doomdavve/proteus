@@ -1,7 +1,8 @@
-#include "waterfront.h"
-#include "waterfront_corner.h"
-#include "waterfront_upstream.h"
+#include "render/waterfront.h"
+#include "core/waterfront_upstream.h"
+#include "render/waterfront_corner.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

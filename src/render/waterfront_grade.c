@@ -1,6 +1,7 @@
-#include "waterfront_grade.h"
-#include "waterfront_lighting.h"
+#include "render/waterfront_grade.h"
+#include "render/waterfront_lighting.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 // The approved sunset and dusk presets are shaded in full by WaterfrontLighting; their grades

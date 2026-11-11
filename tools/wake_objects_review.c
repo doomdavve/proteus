@@ -1,11 +1,12 @@
 /* Arcade wake contracts, actual hull jumps, bounded stress and complete GPU timing. */
-#include "boat_gpu.h"
-#include "boat_test_cases.h"
-#include "boat_test_scenery.h"
-#include "boat_test_session.h"
 #include "external/glad.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
 #include "rlgl.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_session.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

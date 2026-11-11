@@ -4,11 +4,11 @@
 // Fixture data for validators and review tools. The engine no longer selects content from
 // compiled definitions; this library keeps the shipped values so tests can compare packages
 // against the reference they replaced. No production target links it.
-#include "boat_combat.h"
-#include "boat_course.h"
-#include "boat_match.h"
-#include "boat_race.h"
-#include "boat_voyage.h"
+#include "core/boat_combat.h"
+#include "core/boat_course.h"
+#include "core/boat_match.h"
+#include "core/boat_race.h"
+#include "core/boat_voyage.h"
 
 extern const BoatVoyageRoute boat_fixture_voyage_outer;
 extern const BoatCourseGate boat_fixture_course_gates[BOAT_COURSE_GATES];

@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_NET_TRANSPORT_H
 #define PROTEUS_BOAT_NET_TRANSPORT_H
 
-#include "boat_net_protocol.h"
+#include "net/boat_net_protocol.h"
 
 // The only boundary between the protocol sessions and a delivery mechanism: byte messages,
 // delivery classes and small peer numbers. ENet (boat_net_enet.c) and the in-memory

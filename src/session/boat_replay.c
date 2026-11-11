@@ -1,8 +1,9 @@
-#include "boat_replay.h"
-#include "boat_file.h"
-#include "boat_pose.h"
-#include "boat_time_control.h"
+#include "session/boat_replay.h"
+#include "core/boat_pose.h"
+#include "platform/boat_file.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "session/boat_time_control.h"
 
 #include <ctype.h>
 #include <math.h>

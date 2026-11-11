@@ -1,5 +1,5 @@
 /* Native GL 3.3 fragment-pass feasibility prototype. Not a gameplay backend. */
-#include "boat_wake.h"
+#include "core/boat_wake.h"
 #include "external/glad.h"
 #include "raylib.h"
 #include <math.h>

@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_POSE_H
 #define PROTEUS_BOAT_POSE_H
 
-#include "boat.h"
-#include "geometry3d.h"
+#include "core/boat.h"
+#include "core/geometry3d.h"
 
 // Outboard lever arm behind the hull centre, shared by thrust, stern sampling and wash.
 #define BOAT_ENGINE_ARM 1.6f

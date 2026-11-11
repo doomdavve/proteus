@@ -1,7 +1,7 @@
-#include "boat_net_client.h"
-#include "boat_helm.h"
-#include "boat_steering.h"
-#include "boat_throttle.h"
+#include "net/boat_net_client.h"
+#include "core/boat_helm.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
 
 #include <math.h>
 #include <string.h>

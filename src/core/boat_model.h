@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_MODEL_H
 #define PROTEUS_BOAT_MODEL_H
 
-#include "geometry3d.h"
+#include "core/geometry3d.h"
 
 // Visual recipes in metres, Y up, bow toward -Z, rest waterline at Y=0.
 // These do not prescribe performance, physics, prices, or an upgrade progression.

@@ -4,11 +4,11 @@
  * and the candidates each visits must not grow with the number of distant copies.
  * `--report` (or PROTEUS_SCALING_REPORT=1) also prints per-size build cost, memory per owner and
  * per-operation times. Times are a report, never a gate: only counts and equality are asserted. */
-#include "boat_map.h"
-#include "boat_map_tiles.h"
-#include "boat_test_scenery.h"
-#include "boat_water_mesh.h"
-#include "waterfront_city.h"
+#include "core/boat_map.h"
+#include "core/boat_map_tiles.h"
+#include "core/waterfront_city.h"
+#include "render/boat_water_mesh.h"
+#include "support/boat_test_scenery.h"
 
 #include <math.h>
 #include <stdio.h>

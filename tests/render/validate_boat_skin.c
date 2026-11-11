@@ -1,8 +1,9 @@
-#include "boat_flag.h"
-#include "boat_pose.h"
-#include "boat_skin.h"
-#include "boat_view.h"
+#include "core/boat_pose.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_flag.h"
+#include "render/boat_skin.h"
+#include "render/boat_view.h"
 
 // Keep the checks in Release builds, where CI runs this validator.
 #undef NDEBUG

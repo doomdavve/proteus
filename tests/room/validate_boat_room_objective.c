@@ -2,12 +2,12 @@
 // marks and source, its Lua runs only behind the server's rules adapter, failures quarantine it
 // while the room keeps running, and a memory-transport room with two clients scores real mark
 // entries. Time is the virtual service clock only.
-#include "boat_net_client.h"
-#include "boat_net_server.h"
-#include "boat_room_objective.h"
-#include "boat_room_package.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
+#include "net/boat_net_client.h"
+#include "net/boat_net_server.h"
+#include "room/boat_room_objective.h"
+#include "room/boat_room_package.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
 
 #include <inttypes.h>
 #include <stdio.h>

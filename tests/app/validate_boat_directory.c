@@ -1,4 +1,4 @@
-#include "boat_directory.h"
+#include "wake_velocity/boat_directory.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif

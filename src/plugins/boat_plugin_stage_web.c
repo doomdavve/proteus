@@ -1,6 +1,6 @@
 // Browser staging backend: the page's Module.boatPluginStage transport (web/plugin_author.js)
 // runs each request in a disposable Web Worker; the game Wasm only copies bytes in and out.
-#include "boat_plugin_stage_backend.h"
+#include "plugins/boat_plugin_stage_backend.h"
 
 #include <stdlib.h>
 #if defined(__EMSCRIPTEN__)

@@ -1,5 +1,6 @@
-#include "boat_work_session.h"
+#include "session/boat_work_session.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <ctype.h>

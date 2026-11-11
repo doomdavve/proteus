@@ -1,6 +1,6 @@
-#include "wake_velocity_servers.h"
-#include "boat_directory.h"
-#include "boat_net_enet.h"
+#include "wake_velocity/wake_velocity_servers.h"
+#include "net/boat_net_enet.h"
+#include "wake_velocity/boat_directory.h"
 #include <stdio.h>
 #include <stdlib.h>
 

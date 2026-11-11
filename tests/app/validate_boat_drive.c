@@ -1,9 +1,10 @@
 /* Compare the frozen 2994e0d app driver against the extracted production helper. */
-#include "boat_drive_baseline.h"
-#include "boat_test_world.h"
-#include "boat_view.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "wake_velocity_state.h"
+#include "render/boat_view.h"
+#include "support/boat_drive_baseline.h"
+#include "support/boat_test_world.h"
+#include "wake_velocity/wake_velocity_state.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

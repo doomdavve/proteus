@@ -4,11 +4,12 @@
  * at controlled speed and recovers to the last shelter; the bearing cue turns the way right
  * steering turns the boat; and an autopiloted boat from the east shore arrives at Långedrag.
  * A3.5: the exposure is calm until the boat comes within range, then grows smoothly. */
-#include "boat_fixtures.h"
-#include "boat_session.h"
-#include "boat_steering.h"
-#include "boat_throttle.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "session/boat_session.h"
+#include "support/boat_fixtures.h"
 
 #include <math.h>
 #include <stdio.h>

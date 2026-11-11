@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_REPLAY_H
 #define PROTEUS_BOAT_REPLAY_H
 
-#include "boat_presentation.h"
-#include "boat_view_state.h"
+#include "core/boat_view_state.h"
+#include "render/boat_presentation.h"
 
 #define BOAT_REPLAY_MAX_SECONDS 600
 // Recorded world time is absolute session time, so a course may start long after launch.

@@ -1,5 +1,5 @@
-#include "boat_plugin_state.h"
-#include "boat_sandbox_save.h"
+#include "plugins/boat_plugin_state.h"
+#include "session/boat_sandbox_save.h"
 
 #include <math.h>
 #include <stdio.h>

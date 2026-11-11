@@ -1,5 +1,5 @@
 /* Frame pacer deadline chain: synthetic clocks, no window or sleeping. */
-#include "frame_pacer.h"
+#include "platform/frame_pacer.h"
 
 #include <math.h>
 #include <stdio.h>

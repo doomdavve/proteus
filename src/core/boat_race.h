@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_RACE_H
 #define PROTEUS_BOAT_RACE_H
 
-#include "boat_fleet.h"
+#include "core/boat_fleet.h"
 
 // River sprint rules (docs/RACE_PLAN.md R1). Authority only: the race observes the committed
 // fleet after each step and owns race placements, grid holds and the course's ferry clock.

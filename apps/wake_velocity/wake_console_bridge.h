@@ -5,7 +5,7 @@
 // wake_console_bridge_web.c (the page's console panel: transcript copy, queued paste and Tab
 // completion, clipboard notices). No call waits.
 
-#include "wake_console.h"
+#include "wake_velocity/wake_console.h"
 #include <stdbool.h>
 
 // Publish the transcript for the page's copy and screen-reader lines (browser; native: nothing).

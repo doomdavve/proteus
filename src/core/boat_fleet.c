@@ -1,4 +1,5 @@
-#include "boat_fleet.h"
+#include "core/boat_fleet.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <assert.h>

@@ -1,8 +1,9 @@
-#include "boat_cargo.h"
-#include "boat_map.h"
+#include "core/boat_cargo.h"
+#include "core/boat_map.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_traffic.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_harbor.h"
-#include "waterfront_traffic.h"
 
 #include <math.h>
 #include <string.h>

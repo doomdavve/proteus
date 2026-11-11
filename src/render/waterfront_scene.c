@@ -1,6 +1,7 @@
-#include "waterfront_scene.h"
+#include "render/waterfront_scene.h"
 
-#include "boat_clock.h"
+#include "core/boat_clock.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

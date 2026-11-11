@@ -1,6 +1,6 @@
 #ifndef BOAT_TEST_MAPS_H
 #define BOAT_TEST_MAPS_H
-#include "boat_world.h"
+#include "core/boat_world.h"
 
 // Synthetic map east of the river's reserved crane footprint: a 40 x 20 m basin with a quay
 // wall along z = 0, a 3.5 m quay and one 15 m building wall facing the water. It has derived

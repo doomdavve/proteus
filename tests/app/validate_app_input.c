@@ -1,5 +1,5 @@
-#include "wake_velocity_input.h"
-#include "wake_velocity_menu.h"
+#include "wake_velocity/wake_velocity_input.h"
+#include "wake_velocity/wake_velocity_menu.h"
 
 #include <stdio.h>
 #include <stdlib.h>

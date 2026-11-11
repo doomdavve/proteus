@@ -5,18 +5,19 @@
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L // mkdir and symlink for the file cases under strict C17.
 #endif
-#include "boat_fixtures.h"
-#include "boat_location.h"
-#include "boat_map.h"
-#include "boat_plugin.h"
-#include "boat_plugin_io.h"
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
-#include "boat_plugin_state.h"
-#include "boat_plugin_wire.h"
-#include "boat_test_cases.h"
-#include "boat_world.h"
+#include "core/boat_location.h"
+#include "core/boat_map.h"
+#include "core/boat_world.h"
+#include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_lua.h"
+#include "plugins/boat_plugin_state.h"
+#include "plugins/boat_plugin_wire.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,8 +1,8 @@
-#include "boat_work_local.h"
+#include "session/boat_work_local.h"
 
-#include "boat_net_private.h"
-#include "boat_steering.h"
-#include "boat_throttle.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
+#include "net/boat_net_private.h"
 
 #include <math.h>
 #include <stdio.h>

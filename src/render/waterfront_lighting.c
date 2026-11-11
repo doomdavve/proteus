@@ -1,5 +1,6 @@
-#include "waterfront_lighting.h"
+#include "render/waterfront_lighting.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

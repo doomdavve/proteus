@@ -1,7 +1,7 @@
 #ifndef PROTEUS_WATERFRONT_HARBOR_VIEW_H
 #define PROTEUS_WATERFRONT_HARBOR_VIEW_H
 
-#include "waterfront_harbor.h"
+#include "core/waterfront_harbor.h"
 
 // One presentation owner's generated hulls. Default recipes borrow immutable native meshes;
 // customized boats own independent heap storage. Zero-initialize, never copy except through

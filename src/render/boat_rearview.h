@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_REARVIEW_H
 #define PROTEUS_BOAT_REARVIEW_H
 
-#include "boat_gpu.h"
+#include "render/boat_gpu.h"
 
 #define BOAT_REARVIEW_WIDTH 112
 #define BOAT_REARVIEW_HEIGHT 40

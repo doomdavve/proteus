@@ -1,12 +1,13 @@
-#include "boat_banking_fixture.h"
-#include "boat_fixtures.h"
-#include "boat_map.h"
-#include "boat_test_cases.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
+#include "core/boat_map.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_traffic.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_harbor.h"
-#include "waterfront_traffic.h"
+#include "render/boat_view.h"
+#include "support/boat_banking_fixture.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

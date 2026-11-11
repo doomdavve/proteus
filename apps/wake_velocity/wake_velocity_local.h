@@ -5,11 +5,11 @@
 // (src/net/boat_local.h). The game keeps its BoatSession for views, audio and HUD; this glue fills
 // its boat, clock, presentation and arcade wake pool from the client's prediction, never from
 // the authority. Native and (L4a) browser builds.
-#include "boat_local.h"
-#include "boat_profile.h"
-#include "wake_velocity_course.h"
-#include "wake_velocity_drive.h"
-#include "wake_velocity_voyage.h"
+#include "net/boat_local.h"
+#include "wake_velocity/boat_profile.h"
+#include "wake_velocity/wake_velocity_course.h"
+#include "wake_velocity/wake_velocity_drive.h"
+#include "wake_velocity/wake_velocity_voyage.h"
 
 // Zero-initialize.
 typedef struct {

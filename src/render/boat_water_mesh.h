@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_WATER_MESH_H
 #define PROTEUS_BOAT_WATER_MESH_H
 
-#include "boat_map.h"
-#include "boat_water.h"
+#include "core/boat_map.h"
+#include "core/boat_water.h"
 
 // Presentation-side water geometry built from the shared water queries. Physics never reads it.
 

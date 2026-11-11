@@ -1,5 +1,5 @@
-#include "wake_velocity_scenery.h"
-#include "boat_scenery.h"
+#include "wake_velocity/wake_velocity_scenery.h"
+#include "scenery/boat_scenery.h"
 
 bool wake_scenery_startup(const char *assets) { return boat_scenery_load_all(assets); }
 

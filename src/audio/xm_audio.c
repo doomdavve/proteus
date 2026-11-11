@@ -1,4 +1,4 @@
-#include "xm_audio.h"
+#include "audio/xm_audio.h"
 
 #include <math.h>
 #include <stddef.h>

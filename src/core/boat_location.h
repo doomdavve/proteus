@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_LOCATION_H
 #define PROTEUS_BOAT_LOCATION_H
 
-#include "boat_map.h"
+#include "core/boat_map.h"
 #include "raylib.h"
 
 #define BOAT_BASIN_HALF_X 120.0f

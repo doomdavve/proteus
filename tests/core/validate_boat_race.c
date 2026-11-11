@@ -4,16 +4,17 @@
  * leavers, joiners, deadlines and grid rotation. Physical cases step a real fleet: the grid
  * hold through a full-throttle countdown, and a four-bot race through the ferry encounter
  * with a mid-race checkpoint restore. */
-#include "boat_fixtures.h"
-#include "boat_fleet_bots.h"
-#include "boat_map.h"
-#include "boat_plugin_load.h"
-#include "boat_race.h"
-#include "boat_test_cases.h"
-#include "boat_test_world.h"
-#include "boat_throttle.h"
+#include "core/boat_map.h"
+#include "core/boat_race.h"
+#include "core/boat_throttle.h"
+#include "core/waterfront_city.h"
+#include "plugins/boat_plugin_load.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_city.h"
+#include "room/boat_fleet_bots.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_world.h"
 
 #include <inttypes.h>
 #include <math.h>
@@ -29,9 +30,9 @@
     } while (0)
 
 #ifdef BOAT_RACE_PLUGIN_FIXTURE
-#include "boat_fixtures.h"
-#include "boat_plugin.h"
-#include "boat_plugin_io.h"
+#include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_io.h"
+#include "support/boat_fixtures.h"
 static BoatPluginRace plugin_race;
 static const BoatRaceCourse *fixture_course(void) { return &plugin_race.course; }
 #else

@@ -1,6 +1,6 @@
 #ifndef PROTEUS_BOAT_NET_RTC_H
 #define PROTEUS_BOAT_NET_RTC_H
-#include "boat_net_transport.h"
+#include "net/boat_net_transport.h"
 
 // Optional native WebRTC endpoint. WebSocket signaling exchanges complete SDP; gameplay
 // uses five negotiated DataChannels with the protocol's existing delivery classes.

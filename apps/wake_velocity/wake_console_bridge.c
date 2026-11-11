@@ -1,4 +1,4 @@
-#include "wake_console_bridge.h"
+#include "wake_velocity/wake_console_bridge.h"
 
 #include "raylib.h"
 #include <stdio.h>

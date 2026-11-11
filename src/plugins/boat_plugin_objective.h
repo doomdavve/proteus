@@ -2,7 +2,7 @@
 #define PROTEUS_BOAT_PLUGIN_OBJECTIVE_H
 
 // Plugin data: the objective checkpoint values and their byte codec.
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 // P3.1 transactions, P3.2 native objective.hud adapter, P3.3a optional objective.timers.
 #define BOAT_PLUGIN_STATE_BYTES 16384

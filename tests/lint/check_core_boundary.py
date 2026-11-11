@@ -89,11 +89,12 @@ def check_source(name, text, core_headers):
 
 def check_sources(root, files):
     paths = [root / f for f in files]
-    headers = {p.name for p in paths if p.suffix == ".h"}
+    headers = {p.relative_to(root).as_posix().removeprefix("src/")
+               for p in paths if p.suffix == ".h"}
     problems = []
     for path in paths:
         if path.suffix == ".c" and path.with_suffix(".h").exists() \
-                and path.with_suffix(".h").name not in headers:
+                and path.with_suffix(".h").relative_to(root).as_posix().removeprefix("src/") not in headers:
             problems.append(f"{path.name}: header {path.with_suffix('.h').name} not listed")
         problems += check_source(path.name, path.read_text(), headers)
     return problems

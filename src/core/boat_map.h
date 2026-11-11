@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_MAP_H
 #define PROTEUS_BOAT_MAP_H
 
-#include "geometry3d.h"
+#include "core/geometry3d.h"
 
 #include <stdbool.h>
 

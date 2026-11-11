@@ -1,9 +1,9 @@
 #ifndef PROTEUS_BOAT_GPU_H
 #define PROTEUS_BOAT_GPU_H
-#include "boat_cargo_view.h"
-#include "boat_view.h"
-#include "boat_water_mesh.h"
-#include "renderer_gpu.h"
+#include "render/boat_cargo_view.h"
+#include "render/boat_view.h"
+#include "render/boat_water_mesh.h"
+#include "render/renderer_gpu.h"
 
 #define BOAT_GPU_BLOOM_LEVELS 3 // Half, quarter and eighth size.
 

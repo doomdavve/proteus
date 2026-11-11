@@ -1,11 +1,11 @@
 #ifndef PROTEUS_BOAT_NET_SERVER_H
 #define PROTEUS_BOAT_NET_SERVER_H
 
-#include "boat_marks.h"
-#include "boat_match.h"
-#include "boat_net_private.h"
-#include "boat_net_transport.h"
-#include "boat_race.h"
+#include "core/boat_marks.h"
+#include "core/boat_match.h"
+#include "core/boat_race.h"
+#include "net/boat_net_private.h"
+#include "net/boat_net_transport.h"
 
 #define BOAT_NET_INPUT_RING 256 // Commands buffered per slot, indexed by target tick.
 #define BOAT_NET_REPEAT_TICKS 6 // Repeat a missing command this long (50 ms), then zero.

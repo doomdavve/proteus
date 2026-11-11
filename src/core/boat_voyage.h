@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_VOYAGE_H
 #define PROTEUS_BOAT_VOYAGE_H
 
-#include "boat.h"
+#include "core/boat.h"
 
 // Adventure A3.4 (docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md): one optional destination,
 // sheltered recovery points and a patch of exposed rough water, authored in a mapped location's

@@ -1,8 +1,8 @@
-#include "boat_work_menu.h"
+#include "session/boat_work_menu.h"
 
-#include "boat_file.h"
-#include "boat_plugin_catalog.h"
-#include "boat_work_session.h"
+#include "platform/boat_file.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "session/boat_work_session.h"
 
 #include <stdio.h>
 #include <stdlib.h>

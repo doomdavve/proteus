@@ -1,6 +1,6 @@
 // The room command line `wake_velocity --host` gives its `--serve` child (src/room/boat_server.h).
-#include "boat_test_cases.h"
-#include "wake_velocity_host.h"
+#include "support/boat_test_cases.h"
+#include "wake_velocity/wake_velocity_host.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -1,14 +1,15 @@
 /* C3 long-session clock gate: cheap direct-time checks and an opt-in simulated soak. */
-#include "boat_clock.h"
-#include "boat_fixtures.h"
-#include "boat_map.h"
-#include "boat_replay.h"
-#include "boat_session.h"
-#include "boat_test_cases.h"
-#include "boat_test_session.h"
-#include "boat_view.h"
+#include "core/boat_clock.h"
+#include "core/boat_map.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "wake_velocity_state.h"
+#include "render/boat_view.h"
+#include "session/boat_replay.h"
+#include "session/boat_session.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_session.h"
+#include "wake_velocity/wake_velocity_state.h"
 
 #include <inttypes.h>
 #include <math.h>

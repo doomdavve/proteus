@@ -1,6 +1,7 @@
-#include "boat_water.h"
-#include "boat_clock.h"
-#include "boat_model.h"
+#include "core/boat_water.h"
+#include "core/boat_clock.h"
+#include "core/boat_model.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

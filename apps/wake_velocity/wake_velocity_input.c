@@ -1,5 +1,5 @@
-#include "wake_velocity_input.h"
-#include "wake_velocity_controls.h"
+#include "wake_velocity/wake_velocity_input.h"
+#include "wake_velocity/wake_velocity_controls.h"
 
 BoatAppInput boat_app_input_sample(void)
 {

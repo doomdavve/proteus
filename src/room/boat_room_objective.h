@@ -10,9 +10,9 @@
 // boat_room_objective_stage); the marks stay those the room was defined with.
 // P5f: a candidate with other marks revises the room definition instead (see
 // boat_room_objective_stage_revision) and the objective restarts on it when the server commits.
-#include "boat_net_server.h"
-#include "boat_plugin_state.h"
-#include "boat_room_package.h"
+#include "net/boat_net_server.h"
+#include "plugins/boat_plugin_state.h"
+#include "room/boat_room_package.h"
 
 #define BOAT_ROOM_OBJECTIVE_CADENCE 12
 

@@ -3,8 +3,8 @@
 #define NOGDI
 #define NOUSER
 #endif
-#include "boat_directory.h"
-#include "boat_net_enet.h"
+#include "wake_velocity/boat_directory.h"
+#include "net/boat_net_enet.h"
 #include <curl/curl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +15,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #endif
-#include "boat_json.h"
+#include "json/boat_json.h"
 
 #define DIRECTORY_URL "https://wake.davve.net/servers.json"
 enum { TOKENS_MAX = 2048 };

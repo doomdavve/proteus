@@ -1,7 +1,7 @@
 #ifndef BOAT_TEST_WORLD_H
 #define BOAT_TEST_WORLD_H
-#include "boat_test_location.h"
-#include "boat_world.h"
+#include "core/boat_world.h"
+#include "support/boat_test_location.h"
 
 #include <stdbool.h>
 #include <stdio.h>

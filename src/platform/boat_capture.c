@@ -1,4 +1,4 @@
-#include "boat_capture.h"
+#include "platform/boat_capture.h"
 
 #include <stdlib.h>
 

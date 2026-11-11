@@ -1,11 +1,11 @@
 /* PD1: every bundled catalog entry equals evaluating its embedded source; the free, outer and
  * time-trial defaults equal the compiled definitions; and catalog decoding starts no Lua VM. */
-#include "boat_fixtures.h"
-#include "boat_plugin_catalog.h"
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
-#include "boat_plugin_wire.h"
-#include "boat_test_cases.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_lua.h"
+#include "plugins/boat_plugin_wire.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
 
 #include <stdio.h>
 #include <stdlib.h>

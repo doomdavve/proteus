@@ -2,13 +2,13 @@
  * that bind them. Independent owners initialize, query and destroy without sharing state, the
  * river answers exactly as the process-global cache did before ownership moved, and worlds,
  * fleets and their copies only borrow their owner. */
-#include "boat.h"
-#include "boat_fleet.h"
-#include "boat_fleet_bots.h"
-#include "boat_map.h"
-#include "boat_test_cases.h"
-#include "boat_test_scenery.h"
-#include "waterfront_city.h"
+#include "core/boat.h"
+#include "core/boat_fleet.h"
+#include "core/boat_map.h"
+#include "core/waterfront_city.h"
+#include "room/boat_fleet_bots.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_scenery.h"
 
 #include <inttypes.h>
 #include <math.h>

@@ -1,9 +1,9 @@
 #ifndef PROTEUS_BOAT_WORLD_H
 #define PROTEUS_BOAT_WORLD_H
 
-#include "boat_location.h"
-#include "boat_scene_definition.h"
-#include "boat_water.h"
+#include "core/boat_location.h"
+#include "core/boat_scene_definition.h"
+#include "core/boat_water.h"
 
 // Caller-owned physical resources of one location: its definition and, when mapped, the
 // collision map prepared from its description. Worlds, sessions, fleets and all their copies

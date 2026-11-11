@@ -1,8 +1,9 @@
 #ifndef BOAT_FLEET_BOTS_H
 #define BOAT_FLEET_BOTS_H
-#include "boat_fleet.h"
-#include "boat_race.h"
-#include "boat_throttle.h"
+#include "core/boat_fleet.h"
+#include "core/boat_race.h"
+#include "core/boat_throttle.h"
+#include "raylib.h"
 #include "raymath.h"
 
 // Scripted bots may observe a delayed network mirror. A quarter-second feedback horizon

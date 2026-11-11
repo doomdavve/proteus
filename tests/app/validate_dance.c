@@ -1,5 +1,6 @@
-#include "dance.h"
+#include "dance_study/dance.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

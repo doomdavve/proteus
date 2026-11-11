@@ -1,8 +1,8 @@
 #ifndef PROTEUS_WATERFRONT_UPSTREAM_H
 #define PROTEUS_WATERFRONT_UPSTREAM_H
 
-#include "boat_model.h"
-#include "waterfront_traffic.h"
+#include "core/boat_model.h"
+#include "core/waterfront_traffic.h"
 
 // A3.5j: the outer map's river life upstream of the river crop, in renderer X/Z (east/north):
 // two Älvsnabben-style ferries on the Stenpiren - Lindholmspiren - Eriksberg loop, a smaller

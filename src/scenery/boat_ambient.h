@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_AMBIENT_H
 #define PROTEUS_BOAT_AMBIENT_H
 
-#include "boat_location.h"
+#include "core/boat_location.h"
 
 #include <stdbool.h>
 #include <stddef.h>

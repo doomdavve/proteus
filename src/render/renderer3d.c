@@ -1,5 +1,6 @@
-#include "renderer3d.h"
+#include "render/renderer3d.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

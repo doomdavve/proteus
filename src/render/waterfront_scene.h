@@ -1,15 +1,15 @@
 #ifndef PROTEUS_WATERFRONT_SCENE_H
 #define PROTEUS_WATERFRONT_SCENE_H
 
-#include "boat_flag.h"
-#include "boat_skin.h"
-#include "boat_water.h"
-#include "renderer3d.h"
-#include "waterfront_city.h"
-#include "waterfront_flock.h"
-#include "waterfront_harbor.h"
-#include "waterfront_lighting.h"
-#include "waterfront_traffic.h"
+#include "core/boat_water.h"
+#include "core/waterfront_city.h"
+#include "core/waterfront_flock.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_traffic.h"
+#include "render/boat_flag.h"
+#include "render/boat_skin.h"
+#include "render/renderer3d.h"
+#include "render/waterfront_lighting.h"
 
 // Renderer-independent authored data and time evaluation for the waterfront.
 // The returned mesh refers to scene-owned, static generated geometry.

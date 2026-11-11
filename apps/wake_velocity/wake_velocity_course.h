@@ -8,8 +8,8 @@
 // with the copied run. Its course state reaches the client as private state bytes
 // (wake_course_view). The host takes the finish request after the frame into the session's runs,
 // whose existing flush is the storage adapter. No drawing, input or files.
-#include "boat_net_server.h"
-#include "boat_session.h"
+#include "net/boat_net_server.h"
+#include "session/boat_session.h"
 
 #define WAKE_COURSE_STATE_BYTES 74
 

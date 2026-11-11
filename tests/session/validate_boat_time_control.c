@@ -1,6 +1,6 @@
-#include "boat_session.h"
-#include "boat_test_world.h"
-#include "boat_time_control.h"
+#include "session/boat_session.h"
+#include "session/boat_time_control.h"
+#include "support/boat_test_world.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-#include "boat_rearview.h"
+#include "render/boat_rearview.h"
 
 void boat_rearview_set_lighting(BoatRearview *m, float daylight, float hour, bool hour_set)
 {

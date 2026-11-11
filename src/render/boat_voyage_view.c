@@ -1,6 +1,6 @@
-#include "boat_voyage_view.h"
-#include "boat_ui.h"
+#include "render/boat_voyage_view.h"
 #include "raylib.h"
+#include "render/boat_ui.h"
 
 #include <math.h>
 #include <stdio.h>

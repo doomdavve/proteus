@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_VOYAGE_VIEW_H
 #define PROTEUS_BOAT_VOYAGE_VIEW_H
 
-#include "boat_voyage.h"
+#include "core/boat_voyage.h"
 
 // Screen-space destination cue centred at the top of a WIDTH-pixel window: a bearing arrow,
 // the distance or arrival time, and the latest voyage notice, the exposure or the shelter that

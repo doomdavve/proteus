@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_TIME_CONTROL_H
 #define PROTEUS_BOAT_TIME_CONTROL_H
 
-#include "boat_clock.h"
+#include "core/boat_clock.h"
 
 #include <math.h>
 #include <stdbool.h>

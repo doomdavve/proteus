@@ -3,7 +3,7 @@
 #elif !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L
 #endif
-#include "wake_velocity_bridge.h"
+#include "wake_velocity/wake_velocity_bridge.h"
 
 #include <errno.h>
 #include <inttypes.h>

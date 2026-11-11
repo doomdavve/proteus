@@ -5,7 +5,7 @@
 // immutable entry file and submitted through the isolated staging worker; nothing here runs Lua
 // on the game thread, writes the live world, or moves the boat. No raylib and no file access:
 // saving is a caller-supplied operation.
-#include "wake_velocity_plugin.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #define WAKE_COMMAND_LINE 512
 #define WAKE_COMMAND_CHUNKS 32

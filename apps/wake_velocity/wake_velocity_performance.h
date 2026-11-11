@@ -1,7 +1,7 @@
 #ifndef PROTEUS_WAKE_VELOCITY_PERFORMANCE_H
 #define PROTEUS_WAKE_VELOCITY_PERFORMANCE_H
 
-#include "boat_capture.h"
+#include "platform/boat_capture.h"
 
 #include <stdbool.h>
 #include <stddef.h>

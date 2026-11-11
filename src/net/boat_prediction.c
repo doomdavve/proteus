@@ -1,6 +1,7 @@
-#include "boat_prediction.h"
+#include "net/boat_prediction.h"
 
-#include "boat_net_server.h"
+#include "net/boat_net_server.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

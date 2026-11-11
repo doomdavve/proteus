@@ -1,6 +1,7 @@
-#include "waterfront_flock.h"
+#include "core/waterfront_flock.h"
 
-#include "boat_clock.h"
+#include "core/boat_clock.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

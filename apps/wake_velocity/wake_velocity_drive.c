@@ -1,6 +1,7 @@
-#include "wake_velocity_drive.h"
+#include "wake_velocity/wake_velocity_drive.h"
+#include "core/waterfront_traffic.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_traffic.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,5 +1,5 @@
-#include "dance.h"
-#include "xm_audio.h"
+#include "audio/xm_audio.h"
+#include "dance_study/dance.h"
 
 #include <math.h>
 #include <stdio.h>

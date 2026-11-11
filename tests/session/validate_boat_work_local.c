@@ -5,12 +5,12 @@
 // equals it in everything the game presents; each tick's presentation steps equally from the
 // mirror. Fixture scripts and resumes are host management followed by a restart. Real bundled
 // outer work package, no window, files or wall time.
-#include "boat_location.h"
-#include "boat_net_private.h"
-#include "boat_plugin_catalog.h"
-#include "boat_presentation.h"
-#include "boat_test_cases.h"
-#include "boat_work_local.h"
+#include "core/boat_location.h"
+#include "net/boat_net_private.h"
+#include "plugins/boat_plugin_catalog.h"
+#include "render/boat_presentation.h"
+#include "session/boat_work_local.h"
+#include "support/boat_test_cases.h"
 
 #include <math.h>
 #include <stdio.h>

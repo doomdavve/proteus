@@ -1,6 +1,6 @@
-#include "boat_ambient.h"
-#include "boat_map.h"
-#include "boat_scenery.h"
+#include "scenery/boat_ambient.h"
+#include "core/boat_map.h"
+#include "scenery/boat_scenery.h"
 
 #include <stdio.h>
 #include <stdlib.h>

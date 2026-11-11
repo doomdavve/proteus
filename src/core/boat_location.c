@@ -1,5 +1,5 @@
-#include "boat_location.h"
-#include "waterfront_outer.h"
+#include "core/boat_location.h"
+#include "core/waterfront_outer.h"
 
 #include <string.h>
 

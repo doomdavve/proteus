@@ -1,7 +1,7 @@
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L
 #endif
-#include "wake_velocity_plugin.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #include <math.h>
 #include <stdio.h>

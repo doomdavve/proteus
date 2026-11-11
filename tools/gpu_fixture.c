@@ -1,9 +1,9 @@
-#include "boat_test_scenery.h"
 #include "external/glad.h"
 #include "raylib.h"
 #include "raymath.h"
-#include "renderer_gpu.h"
+#include "render/renderer_gpu.h"
 #include "rlgl.h"
+#include "support/boat_test_scenery.h"
 
 #include <limits.h>
 #include <math.h>

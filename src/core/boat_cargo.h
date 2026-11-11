@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_CARGO_H
 #define PROTEUS_BOAT_CARGO_H
 
-#include "boat_pose.h"
-#include "boat_scene_definition.h"
+#include "core/boat_pose.h"
+#include "core/boat_scene_definition.h"
 
 // S0 fixture: one upright 0.8 m crate, one kinematic service crane and one deck.
 // All positions are renderer coordinates. No cargo/cargo or reaction-force coupling.

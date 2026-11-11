@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_REMOTE_VIEW_H
 #define PROTEUS_BOAT_REMOTE_VIEW_H
 
-#include "boat_fleet.h"
+#include "core/boat_fleet.h"
 
 // Multiplayer M4 remote view: other boats are drawn from authoritative snapshots about 100 ms
 // behind the estimated server time, and blended toward their predicted collision proxy when

@@ -1,4 +1,5 @@
-#include "boat_voyage.h"
+#include "core/boat_voyage.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

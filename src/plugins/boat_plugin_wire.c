@@ -1,6 +1,6 @@
-#include "boat_plugin_wire.h"
+#include "plugins/boat_plugin_wire.h"
 
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 #include <math.h>
 #include <stdio.h>

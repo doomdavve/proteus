@@ -1,6 +1,6 @@
 // Plugin P5a: mark validation, digest and the per-slot entry detector in proteus_boat_core.
-#include "boat_marks.h"
-#include "boat_test_cases.h"
+#include "core/boat_marks.h"
+#include "support/boat_test_cases.h"
 
 #include <stdio.h>
 #include <string.h>

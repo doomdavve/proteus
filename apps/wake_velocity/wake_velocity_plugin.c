@@ -1,7 +1,7 @@
-#include "wake_velocity_plugin.h"
-#include "boat_plugin_eval.h"
-#include "boat_ui.h"
-#include "waterfront_traffic.h"
+#include "wake_velocity/wake_velocity_plugin.h"
+#include "core/waterfront_traffic.h"
+#include "plugins/boat_plugin_eval.h"
+#include "render/boat_ui.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -19,7 +19,7 @@
 // with an authority never evaluates, and the browser's direct path (replay viewing) runs no
 // objective. Native direct hosts (the review tools) evaluate synchronously.
 #ifdef __EMSCRIPTEN__
-#include "wake_velocity_plugin_web.h"
+#include "wake_velocity/wake_velocity_plugin_web.h"
 #endif
 
 #include <errno.h>

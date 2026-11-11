@@ -2,7 +2,7 @@
 #define PROTEUS_BOAT_PLUGIN_REVISION_H
 
 // Plugin data: one immutable definition revision.
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
 typedef struct {
     BoatPluginManifest manifest; // Canonical copy; the kind-specific record repeats it.

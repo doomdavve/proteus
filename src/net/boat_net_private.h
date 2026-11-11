@@ -5,7 +5,7 @@
 // exchange that v14 cannot express. They use the v14 header layout with a type in a reserved
 // range that boat_net_decode() rejects, so a hosted server that received one would count it as
 // malformed; hosted bytes and BOAT_NET_VERSION are unchanged. Remote peers never send them.
-#include "boat_net_protocol.h"
+#include "net/boat_net_protocol.h"
 
 // A private (in-process, single-thread) session of one authority and one client, set alike on
 // both endpoints by their host. Zero for hosted rooms. See docs/ARCHITECTURE_AR1.md section 5:

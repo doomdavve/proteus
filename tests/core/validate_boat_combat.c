@@ -1,18 +1,19 @@
-#include "boat_combat.h"
-#include "boat_fleet.h"
-#include "boat_match.h"
-#include "boat_net_protocol.h"
+#include "core/boat_combat.h"
+#include "core/boat_fleet.h"
+#include "core/boat_match.h"
+#include "net/boat_net_protocol.h"
+#include "raylib.h"
 #include "raymath.h"
 
 // Validator assertions include setup/tick calls and must run in Release as well.
 #undef NDEBUG
+#include "support/boat_fixtures.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "boat_fixtures.h"
 
 static BoatWorldResources resources;
 static BoatFleet f;

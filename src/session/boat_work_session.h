@@ -5,11 +5,11 @@
 // package's job host, save and resume of that state, and the pure automatic-saving watch. It
 // draws nothing, reads no input and touches no files (callers own bytes, windows and paths).
 
-#include "boat.h"
-#include "boat_cargo.h"
-#include "boat_plugin_host.h"
-#include "boat_sandbox_save.h"
-#include "boat_world.h"
+#include "core/boat.h"
+#include "core/boat_cargo.h"
+#include "core/boat_world.h"
+#include "plugins/boat_plugin_host.h"
+#include "session/boat_sandbox_save.h"
 
 #include <stdbool.h>
 #include <stddef.h>

@@ -1,7 +1,8 @@
-#include "boat_flag.h"
-#include "boat_clock.h"
-#include "boat_skin.h"
+#include "render/boat_flag.h"
+#include "core/boat_clock.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_skin.h"
 
 #include <math.h>
 

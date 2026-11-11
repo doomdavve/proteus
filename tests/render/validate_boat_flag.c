@@ -1,5 +1,6 @@
-#include "boat_flag.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_flag.h"
 
 #include <math.h>
 #include <stdio.h>

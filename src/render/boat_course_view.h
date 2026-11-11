@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_COURSE_VIEW_H
 #define PROTEUS_BOAT_COURSE_VIEW_H
 
-#include "boat_course.h"
-#include "renderer3d.h"
+#include "core/boat_course.h"
+#include "render/renderer3d.h"
 
 typedef void (*BoatCourseBoxDraw)(void *context, Transform3D transform, Color color);
 void boat_course_visit(const BoatCourse *course, BoatCourseBoxDraw draw, void *context);

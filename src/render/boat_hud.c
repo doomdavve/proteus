@@ -1,7 +1,7 @@
-#include "boat_hud.h"
-#include "boat_throttle.h"
-#include "boat_ui.h"
+#include "render/boat_hud.h"
+#include "core/boat_throttle.h"
 #include "raylib.h"
+#include "render/boat_ui.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -6,7 +6,7 @@
 // client and ENet LAN broadcast) or wake_velocity_servers_web.c (the page's Module.boatServers
 // fetch; browsers have no LAN search). No call waits: a refresh or query starts work that later
 // polls observe, and the entries stay those of the last completed fetch.
-#include "boat_net_protocol.h"
+#include "net/boat_net_protocol.h"
 #include <stdbool.h>
 #include <stddef.h>
 

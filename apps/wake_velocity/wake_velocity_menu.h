@@ -1,7 +1,7 @@
 #ifndef WAKE_VELOCITY_MENU_H
 #define WAKE_VELOCITY_MENU_H
 #include "raylib.h"
-#include "wake_velocity_input.h"
+#include "wake_velocity/wake_velocity_input.h"
 
 #include <stdbool.h>
 

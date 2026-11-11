@@ -1,4 +1,4 @@
-#include "waterfront_outer.h"
+#include "core/waterfront_outer.h"
 
 #include "../../assets/geometry/outer/water.h"
 

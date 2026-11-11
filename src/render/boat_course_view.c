@@ -1,5 +1,5 @@
-#include "boat_course_view.h"
-#include "boat_ui.h"
+#include "render/boat_course_view.h"
+#include "render/boat_ui.h"
 
 #include <math.h>
 

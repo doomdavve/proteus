@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_SCENERY_H
 #define PROTEUS_BOAT_SCENERY_H
 
-#include "boat_location.h"
+#include "core/boat_location.h"
 
 // Presentation meshes of the mapped locations, loaded at run time from their scenery packs
 // (tools/map_pack.py writes assets/geometry/<location>/scenery.bin). A pack holds a location's

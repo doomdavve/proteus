@@ -4,10 +4,10 @@
  * queries must equal the exhaustive scan, and points outside the region or over land must not be
  * water. The route is copied from docs/adventure/survey.py (SLICE_ROUTE) in map east/north metres,
  * which the queries take as simulation X = -east, Z = north. */
-#include "boat_map.h"
-#include "boat_test_scenery.h"
-#include "boat_world.h"
-#include "waterfront_outer.h"
+#include "core/boat_map.h"
+#include "core/boat_world.h"
+#include "core/waterfront_outer.h"
+#include "support/boat_test_scenery.h"
 
 #include <math.h>
 #include <stdio.h>

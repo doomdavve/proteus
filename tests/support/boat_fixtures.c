@@ -1,4 +1,4 @@
-#include "boat_fixtures.h"
+#include "support/boat_fixtures.h"
 
 // The outer location's first-slice outing, copied from src/core/boat_voyage.c before compiled
 // selection was removed.

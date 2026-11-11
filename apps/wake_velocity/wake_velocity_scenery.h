@@ -7,7 +7,7 @@
 #ifndef WAKE_VELOCITY_SCENERY_H
 #define WAKE_VELOCITY_SCENERY_H
 
-#include "boat_location.h"
+#include "core/boat_location.h"
 #include <stdbool.h>
 
 typedef enum { WAKE_SCENERY_PENDING, WAKE_SCENERY_READY, WAKE_SCENERY_FAILED } WakeSceneryStatus;

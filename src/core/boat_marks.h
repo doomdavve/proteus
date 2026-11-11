@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_MARKS_H
 #define PROTEUS_BOAT_MARKS_H
 
-#include "boat_fleet.h"
-#include "boat_map.h"
+#include "core/boat_fleet.h"
+#include "core/boat_map.h"
 
 #include <stdbool.h>
 #include <stdint.h>

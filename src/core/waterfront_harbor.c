@@ -1,6 +1,7 @@
-#include "waterfront_harbor.h"
-#include "waterfront_outer.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

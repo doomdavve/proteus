@@ -1,4 +1,4 @@
-#include "wake_velocity_state.h"
+#include "wake_velocity/wake_velocity_state.h"
 #include <string.h>
 
 static void fold(uint64_t *hash, unsigned char byte)

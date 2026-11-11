@@ -1,11 +1,12 @@
-#include "boat_plugin.h"
+#include "plugins/boat_plugin.h"
 
-#include "boat_cargo.h"
-#include "boat_json.h"
-#include "boat_plugin_decode.h"
+#include "core/boat_cargo.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
+#include "plugins/boat_plugin_decode.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_harbor.h"
-#include "waterfront_outer.h"
+#include "json/boat_json.h"
 
 #include <math.h>
 #include <stdarg.h>

@@ -4,9 +4,9 @@
 // PD2/PD3: the authority's one package loader. A catalog ID decodes the build-time entry with no
 // Lua; a directory is evaluated once at start-up with full validation. Both become the room
 // definition the authority sends to every client.
-#include "boat_plugin_catalog.h"
-#include "boat_room_definition.h"
-#include "boat_world.h"
+#include "core/boat_room_definition.h"
+#include "core/boat_world.h"
+#include "plugins/boat_plugin_catalog.h"
 
 // The package ID a room mode uses when --package is absent. Deathmatch uses `proteus.deathmatch`
 // at every location; race uses `proteus.river-sprint` on the outer map; free uses the location's

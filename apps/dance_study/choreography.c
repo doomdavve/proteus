@@ -1,4 +1,4 @@
-#include "choreography.h"
+#include "dance_study/choreography.h"
 
 #include <ctype.h>
 #include <math.h>

@@ -1,4 +1,4 @@
-#include "boat_plugin_objective.h"
+#include "plugins/boat_plugin_objective.h"
 
 #include <string.h>
 

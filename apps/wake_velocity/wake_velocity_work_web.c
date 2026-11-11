@@ -1,6 +1,6 @@
-#include "wake_velocity_work.h"
+#include "wake_velocity/wake_velocity_work.h"
 
-#include "boat_title.h"
+#include "wake_velocity/boat_title.h"
 
 #include <stdio.h>
 

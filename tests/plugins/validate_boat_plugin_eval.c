@@ -1,4 +1,4 @@
-#include "boat_plugin_eval.h"
+#include "plugins/boat_plugin_eval.h"
 
 #include <limits.h>
 #include <stdio.h>

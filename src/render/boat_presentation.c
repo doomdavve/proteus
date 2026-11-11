@@ -1,5 +1,6 @@
-#include "boat_presentation.h"
-#include "boat_pose.h"
+#include "render/boat_presentation.h"
+#include "core/boat_pose.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

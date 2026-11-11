@@ -1,6 +1,6 @@
-#include "wake_command.h"
+#include "wake_velocity/wake_command.h"
 
-#include "boat_scene_definition.h"
+#include "core/boat_scene_definition.h"
 
 #include <math.h>
 #include <stdarg.h>

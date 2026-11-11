@@ -5,7 +5,7 @@
 #define _DEFAULT_SOURCE // getifaddrs, interface flags and SO_REUSEPORT.
 #define _DARWIN_C_SOURCE
 #endif
-#include "boat_net_enet.h"
+#include "net/boat_net_enet.h"
 
 #ifdef _WIN32
 // ENet includes windows.h after raylib; exclude the GDI/user names raylib also declares.

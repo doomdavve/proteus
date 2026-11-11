@@ -1,4 +1,4 @@
-#include "boat_net_protocol.h"
+#include "net/boat_net_protocol.h"
 
 #include <assert.h>
 #include <float.h>

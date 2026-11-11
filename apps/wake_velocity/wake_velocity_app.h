@@ -4,7 +4,7 @@
 // itself and the title's start and stop. CMake selects wake_velocity_app.c (native) or
 // wake_velocity_app_web.c (browser). Sessions, frame pacing and audio streams keep their own
 // owners; this holds only what differs between the native loop and the page.
-#include "boat_screen.h"
+#include "render/boat_screen.h"
 #include <stdbool.h>
 
 // Monotonic seconds for plugin request and acceptance timestamps. The browser's clock

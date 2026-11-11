@@ -2,19 +2,19 @@
  * definition as data, and clients with no knowledge of the edited course or combat values
  * predict and mirror it bit for bit. The validator links the plugin host and catalog; the core
  * and net libraries remain free of them. */
-#include "boat_fleet_bots.h"
-#include "boat_net_client.h"
-#include "boat_net_server.h"
-#include "boat_net_transport.h"
-#include "boat_plugin.h"
-#include "boat_plugin_io.h"
-#include "boat_plugin_load.h"
-#include "boat_plugin_wire.h"
-#include "boat_room_package.h"
-#include "boat_test_cases.h"
-#include "boat_world.h"
+#include "core/boat_world.h"
+#include "net/boat_net_client.h"
+#include "net/boat_net_server.h"
+#include "net/boat_net_transport.h"
+#include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_wire.h"
+#include "room/boat_fleet_bots.h"
+#include "room/boat_room_package.h"
+#include "support/boat_test_cases.h"
 
-#include "boat_fixtures.h"
+#include "support/boat_fixtures.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

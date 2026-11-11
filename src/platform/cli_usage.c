@@ -1,4 +1,4 @@
-#include "cli_usage.h"
+#include "platform/cli_usage.h"
 
 void cli_usage_section(FILE *out, const char *title) { fprintf(out, "\n%s\n", title); }
 

@@ -2,11 +2,11 @@
  * cases drive boat_match_observe over a hand-set fleet (ticks, lives, contact impulses and
  * capsize latches) for the credit window, self-capsize, grace, respawn, bailout, leavers and
  * rounds; physical cases step a real fleet in which a planted wake record capsizes a boat. */
-#include "boat_match.h"
-#include "boat_test_world.h"
+#include "core/boat_match.h"
+#include "support/boat_test_world.h"
 
+#include "support/boat_fixtures.h"
 #include <stdio.h>
-#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \

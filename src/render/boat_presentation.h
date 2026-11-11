@@ -1,8 +1,8 @@
 #ifndef PROTEUS_BOAT_PRESENTATION_H
 #define PROTEUS_BOAT_PRESENTATION_H
 
-#include "boat.h"
-#include "boat_flag.h"
+#include "core/boat.h"
+#include "render/boat_flag.h"
 
 #include <math.h>
 

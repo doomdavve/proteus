@@ -1,12 +1,13 @@
-#include "boat_fixtures.h"
-#include "boat_map.h"
-#include "boat_reset_hold.h"
-#include "boat_steering.h"
-#include "boat_test_cases.h"
-#include "boat_test_session.h"
-#include "boat_throttle.h"
-#include "boat_view.h"
+#include "core/boat_map.h"
+#include "core/boat_reset_hold.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_view.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdint.h>

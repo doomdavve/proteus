@@ -1,9 +1,9 @@
 #ifndef PROTEUS_WAKE_VELOCITY_LIGHTING_REVIEW_H
 #define PROTEUS_WAKE_VELOCITY_LIGHTING_REVIEW_H
 
-#include "boat_capture.h"
-#include "renderer3d.h"
-#include "renderer_gpu.h"
+#include "platform/boat_capture.h"
+#include "render/renderer3d.h"
+#include "render/renderer_gpu.h"
 
 #include <stdbool.h>
 #include <stdint.h>

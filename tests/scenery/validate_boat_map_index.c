@@ -3,13 +3,14 @@
  * and normal, bit for bit) on dense, shore, seam, corner, random and far-away points for several
  * cell sizes, and both tile sizes must list every item where it belongs. Reports index, tile
  * and per-query candidate counts. */
-#include "boat_location.h"
-#include "boat_map.h"
-#include "boat_map_tiles.h"
-#include "boat_test_cases.h"
-#include "boat_test_scenery.h"
+#include "core/boat_location.h"
+#include "core/boat_map.h"
+#include "core/boat_map_tiles.h"
+#include "core/waterfront_city.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_city.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_scenery.h"
 
 #include <float.h>
 #include <math.h>

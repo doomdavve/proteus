@@ -1,10 +1,10 @@
 #ifndef PROTEUS_BOAT_NET_PROTOCOL_H
 #define PROTEUS_BOAT_NET_PROTOCOL_H
 
-#include "boat_fleet.h"
-#include "boat_match.h"
-#include "boat_race.h"
-#include "boat_room_definition.h"
+#include "core/boat_fleet.h"
+#include "core/boat_match.h"
+#include "core/boat_race.h"
+#include "core/boat_room_definition.h"
 
 #include <stddef.h>
 #include <stdint.h>

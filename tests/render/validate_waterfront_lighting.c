@@ -1,9 +1,10 @@
-#include "boat_view.h"
-#include "renderer3d.h"
-#include "waterfront_corner.h"
-#include "waterfront_lighting.h"
-#include "waterfront_scene.h"
+#include "render/boat_view.h"
+#include "render/renderer3d.h"
+#include "render/waterfront_corner.h"
+#include "render/waterfront_lighting.h"
+#include "render/waterfront_scene.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <float.h>

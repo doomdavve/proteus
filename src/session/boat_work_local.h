@@ -17,8 +17,8 @@
 //
 // No drawing, input or files. The job runs the package's Lua on the authority, so this library
 // links the work session's plugin host; proteus_boat_net never links it.
-#include "boat_net_transport.h"
-#include "boat_work_session.h"
+#include "net/boat_net_transport.h"
+#include "session/boat_work_session.h"
 
 #define BOAT_WORK_LOCAL_CHUNK_TICKS 12
 #define BOAT_WORK_LOCAL_MAX_GRANT 96

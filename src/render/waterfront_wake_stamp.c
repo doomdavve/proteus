@@ -1,5 +1,6 @@
-#include "waterfront_wake_stamp.h"
+#include "render/waterfront_wake_stamp.h"
 
+#include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
 

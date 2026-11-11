@@ -3,18 +3,19 @@
  * classified; a rename keeps all progress, a route change restarts the voyage and an exposure
  * change restarts the session; a failed stage never touches the active revision; Undo reinstalls
  * through the same rules; and save polling, on a virtual clock, stages each settled save once. */
-#include "boat_fixtures.h"
-#include "boat_plugin_host.h"
-#include "boat_plugin_load.h"
-#include "boat_plugin_lua.h"
-#include "boat_session.h"
-#include "boat_steering.h"
-#include "boat_test_cases.h"
-#include "boat_throttle.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
+#include "core/waterfront_outer.h"
+#include "core/waterfront_traffic.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_lua.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "wake_velocity_plugin.h"
-#include "waterfront_outer.h"
-#include "waterfront_traffic.h"
+#include "session/boat_session.h"
+#include "support/boat_fixtures.h"
+#include "support/boat_test_cases.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #include <math.h>
 #include <stddef.h>

@@ -1,4 +1,5 @@
-#include "boat_plugin_decode.h"
+#include "plugins/boat_plugin_decode.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

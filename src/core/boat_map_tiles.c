@@ -1,4 +1,5 @@
-#include "boat_map_tiles.h"
+#include "core/boat_map_tiles.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <stdlib.h>

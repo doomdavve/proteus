@@ -1,5 +1,5 @@
-#include "boat_grodan.h"
-#include "boat_flag.h"
+#include "render/boat_grodan.h"
+#include "render/boat_flag.h"
 
 // GH3 (docs/GOTHENBURG_HARBOUR_PLAN.md): the Grodan, a made-up stand-in for Gothenburg's open
 // canal tour boats. 15 x 4.2 m and low, so it fits under the canal bridges; the dimensions are

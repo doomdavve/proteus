@@ -2,7 +2,7 @@
 #define _POSIX_C_SOURCE 200809L // open with O_NOFOLLOW and fstat under strict C17.
 #define _DARWIN_C_SOURCE // macOS hides O_NOFOLLOW from strict POSIX.
 #endif
-#include "boat_plugin_io.h"
+#include "plugins/boat_plugin_io.h"
 
 #include <stdio.h>
 #include <stdlib.h>

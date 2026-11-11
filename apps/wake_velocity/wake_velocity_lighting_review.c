@@ -3,11 +3,11 @@
 // is written at the end.
 #ifndef __EMSCRIPTEN__
 
-#include "wake_velocity_lighting_review.h"
+#include "wake_velocity/wake_velocity_lighting_review.h"
 #include "external/glad.h"
 
+#include "render/waterfront_lighting.h"
 #include "rlgl.h"
-#include "waterfront_lighting.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -450,7 +450,7 @@ bool wake_lighting_review_end(WakeLightingReview *review)
 
 #else // __EMSCRIPTEN__
 
-#include "wake_velocity_lighting_review.h"
+#include "wake_velocity/wake_velocity_lighting_review.h"
 
 bool wake_lighting_review_begin(
     WakeLightingReview *review, const char *csv_path, WaterfrontGpuScene *scene)

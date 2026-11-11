@@ -1,8 +1,8 @@
 #ifndef WAKE_VELOCITY_DRIVE_H
 #define WAKE_VELOCITY_DRIVE_H
-#include "boat_fleet.h"
-#include "boat_profile.h"
-#include "boat_session.h"
+#include "core/boat_fleet.h"
+#include "session/boat_session.h"
+#include "wake_velocity/boat_profile.h"
 typedef struct {
     BoatWakeObjects wakes; // The single-boat arcade pool.
     BoatWakeObjects traffic; // Opt-in race trial scenery; never takes a player slot.

@@ -1,4 +1,4 @@
-#include "boat_room_objective.h"
+#include "room/boat_room_objective.h"
 
 #include <stdio.h>
 #include <string.h>

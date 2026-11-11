@@ -1,11 +1,12 @@
-#include "boat.h"
-#include "boat_map.h"
-#include "boat_model.h"
-#include "boat_pose.h"
-#include "boat_steering.h"
+#include "core/boat.h"
+#include "core/boat_map.h"
+#include "core/boat_model.h"
+#include "core/boat_pose.h"
+#include "core/boat_steering.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_traffic.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_harbor.h"
-#include "waterfront_traffic.h"
 
 #include <assert.h>
 #include <math.h>

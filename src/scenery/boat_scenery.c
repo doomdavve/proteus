@@ -1,8 +1,8 @@
-#include "boat_scenery.h"
-#include "boat_ambient.h"
-#include "boat_water_atlas.h"
-#include "waterfront_city.h"
-#include "waterfront_outer.h"
+#include "scenery/boat_scenery.h"
+#include "core/waterfront_city.h"
+#include "core/waterfront_outer.h"
+#include "scenery/boat_ambient.h"
+#include "scenery/boat_water_atlas.h"
 
 #include <stdint.h>
 #include <stdio.h>

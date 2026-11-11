@@ -1,5 +1,5 @@
-#include "waterfront_grade.h"
-#include "waterfront_lighting.h"
+#include "render/waterfront_grade.h"
+#include "render/waterfront_lighting.h"
 
 #include <math.h>
 #include <stdio.h>

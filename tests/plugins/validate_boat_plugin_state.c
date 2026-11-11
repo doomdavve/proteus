@@ -1,5 +1,5 @@
-#include "boat_plugin_state.h"
-#include "boat_test_cases.h"
+#include "plugins/boat_plugin_state.h"
+#include "support/boat_test_cases.h"
 
 #include <limits.h>
 #include <stdio.h>

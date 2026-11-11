@@ -1,11 +1,12 @@
 // M1: exercise the shipped marina and rejection boundaries through native staging.
-#include "boat_plugin_host.h"
-#include "boat_plugin_io.h"
-#include "boat_plugin_load.h"
-#include "boat_world.h"
+#include "core/boat_world.h"
+#include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
+#include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_load.h"
+#include "raylib.h"
 #include "raymath.h"
-#include "waterfront_harbor.h"
-#include "waterfront_outer.h"
 
 #include <math.h>
 #include <stdio.h>

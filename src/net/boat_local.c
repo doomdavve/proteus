@@ -1,4 +1,4 @@
-#include "boat_local.h"
+#include "net/boat_local.h"
 
 #include <math.h>
 #include <string.h>

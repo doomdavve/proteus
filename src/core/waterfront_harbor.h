@@ -1,9 +1,9 @@
 #ifndef PROTEUS_WATERFRONT_HARBOR_H
 #define PROTEUS_WATERFRONT_HARBOR_H
 
-#include "boat_model.h"
-#include "boat_scene_definition.h"
-#include "boat_water.h"
+#include "core/boat_model.h"
+#include "core/boat_scene_definition.h"
+#include "core/boat_water.h"
 
 #define WATERFRONT_HARBOR_BOATS 7
 #define WATERFRONT_FERRY_LINES 4

@@ -1,5 +1,5 @@
-#include "boat_plugin_state.h"
-#include "boat_plugin_lua.h"
+#include "plugins/boat_plugin_state.h"
+#include "plugins/boat_plugin_lua.h"
 
 #include "lauxlib.h"
 #include "lua.h"

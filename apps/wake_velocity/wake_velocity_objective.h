@@ -7,10 +7,10 @@
 // stages its batch for the next tick and commits it before that tick; a failing callback or a
 // full queue quarantines it. The revision is borrowed and never written. No drawing, input or
 // files; the native functions run Lua (the browser evaluates in its isolated worker instead).
-#include "boat_plugin_eval.h"
-#include "boat_plugin_revision.h"
-#include "boat_plugin_state.h"
-#include "boat_voyage.h"
+#include "core/boat_voyage.h"
+#include "plugins/boat_plugin_eval.h"
+#include "plugins/boat_plugin_revision.h"
+#include "plugins/boat_plugin_state.h"
 
 #define WAKE_PLUGIN_TRACE 16
 #define WAKE_OBJECTIVE_CADENCE 12

@@ -1,13 +1,13 @@
 #ifndef PROTEUS_BOAT_CARGO_VIEW_H
 #define PROTEUS_BOAT_CARGO_VIEW_H
 
-#include "boat_cargo.h"
-#include "boat_model.h"
-#include "boat_water.h"
-#include "boat_world.h"
-#include "renderer3d.h"
-#include "waterfront.h"
-#include "waterfront_lighting.h"
+#include "core/boat_cargo.h"
+#include "core/boat_model.h"
+#include "core/boat_water.h"
+#include "core/boat_world.h"
+#include "render/renderer3d.h"
+#include "render/waterfront.h"
+#include "render/waterfront_lighting.h"
 
 // Append a vertical landing decal clipped to actual receiver triangles. Start OUT with
 // boat_model_begin; do not pass OUT as RECEIVERS. Geometry is caller-owned and bounded.

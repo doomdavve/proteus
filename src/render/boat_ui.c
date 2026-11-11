@@ -1,5 +1,5 @@
-#include "boat_ui.h"
-#include "boat_assets.h"
+#include "render/boat_ui.h"
+#include "platform/boat_assets.h"
 #include <math.h>
 #include <string.h>
 

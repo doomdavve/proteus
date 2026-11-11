@@ -1,4 +1,4 @@
-#include "waterfront_lights.h"
+#include "render/waterfront_lights.h"
 
 #include <math.h>
 #include <stdio.h>

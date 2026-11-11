@@ -1,5 +1,6 @@
-#include "boat_remote_view.h"
+#include "net/boat_remote_view.h"
 
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

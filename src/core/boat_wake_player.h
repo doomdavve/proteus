@@ -1,6 +1,6 @@
 #ifndef PROTEUS_BOAT_WAKE_PLAYER_H
 #define PROTEUS_BOAT_WAKE_PLAYER_H
-#include "boat_wake.h"
+#include "core/boat_wake.h"
 
 /* Application-owned world, separate from copyable Boat/BoatWater values. Boat and
  * rendering borrow its published endpoint. Destroy only after all borrowers stop. */

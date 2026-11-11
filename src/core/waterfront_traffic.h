@@ -1,8 +1,8 @@
 #ifndef PROTEUS_WATERFRONT_TRAFFIC_H
 #define PROTEUS_WATERFRONT_TRAFFIC_H
 
-#include "boat_model.h"
-#include "boat_water.h"
+#include "core/boat_model.h"
+#include "core/boat_water.h"
 
 #define WATERFRONT_TRAFFIC_VESSELS 4 // The river's circuits, on every mapped location.
 // A3.5j: the outer map's upstream ferries and schooner (waterfront_upstream.h) follow them at

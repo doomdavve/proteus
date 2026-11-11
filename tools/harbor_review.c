@@ -1,10 +1,11 @@
 // Repeatable CPU/GPU berth views; all poses come from the same shared snapshot as playback.
-#include "boat_test_scenery.h"
-#include "boat_water_mesh.h"
-#include "renderer_gpu.h"
-#include "waterfront.h"
-#include "waterfront_city.h"
+#include "core/waterfront_city.h"
+#include "render/boat_water_mesh.h"
+#include "render/renderer_gpu.h"
+#include "render/waterfront.h"
+#include "support/boat_test_scenery.h"
 
+#include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
 

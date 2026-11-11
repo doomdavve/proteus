@@ -1,6 +1,6 @@
 #ifndef PROTEUS_BOAT_NET_MUX_H
 #define PROTEUS_BOAT_NET_MUX_H
-#include "boat_net_transport.h"
+#include "net/boat_net_transport.h"
 // Two transports share one authority's peer namespace. No platform types enter the core.
 typedef struct {
     BoatNetTransport transports[2];

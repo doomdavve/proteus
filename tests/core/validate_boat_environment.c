@@ -1,10 +1,11 @@
-#include "boat_clock.h"
-#include "boat_map.h"
-#include "boat_test_cases.h"
-#include "boat_test_session.h"
+#include "core/boat_clock.h"
+#include "core/boat_map.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/waterfront_scene.h"
 #include "rlgl.h"
-#include "waterfront_scene.h"
+#include "support/boat_test_cases.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -1,9 +1,9 @@
 #ifndef PROTEUS_BOAT_HELM_H
 #define PROTEUS_BOAT_HELM_H
 
-#include "boat.h"
-#include "boat_steering.h"
-#include "boat_throttle.h"
+#include "core/boat.h"
+#include "core/boat_steering.h"
+#include "core/boat_throttle.h"
 
 #include <math.h>
 

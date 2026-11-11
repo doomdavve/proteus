@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_PLUGIN_EVAL_H
 #define PROTEUS_BOAT_PLUGIN_EVAL_H
 
-#include "boat_plugin_state.h"
+#include "plugins/boat_plugin_state.h"
 
 #define BOAT_PLUGIN_EVAL_REQUEST_MAX 131072u
 #define BOAT_PLUGIN_EVAL_REPLY_MAX 49152u

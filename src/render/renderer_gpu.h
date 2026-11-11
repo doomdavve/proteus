@@ -1,12 +1,12 @@
 #ifndef PROTEUS_RENDERER_GPU_H
 #define PROTEUS_RENDERER_GPU_H
 
-#include "waterfront_corner.h"
-#include "waterfront_harbor_view.h"
-#include "waterfront_lights.h"
-#include "waterfront_scene.h"
-#include "waterfront_wake_stamp.h"
-#include "waterfront_water_history.h"
+#include "render/waterfront_corner.h"
+#include "render/waterfront_harbor_view.h"
+#include "render/waterfront_lights.h"
+#include "render/waterfront_scene.h"
+#include "render/waterfront_wake_stamp.h"
+#include "render/waterfront_water_history.h"
 
 #include "raylib.h"
 

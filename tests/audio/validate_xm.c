@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "xm_audio.h"
+#include "audio/xm_audio.h"
 
 #define JAR_XM_IMPLEMENTATION
 #include "jar_xm.h"

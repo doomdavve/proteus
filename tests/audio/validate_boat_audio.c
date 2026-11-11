@@ -1,4 +1,4 @@
-#include "boat_audio.h"
+#include "audio/boat_audio.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -1,7 +1,7 @@
 #ifndef PROTEUS_BOAT_PREDICTION_H
 #define PROTEUS_BOAT_PREDICTION_H
 
-#include "boat_net_protocol.h"
+#include "net/boat_net_protocol.h"
 
 // Multiplayer M4 client prediction: a speculative copy of the four-boat fleet run ahead of the
 // authority with the client's own commands. Every correction restores the newest authoritative

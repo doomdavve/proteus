@@ -1,10 +1,10 @@
 #ifndef PROTEUS_WATERFRONT_CORNER_H
 #define PROTEUS_WATERFRONT_CORNER_H
 
-#include "boat_map.h"
-#include "boat_map_tiles.h"
-#include "renderer3d.h"
-#include "waterfront_outer.h"
+#include "core/boat_map.h"
+#include "core/boat_map_tiles.h"
+#include "core/waterfront_outer.h"
+#include "render/renderer3d.h"
 
 // Static city dressing: the authored cafe at OSM way 282574767 and a map-constrained
 // kit distributed along streets, exterior facades, and quays. Placements are artistic.
