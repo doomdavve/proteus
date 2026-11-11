@@ -1378,7 +1378,8 @@ coverage. Add focused negative checks, not tests that restate file lists.
 
 ### AR8/AR9 design — 2026-11-11
 
-Proposed on `arch/ar8-layout` before any move; decisions AR8-1 to AR8-4 below await the user.
+Proposed on `arch/ar8-layout` before any move. The user decided AR8-1 (b), AR8-2 (a), AR8-3 (a)
+and AR8-4 (a) on 2026-11-11.
 AR8 and AR9 form one milestone and one PR. Moves start once PR #186 (L4b) has merged, since
 it touches the application, plugin and net files that move.
 
@@ -1408,12 +1409,17 @@ and running from the repository root; generated file paths; `tools/plugin_author
 packaged plugin tools' layout. Relative includes of `assets/` and `third_party/` gain one
 `../`. Moves use `git mv` with no edits in the same file, so `git log --follow` keeps history.
 
-**Includes (AR9).** Each library publishes its own directory and nothing else; there is no
-`src/` include root. A consumer sees a header only through a library it links. A new check,
+**Includes (AR8-1 b, AR9).** Every project include is qualified by its owning directory, also
+within a directory: `#include "core/boat.h"`, `"net/boat_net_server.h"`,
+`"wake_velocity/wake_velocity_local.h"`, `"support/boat_test_world.h"`. The include roots are
+`src/`, `apps/` and `tests/`, published by the libraries that own them. While moves are in
+progress each moved directory is a temporary include path, so flat includes still resolve and
+each move stays a pure rename; one commit then qualifies every include and drops the temporary
+paths. Since the roots expose every header, ownership is enforced by a check: a new one,
 `module_includes`, holds the allowed module graph, closed transitively (core → nothing;
 scenery, net → core; render → scenery, platform; plugins → core, json; session → render,
-net, plugins; room → net, plugins, platform; apps and tests → anything), and rejects an include that
-resolves into a module not allowed, with negative self-test cases. Existing gates become
+net, plugins; room → net, plugins, platform; apps and tests → anything), and rejects an unqualified
+project include or one into a module not allowed, with negative self-test cases. Existing gates become
 directory-based where a directory equals the boundary: `boat_core_boundary` covers every
 file in `src/core/` (a new file is checked without editing a list), and `boat_net_boundary`
 covers `src/net/` except its named transport files. `plugin_data_boundary` keeps its explicit
@@ -1428,9 +1434,10 @@ byte-identical to main):
 4. AR8b platform, session, room; 5. AR8b applications.
 6. AR8b tests and tools: validators and checks into `tests/`, registration with them.
 7. AR9 target changes kept out of the moves: `proteus_audio`, `proteus_room`, `boat_profile`
-   out of `proteus_boat_drive`, the remaining whole-`src` include removed.
-8. AR9 `module_includes` and the directory-based gates, with mutation evidence.
-9. Closing: owning docs, `AGENTS.md` layout section, plan status.
+   out of `proteus_boat_drive`.
+8. AR8-1 qualified includes in every file; the temporary include paths removed.
+9. AR9 `module_includes` and the directory-based gates, with mutation evidence.
+10. Closing: owning docs, `AGENTS.md` layout section, plan status.
 
 Each move commit rewrites repository paths with a one-off script (kept in the scratchpad,
 not committed) across `docs/`, `README.md`, `AGENTS.md`, CMake, Python checks, CI workflows,
@@ -1441,22 +1448,22 @@ CPU captures of basin and outer byte-identical to main, and the generated catalo
 the browser build, `check_web_wasm.py` and `check_web_plugin_author.py`; `package_web.py` and
 `tools/macos/package.py` dry runs. Windows and Linux are checked by CI after the push only.
 
-**Decisions for the user.**
+**Decisions (accepted 2026-11-11 as marked).**
 
-- **AR8-1 include style.** (a, recommended) Flat names (`#include "boat.h"`) with per-library
+- **AR8-1 include style: (b) chosen.** (a, recommended) Flat names (`#include "boat.h"`) with per-library
   include directories: moves need no source edits and the check enforces ownership. (b)
   Qualified names (`#include "core/boat.h"`) from one `src/` root: ownership is visible in
   every include, but nearly every file changes and the root still exposes all headers, so the
   check is needed anyway.
-- **AR8-2 test layout.** (a, recommended) `tests/<module>/` mirroring the owners (`core`,
+- **AR8-2 test layout: (a) chosen.** (a, recommended) `tests/<module>/` mirroring the owners (`core`,
   `net`, `render`, `plugins`, `session`, `room`, `app`, `web`, `lint`, `tools`, plus
   `tests/support/` for `boat_test_*.h`, `boat_fixtures` and fixture data), each with its own
   test registration. (b) One flat `tests/` with one registration file. (c) Tests beside each
   module (`src/core/tests/`).
-- **AR8-3 paths in dated history.** (a, recommended) Rewrite paths in every document,
+- **AR8-3 paths in dated history: (a) chosen.** (a, recommended) Rewrite paths in every document,
   including dated sections, so links keep working; `git log --follow` recovers the old
   name. (b) Rewrite only specs, guides and active plans; leave history with dead paths.
-- **AR8-4 quiet window.** Thirty-odd unmerged local branches from October (adventure A2/A3,
+- **AR8-4 quiet window: (a) chosen.** Thirty-odd unmerged local branches from October (adventure A2/A3,
   `deathmatch-arsenal`, skins, HUD, graphics doc packages) predate the moves and would need
   rebasing with rename detection. (a, recommended) Proceed after #186; none must land first.
   (b) Name branches to merge first.
