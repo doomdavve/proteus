@@ -1,16 +1,16 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-10:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
+**Status, 2026-11-11:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
 [decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). AR2–AR6 milestone
-(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. The user played it on macOS (see the
-[AR3 status](#ar3-status)); nothing browser-built or Windows-built.
+(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. AR7's L6, L0's removal and L2 (time
+trial on the wake pool and the local authority, [D11](ARCHITECTURE_AR1.md#product-decisions))
+merged as PR #181 ([AR7 status](#ar7-status)). The user played both on macOS; nothing
+browser-built or Windows-built.
 **Open:** remaining manual native, browser and Windows checks per step; the menu-gated touch
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** L6, L0's removal and L2 (time trial on the wake pool and the local authority) are
-implemented on `arch/l6-scripted-drives` ([AR7 status](#ar7-status)); then L1 with L9 (voyages,
-objectives and plugin authoring).
+**Next:** L1 with L9 (voyages, objectives and plugin authoring) on `arch/l1-voyages`.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -791,7 +791,7 @@ change.
 
 #### AR7 status
 
-2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178), not pushed.
+2026-11-10, branch `arch/l6-scripted-drives` (from `main` after PR #178); merged as PR #181.
 
 L6 (scripted demos and captures) and L0's removal point, implemented:
 
