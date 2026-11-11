@@ -56,7 +56,8 @@ void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
 {
     if (!course->enabled || !course->definition)
         return;
-    int centiseconds = (int)(course->elapsed * 100);
+    // Round like the BEST and split readouts (%.2f), so a finish shows the same hundredths.
+    int centiseconds = (int)lround(course->elapsed * 100);
     DrawRectangle(8, 8, 224, 62, (Color) { 14, 23, 32, 245 });
     boat_ui_text(TextFormat("S COURSE  %02d:%02d.%02d", centiseconds / 6000,
                      centiseconds / 100 % 60, centiseconds % 100),
