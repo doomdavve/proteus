@@ -394,6 +394,17 @@ add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
 target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
 target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
 
+# AR6 (L0): private single player as a local authority and client, native and (L4a) browser. The
+# glue is a library so validate_boat_local drives the game's own code.
+add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
+  tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
+  tools/wake_velocity_voyage.h)
+target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
+  proteus_wake_objective)
+target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
+target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
+
 if(NOT EMSCRIPTEN)
   # ENet v1.3.18 (MIT, LICENSE in its source tree), pinned to the tag's commit. Its sources are
   # compiled here as a static library with its own configure checks and no project warnings.
@@ -442,16 +453,6 @@ if(NOT EMSCRIPTEN)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
-  # AR6 (L0): private free boating as a local authority and client (native only for now). The
-  # glue is a library so validate_boat_local drives the game's own code.
-  add_library(proteus_local_drive STATIC tools/wake_velocity_local.c tools/wake_velocity_local.h
-    tools/wake_velocity_course.c tools/wake_velocity_course.h tools/wake_velocity_voyage.c
-    tools/wake_velocity_voyage.h)
-  target_include_directories(proteus_local_drive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
-  target_link_libraries(proteus_local_drive PUBLIC proteus_boat_drive proteus_boat_net
-    proteus_wake_objective)
-  target_compile_options(proteus_local_drive PRIVATE ${PROTEUS_WARNINGS})
-  target_link_libraries(wake_velocity PRIVATE proteus_local_drive)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
   target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h

@@ -5,6 +5,32 @@
 
 enum { EXPOSED = 1, ARRIVED = 2, TOO_FAST = 4, OBSERVED = 8, WEATHER = 16 };
 
+#ifdef __EMSCRIPTEN__
+// L4a: the browser evaluates objectives only in its isolated worker, and the game gives its local
+// authority no revision with an objective (L4b moves them here). Clearing still advances the
+// generation; nothing evaluates.
+static void wake_objective_init(
+    WakeObjective *run, const BoatPluginRevision *revision, uint64_t tick)
+{
+    (void)run, (void)revision, (void)tick;
+}
+
+static void wake_objective_update(
+    WakeObjective *run, const BoatPluginRevision *revision, uint64_t tick)
+{
+    (void)run, (void)revision, (void)tick;
+}
+
+static bool wake_objective_migrate(WakeObjective *run, const BoatPluginRevision *candidate,
+    unsigned active, uint64_t tick, BoatPluginObjective *migrated)
+{
+    (void)candidate, (void)active, (void)tick, (void)migrated;
+    snprintf(run->objective_diagnostic.message, sizeof(run->objective_diagnostic.message),
+        "the browser's local authority runs no objective");
+    return false;
+}
+#endif
+
 void wake_voyage_init(WakeVoyageAuthority *voyage, const BoatSession *session, unsigned slot)
 {
     // The objective is large; clear it in place rather than through a temporary. Its trace is
@@ -232,7 +258,8 @@ static size_t private_state(void *context, uint8_t *out)
         ? v->objective.objective_diagnostic.message
         : v->commit_status == WAKE_COMMIT_FAILED ? v->commit_message
                                                  : "";
-    size_t length = strnlen(message, sizeof(v->commit_message) - 1);
+    const char *end = memchr(message, 0, sizeof(v->commit_message) - 1);
+    size_t length = end ? (size_t)(end - message) : sizeof(v->commit_message) - 1;
     *p++ = (uint8_t)length;
     memcpy(p, message, length);
     return size + WAKE_VOYAGE_OBJECTIVE_BYTES + length;

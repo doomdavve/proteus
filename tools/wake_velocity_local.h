@@ -4,7 +4,7 @@
 // AR6 (ledger L0): the game's glue for private free boating as a local authority and client
 // (src/boat_local.h). The game keeps its BoatSession for views, audio and HUD; this glue fills
 // its boat, clock, presentation and arcade wake pool from the client's prediction, never from
-// the authority. Native builds only.
+// the authority. Native and (L4a) browser builds.
 #include "boat_local.h"
 #include "boat_profile.h"
 #include "wake_velocity_course.h"
