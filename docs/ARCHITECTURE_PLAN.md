@@ -1376,6 +1376,94 @@ Done when source additions normally touch their owning module, unrelated headers
 inherited, boundary checks still reject deliberate violations, and quick/full lanes keep their
 coverage. Add focused negative checks, not tests that restate file lists.
 
+### AR8/AR9 design — 2026-11-11
+
+Proposed on `arch/ar8-layout` before any move; decisions AR8-1 to AR8-4 below await the user.
+AR8 and AR9 form one milestone and one PR. Moves start once PR #186 (L4b) has merged, since
+it touches the application, plugin and net files that move.
+
+**Rule.** A directory owns libraries, not loose files: each static library lives in exactly
+one directory, and one directory may hold several libraries of the same module. Executables
+live with their application, test or tool. Header/implementation pairs stay together.
+
+| Directory | Contents (today's targets and files) |
+| --- | --- |
+| `src/core/` | `proteus_boat_core`, unchanged list |
+| `src/scenery/` | `proteus_boat_scenery` (`boat_scenery`, `boat_water_atlas`, `boat_ambient`) |
+| `src/render/` | `proteus_render`, `proteus_gpu`, `profiler.[ch]` (the F3 overlay draws) |
+| `src/audio/` | `boat_audio`, `xm_audio` (compiled into executables today; becomes `proteus_audio`) |
+| `src/net/` | `proteus_boat_net` (with `boat_local`), the ENet, WebRTC and browser transports |
+| `src/plugins/` | `proteus_plugin_data`, `proteus_plugins` with its stage backends, `proteus_plugin_catalog`, `boat_plugin_catalog_gen.c`, `boat_plugin_stage_worker.c` |
+| `src/json/` | `proteus_json` (manifests and the server directory) |
+| `src/session/` | `proteus_boat_session` (session, replay), `boat_profile`, sandbox save, work session, work local, work save and menu |
+| `src/room/` | `boat_server`, `boat_room_package`, `boat_room_objective`, `boat_fleet_bots.h` from `tools/` (shared by the game and `boat_server`; becomes `proteus_room`) |
+| `src/platform/` | `proteus_file`, `proteus_frame_pacer`, `boat_capture`, `boat_assets.h`, `cli_usage` |
+| `apps/wake_velocity/` | the game's `wake_velocity*`, `wake_console*`, `wake_command`, `boat_title`, `boat_directory`, `boat_music.h`, `boat_gpu_timer.h` sources; `proteus_boat_drive`, `proteus_local_drive`, `proteus_wake_objective`; `boat_plugin_worker` (links the game's plugin glue); `wake_study`, built from the same sources |
+| `apps/boat_server/`, `apps/cargo_sandbox/`, `apps/dance_study/` | each executable's main; the dance study takes `dance` and `choreography` |
+| `tests/` | validators, boundary/lint scripts, browser checks, test helpers and fixtures (AR8-2) |
+| `tools/` | developer utilities only: reviews, benchmark, bakes, generators, map pipeline, packaging and release, `plugin_author.py`, `boat_bot`, `boat_race_trial`, `gpu_fixture`, `title_backdrop`, `wake_baseline` |
+
+**Preserved.** Target, executable and test names, labels, presets and CI lanes; asset paths
+and running from the repository root; generated file paths; `tools/plugin_author.py` and the
+packaged plugin tools' layout. Relative includes of `assets/` and `third_party/` gain one
+`../`. Moves use `git mv` with no edits in the same file, so `git log --follow` keeps history.
+
+**Includes (AR9).** Each library publishes its own directory and nothing else; there is no
+`src/` include root. A consumer sees a header only through a library it links. A new check,
+`module_includes`, holds the allowed module graph, closed transitively (core → nothing;
+scenery, net → core; render → scenery, platform; plugins → core, json; session → render,
+net, plugins; room → net, plugins, platform; apps and tests → anything), and rejects an include that
+resolves into a module not allowed, with negative self-test cases. Existing gates become
+directory-based where a directory equals the boundary: `boat_core_boundary` covers every
+file in `src/core/` (a new file is checked without editing a list), and `boat_net_boundary`
+covers `src/net/` except its named transport files. `plugin_data_boundary` keeps its explicit
+list, because data and host share `src/plugins/`, and it reads `src/plugins/CMakeLists.txt`.
+
+**Commits** (one per row; each builds, passes `ctest --preset full` and keeps captures
+byte-identical to main):
+
+1. AR8a core, scenery, render, audio: `git mv`, the module's `CMakeLists.txt` cut verbatim
+   from the root, its include directory, path updates in scripts, CI and docs.
+2. AR8a net and json; 3. AR8a plugins.
+4. AR8b platform, session, room; 5. AR8b applications.
+6. AR8b tests and tools: validators and checks into `tests/`, registration with them.
+7. AR9 target changes kept out of the moves: `proteus_audio`, `proteus_room`, `boat_profile`
+   out of `proteus_boat_drive`, the remaining whole-`src` include removed.
+8. AR9 `module_includes` and the directory-based gates, with mutation evidence.
+9. Closing: owning docs, `AGENTS.md` layout section, plan status.
+
+Each move commit rewrites repository paths with a one-off script (kept in the scratchpad,
+not committed) across `docs/`, `README.md`, `AGENTS.md`, CMake, Python checks, CI workflows,
+packaging and `deploy/`, then `git grep` for stale `src/<moved>` and `tools/<moved>` paths.
+
+**Verification.** Fresh native configure and build, warning-clean; `ctest --preset full`;
+CPU captures of basin and outer byte-identical to main, and the generated catalog unchanged;
+the browser build, `check_web_wasm.py` and `check_web_plugin_author.py`; `package_web.py` and
+`tools/macos/package.py` dry runs. Windows and Linux are checked by CI after the push only.
+
+**Decisions for the user.**
+
+- **AR8-1 include style.** (a, recommended) Flat names (`#include "boat.h"`) with per-library
+  include directories: moves need no source edits and the check enforces ownership. (b)
+  Qualified names (`#include "core/boat.h"`) from one `src/` root: ownership is visible in
+  every include, but nearly every file changes and the root still exposes all headers, so the
+  check is needed anyway.
+- **AR8-2 test layout.** (a, recommended) `tests/<module>/` mirroring the owners (`core`,
+  `net`, `render`, `plugins`, `session`, `room`, `app`, `web`, `lint`, `tools`, plus
+  `tests/support/` for `boat_test_*.h`, `boat_fixtures` and fixture data), each with its own
+  test registration. (b) One flat `tests/` with one registration file. (c) Tests beside each
+  module (`src/core/tests/`).
+- **AR8-3 paths in dated history.** (a, recommended) Rewrite paths in every document,
+  including dated sections, so links keep working; `git log --follow` recovers the old
+  name. (b) Rewrite only specs, guides and active plans; leave history with dead paths.
+- **AR8-4 quiet window.** Thirty-odd unmerged local branches from October (adventure A2/A3,
+  `deathmatch-arsenal`, skins, HUD, graphics doc packages) predate the moves and would need
+  rebasing with rename detection. (a, recommended) Proceed after #186; none must land first.
+  (b) Name branches to merge first.
+
+**Defers** (Open loops): manual checks owed by AR7 rows, impaired-delivery qualification,
+the touch tap and pinned `saved_at` stay open; AR8 changes no behaviour.
+
 ### AR10 — Close the plan as the architecture specification
 
 Rewrite this file as `docs/ARCHITECTURE.md`: implemented modules, dependency graph,
