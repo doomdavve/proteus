@@ -10,10 +10,10 @@ browser-built or Windows-built.
 tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-L1a (voyages and tours) and L1b (authoring and objectives on the authority, L9 folded in) are
-implemented on `arch/l1-voyages` ([L1 status](#l1b-status)); the user approved the L1 PR on
-2026-11-11 and defers windowed checks until every L* row is done.
-**Next:** the remaining AR7 rows (L3, L4, L5, L7, L8); the user's manual checks follow them.
+L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
+([L1 status](#l1b-status)). L7 and L8 implemented on `arch/ar7-rest` ([status](#l7-l8-status)).
+The user defers windowed checks until every L* row is done.
+**Next:** L3 (working harbour), then L5 and L4, on `arch/ar7-rest`.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1060,6 +1060,29 @@ save that stages a migration and F7 (MIGRATION IN PROGRESS for one frame, then a
 failing migration, F6 Undo, a live route edit and a live marina layout edit, the console
 promoting a running bundled voyage to authoring, and `plugin_author.py live-inspect` against a
 running game; plus L1a's owed voyage and tour checks.
+
+<a id="l7-l8-status"></a>L7 and L8, implemented 2026-11-11 on `arch/ar7-rest` (from `main` after
+PR #184):
+
+- L7 (replay and ghost viewing): viewing runs no authority, as designed; the replay branch of
+  the frame loop grants nothing. One gap closed: a session launched with `--replay FILE` never
+  opened the local session, so its first restart drove the course on the direct path. Its
+  restart now opens the local session when the session is eligible.
+- L8 (developer studies, [D6](ARCHITECTURE_AR1.md#product-decisions) (b)): `--wake-field`,
+  `--player-wake`, `--no-player-wake` and `--wake-objects-crossing` run in `wake_study`, the
+  game's own sources and target settings built with `WAKE_VELOCITY_STUDY` (native only, never
+  packaged). `wake_velocity` (native and browser) rejects them and names `wake_study`, so its
+  native free boating, time trial, voyages and authoring always have the wake pool and the local
+  authority. `--wake-height` and `--wake-life-ticks` stay in the game: they were already private
+  world options.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11): `wake_study`
+captures byte-identical to the L1 build's `wake_velocity` for `--player-wake`,
+`--no-player-wake`, `--wake-objects-crossing`, `--player-wake --current --waves` (all
+`--time 9`) and `--wake-field --time 3`; the game's basin capture unchanged; new
+`wake_velocity_study_rejected.<option>` tests; `ctest --preset full -j8` passed 531/531 (13
+disabled). Not verified: the `--replay` restart in a window (no scripted restart exists), any
+browser or Windows build.
 
 ### AR8 — Move files into owning directories
 
