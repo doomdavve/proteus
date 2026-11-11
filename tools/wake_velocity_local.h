@@ -30,6 +30,9 @@ typedef struct {
     void *resolve_context;
     // L1b: the client's view of the authority's objective after each frame.
     WakeObjectiveView objective;
+    // L4b: the authority's isolated objective evaluator (the browser's worker; NULL natively,
+    // where the authority evaluates at once). Set by the game before opening.
+    const WakeObjectiveWorker *worker;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
     void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
     void *traced_context;
@@ -47,8 +50,14 @@ bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectS
 // After the game restarted SESSION and OBJECTS: a new generation from their reset state.
 bool wake_local_restart(
     WakeLocal *local, const BoatSession *session, const ObjectStudy *objects, double now);
+// L4b: whether the host must hold the clock: with a worker, until the client has seen the
+// authority's objective after a start, and while it reports an evaluation pending. Read from the
+// client's view only.
+bool wake_local_waiting(const WakeLocal *local);
 // Grant the ticks ACCUMULATOR holds (boat_time_grant, at most BOAT_LOCAL_MAX_GRANT; any excess
-// stays for the next frame) and run them; then copy the predicted pool into OBJECTS. Presentation
+// stays for the next frame) and run them. L4b: with a worker and an objective, a grant ends at
+// the next update boundary, and a waiting frame grants nothing and empties ACCUMULATOR (as the
+// direct path's worker gate does) while the authority still services its evaluator; then copy the predicted pool into OBJECTS. Presentation
 // steps per predicted tick against the pool the boat read. A time trial first latches SESSION's
 // practice on the authority; afterwards SESSION's course shows the authority's state and a
 // finish is settled into its runs for boat_session_flush. False on an endpoint failure (D10).

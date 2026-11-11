@@ -14,9 +14,9 @@ L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
 ([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
 ([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
 until every L* row is done.
-L5 closed by evidence ([L5](#l5-decision)).
-**Next:** L4b objectives, then authoring, on the browser authority; the user accepted [L4-1, L4-2](#l4b-decision) and
-[L5-1](#l5-decision) as recommended on 2026-11-11.
+L5 closed by evidence ([L5](#l5-decision)); L4b objectives implemented ([L4b](#l4b-status)).
+The user accepted [L4-1, L4-2](#l4b-decision) and [L5-1](#l5-decision) on 2026-11-11.
+**Next:** L4b authoring (L4-2 (b)): browser staging, migration and Undo on the authority.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1167,6 +1167,42 @@ the authority (commit and recover requests wait for the next tick).
 | --- | --- | --- | --- |
 | L4-1 | Where the gate lives | (a) the host ends each grant at the objective cadence's next boundary and grants nothing while the client's objective view reports a pending evaluation; the authority services its evaluator (and pending requests) on zero-grant frames, a change to `boat_local`'s L0 path; the result is seen one frame later than today; (b) the host polls the authority's adapter between frames as host management (as L3's persistence capture), same latency as today, but the gate decision reads authority state | (a): keeps rule 2; one frame (about 17 ms) per update against a worker round trip of 35–100 ms |
 | L4-2 | Browser authoring | (a) stays on the direct path with L4a's restart on promotion, the one remaining direct path; (b) moves too: the worker's migrate runs for the authority and its result commits frames later (L1-1's two-phase commit, asynchronous), staging and Apply wait as L1-3 | (b), as a step after the objectives, since "done when" needs every shipped mode on the authority; it needs Chromium, Firefox and WebKit qualification |
+
+<a id="l4b-status"></a>L4b objectives (L4-1 (a)), implemented 2026-11-11 on `arch/ar7-rest`:
+
+- The voyage adapter evaluates through a `WakeObjectiveWorker` when the host gives it one (the
+  browser's `wake_web_objective_*`; NULL natively, which evaluates at once as before). INIT and
+  every boundary's UPDATE start a job (`wake_objective_begin`); a new `service` rules hook, called
+  by every grant after its messages and before its ticks, collects the reply
+  (`wake_objective_poll`): INIT becomes the objective, an UPDATE is staged for the tick after its
+  boundary, with the native path's trace; a failed callback, an invalid or stale reply or the
+  5 s elapsed-time deadline quarantines. A tick committed while a job is open quarantines as an
+  overrun. The private state's objective tail gains a pending byte (19 bytes before the text).
+- `boat_local_frame` with zero ticks now still services the authority and the client. With a
+  worker and an objective, `wake_local_frame` ends each grant at the next 12-tick boundary and
+  grants nothing (emptying the accumulator, as the direct path's gate does) while the client's
+  view is not yet valid or reports a pending job (`wake_local_waiting`); the game also holds a
+  reset then. The rule-2 boundary holds: the host reads only the client's view.
+- The browser's `LOCAL_PLATFORM_ELIGIBLE` no longer excludes objectives, only authoring.
+  `wake_plugin_attach` closes the direct path's INIT job, and a restart that leaves the local
+  session detaches before the direct path starts its own objective.
+- Reach: the browser catalog (basin-free, time-trial, langedrag, harbor-life, grodan) has no
+  objective voyage, and imported packages always open as authoring, so shipped browser play
+  reaches this path only once authoring moves too (the next step).
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang Debug and emcc MinSizeRel, 2026-11-11; headless
+Chromium 156 through Playwright 1.64.1 with SwiftShader):
+
+- `ctest --preset full -j8`: 539/539, including `boat_local.isolated_objective`,
+  `isolated_quarantine` and `isolated_deadline` (see [TESTING](TESTING.md)). A mutation that
+  never stages a worker UPDATE fails `isolated_objective`.
+- Browser game builds clean; `tools/check_web_wasm.py`: no Lua in the game.
+  `tools/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
+  (22 normal callbacks, deadline across freeze, restart). A scratch drive of the default Langedrag
+  voyage ran 309 ticks on the local authority with no page errors.
+
+Not verified: Firefox and WebKit, an objective voyage on the browser's authority (unreachable in
+shipped play until authoring moves), any manual play.
 
 <a id="l5-decision"></a>L5 (hosted rooms), decision 2026-11-11; the user accepted L5-1 (a) as
 recommended on 2026-11-11. AR1's ledger names no

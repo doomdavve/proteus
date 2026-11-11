@@ -7,6 +7,7 @@
 // stages its batch for the next tick and commits it before that tick; a failing callback or a
 // full queue quarantines it. The revision is borrowed and never written. No drawing, input or
 // files; the native functions run Lua (the browser evaluates in its isolated worker instead).
+#include "boat_plugin_eval.h"
 #include "boat_plugin_revision.h"
 #include "boat_plugin_state.h"
 #include "boat_voyage.h"
@@ -49,6 +50,7 @@ typedef struct {
     unsigned commit, commits; // The latest commit request's revision number, requests handled,
     // and the latest one's result.
     WakeCommitStatus commit_status;
+    bool pending; // L4b: an isolated evaluation is in flight; the host must hold the clock.
     bool suspended;
     // The suspension's, or a failed migration's, diagnostic text.
     char message[sizeof(((BoatPluginDiagnostic *)0)->message)];
@@ -80,6 +82,39 @@ void wake_objective_update(WakeObjective *run, const BoatPluginRevision *revisio
 bool wake_objective_migrate(WakeObjective *run, const BoatPluginRevision *candidate,
     unsigned active, uint64_t tick, BoatPluginObjective *migrated);
 #endif
+// L4b: an isolated evaluator: the browser's objective worker (wake_velocity_plugin_web.h), or a
+// validator's model of it. Each job evaluates one encoded request; see those functions.
+typedef struct {
+    unsigned (*start)(const unsigned char *bytes, unsigned size); // 0 when unavailable.
+    int (*status)(unsigned job); // 0 pending, 1 replied, negative failed.
+    int (*read)(unsigned job, unsigned char *bytes); // The reply's size, or -1.
+    void (*close)(unsigned job); // Late replies are inert.
+} WakeObjectiveWorker;
+
+#define WAKE_OBJECTIVE_DEADLINE 5.0 // Seconds of elapsed time a job may take.
+
+// One evaluation in flight on an isolated evaluator (zero for none).
+typedef struct {
+    unsigned job;
+    double deadline;
+    BoatPluginEvalRequest *request; // Owned while the job is open.
+} WakeObjectiveJob;
+
+// Start ACTION (INIT after wake_objective_clear returned true, or UPDATE after
+// wake_objective_queue did) of REVISION at TICK on WORKER at NOW; EPOCH identifies the run.
+// NOW may be NaN: the deadline then counts from the first poll. False when no job could start:
+// then the objective is quarantined, as a failed callback would.
+bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
+    const WakeObjectiveWorker *worker, BoatPluginTransition action,
+    const BoatPluginRevision *revision, uint64_t epoch, uint64_t tick, double now);
+// Collect JOB's reply at NOW. True when it resolved: an INIT's result becomes the objective, an
+// UPDATE's is staged for the next tick (as wake_objective_init and wake_objective_update leave
+// them), with the same trace; a failed callback, an invalid or stale reply or the deadline
+// quarantines it. False while the job is pending.
+bool wake_objective_poll(
+    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker, double now);
+// Close JOB (if open) without applying anything.
+void wake_objective_cancel(WakeObjectiveJob *job, const WakeObjectiveWorker *worker);
 // The objective's inspection text under REVISION (the active revision's number) into OUT (at most
 // CAPACITY bytes, terminated): its revision line, then (from *FIRST, the revision line's length)
 // its rng, pending batch, HUD, timers, state bytes, queued events and trace. Returns the length

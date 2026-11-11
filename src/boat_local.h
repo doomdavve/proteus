@@ -85,8 +85,9 @@ unsigned boat_local_chunk(uint64_t tick, unsigned remaining);
 // Run one host frame's GRANT ticks (zero while paused, at most BOAT_LOCAL_MAX_GRANT) in chunks. Per
 // chunk: the client commands each tick from INPUT and the frame's targets (solo's expressions) and
 // OBSERVER sees each predicted tick; one batch is flushed; the authority handles its messages and
-// runs the chunk; the client handles the results. False on an endpoint failure (D10), with failure
-// text.
+// runs the chunk; the client handles the results. A frame of zero ticks still lets the authority
+// handle its messages and service its rules adapter (L4b), and the client handle the results.
+// False on an endpoint failure (D10), with failure text.
 bool boat_local_frame(BoatLocal *local, double now, unsigned grant, BoatInput input,
     float thrust_target, float steering_target, const BoatLocalObserver *observer);
 // boat_local_frame with each tick's command from SCRIPT instead of one frame's helm.

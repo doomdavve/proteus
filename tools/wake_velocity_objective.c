@@ -1,9 +1,11 @@
 #include "wake_velocity_objective.h"
 
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void wake_objective_trace(WakeObjective *run, unsigned revision, BoatPluginTransition action,
@@ -146,6 +148,114 @@ bool wake_objective_migrate(WakeObjective *run, const BoatPluginRevision *candid
     return true;
 }
 #endif
+
+void wake_objective_cancel(WakeObjectiveJob *job, const WakeObjectiveWorker *worker)
+{
+    if (job->job && worker && worker->close)
+        worker->close(job->job);
+    free(job->request);
+    *job = (WakeObjectiveJob) { 0 };
+}
+
+bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
+    const WakeObjectiveWorker *worker, BoatPluginTransition action,
+    const BoatPluginRevision *revision, uint64_t epoch, uint64_t tick, double now)
+{
+    static uint64_t serial;
+    BoatPluginEvalRequest *r = NULL;
+    unsigned char *bytes = NULL;
+    unsigned started = 0;
+    if (!job->job && worker && worker->start && serial != UINT64_MAX && tick <= INT64_MAX) {
+        r = calloc(1, sizeof(*r));
+        bytes = malloc(BOAT_PLUGIN_EVAL_REQUEST_MAX);
+    }
+    if (r && bytes) {
+        r->serial = ++serial;
+        r->epoch = epoch;
+        r->revision = r->candidate = revision->number;
+        r->transition = action;
+        r->tick = (int64_t)tick;
+        r->objective = run->objective;
+        r->source_size = revision->source_size;
+        memcpy(r->source, revision->source, r->source_size);
+        r->version = revision->voyage.manifest.state_version;
+        r->generation = run->generation;
+        r->timers = revision->voyage.manifest.timers;
+        if (action == BOAT_PLUGIN_OBJECTIVE_UPDATE) {
+            r->event_count = run->event_count;
+            memcpy(r->events, run->events, r->event_count * sizeof(r->events[0]));
+        }
+        size_t size = boat_plugin_eval_encode_request(r, bytes, BOAT_PLUGIN_EVAL_REQUEST_MAX);
+        if (size)
+            started = worker->start(bytes, (unsigned)size);
+    }
+    free(bytes);
+    if (!started) {
+        free(r);
+        limit(run, BOAT_PLUGIN_IO,
+            action == BOAT_PLUGIN_OBJECTIVE_INIT ? "cannot start isolated objective initialization"
+                                                 : "cannot start isolated objective update");
+        return false;
+    }
+    *job = (WakeObjectiveJob) {
+        .job = started, .deadline = now + WAKE_OBJECTIVE_DEADLINE, .request = r
+    };
+    return true;
+}
+
+bool wake_objective_poll(
+    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker, double now)
+{
+    if (!job->job)
+        return false;
+    const BoatPluginEvalRequest *r = job->request;
+    int status = worker->status(job->job);
+    bool stale = run->generation != r->generation
+        || run->objective.quarantined != r->objective.quarantined
+        || boat_plugin_objective_digest(&run->objective)
+            != boat_plugin_objective_digest(&r->objective);
+    if (isnan(job->deadline))
+        job->deadline = now + WAKE_OBJECTIVE_DEADLINE; // Begun before any elapsed time was known.
+    bool expired = !isfinite(now) || now >= job->deadline;
+    if (!status && !stale && !expired)
+        return false;
+    unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REPLY_MAX);
+    int size = status == 1 && bytes ? worker->read(job->job, bytes) : -1;
+    static BoatPluginObjective result;
+    BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
+    bool accepted = !stale && !expired && size > 0
+        && boat_plugin_eval_result(r, bytes, (size_t)size, &result, &d);
+    free(bytes);
+    if (!accepted) {
+        d.status = BOAT_PLUGIN_IO;
+        snprintf(d.message, sizeof(d.message), "%s",
+            stale         ? "stale objective receipt"
+                : expired ? "isolated objective deadline"
+                          : "invalid or failed objective worker reply");
+    }
+    BoatPluginTransition action = r->transition;
+    bool update = action == BOAT_PLUGIN_OBJECTIVE_UPDATE;
+    unsigned number = r->candidate, events = update ? r->event_count : 0;
+    int64_t tick = r->tick;
+    uint64_t before = update ? boat_plugin_objective_digest(&run->objective) : 0;
+    wake_objective_cancel(job, worker);
+    run->objective_diagnostic = d;
+    // The trace wake_objective_init and wake_objective_update record.
+    if (accepted && d.status == BOAT_PLUGIN_OK && update) {
+        run->staged_objective = result;
+        run->objective_pending = true;
+        wake_objective_trace(run, number, action, before, &run->staged_objective, events);
+    } else {
+        if (accepted && d.status == BOAT_PLUGIN_OK)
+            run->objective = result;
+        else
+            run->objective.quarantined = true;
+        wake_objective_trace(run, number, action, before, &run->objective, events);
+    }
+    if (update)
+        run->trace[run->trace_count - 1].tick = tick;
+    return true;
+}
 
 void wake_objective_adopt(
     WakeObjective *run, unsigned revision, const BoatPluginObjective *migrated)

@@ -980,8 +980,11 @@ reaches it before the next tick. A migration runs there: F7 (or `live-apply`) re
 either `applied` under the candidate's number or `migration_failed` with the active revision
 kept. Until then staging, Undo and F7 answer `busy` (MIGRATION IN PROGRESS). The objective's
 inspection lines come from the authority and answer `live-inspect` on the frame after it is
-asked; they can be a frame older than the owner fields. The browser runs the objective in its
-isolated worker instead.
+asked; they can be a frame older than the owner fields. The browser's local authority evaluates the
+objective in the isolated worker: at each update boundary the game holds the clock (no ticks,
+the scene still drawn) until the result arrives, a frame later than on the browser's direct
+path. A browser session that is authoring still runs on that direct path, with the worker gate
+in the game itself.
 
 ## Live console and command layer (PC)
 

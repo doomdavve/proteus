@@ -68,6 +68,10 @@ typedef struct {
     // L1b, private sessions only: the adapter's inspection text, written into OUT (at most
     // CAPACITY bytes); the client asked for it. Returns its length. Optional.
     size_t (*inspect)(void *context, char *out, size_t capacity);
+    // L4b, private sessions only: called by every grant at NOW, after its messages and before its
+    // ticks (also when it grants none), so the adapter can collect an asynchronous evaluation;
+    // the HUD (state) is read again afterwards. Optional.
+    void (*service)(void *context, double now);
 } BoatNetRules;
 
 typedef struct {

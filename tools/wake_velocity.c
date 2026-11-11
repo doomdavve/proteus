@@ -1335,10 +1335,15 @@ static int study(int argc, char **argv)
     // package), voyages and tours with or without an objective, and `--plugin` authoring of each,
     // live, scripted (`--demo`) or captured, run as a local authority and client. The working
     // harbour, rooms, replay viewing and the developer studies keep the direct path until their
-    // ledger rows migrate them. L4a: the browser runs the same session for packages without an
-    // objective while it is not authoring; objectives and authoring keep its isolated worker on
-    // the direct path until L4b moves them onto the authority.
+    // ledger rows migrate them. L4a/L4b: the browser runs the same session while it is not
+    // authoring, its authority evaluating objectives on the isolated worker; authoring keeps the
+    // direct path until L4b's next step moves it onto the authority.
     static WakeLocal local;
+#ifdef __EMSCRIPTEN__
+    static const WakeObjectiveWorker web_worker = { wake_web_objective_start,
+        wake_web_objective_status, wake_web_objective_read, wake_web_objective_close };
+    local.worker = &web_worker;
+#endif
     // L1b: the plugin's objective and commits run on the local authority while it is active.
     static WakePluginAuthority plugin_authority;
     static LocalAuthority local_authority;
@@ -1354,9 +1359,7 @@ static int study(int argc, char **argv)
                     || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route))      \
         && LOCAL_PLATFORM_ELIGIBLE())
 #ifdef __EMSCRIPTEN__
-#define LOCAL_PLATFORM_ELIGIBLE()                                                                  \
-    (!plugin.authoring && plugin.host.depth                                                        \
-        && !boat_plugin_host_active(&plugin.host)->manifest.objective)
+#define LOCAL_PLATFORM_ELIGIBLE() (!plugin.authoring && plugin.host.depth)
 #else
 #define LOCAL_PLATFORM_ELIGIBLE() true
 #endif
@@ -1985,9 +1988,16 @@ static int study(int argc, char **argv)
             break;
         }
 #endif
-        if (plugin_active && wake_plugin_waiting(&plugin))
+        // L4b: the local authority's isolated evaluation holds a reset as the direct path's does.
+        bool local_waiting = false;
+#ifdef PROTEUS_BOAT_NET
+        local_waiting = wake_local_waiting(&local);
+#endif
+        if (plugin_active && (wake_plugin_waiting(&plugin) || local_waiting)) {
             plugin_reset_pending |= reset_requested;
-        else if (plugin_reset_pending) {
+            if (local_waiting)
+                reset_requested = false; // The local frame below still services the authority.
+        } else if (plugin_reset_pending) {
             reset_requested = true;
             plugin_reset_pending = false;
         }
@@ -2085,17 +2095,21 @@ static int study(int argc, char **argv)
             if (objects)
                 object_study_reset(objects, &session, object_crossing, object_life, object_height);
             accumulator = 0;
-            if (plugin_active)
-                wake_plugin_reset_objective(&plugin, &session);
 #ifdef PROTEUS_BOAT_NET
-            // A restart recreates both endpoints with a new generation; a revision that is no
-            // longer plain free boating continues on the direct path from the reset session.
-            if (local.active)
-                local_plugin(&local, &plugin, plugin_active); // The revision may be new.
+            // A revision that no longer runs on the local authority continues on the direct path
+            // from the reset session, which starts its own objective below.
             if (local.active && !LOCAL_ELIGIBLE()) {
                 wake_local_close(&local);
                 wake_plugin_attach(&plugin, NULL);
-            } else if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
+            }
+#endif
+            if (plugin_active)
+                wake_plugin_reset_objective(&plugin, &session);
+#ifdef PROTEUS_BOAT_NET
+            // A restart recreates both endpoints with a new generation.
+            if (local.active)
+                local_plugin(&local, &plugin, plugin_active); // The revision may be new.
+            if (local.active && !wake_local_restart(&local, &session, objects, GetTime())) {
                 snprintf(study_failure, sizeof(study_failure), "Single player stopped: %s.",
                     local.local.failure);
                 fprintf(stderr, "%s\n", study_failure);

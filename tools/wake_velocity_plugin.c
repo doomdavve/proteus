@@ -451,6 +451,9 @@ static void forward(WakePlugin *plugin, BoatSession *session, const BoatPluginRe
 
 void wake_plugin_attach(WakePlugin *plugin, WakePluginAuthority *authority)
 {
+#if WAKE_PLUGIN_ISOLATED_OBJECTIVE
+    close_evaluation(plugin); // L4b: the authority starts its own INIT; this one is inert.
+#endif
     plugin->authority = authority;
     WakeObjective *run = &plugin->run;
     run->objective = (BoatPluginObjective) { .generation = run->generation };

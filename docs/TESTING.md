@@ -881,9 +881,17 @@ HUD agree, and `wake_plugin_inspect` prints the same text on both), all slow;
 `voyage_state` (the voyage codec, its weather
 reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect and
 PrivateInspection messages, which the v14 and
-input decoders reject); and
+input decoders reject);
 `recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
-next snapshot corrects the client; a client refuses a request for another tick). Each
+next snapshot corrects the client; a client refuses a request for another tick); and the L4b
+cases, which give a second session's authority a C model of the browser's objective worker:
+`isolated_objective` (slow; beside the native authority on the same per-tick script, equal
+boats, voyages, objectives, staged batches and traces at every frame while the model answers
+after zero to three frames at 1x and 8x; held frames grant nothing and no grant crosses an
+update boundary; a restart closes the job in flight and starts INIT again), `isolated_quarantine`
+(slow; a failing callback quarantines at the same boundary with the same text) and
+`isolated_deadline` (an unanswered INIT quarantines after 5 s of virtual elapsed time and play
+resumes; a tick granted past a pending boundary quarantines as an overrun). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports
