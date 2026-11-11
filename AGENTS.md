@@ -45,12 +45,12 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
   protocol codec, authority/client sessions, client prediction, remote boat view and transports.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
-  ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
+  ENet and sockets. `src/room/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
-- `src/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
+- `src/session/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
   and resume, autosave watch) shared by `cargo_sandbox` and the game; no drawing, input or files.
-  `src/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
-  `src/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
+  `src/session/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
+  `src/session/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
   client mirror for the game (ledger L3).
 - `tools/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.

@@ -62,8 +62,8 @@ initializer. Result sections below keep the values as recorded at the time.
 
 **Read:** `docs/river/README.md`, `docs/river/survey.py`, `tools/prepare_waterfront.py`,
 `src/core/boat_map.c`, `src/render/boat_water_mesh.c`, `src/core/boat_location.[ch]`, `src/core/boat_world.[ch]`,
-`src/boat_session.[ch]`, `src/core/boat_fleet.[ch]`, `tools/boat_water_review.c`,
-`tools/boat_benchmark.c`, `src/boat_profile.h`, and `docs/BOATING_PERFORMANCE.md`.
+`src/session/boat_session.[ch]`, `src/core/boat_fleet.[ch]`, `tools/boat_water_review.c`,
+`tools/boat_benchmark.c`, `src/session/boat_profile.h`, and `docs/BOATING_PERFORMANCE.md`.
 
 **Create:** `docs/adventure/README.md` as the survey/evidence guide and
 `docs/adventure/baseline.md` as a dated summary. These paths are proposed and do not exist yet.
@@ -255,7 +255,7 @@ including the 24 GPU-labelled ones (15 retired tests disabled; log
 
 ## A0.4 — measure the real river workload
 
-**Edit:** `tools/boat_water_review.c`, `src/boat_profile.[ch]` only for reusable statistics,
+**Edit:** `tools/boat_water_review.c`, `src/session/boat_profile.[ch]` only for reusable statistics,
 and `CMakeLists.txt` for a focused report-contract test. Add a small report validator under
 `tools/`; update `docs/BOATING_PERFORMANCE.md`, `docs/TESTING.md` and the adventure baseline.
 Keep the production simulation/renderer algorithms unchanged.
@@ -469,7 +469,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
 
 ## A1.2 — wire physical map ownership through all callers
 
-**Edit:** `src/core/boat_world.[ch]`, `src/boat_session.[ch]`, `src/core/boat.c`,
+**Edit:** `src/core/boat_world.[ch]`, `src/session/boat_session.[ch]`, `src/core/boat.c`,
 `src/core/boat_fleet.[ch]`, affected prediction/net client/server initialization,
 `src/net/boat_net_protocol.c`, `tools/wake_velocity*.c`, server/bot/review tools and validators.
 Use A0.1's caller inventory; these are entry points, not an exhaustive filename list.

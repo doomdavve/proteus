@@ -207,7 +207,7 @@ and spinning the rest. macOS `usleep()` usually oversleeps by more than that 5% 
 standalone probe on this machine exceeded it in 179–199 of 200 sleeps. Each oversleep is lost
 because the next wait starts from the late frame end, so the cadence settles below 60 Hz.
 
-`src/frame_pacer.[ch]` replaces the cap in `wake_velocity` (session and title) with a chain of
+`src/platform/frame_pacer.[ch]` replaces the cap in `wake_velocity` (session and title) with a chain of
 absolute deadlines. `frame_pacer_wait()` runs just before `EndDrawing()` with
 `SetTargetFPS(0)`, so input is still polled right after the swap. It sleeps to 1 ms before the
 deadline and spins the rest. A late frame is repaid by the next one, and a stall of more than one

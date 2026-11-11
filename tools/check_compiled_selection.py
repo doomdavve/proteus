@@ -37,7 +37,7 @@ PRODUCTION_SOURCES = (
     'tools/wake_velocity_plugin.c',
     'tools/wake_velocity_net.c',
     'tools/wake_velocity_host.c',
-    'tools/boat_server.c',
+    'src/room/boat_server.c',
     'tools/boat_bot.c',
     'tools/boat_plugin_worker.c',
     'src/plugins/boat_plugin_catalog_gen.c',

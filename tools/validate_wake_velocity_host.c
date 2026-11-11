@@ -1,4 +1,4 @@
-// The room command line `wake_velocity --host` gives its `--serve` child (tools/boat_server.h).
+// The room command line `wake_velocity --host` gives its `--serve` child (src/room/boat_server.h).
 #include "boat_test_cases.h"
 #include "wake_velocity_host.h"
 

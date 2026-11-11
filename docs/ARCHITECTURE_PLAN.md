@@ -968,7 +968,7 @@ L1b (authoring and objectives on the authority), design 2026-11-11; the user acc
   later commit reuses one, after the authority has moved its borrow. The authority's adapter
   (the voyage adapter, extended): voyage progress and the objective transaction (checkpoint,
   event queue, sequence, the batch staged for T+1, timers, quarantine and diagnostic), as the
-  room objective does (`tools/boat_room_objective.c`). Lua runs on the native authority, as in
+  room objective does (`src/room/boat_room_objective.c`). Lua runs on the native authority, as in
   hosted rooms.
 - The objective on the authority: after each committed tick the adapter queues the voyage's
   events and, every 12 ticks, runs the update; the batch commits before the next tick
@@ -1084,7 +1084,7 @@ browser or Windows build.
 <a id="l3-status"></a>L3 (working harbour), implemented 2026-11-11 on `arch/ar7-rest`, as AR1
 designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), work mode):
 
-- Endpoint: `src/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
+- Endpoint: `src/session/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
   part of `proteus_boat_net`). The authority owns a `BoatWorkSession`; the client owns a mirror
   filled only from its messages over the memory transport, with no prediction. The client sends
   each frame's actions, helm targets and crane axes (`0xC6`); the authority applies them before
@@ -1558,7 +1558,7 @@ application/server -> selected modules and platform adapters
 ```
 
 P5 adds `boat_marks` to core, protocol v14 and room definition v4, HUD/revision data to net,
-and the application-side `BoatRoomObjective` (`tools/boat_room_objective.c`) over
+and the application-side `BoatRoomObjective` (`src/room/boat_room_objective.c`) over
 `BoatNetRules`. Net invokes the adapter but does not link Lua. Rules callbacks must not touch
 the server (non-reentrancy). Each server tick runs: fleet step, match/race observation, mark
 events, rules `after_tick`, objective publication, revision processing, then births/snapshots.

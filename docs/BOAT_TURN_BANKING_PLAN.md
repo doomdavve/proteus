@@ -47,7 +47,7 @@ Source audit at `7d5fd48`, with a clean starting worktree:
 | `src/core/boat.c`, `buoyancy_step` | Six unilateral supports already integrate heave, pitch, roll and their velocities. Add one applied roll moment here, before integration. |
 | `src/core/boat.c`, `hull_rotation`, `hull_motion`, `boat_player_pose` | Shared rolled pose and attachment velocities already exist. Rendering reflects simulation X. Test physical sides, not Euler-component guesses. |
 | `src/core/boat.h` | Owns `roll`, `roll_velocity`, `planing`; add only the filtered turn-load state if using the specified filter. |
-| `src/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
+| `src/session/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
 | `tools/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
 | `tools/validate_boat_environment.c`, `tools/validate_boat_replay.c`, `tools/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
 | `tools/wake_velocity.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |

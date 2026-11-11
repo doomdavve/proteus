@@ -411,7 +411,7 @@ pending credit to them is dropped. Ties share first place.
 - `tools/wake_velocity.c`, `src/render/boat_hud.c`: in deathmatch only, round timer and own score, a
   four-line kill feed (5 s per entry, roster names), a Tab-held scoreboard also shown during
   intermission, and `CAPSIZED BY <name> / RESPAWN n`. Free mode HUD unchanged.
-- `tools/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
+- `src/room/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
   scripted deathmatch run. `tools/boat_bot.c`: a `--hunt` script that lays wakes across and
   rams the nearest boat.
 

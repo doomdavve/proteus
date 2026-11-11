@@ -38,10 +38,10 @@ core/net.
 | Mode | Today | Authority owns | Client owns | Storage adapter | Platform adapters |
 | --- | --- | --- | --- | --- | --- |
 | Free boating (basin/outer, standard and harbor-life packages, skins) | `BoatSession` stepped in the frame loop (`tools/wake_velocity.c:2062-2111`); the title adds `--current --crossing-wake` (`:2735-2736`); skins pick a handling class (`:1283-1290`); reset restarts tick, water and wakes (`:2036-2039`). | Fleet room (one slot) with handling class, current and crossing water, wake objects, scene traffic contacts; restart generation. | Input, prediction view, camera, presentation (spray, flag), HUD, audio. | None (no saves). | Input/capability (AR2), lifecycle (AR3). |
-| Voyage / canal tour / Grodan tour / imported voyages | Session voyage observed per tick (`src/boat_session.c:151-154`); recover to shelter (`tools/wake_velocity.c:2030-2035`); objective in `wake_plugin_after_tick` (`tools/wake_velocity_plugin.c:361-415`). | Route, shelters, exposure/weather, voyage events, objective transaction and timers, revision commit. | Voyage/objective HUD from state messages; notices. | Plugin source/import (existing plugin I/O, not authority). | Objective evaluator bridge (browser, AR3); plugin staging workers (AR4). |
-| Time trial (basin course, course packages) | Course swept per tick; runs recorded per tick and flushed after the frame (`src/boat_session.c:150-160`, `tools/wake_velocity.c:2120-2126`); practice latch on altered time or console use (`:1695`, `:2074`). | Course state, elapsed/splits/finish, practice latch, run recording, best selection request. | Course HUD, ghost/replay playback, replay transport controls. | Best and last replay files (atomic replace, digest-named best). | Native data directory / browser IndexedDB. |
+| Voyage / canal tour / Grodan tour / imported voyages | Session voyage observed per tick (`src/session/boat_session.c:151-154`); recover to shelter (`tools/wake_velocity.c:2030-2035`); objective in `wake_plugin_after_tick` (`tools/wake_velocity_plugin.c:361-415`). | Route, shelters, exposure/weather, voyage events, objective transaction and timers, revision commit. | Voyage/objective HUD from state messages; notices. | Plugin source/import (existing plugin I/O, not authority). | Objective evaluator bridge (browser, AR3); plugin staging workers (AR4). |
+| Time trial (basin course, course packages) | Course swept per tick; runs recorded per tick and flushed after the frame (`src/session/boat_session.c:150-160`, `tools/wake_velocity.c:2120-2126`); practice latch on altered time or console use (`:1695`, `:2074`). | Course state, elapsed/splits/finish, practice latch, run recording, best selection request. | Course HUD, ghost/replay playback, replay transport controls. | Best and last replay files (atomic replace, digest-named best). | Native data directory / browser IndexedDB. |
 | Race (hosted) | `boat_server` race room; client mirror/prediction. | Unchanged server race rules. | Unchanged. | None. | ENet / WebRTC transport. |
-| Working harbour (native only) | `BoatWorkSession` ticked by the game (`tools/wake_velocity.c:2079-2094`); autosave after the frame (`:2122-2125`); browser stubs (`tools/wake_velocity_work_web.c:7-9`, `CMakeLists.txt:309-316`). | Work session: boat, cranes, crate, sites, job host and its 12-tick update, lighting clock, autosave watch, checkpoint capture. | Crane view, HUD, notices, SAVED mark, menus. | `cargo-<package>.sav` with `.bak` and `.rejected` (`src/boat_work_save.h:1-7`). | Files (native); none in browser. |
+| Working harbour (native only) | `BoatWorkSession` ticked by the game (`tools/wake_velocity.c:2079-2094`); autosave after the frame (`:2122-2125`); browser stubs (`tools/wake_velocity_work_web.c:7-9`, `CMakeLists.txt:309-316`). | Work session: boat, cranes, crate, sites, job host and its 12-tick update, lighting clock, autosave watch, checkpoint capture. | Crane view, HUD, notices, SAVED mark, menus. | `cargo-<package>.sav` with `.bak` and `.rejected` (`src/session/boat_work_save.h:1-7`). | Files (native); none in browser. |
 | Hosted free / deathmatch / shelter hunt | `boat_server` (dedicated or the `--host` child process, `tools/wake_velocity_host.c:142-185`, `:254-305`); the game is a client (`tools/wake_velocity_net.c:172-272`). | Unchanged: fleet, match, marks, `BoatRoomObjective`, revisions. | Unchanged; joins the common client composition. | None. | ENet / WebRTC, host process. |
 | Scripted demos and captures (`--demo`, `--screenshot --time`, work scripts) | `--demo` steps `demo_step` inside the frame loop (`tools/wake_velocity.c:2095-2096`); `--screenshot` drives and work scripts run outside it (`:1367-1390`). | The same private authority as the mode, fed by a scripted command source. | Capture rendering. | `--save-now` through the work storage adapter. | Headless CPU renderer. |
 | Replay and ghost viewing (L/B, `--replay`, `--ghost`) | Pose samples played in recorded water; no simulation (`tools/wake_velocity.c:2060-2064`). | None: viewing runs no authority. A ghost race reads a file beside a live time-trial authority. | Playback, seek, pause, speed, ghost drawing. | Read-only replay files. | — |
@@ -61,7 +61,7 @@ stage calls the opposite endpoint, so delivery is never reentrant.
    notice), restart, staged revision, resume-at-start. These are local calls on the authority
    host, ordered before this frame's ticks.
 3. **Grant:** `G` ticks from the existing accumulator (`boat_time_frame_seconds` or
-   `boat_time_work_frame_seconds`, `src/boat_time_control.h:24-37`); `G = 0` while paused,
+   `boat_time_work_frame_seconds`, `src/session/boat_time_control.h:24-37`); `G = 0` while paused,
    replay is playing or an objective transaction gates the authority. `G <= 96`
    (0.1 s × 8 × 120 Hz), the same bound solo has today. Pause states and rates follow the
    accepted D1 and D2.
@@ -120,9 +120,9 @@ version stay v14. Candidates, each tied to its ledger row:
 
 | Need | Why v14 lacks it |
 | --- | --- |
-| Handling class per slot | Fleet steps every slot with `boat_step` (`src/core/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/boat_session.c:148-149`). |
+| Handling class per slot | Fleet steps every slot with `boat_step` (`src/core/boat_fleet.c:316`); solo uses `boat_step_handling` with the skin's class (`src/session/boat_session.c:148-149`). |
 | Current and crossing water | Rooms use calm water without them (`tools/wake_velocity.c:365-371`). |
-| Restart session (new generation) | SpawnRequest respawns one boat; solo reset sets the tick back to 0 (`src/boat_session.c:20`) and restarts water and wakes. See [restart](#restart-and-session-generations). |
+| Restart session (new generation) | SpawnRequest respawns one boat; solo reset sets the tick back to 0 (`src/session/boat_session.c:20`) and restarts water and wakes. See [restart](#restart-and-session-generations). |
 | Full-precision commands | v14 rates are `int8` ×127 (`src/net/boat_net_protocol.h:141`, `src/net/boat_net_protocol.c:1109-1121`); see D4 and the hosted-path risk below. |
 | Voyage state and recover | Route, shelter, exposure, weather and voyage events are session-only. |
 | Course state and run results | Gates, elapsed, splits, finish and practice are session-only; race state is the room race. |
@@ -154,13 +154,13 @@ the L0 gates already require. The host runs the in-process handshake in bounded 
 within the restart frame, so the player sees what solo shows today (the accepted D5 keeps the full
 restart). If the gates show it needs more than one frame, how that frame looks joins D10.
 
-What crosses a restart follows today's `boat_session_restart` (`src/boat_session.c:60-75`), the
+What crosses a restart follows today's `boat_session_restart` (`src/session/boat_session.c:60-75`), the
 caller's reset branch (`tools/wake_velocity.c:2036-2058`) and `boat_session_init`
-(`src/boat_session.c:30-37`):
+(`src/session/boat_session.c:30-37`):
 
 | Carried into the new endpoints | Reset |
 | --- | --- |
-| Location, waves and water options; handling class; voyage route and course definition; the active plugin revision; time-scale index and pause state (host-owned); best, last and reference runs; personal save paths. | Tick (to 0), world water and wakes, boat and presentation, voyage progress, course progress, objective (new generation), in-progress recording, practice latch; the ghost opponent is copied again from the reference or best run (`src/boat_replay.c:404-418`). |
+| Location, waves and water options; handling class; voyage route and course definition; the active plugin revision; time-scale index and pause state (host-owned); best, last and reference runs; personal save paths. | Tick (to 0), world water and wakes, boat and presentation, voyage progress, course progress, objective (new generation), in-progress recording, practice latch; the ghost opponent is copied again from the reference or best run (`src/session/boat_replay.c:404-418`). |
 
 Before teardown the host captures the old authority's pending storage requests (a finished
 run's best/last save, a dirty work checkpoint) and lets the storage adapter complete them, as
@@ -173,7 +173,7 @@ service and acks, leave-time save, diagnostics counters. Not every local operati
 remotely invokable.
 
 Work mode does not use the fleet representation: its authority is `BoatWorkSession`
-(already free of drawing, input and files, `src/boat_work_session.h:1-6`) behind a private
+(already free of drawing, input and files, `src/session/boat_work_session.h:1-6`) behind a private
 endpoint using the same transport, framing and frame order. In T1 its state message is
 emitted once at the end of each service, so the client presents tick `N` without prediction.
 Because the helm rates are derived per tick from the boat's wheel and throttle
@@ -255,15 +255,15 @@ limits, and produced late commands), and raising the catch-up cap (same clock co
 
 | Item | Capture (authority, between ticks) | Request queue | Storage adapter | Outcomes |
 | --- | --- | --- | --- | --- |
-| Course run and best | Finish commits the result at its tick (must-complete); the recorder keeps the per-tick replay samples. Practice runs never request a save. | One pending best/last request; a newer finish supersedes an unstarted one. | Atomic replace in the data directory; digest-named best (`src/boat_replay.h:55-80`); IndexedDB in the browser. | Ack `saved`/`failed(reason)` with run identity and session generation; failure keeps the run as "last" and reports it, as today. |
-| Work autosave | `boat_work_frame_due` after the frame's ticks (`src/boat_work_session.h:139-141`); `boat_work_session_save` copies a checkpoint with generation, tick and work digest. | One request; an unstarted older checkpoint is superseded (coalescing like today's dirty state). | `cargo-<package>.sav`, `.bak`, `.rejected` unchanged. | Ack with checkpoint identity (session generation, tick, digest); clean only if it matches the latest capture; failure keeps dirty for the next policy-driven attempt. No crash durability or infinite retry. |
-| Work resume | Before the first tick. | — | Startup read (allowed blocking), backup fallback, set-aside. | Resumed / fresh / set aside, as `boat_work_save_load` (`src/boat_work_save.h:33-36`). |
+| Course run and best | Finish commits the result at its tick (must-complete); the recorder keeps the per-tick replay samples. Practice runs never request a save. | One pending best/last request; a newer finish supersedes an unstarted one. | Atomic replace in the data directory; digest-named best (`src/session/boat_replay.h:55-80`); IndexedDB in the browser. | Ack `saved`/`failed(reason)` with run identity and session generation; failure keeps the run as "last" and reports it, as today. |
+| Work autosave | `boat_work_frame_due` after the frame's ticks (`src/session/boat_work_session.h:139-141`); `boat_work_session_save` copies a checkpoint with generation, tick and work digest. | One request; an unstarted older checkpoint is superseded (coalescing like today's dirty state). | `cargo-<package>.sav`, `.bak`, `.rejected` unchanged. | Ack with checkpoint identity (session generation, tick, digest); clean only if it matches the latest capture; failure keeps dirty for the next policy-driven attempt. No crash durability or infinite retry. |
+| Work resume | Before the first tick. | — | Startup read (allowed blocking), backup fallback, set-aside. | Resumed / fresh / set aside, as `boat_work_save_load` (`src/session/boat_work_save.h:33-36`). |
 | Leave-time save | On quit/title return, after the last tick. | Synchronous at shutdown (not a frame path). | As autosave. | Reported success/failure, as `boat_work_save_leave` (`:41-44`). |
-| Objective state | Authority adapter owns checkpoint, events, HUD and quarantine (room pattern: `tools/boat_room_objective.c:225-250`). | — | Not persisted (unchanged). | Commit, or the existing failure/quarantine policy. |
+| Objective state | Authority adapter owns checkpoint, events, HUD and quarantine (room pattern: `src/room/boat_room_objective.c:225-250`). | — | Not persisted (unchanged). | Commit, or the existing failure/quarantine policy. |
 | Authored revisions | Staged by host management; committed at the authority's boundary (solo: between ticks with restart, as today; rooms: P5f staged/announced). | — | Package I/O stays in plugin I/O. | Staged refusable; announced must-complete. |
 
 The replay recorder needs the camera-follow value that today comes from presentation
-(`src/boat_replay.h:28-30`). It is one exponential follow of heading
+(`src/session/boat_replay.h:28-30`). It is one exponential follow of heading
 (`src/render/boat_presentation.c:258-260`); the time-trial group gives the recorder its own copy of that
 expression so the authority links no renderer and replay bytes stay identical. Pose ghosts stay
 `BoatReplay` files; P5g session records, when they land, are the format for authority

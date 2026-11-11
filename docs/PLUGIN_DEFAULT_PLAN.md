@@ -217,7 +217,7 @@ still use compiled content. A temporary `--no-plugins` restores the compiled pat
 
 Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/boat_title.[ch]`,
 `src/plugins/boat_plugin.[ch]`, `src/plugins/boat_plugin_host.[ch]`, `src/plugins/boat_plugin_stage.c`,
-`src/core/boat_course.[ch]`, `src/render/boat_course_view.c`, `src/boat_replay.c`,
+`src/core/boat_course.[ch]`, `src/render/boat_course_view.c`, `src/session/boat_replay.c`,
 `tools/boat_race_plugin.[ch]`.
 
 ### Tasks
@@ -387,7 +387,7 @@ Read first: [hot reload](PLUGIN_PLAN.md#hot-reload-is-the-normal-development-pat
 [replacement rules](PLUGIN_API.md#replacement-restart-and-owner-lifetime), the
 [live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent),
 `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity_bridge.c`, `src/plugins/boat_plugin_host.c`,
-`src/plugins/boat_plugin_stage.c`, `src/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
+`src/plugins/boat_plugin_stage.c`, `src/session/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
 consumers in `src/core/boat.c`, `src/core/boat_combat.c`, `src/waterfront_*.c`, `src/render/boat_view.c`, `src/render/boat_gpu.c`.
 
 ### Language
@@ -626,10 +626,10 @@ join and predict it bit for bit. Protocol v9. Scenes remain compiled until PD3.
 
 Read first: [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md) (handshake, world checkpoint, version
 rules), `src/net/boat_net_protocol.[ch]`, `src/net/boat_net_server.[ch]`, `src/net/boat_net_client.[ch]`,
-`src/net/boat_prediction.[ch]`, `tools/boat_server.c`, `tools/boat_bot.c`, `tools/wake_velocity_net.c`,
+`src/net/boat_prediction.[ch]`, `src/room/boat_server.c`, `tools/boat_bot.c`, `tools/wake_velocity_net.c`,
 `tools/wake_velocity_host.c`, and [ROOM_CONTENT_PLAN.md](ROOM_CONTENT_PLAN.md).
 
-Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server.c:421` and `:699`,
+Compiled content used by rooms today: `boat_net_server.c:30`, `src/room/boat_server.c:421` and `:699`,
 `boat_net_race_bind` (`src/net/boat_net_protocol.c:1494`), `tools/wake_velocity_net.c:574`,
 `src/render/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
 `src/net/boat_net_protocol.c:1086`.
@@ -665,7 +665,7 @@ name is shown only after joining.
    location, match rules and combat rules. Add `plugins/deathmatch`, whose values equal
    `boat_match_default_rules` and `boat_combat_default_rules`. Free rooms use the `free` packages,
    adding a free `outer` room package if that location is hostable. Race rooms use `river-sprint`.
-3. **Make the authority load packages.** `tools/boat_server.c` gains `--package ID|DIR` and defaults
+3. **Make the authority load packages.** `src/room/boat_server.c` gains `--package ID|DIR` and defaults
    from `--mode` and `--location`. A catalog ID uses the decoded entry with no Lua. A directory is
    evaluated once at start-up with full validation. Either way it builds the definition and passes it to `boat_net_server_init` through the config,
    replacing `race` rules and match fields. A bad directory package refuses to start the room with the
@@ -733,7 +733,7 @@ with a structural validator, a shared `boat_race_course_validate` used by plugin
 rooms, and a canonical fieldwise codec capped at 16 KiB. The new `match` kind and
 `match.define` grant decode `match.rules` and `match.combat`; `plugins/deathmatch` equals
 `boat_match_default_rules` and `boat_combat_default_rules` at every location, and
-`plugins/outer-free` completes the three free locations. `tools/boat_room_package.c` is the
+`plugins/outer-free` completes the three free locations. `src/room/boat_room_package.c` is the
 authority loader: a catalog ID decodes without Lua, a directory is evaluated once with the map
 checks, a package with a scene fixes its location, and a conflicting `--location` refuses to
 start. `boat_server` and `wake_velocity --serve` use it, default by mode/location, apply rule
@@ -1126,7 +1126,7 @@ One defect remains: `web/rtc_transport.js` ends the session when a reliable mess
 no longer matches the menu, and the check for the hosted room reads only the first page's logs. It has the same
 kind of stale key sequence that joined production on 2026-10-31.
 
-**Saved bests depend on the compiled course.** `boat_replay_best_path` (`src/boat_replay.c:363`) keeps the plain
+**Saved bests depend on the compiled course.** `boat_replay_best_path` (`src/session/boat_replay.c:363`) keeps the plain
 `course-calm-physicsN.run` name only when the digest equals `boat_course_compiled_digest()`, and
 `tools/wake_velocity.c:953` uses the same value to gate `--replay` and `--ghost`. Deleting the compiled course
 without a pinned value would orphan every player's best, which is a stop rule. The value is
@@ -1155,7 +1155,7 @@ Other findings:
   - `tools/wake_velocity.c:953`
   - `tools/wake_velocity_plugin.c:412`, `:495` and `:747-751`, which compare with or restore `definition->voyage`
     and a NULL course
-  - `tools/boat_server.c:218` and `:700`, the `--scripted` path
+  - `src/room/boat_server.c:218` and `:700`, the `--scripted` path
 - **Dev tools to move:** `boat_hud_review`, `boat_race_trial`, `boat_combat_review` and `boat_fleet_review`.
 - **Validators:** scope is small. Across `tools/`, `boat_voyage_outer` has 16 uses, `boat_race_river_course` 14,
   `boat_race_default_rules` 14, `boat_match_default_rules` 10 and the rest under 5. Include

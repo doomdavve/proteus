@@ -24,7 +24,7 @@ DATA_FILES = ("src/plugins/boat_plugin.c", "src/plugins/boat_plugin.h", "src/plu
               "src/plugins/boat_plugin_revision.h", "src/plugins/boat_plugin_race.c",
               "src/plugins/boat_plugin_objective.h", "src/plugins/boat_plugin_objective_codec.c",
               "src/plugins/boat_plugin_wire.c", "src/plugins/boat_plugin_wire.h")
-CONSUMER_FILES = ("src/boat_sandbox_save.c", "src/boat_sandbox_save.h",
+CONSUMER_FILES = ("src/session/boat_sandbox_save.c", "src/session/boat_sandbox_save.h",
                   "src/plugins/boat_plugin_catalog.c", "src/plugins/boat_plugin_catalog.h",
                   "tools/validate_boat_plugin_data.c")
 FILES = DATA_FILES + CONSUMER_FILES
@@ -75,7 +75,7 @@ SELF_TEST_APPENDS = (
     ("src/plugins/boat_plugin.c", '#include "boat_plugin_lua.h"'),
     ("src/plugins/boat_plugin_wire.c", "#include <unistd.h>"),
     ("src/plugins/boat_plugin_race.c", "static lua_State *L;"),
-    ("src/boat_sandbox_save.c", 'static void f(void) { fopen("x", "r"); }'),
+    ("src/session/boat_sandbox_save.c", 'static void f(void) { fopen("x", "r"); }'),
     ("src/plugins/boat_plugin_catalog.c",
      "static void g(void) { boat_plugin_load_voyage(0, 0, 0, 0); }"),
     ("src/plugins/boat_plugin_objective_codec.c", "#ifdef __EMSCRIPTEN__\n#endif"),

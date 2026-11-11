@@ -555,7 +555,7 @@ Human review: collect the first Windows baseline when the user has the machine a
 at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
 before that hardware run; Windows performance remains unqualified until actual reports return.
 
-**Read first:** `src/render/profiler.[ch]`, `src/boat_profile.[ch]`, `tools/wake_velocity.c`,
+**Read first:** `src/render/profiler.[ch]`, `src/session/boat_profile.[ch]`, `tools/wake_velocity.c`,
 `tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
 `CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
 `tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),
@@ -671,7 +671,7 @@ claim Windows qualification. Final integrated acceptance retains the Windows ret
   2026-11-03 and saved below. Recurring GeForce river hitch open; investigation deferred.
 - Commit(s): `854d90b` (bounded capture, async GPU identity, F4/`--performance-report`, portable
   bundle), `60c1713` (Windows collection launcher, Mac analyzer, fixture tests, CI packaging).
-- Interfaces/owners: `src/boat_capture.[ch]` samples and summarizes only, with no I/O or GL;
+- Interfaces/owners: `src/platform/boat_capture.[ch]` samples and summarizes only, with no I/O or GL;
   `tools/wake_velocity_performance.[ch]` owns file/GL metadata and bundle writing in the app;
   `tools/boat_gpu_timer.h` owns asynchronous queries; `boat_capture` and `performance_analyzer`
   CTest cases cover the contract. Core/net are unchanged and still pass their boundary checks.

@@ -222,7 +222,7 @@ define emission visibility between ticks; introducing `BoatWorld` alone does not
 
 ### P1 — frame/tick records and timing boundaries
 
-Read/edit: `src/render/profiler.[ch]`, `tools/wake_velocity.c`; add `src/boat_profile.[ch]` for boating-specific
+Read/edit: `src/render/profiler.[ch]`, `tools/wake_velocity.c`; add `src/session/boat_profile.[ch]` for boating-specific
 records/reporting so the main demo's existing profiler output remains compatible.
 
 1. Add a bounded metrics record. Store completed-frame wall time, simulation-loop total, physics
@@ -248,7 +248,7 @@ a test that merely duplicates timer calls.
 ### P2 — benchmark tool, counts, and report contract
 
 Read/edit: `tools/boat_water_review.c`, `tools/wake_velocity.c`, `src/render/boat_gpu.[ch]`,
-`src/render/renderer_gpu.[ch]`, `src/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
+`src/render/renderer_gpu.[ch]`, `src/session/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
 
 1. Share the existing scripted controls/routes in a small tools-only fixture helper. Preserve
    their behavior. Both app-style and benchmark driving must ultimately use the production tick
@@ -333,7 +333,7 @@ Proposed commands, available only after P2 (not current repository commands):
 
 ### C1 — authoritative ticks, precise seconds, compatibility
 
-Read/edit: `src/core/boat.[ch]`, `src/core/boat_course.[ch]`, `src/boat_replay.[ch]`,
+Read/edit: `src/core/boat.[ch]`, `src/core/boat_course.[ch]`, `src/session/boat_replay.[ch]`,
 `tools/wake_velocity.c`, fixture/validator callers. Add a small `src/core/boat_clock.h`.
 
 1. Define `BOAT_TICK_HZ = 120`, retain float `BOAT_STEP` for the existing force integrator, and
@@ -459,7 +459,7 @@ the existing map/patch outputs as reference; do not fix performance by changing 
 
 ### W3 — introduce the world and session owners
 
-Add `src/core/boat_world.[ch]`, `src/boat_session.[ch]`; update `src/core/boat.[ch]`, app/tools/tests.
+Add `src/core/boat_world.[ch]`, `src/session/boat_session.[ch]`; update `src/core/boat.[ch]`, app/tools/tests.
 
 1. `BoatWorld` owns its immutable definition reference, initialized collision cache, and the
    existing `BoatWater` settings/history. Read-only physics APIs accept `const` world/water
@@ -540,7 +540,7 @@ do not claim different wall-clock keyboard sampling is automatically identical.
 
 ### S3 — session rules, replay views, and finish persistence
 
-Read/edit: `src/boat_session.[ch]`, `src/core/boat_course.[ch]`, `src/boat_replay.[ch]`,
+Read/edit: `src/session/boat_session.[ch]`, `src/core/boat_course.[ch]`, `src/session/boat_replay.[ch]`,
 `src/audio/boat_audio.[ch]`, `tools/wake_velocity.c` and benchmark fixtures.
 
 1. Move course state and run/replay orchestration into `BoatSession`; physics returns previous/
@@ -961,7 +961,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   `BOAT_BASIN_HALF_X/Z` moved to `boat_location.h`.
 - **World and session (W3 basin):** `BoatWorld` (`src/core/boat_world.[ch]`) holds a borrowed
   definition, the `BoatWater` settings and D3 history by value, and the optional borrowed legacy
-  `wake_field`. `BoatSession` (`src/boat_session.[ch]`) holds world, boat and the only live
+  `wake_field`. `BoatSession` (`src/session/boat_session.[ch]`) holds world, boat and the only live
   clock (`tick`). `boat_session_step` advances once (refusing at `UINT64_MAX`) and calls
   `boat_step(boat, world, now, wheel, throttle)`; every physics helper takes the world and
   time explicitly, and D3 segments are published into `world->water` at the same point as

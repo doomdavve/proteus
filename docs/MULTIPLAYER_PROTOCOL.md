@@ -520,7 +520,7 @@ to 1024 bytes of the text, at most 32 KiB in all. Chunks arrive in order on the 
 the client starts a text at index 0 and keeps the newest whole one. A chunk out of order is a
 decode error and drops the partial text.
 
-**Working harbour endpoint (L3).** The working harbour's private session (`src/boat_work_local.h`)
+**Working harbour endpoint (L3).** The working harbour's private session (`src/session/boat_work_local.h`)
 is not a fleet room: its authority owns a `BoatWorkSession` and its client a mirror with no
 prediction. It shares the header, the reliable control channel and the memory transport, and its
 payloads are opaque to the protocol (`boat_net_private_encode_payload`); the work endpoint's own

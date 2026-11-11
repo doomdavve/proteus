@@ -274,7 +274,7 @@ the water for an objective that runs on a multiplayer room's authority
 stay fixed for the room's life; the script can be [reloaded](#room-objective-reload-p5e).
 
 `boat_server` (and the game's HOST A ROOM child) loads the objective with
-`boat_room_package_load_objective` and runs it in `tools/boat_room_objective.c` behind
+`boat_room_package_load_objective` and runs it in `src/room/boat_room_objective.c` behind
 `BoatNetServerConfig.rules`, so `proteus_boat_net` never links Lua. The objective starts at tick
 zero with generation 1 and updates at every 12-tick boundary with the queued events, under the
 [P3 transaction](#objective-transactions-p31--p32) and default budgets. A failing callback, or more

@@ -61,7 +61,10 @@ set(PROTEUS_TRANSITION_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/render ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
   ${CMAKE_CURRENT_SOURCE_DIR}/src/net
   ${CMAKE_CURRENT_SOURCE_DIR}/src/json
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/session
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/room)
 include_directories(${PROTEUS_TRANSITION_INCLUDES})
 
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -230,11 +233,11 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
 # SV1b: the sandbox save's byte format. Buffers only: no files and no Lua (plugin data only).
-add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
+add_library(proteus_sandbox_save STATIC src/session/boat_sandbox_save.c src/session/boat_sandbox_save.h)
 target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugin_data)
 target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 
-add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
+add_library(proteus_work_session STATIC src/session/boat_work_session.c src/session/boat_work_session.h)
 # The work session steps the package's objective, so it links the Lua host.
 target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_plugins
   proteus_boat_core)
@@ -242,12 +245,12 @@ target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
 # L3: the working harbour's private local endpoint (authority session, client mirror, memory
 # transport). It links the work session's Lua; proteus_boat_net never links it.
-add_library(proteus_work_local STATIC src/boat_work_local.c src/boat_work_local.h)
+add_library(proteus_work_local STATIC src/session/boat_work_local.c src/session/boat_work_local.h)
 target_link_libraries(proteus_work_local PUBLIC proteus_work_session proteus_boat_net)
 target_compile_options(proteus_work_local PRIVATE ${PROTEUS_WARNINGS})
 
-add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
-  src/boat_work_menu.c src/boat_work_menu.h)
+add_library(proteus_work_save STATIC src/session/boat_work_save.c src/session/boat_work_save.h
+  src/session/boat_work_menu.c src/session/boat_work_menu.h)
 target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
 target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
@@ -283,24 +286,24 @@ target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
 
 # SV1d: user-data file helpers (atomic save with backup, bounded listing). No raylib.
-add_library(proteus_file STATIC src/boat_file.c src/boat_file.h)
+add_library(proteus_file STATIC src/platform/boat_file.c src/platform/boat_file.h)
 target_include_directories(proteus_file PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(proteus_file PRIVATE ${PROTEUS_WARNINGS})
 
 # Single-player session orchestration and replay persistence.
-add_library(proteus_boat_session STATIC src/boat_replay.c src/boat_session.c)
+add_library(proteus_boat_session STATIC src/session/boat_replay.c src/session/boat_session.c)
 target_link_libraries(proteus_boat_session PUBLIC proteus_render proteus_file)
 target_compile_options(proteus_boat_session PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
 # validators; executable-specific audio, music and asset paths stay with their consumers.
 add_library(proteus_boat_drive STATIC
-  tools/wake_velocity_drive.c tools/wake_velocity_state.c src/boat_profile.c)
+  tools/wake_velocity_drive.c tools/wake_velocity_state.c src/session/boat_profile.c)
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
 # Absolute-deadline frame pacing with a vsync backstop for windowed loops (sleeps; not core).
-add_library(proteus_frame_pacer STATIC src/frame_pacer.c src/frame_pacer.h)
+add_library(proteus_frame_pacer STATIC src/platform/frame_pacer.c src/platform/frame_pacer.h)
 target_include_directories(proteus_frame_pacer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(proteus_frame_pacer PUBLIC raylib)
 target_compile_options(proteus_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
@@ -310,7 +313,7 @@ target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME frame_pacer COMMAND validate_frame_pacer)
 
 add_executable(validate_boat_capture tools/validate_boat_capture.c
-  tools/wake_velocity_performance.c src/boat_capture.c)
+  tools/wake_velocity_performance.c src/platform/boat_capture.c)
 target_include_directories(validate_boat_capture PRIVATE ${raylib_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(validate_boat_capture PRIVATE raylib)
@@ -342,8 +345,8 @@ add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_input.c
   tools/wake_velocity_work.h tools/wake_velocity_scenery.h tools/wake_velocity_app.h
   tools/wake_velocity_controls.h
   tools/boat_title.c
-  tools/cli_usage.c tools/wake_velocity_performance.c src/render/profiler.c src/audio/boat_audio.c
-  src/audio/xm_audio.c src/boat_capture.c)
+  src/platform/cli_usage.c tools/wake_velocity_performance.c src/render/profiler.c src/audio/boat_audio.c
+  src/audio/xm_audio.c src/platform/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
   proteus_work_save)
 # WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
@@ -476,9 +479,9 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_directory PROPERTIES LABELS "cpu;quick")
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
   target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
-    tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h
-    tools/boat_room_package.c tools/boat_room_package.h
-    tools/boat_room_objective.c tools/boat_room_objective.h)
+    tools/wake_velocity_host.c tools/wake_velocity_host.h src/room/boat_server.c src/room/boat_server.h
+    src/room/boat_room_package.c src/room/boat_room_package.h
+    src/room/boat_room_objective.c src/room/boat_room_objective.h)
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -1213,9 +1216,9 @@ add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
-add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c
-  tools/boat_room_package.c tools/boat_room_objective.c)
-add_executable(boat_bot tools/boat_bot.c tools/cli_usage.c)
+add_executable(boat_server tools/boat_server_main.c src/room/boat_server.c src/platform/cli_usage.c
+  src/room/boat_room_package.c src/room/boat_room_objective.c)
+add_executable(boat_bot tools/boat_bot.c src/platform/cli_usage.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
 endforeach()
@@ -1340,7 +1343,7 @@ proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)
 # PD2/PD3: a room built from an edited package reaches clients as data.
 add_executable(validate_boat_room_package tools/validate_boat_room_package.c
-  tools/boat_room_package.c)
+  src/room/boat_room_package.c)
 target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus_plugin_catalog
   proteus_boat_net)
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
@@ -1348,7 +1351,7 @@ proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core 
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # P5b: a free package's room objective runs only behind the authority's rules adapter.
 add_executable(validate_boat_room_objective tools/validate_boat_room_objective.c
-  tools/boat_room_package.c tools/boat_room_objective.c)
+  src/room/boat_room_package.c src/room/boat_room_objective.c)
 target_link_libraries(validate_boat_room_objective PRIVATE proteus_plugins proteus_plugin_catalog
   proteus_boat_net)
 target_compile_options(validate_boat_room_objective PRIVATE ${PROTEUS_WARNINGS})

@@ -145,7 +145,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 | [`src/core/boat_water.c`](../src/core/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
 | [`src/core/boat_wake_objects.[ch]`](../src/core/boat_wake_objects.h): `BoatWakeObjects`, `boat_wake_objects_advance`, `boat_wake_objects_track`, `boat_wake_objects_query`, `boat_wake_objects_pack` | Caller-owned world already exists. Four emitters ×32 objects; cadence 60 ticks, maximum lifetime 1920 ticks, default crest 1.8 m; propagation 2.4 m/s. Immutable records evolve analytically with age. Emission is conditional on wetness/speed/span, not simply one event every 60 ticks. Emitter filters/start/cursor are future-affecting state. |
 | `timed_boat_step` and [`tools/wake_objects_review.c`](../tools/wake_objects_review.c): `local_fleet`, `gameplay_envelope` | Rival and four-boat tests share a world. The app tracks player emission before stepping the rival; the fleet test tracks inside its boat loop and solves pairs afterward. Neither is the new authoritative schedule. Current births have a zero birth envelope on that tick, mitigating immediate surface-order effects; do not claim an observed order bug from inspection alone. |
-| [`src/boat_replay.[ch]`](../src/boat_replay.h): `BoatReplaySample`, `boat_replay_pose`, `boat_replay_sample` | Pose recording omits vertical/angular velocities, planing, motion timers/state, complete wake/emitter state and session state. Keep ghosts/replays as views. At this source assessment file format was `REPLAY_VERSION 1` and handling compatibility was `BOAT_PHYSICS_REVISION 5`; C1 later advanced these to 2 and 6. Neither equals the future protocol version. |
+| [`src/session/boat_replay.[ch]`](../src/session/boat_replay.h): `BoatReplaySample`, `boat_replay_pose`, `boat_replay_sample` | Pose recording omits vertical/angular velocities, planing, motion timers/state, complete wake/emitter state and session state. Keep ghosts/replays as views. At this source assessment file format was `REPLAY_VERSION 1` and handling compatibility was `BOAT_PHYSICS_REVISION 5`; C1 later advanced these to 2 and 6. Neither equals the future protocol version. |
 | [`src/core/boat_map.c`](../src/core/boat_map.c): `shore`, `init`; [`src/render/waterfront_scene.c`](../src/render/waterfront_scene.c): `river_enabled`, `waterfront_scene_select_river`; `boat_water.c`: `surfaces`, `patches` | Map selection and caches are still global. Separate immutable map/query data from render resources through foundations work. Basin first avoids making mapped-world extraction a hidden first-slice prerequisite. S4 basin slice (2026-10-23): the selector is now `waterfront_city_select_river` in `waterfront_city.c` and the surface/patch caches are in `boat_water_mesh.c`, both still global. |
 | [`src/core/waterfront_harbor.c`](../src/core/waterfront_harbor.c): `waterfront_harbor_contact_height`; [`src/core/waterfront_traffic.c`](../src/core/waterfront_traffic.c): `waterfront_traffic_motion`, `waterfront_traffic_contact_height` | Shared posed contact envelopes are useful. Ordinary traffic remains on authored routes, with one-way collision response and visual trails; it does not emit into the four-player arcade pool. Evaluate authoritative routes/obstacle poses at a common tick. |
 | [`src/render/boat_gpu.c`](../src/render/boat_gpu.c): `boat_gpu_draw_with_ghost`; [`src/render/waterfront_scene.h`](../src/render/waterfront_scene.h): `WaterfrontSceneFrame`; [`src/render/renderer_gpu.c`](../src/render/renderer_gpu.c): `draw_ghost` | One player plus one special ghost is not a fleet renderer. Ghosts omit shadows/reflections. Add bounded ordinary vessel views; keep race ghosts separate. The frame's “owned/no mutable pointers” comment is no longer literally true: copied `BoatWater` contains a borrowed `objects` pointer. Freeze/copy the render wake records before passes. |
@@ -662,7 +662,7 @@ Dependencies: current accepted arcade baseline. Deliver as three reviewable step
 
 1. **M1a / foundations P2a then P3a:** benchmark/report and freeze named physical/wake traces;
    reuse `boat_profile_time`, `demo_step` and the production app's step sequence. Likely
-   `tools/boat_benchmark.c`, a small tools-only fixture helper, `src/boat_profile.[ch]`, CMake,
+   `tools/boat_benchmark.c`, a small tools-only fixture helper, `src/session/boat_profile.[ch]`, CMake,
    and `docs/BOATING_PERFORMANCE.md`. Exact first task below.
 2. **M1b / C1–C3:** integer authority and exact accumulator duration, bounded double-derived
    phases, revisioned offline replay compatibility. Likely `boat_clock.h`, `boat.[ch]`, water,
@@ -684,7 +684,7 @@ pass a new performance target; it must produce truthful repeatable data.
 ### M2 — four-boat local authority and resumable checkpoints
 
 Depends on M1 core. Likely `src/core/boat_world.[ch]`, extracted pair-contact helpers from `boat.c`,
-`boat_wake_objects.[ch]`, `tools/validate_boat_world.c`, `tools/boat_server.c`, CMake. Add
+`boat_wake_objects.[ch]`, `tools/validate_boat_world.c`, `src/room/boat_server.c`, CMake. Add
 `boat_world_step(world, inputs[4])`, the staged order above, spawn/life rules and explicit
 checkpoint save/restore without pointers. First keep one-boat output equivalent, then qualify
 two boats, then the existing local four-boat scenario. Add bounded server CLI scripted mode
@@ -701,14 +701,14 @@ no lost wake histories on one-boat reset, full checkpoint <=8 KiB and no allocat
 Record CPU against the proposed budget; network and multi-view presentation are non-goals.
 
 Status, 2026-10-23: implemented as `BoatFleet`/`boat_fleet_step` in `src/core/boat_fleet.[ch]`,
-`tools/validate_boat_fleet.c` and `tools/boat_server.c`; automated checks pass and the user
+`tools/validate_boat_fleet.c` and `src/room/boat_server.c`; automated checks pass and the user
 played the fleet crossing rival on 2026-10-23. Details, deviations and evidence are in the
 [M2 handoff](#m2-local-authority-handoff--2026-10-23).
 
 ### M3 — protocol, transport and process boundary
 
 Depends on M2. Likely new `src/net/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
-`boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `tools/boat_server.c`,
+`boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `src/room/boat_server.c`,
 `tools/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
 warnings. Implement handshake/version rejection, bounded queues, input/snapshot/control codec,
 initial world/wake checkpoint and in-memory delivery impairment before real sockets.
@@ -827,7 +827,7 @@ builds now run on Winterfell. The role rerun reported `changed=0`; native/browse
 weapon inputs/combat pages passed. The [routine operator workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)
 owns future upgrades; human weapons balance/audio and wider soak acceptance remain pending.
 
-Depends on M5. Likely `tools/boat_server.c`, Host launcher/client connection UI, native
+Depends on M5. Likely `src/room/boat_server.c`, Host launcher/client connection UI, native
 packagers/workflows, CMake server-only Linux configuration, README, platform/release/test guides.
 Deliver direct host/port plus room token, graceful exit/disconnect, child-process Host lifecycle,
 firewall/NAT help and a minimal dedicated service/run guide. Prefer a standalone server package
@@ -1800,7 +1800,7 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
 (a Windows title-bar drag blocks it) would freeze and then burst-correct every player.
 
 **Behaviour.**
-- `boat_server.c`'s entry point is now `boat_server_main` (`tools/boat_server.h`).
+- `boat_server.c`'s entry point is now `boat_server_main` (`src/room/boat_server.h`).
   `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `wake_velocity --serve ARGS`
   runs the same command line before any window, audio or asset work.
 - `boat_server --exit-with-stdin` closes the room gracefully once its standard input ends.

@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // Host from wake_velocity (docs/MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25): a second copy
-// of this executable runs the room as `--serve` (boat_server's command line, tools/boat_server.h)
+// of this executable runs the room as `--serve` (boat_server's command line, src/room/boat_server.h)
 // in a child process, so the room's 120 Hz authority never waits for this window's frames, focus or
 // audio, and shares none of this process's lazily built map and model caches. The child reads its
 // standard input from a pipe and closes the room when that pipe ends, including when this process

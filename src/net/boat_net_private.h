@@ -56,7 +56,7 @@ typedef struct {
 #define BOAT_NET_PRIVATE_INSPECTION_CHUNK 1024
 #define BOAT_NET_PRIVATE_INSPECTION_BYTES 32768
 
-// L3: the working harbour's private endpoint (src/boat_work_local.h). Its payloads are opaque to
+// L3: the working harbour's private endpoint (src/session/boat_work_local.h). Its payloads are opaque to
 // the protocol; the work endpoint's own codec reads them. All four travel on the reliable control
 // channel. C->S: the frame's actions, helm targets and crane axes, applied before its first tick.
 #define BOAT_NET_PRIVATE_WORK_FRAME 0xc6
