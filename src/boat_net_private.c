@@ -422,3 +422,33 @@ BoatNetError boat_net_private_decode_inspection(const uint8_t *data, size_t size
     *header = h;
     return BOAT_NET_OK;
 }
+
+size_t boat_net_private_encode_payload(const BoatNetHeader *header, uint8_t type,
+    const uint8_t *payload, size_t size, uint8_t out[BOAT_NET_MAX_MESSAGE])
+{
+    if (type < BOAT_NET_PRIVATE_FIRST || size > BOAT_NET_MAX_PAYLOAD || (size && !payload))
+        return 0;
+    uint8_t *p = out;
+    private_header(&p, header, type, (uint16_t)size);
+    if (size)
+        memcpy(p, payload, size);
+    return (size_t)(p - out) + size;
+}
+
+BoatNetError boat_net_private_decode_payload(const uint8_t *data, size_t size, uint8_t type,
+    BoatNetHeader *header, uint8_t payload[BOAT_NET_MAX_PAYLOAD], size_t *payload_size)
+{
+    const uint8_t *p;
+    BoatNetHeader h;
+    if (type < BOAT_NET_PRIVATE_FIRST)
+        return BOAT_NET_BAD_TYPE;
+    BoatNetError error = read_private_header(&p, data, size, type, &h);
+    if (error != BOAT_NET_OK)
+        return error;
+    if (h.payload > BOAT_NET_MAX_PAYLOAD)
+        return BOAT_NET_BAD_LENGTH;
+    memcpy(payload, p, h.payload);
+    *payload_size = h.payload;
+    *header = h;
+    return BOAT_NET_OK;
+}

@@ -230,6 +230,12 @@ target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_p
   proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
+# L3: the working harbour's private local endpoint (authority session, client mirror, memory
+# transport). It links the work session's Lua; proteus_boat_net never links it.
+add_library(proteus_work_local STATIC src/boat_work_local.c src/boat_work_local.h)
+target_link_libraries(proteus_work_local PUBLIC proteus_work_session proteus_boat_net)
+target_compile_options(proteus_work_local PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
   src/boat_work_menu.c src/boat_work_menu.h)
 target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
@@ -658,6 +664,12 @@ target_link_libraries(validate_app_input PRIVATE proteus_render)
 target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME app_input COMMAND validate_app_input)
 set_tests_properties(app_input PROPERTIES LABELS "cpu;quick")
+# L3: the working harbour on its private local endpoint against the direct session.
+add_executable(validate_boat_work_local tools/validate_boat_work_local.c)
+target_link_libraries(validate_boat_work_local PRIVATE proteus_work_local proteus_render
+  proteus_plugin_catalog)
+target_compile_options(validate_boat_work_local PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_work_local validate_boat_work_local LABELS core cpu)
 # The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
 add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
 target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
