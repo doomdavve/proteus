@@ -8,7 +8,7 @@ target_compile_options(proteus_wake_objective PRIVATE ${PROTEUS_WARNINGS})
 # Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
 # validators; executable-specific audio, music and asset paths stay with their consumers.
 add_library(proteus_boat_drive STATIC
-  wake_velocity_drive.c wake_velocity_state.c ${PROJECT_SOURCE_DIR}/src/session/boat_profile.c)
+  wake_velocity_drive.c wake_velocity_state.c boat_profile.c)
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 

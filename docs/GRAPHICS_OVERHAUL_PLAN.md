@@ -555,7 +555,7 @@ Human review: collect the first Windows baseline when the user has the machine a
 at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
 before that hardware run; Windows performance remains unqualified until actual reports return.
 
-**Read first:** `src/render/profiler.[ch]`, `src/session/boat_profile.[ch]`, `apps/wake_velocity/wake_velocity.c`,
+**Read first:** `src/render/profiler.[ch]`, `apps/wake_velocity/boat_profile.[ch]`, `apps/wake_velocity/wake_velocity.c`,
 `tools/boat_water_review.c`, `tests/render/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
 `CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
 `tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),

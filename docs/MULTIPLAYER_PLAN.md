@@ -662,7 +662,7 @@ Dependencies: current accepted arcade baseline. Deliver as three reviewable step
 
 1. **M1a / foundations P2a then P3a:** benchmark/report and freeze named physical/wake traces;
    reuse `boat_profile_time`, `demo_step` and the production app's step sequence. Likely
-   `tools/boat_benchmark.c`, a small tools-only fixture helper, `src/session/boat_profile.[ch]`, CMake,
+   `tools/boat_benchmark.c`, a small tools-only fixture helper, `apps/wake_velocity/boat_profile.[ch]`, CMake,
    and `docs/BOATING_PERFORMANCE.md`. Exact first task below.
 2. **M1b / C1–C3:** integer authority and exact accumulator duration, bounded double-derived
    phases, revisioned offline replay compatibility. Likely `boat_clock.h`, `boat.[ch]`, water,

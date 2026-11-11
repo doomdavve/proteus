@@ -222,7 +222,7 @@ define emission visibility between ticks; introducing `BoatWorld` alone does not
 
 ### P1 — frame/tick records and timing boundaries
 
-Read/edit: `src/render/profiler.[ch]`, `apps/wake_velocity/wake_velocity.c`; add `src/session/boat_profile.[ch]` for boating-specific
+Read/edit: `src/render/profiler.[ch]`, `apps/wake_velocity/wake_velocity.c`; add `apps/wake_velocity/boat_profile.[ch]` for boating-specific
 records/reporting so the main demo's existing profiler output remains compatible.
 
 1. Add a bounded metrics record. Store completed-frame wall time, simulation-loop total, physics
