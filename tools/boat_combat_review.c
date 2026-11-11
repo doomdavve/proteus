@@ -1,12 +1,12 @@
 // Fixed combat presentation fixture. Offline captures and a visible animation use the
 // production CPU/GPU scene, water, HUD and audio; never joins or modifies a room.
-#include "boat_audio.h"
-#include "boat_fixtures.h"
-#include "boat_fleet.h"
-#include "boat_gpu.h"
-#include "boat_hud.h"
-#include "boat_rearview.h"
-#include "wake_velocity_net.h"
+#include "audio/boat_audio.h"
+#include "core/boat_fleet.h"
+#include "render/boat_gpu.h"
+#include "render/boat_hud.h"
+#include "render/boat_rearview.h"
+#include "support/boat_fixtures.h"
+#include "wake_velocity/wake_velocity_net.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

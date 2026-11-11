@@ -1,6 +1,6 @@
 // Transport feasibility gate: echo only validated protocol bytes, before involving gameplay.
-#include "boat_net_enet.h"
-#include "boat_net_rtc.h"
+#include "net/boat_net_enet.h"
+#include "net/boat_net_rtc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

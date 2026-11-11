@@ -2,7 +2,7 @@
 
 2026-10-21, macOS / Apple Silicon. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md).
 Previous baseline: [W2.1b at 801970a](WAKE_W2_REFINEMENT_RESULTS.md).
-Implementation: [boat_wake.c](../src/boat_wake.c), [API](../src/boat_wake.h),
+Implementation: [boat_wake.c](../src/core/boat_wake.c), [API](../src/core/boat_wake.h),
 [C review](../tools/wake_field_review.c), [domain runner/collector](../tools/wake_domain_review.py).
 
 **Current status:** the isolated W2.1 numerical proof remains complete. The subsequent
@@ -175,13 +175,13 @@ isolated test/source-calibration domain, not an accepted moving gameplay world e
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
-cc -std=c17 -O2 -g -Wall -Wextra -Wpedantic -Isrc tools/wake_field_review.c src/boat_wake.c -lm -o build/wake_field_review_optimized
+cc -std=c17 -O2 -g -Wall -Wextra -Wpedantic -Isrc tools/wake_field_review.c src/core/boat_wake.c -lm -o build/wake_field_review_optimized
 ./build/wake_field_review_optimized --check
 ./build/wake_field_review_optimized --costs > build/wake-w21-costs.json
 python3 tools/wake_domain_review.py --executable build/wake_field_review_optimized --output build/wake-w21-accurate --jobs 6
 # Collect existing complete case files without running the simulations again:
 python3 tools/wake_domain_review.py --output build/wake-w21-accurate --collect-only
-cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tools/wake_field_review.c src/boat_wake.c -lm -o build/wake_field_review_sanitize
+cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tools/wake_field_review.c src/core/boat_wake.c -lm -o build/wake_field_review_sanitize
 ./build/wake_field_review_sanitize --check
 xcrun xctrace record --template 'Time Profiler' --output build/wake-w21-cost.trace --launch -- ./build/wake_field_review_optimized --costs-fast
 ```

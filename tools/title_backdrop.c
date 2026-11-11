@@ -1,8 +1,9 @@
 // Regenerate the title's fixed river view without a player boat or player wake.
-#include "boat_gpu.h"
-#include "boat_test_scenery.h"
-#include "boat_world.h"
+#include "core/boat_world.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
+#include "support/boat_test_scenery.h"
 
 #include <stdio.h>
 

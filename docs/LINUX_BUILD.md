@@ -15,9 +15,9 @@ GLFW backport is implemented; its Linux rerun and user acceptance remain pending
 ## Earlier Linux CI findings (before Wayland enablement)
 
 2026-10-24, first run after the merge into `main`: GCC on glibc stopped compiling
-`src/boat_profile.c` and `src/profiler.c` because strict C17 (`CMAKE_C_EXTENSIONS OFF`) hides
+`apps/wake_velocity/boat_profile.c` and `src/render/profiler.c` because strict C17 (`CMAKE_C_EXTENSIONS OFF`) hides
 `clock_gettime`/`CLOCK_MONOTONIC`; macOS and Windows are unaffected. Both files now define
-`_POSIX_C_SOURCE 200809L` first on non-Windows builds, as `src/boat_net_enet.c` already did.
+`_POSIX_C_SOURCE 200809L` first on non-Windows builds, as `src/net/boat_net_enet.c` already did.
 No glibc toolchain was available locally (macOS, no container runtime), so the fix is verified
 only by macOS Debug/Release builds and CTest; further Linux errors may surface on the next run.
 
@@ -73,7 +73,7 @@ as `GLFW - Wayland` or `GLFW - X11`.
 Run from the repository root after building:
 
 ```sh
-bash tools/check_wayland.sh build-linux
+bash tests/lint/check_wayland.sh build-linux
 XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/wake_velocity \
   --verbose --location basin --mouse-steering --frames 120
 ```

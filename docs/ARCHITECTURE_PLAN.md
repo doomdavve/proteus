@@ -1,15 +1,13 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-11:** AR0–AR6 merged (PRs #177, #178). AR7's ledger is implemented: L6, L0's
-removal and L2 (#181), L1 with L9 (#184), L7, L8, L3, L4a, L5 and L4b objectives (#185), and L4b
-authoring on `arch/l4b-authoring` ([L4b authoring](#l4b-authoring-status)): every shipped solo
-mode, native and browser, runs on the local authority; no direct gameplay path is left in the
-browser. The user played up to #181 on macOS; nothing browser-built or Windows-built.
-**Open:** the deferred manual checks (native windowed, browser, Windows; listed per row); the
-menu-gated touch tap (AR7); impaired-delivery qualification; pinned `saved_at` (L3).
-**Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
-directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the user's review of `arch/l4b-authoring` and the owed manual checks; then AR8.
+**Status, 2026-11-11:** AR0–AR7 merged through PR #186; every shipped solo mode uses the
+local authority. AR8a, AR8b and AR9 are implemented locally on `arch/ar8-layout`:
+module/application/test moves, local CMake, qualified includes and enforced module boundaries.
+**Open:** AR7's deferred manual checks, menu-gated touch tap, impaired-delivery qualification
+and pinned `saved_at`; AR10 specification closure. Audio/room library extraction is deferred.
+**Done when:** the migrated authority/client system and owning modules are documented in
+`docs/ARCHITECTURE.md` (AR10), with remaining qualifications explicitly assigned.
+**Next:** review the local AR8/AR9 milestone; AR10 closes the overall architecture plan.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -128,8 +126,8 @@ take over, block or complete:
 Read-only source review on 2026-11-08 against `e25b47a`, macOS (historical; AR0 supersedes it):
 
 - Core and networking have source and archive-symbol boundary checks in
-  [check_core_boundary.py](../tools/check_core_boundary.py).
-- [BoatNetTransport](../src/boat_net_transport.h) is an existing small backend interface.
+  [check_core_boundary.py](../tests/lint/check_core_boundary.py).
+- [BoatNetTransport](../src/net/boat_net_transport.h) is an existing small backend interface.
 - The root [CMakeLists.txt](../CMakeLists.txt) exports the entire `src` include directory from
   core. The flat tree obscures ownership and private headers.
 - `tools/` mixes production glue, platform services and presentation with validators and
@@ -316,7 +314,7 @@ authoritative state. Keep predicted controls distinct from commits.
 
 **AR2a status (2026-11-09, branch `arch/ar2-pilot`, not merged; nothing played).**
 Implemented: `BoatAppInput` and `boat_app_input_sample(poll_touch)` in
-`tools/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
+`apps/wake_velocity/wake_velocity_input.[ch]`, application-layer code outside core and net. It is sampled once
 per frame at the start of the `study()` frame body and once per frame in `boat_title_run`. It
 carries pressed navigation (up/down/left/right, confirm, activate, back, pause, time-scale
 bracket and backslash keys), held Backspace, the pointer in
@@ -398,7 +396,7 @@ bridges.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-10): each of the three
 commits builds warning-clean and passes `platform_bridges` and its self-test; a script that extracts
-every `EM_JS(...)` from `f1ed07b:tools/wake_velocity.c` and from the new files finds all 14
+every `EM_JS(...)` from `f1ed07b:apps/wake_velocity/wake_velocity.c` and from the new files finds all 14
 byte-identical apart from the renamed import, none left in `wake_velocity.c`, and the app backend's
 existing import unchanged; the stub `cc -fsyntax-only -D__EMSCRIPTEN__` check passes for every
 `*_web.c`, `wake_velocity.c`, the title, input, console and plugin glue; basin and outer CPU
@@ -460,11 +458,11 @@ call waits, and state keeps its previous owner (free functions, rule 10):
 | Scenery deferral, `wake_scenery_deferred` (scenery service) | Whether acquisition waits for the window | False | True: the first CPU draw and its capture wait for `scenery_ready` | `study()` |
 | Console bridge, `wake_console_bridge.h` | Transcript sync; closed; clipboard step; queued completions; whether Tab completes; text-entry availability; page state | Nothing; nothing; Ctrl/Cmd+C/V through raylib; nothing; yes; yes; nothing | Page transcript; drop queued Tab and paste; page paste and clipboard notice; page Tab queue; no; physical keyboard only; `Module.boatConsole*` | `wake_console.c`; console availability and state in `study()` |
 
-Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
+Enforcement: `platform_bridges` (quick) runs `tests/lint/check_platform_bridges.py`. Inline JavaScript
 lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
 (`wake_velocity.c` had 14 for AR2b touch, mouse and viewport capabilities, now 0 and delisted; the
-native stage worker `tools/boat_plugin_stage_worker.c` 1; AR4's merge brought
-`src/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
+native stage worker `src/plugins/boat_plugin_stage_worker.c` 1; AR4's merge brought
+`src/plugins/boat_plugin_stage.c` to 0 and dropped its entry). The title, game, console and plugin glue may
 not reach a service's backends directly, and `CMakeLists.txt` builds `*_web.c` only in EMSCRIPTEN
 branches or in the native test targets the check allowlists with a reason
 (`validate_boat_plugin_stage_web`, which compiles the browser staging backend against a C model of
@@ -492,7 +490,7 @@ Decisions (technical, recorded here):
   through page actions 2 or 8) compile under the seam but have no case, since starting one
   needs a staged revision with a changed objective.
 - EM_JS imports are called only inside their backend file, through C wrappers. Game and tools
-  bridges are named `wake_js_*`; the plugin stage backend (`src/boat_plugin_stage_web.c`, AR4)
+  bridges are named `wake_js_*`; the plugin stage backend (`src/plugins/boat_plugin_stage_web.c`, AR4)
   keeps its `browser_*` names, since renaming them would be churn.
 - AR3f keeps the browser's ordering: canvas growth before the UI loads, then 60 fps, the scenery
   wait and the deferred first CPU draw; the console's paste and notice before typed text and its
@@ -673,7 +671,7 @@ browser authority.
 
 Implemented (ledger row L0):
 
-- `src/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
+- `src/net/boat_local.[ch]` (`proteus_boat_net`): `BoatLocal` owns one `BoatNetServer`, one
   predicting `BoatNetClient` and an unimpaired memory transport in the game's thread. Start runs
   the handshake in bounded service rounds (3 in practice, at most 8) at tick 0; a frame's grant
   runs in chunks of at most 12 ticks ending on multiples of 12 (at most 9 per frame): the client
@@ -686,10 +684,10 @@ Implemented (ledger row L0):
   without a snapshot), wake-mismatch resync (120) and the prediction hold (12) in granted ticks,
   with no peer timeout, snapshot-silence close or ping. Hosted service is unchanged.
 - Full-precision commands (D4): in-memory float rates on `BoatNetCommand`, carried by the
-  private range's PrivateInputBatch (`src/boat_net_private.[ch]`, type 0xC0, rejected by hosted
+  private range's PrivateInputBatch (`src/net/boat_net_private.[ch]`, type 0xC0, rejected by hosted
   rooms). The v14 codec and golden bytes are unchanged.
 - Fleet per-slot handling (`BoatFleet.handling`, NULL for the speedboat in every room).
-- Game (`tools/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
+- Game (`apps/wake_velocity/wake_velocity_local.[ch]`, native only): free packages without a voyage, objective
   or authoring (in practice basin free boating) start a local session; the solo accumulator's
   ticks become the grant (at most 96 per frame; `boat_local_frame` refuses more and the glue
   carries any excess in the accumulator); the client's prediction fills the game's `BoatSession`
@@ -794,9 +792,9 @@ change.
 
 L6 (scripted demos and captures) and L0's removal point, implemented:
 
-- Scripted command source: `boat_local_frame_scripted` (`src/boat_local.[ch]`) takes each tick's
+- Scripted command source: `boat_local_frame_scripted` (`src/net/boat_local.[ch]`) takes each tick's
   helm from a `BoatLocalScript` callback given the predicted boat the authority will step; its
-  rates are sent as they are. `demo_input` (`tools/wake_velocity_drive.[ch]`) is the scripted
+  rates are sent as they are. `demo_input` (`apps/wake_velocity/wake_velocity_drive.[ch]`) is the scripted
   drive's helm, shared by `demo_step` and the glue's `wake_local_scripted_frame` (`--demo` in
   the frame loop) and `wake_local_scripted_drive` (a capture's drive before the window, in grants
   of at most 96 on virtual time from 0).
@@ -843,7 +841,7 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
   onto a line with one loop fewer, at a lower mean speed (9.15 → 8.81 m/s). With the pool present
   but empty the lap stays 57.80 s; a full-throttle pilot is slower on the pool (30.5 → 32.4 s).
   The local path equals the direct path, and the drop already appears at `b76cace`.
-- Authority adapter: `tools/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
+- Authority adapter: `apps/wake_velocity/wake_velocity_course.[ch]` (`proteus_local_drive`; it records
   replays, which `proteus_boat_net` may not) is the local authority's `BoatNetRules`. Two new
   optional callbacks, used only by private servers: `committed` (the fleet after each tick,
   read-only) and `private_state` (bytes for the client after each grant). The adapter steps the
@@ -851,7 +849,7 @@ L2 (time trial, runs, bests and ghosts), implemented 2026-11-10 on the same bran
   presentation code), and settles a finish at its tick: best selection
   against the generation's best time, the practice latch, and one pending finish request holding
   the copied run. The camera follow is one pure inline helper (`boat_camera_follow`,
-  `src/boat_presentation.h`) that both the presentation and the recorder call.
+  `src/render/boat_presentation.h`) that both the presentation and the recorder call.
 - Wire: private type `0xC1` PrivateState ([protocol](MULTIPLAYER_PROTOCOL.md#private-range-in-process-sessions-only)),
   sent at the end of a grant when it changed; the client keeps the newest
   (`boat_local_state`). The glue decodes it into the session's course and practice latch after
@@ -905,12 +903,12 @@ voyages and tours without an objective, and L1b, authoring and objectives on the
 (ledger L9 folded in). The first split had a separate L1b for the objective adapter; it was
 merged into the authoring step on 2026-11-11 (the user's choice) because a voyage objective exists only while
 authoring: the catalog generator refuses an objective on any bundled package except a free one
-(`tools/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
+(`src/plugins/boat_plugin_catalog_gen.c`), so only `--plugin DIR` (Shelter tour) and a package the
 console has promoted can run one, and authoring stayed on the direct path.
 
 L1a (voyage state, events, weather and recover), implemented 2026-11-11:
 
-- Authority adapter: `tools/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
+- Authority adapter: `apps/wake_velocity/wake_velocity_voyage.[ch]` (in `proteus_local_drive`) is the local
   authority's `BoatNetRules` for a session with a voyage route. `committed` steps the voyage from
   the committed boat as `boat_session_step` does. Two new optional private-only callbacks:
   `weather` (the storm the world's water carries from the next tick; the server writes it into
@@ -968,7 +966,7 @@ L1b (authoring and objectives on the authority), design 2026-11-11; the user acc
   later commit reuses one, after the authority has moved its borrow. The authority's adapter
   (the voyage adapter, extended): voyage progress and the objective transaction (checkpoint,
   event queue, sequence, the batch staged for T+1, timers, quarantine and diagnostic), as the
-  room objective does (`tools/boat_room_objective.c`). Lua runs on the native authority, as in
+  room objective does (`src/room/boat_room_objective.c`). Lua runs on the native authority, as in
   hosted rooms.
 - The objective on the authority: after each committed tick the adapter queues the voyage's
   events and, every 12 ticks, runs the update; the batch commits before the next tick
@@ -1011,7 +1009,7 @@ L1b (authoring and objectives on the authority), design 2026-11-11; the user acc
 | L1-4 | Branch and PR | (a) L1a and L1b in one PR (the milestone); (b) open the L1a PR now and L1b as the next milestone | (a), after your windowed L1a check |
 
 <a id="l1b-status"></a>L1b implemented 2026-11-11 (steps: objective transaction extracted to
-`tools/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
+`apps/wake_velocity/wake_velocity_objective.[ch]`, the objective on the voyage adapter, PrivateCommit,
 PrivateInspect/Inspection, then the game's wiring):
 
 - The objective transaction (`WakeObjective`: checkpoint, event queue, sequence, staged batch,
@@ -1023,7 +1021,7 @@ PrivateInspect/Inspection, then the game's wiring):
   The voyage adapter handles rebind, live, migrate (two-phase, L1-1) and restart voyage; the
   course adapter rebinds an unchanged or renamed course. Session restarts stay new local
   generations.
-- The game (`tools/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
+- The game (`apps/wake_velocity/wake_velocity_plugin.[ch]`, `wake_velocity.c`): `WakePluginAuthority`
   (`wake_plugin_attach`) forwards every host commit; a migration holds staging, Undo and F7 with
   `busy` until its result arrives (L1-3), then commits or reports `migration_failed`.
   `wake_plugin_inspect` and the bridge's `inspect` take the objective's lines from the
@@ -1084,7 +1082,7 @@ browser or Windows build.
 <a id="l3-status"></a>L3 (working harbour), implemented 2026-11-11 on `arch/ar7-rest`, as AR1
 designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), work mode):
 
-- Endpoint: `src/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
+- Endpoint: `src/session/boat_work_local.[ch]` (`proteus_work_local`, links the work session's Lua; not
   part of `proteus_boat_net`). The authority owns a `BoatWorkSession`; the client owns a mirror
   filled only from its messages over the memory transport, with no prediction. The client sends
   each frame's actions, helm targets and crane axes (`0xC6`); the authority applies them before
@@ -1102,7 +1100,7 @@ designed it ([section 3](ARCHITECTURE_AR1.md#3-shared-commandstate-contract), wo
   the unchanged `BoatWorkSave`. RETURN CRATE travels as an action with the next frame; a paused
   frame still sends its actions with a zero grant. An endpoint failure returns to the title
   after the leave-time save (D10).
-- The game's direct work tick loop is removed (`tools/wake_velocity.c`); `cargo_sandbox` stays a
+- The game's direct work tick loop is removed (`apps/wake_velocity/wake_velocity.c`); `cargo_sandbox` stays a
   direct developer tool.
 
 Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0, Debug, 2026-11-11):
@@ -1125,7 +1123,7 @@ on `arch/ar7-rest`:
 
 - The browser game links `proteus_local_drive` and runs plain free boating, the time trial and
   voyages and tours without an objective on the same in-process local authority and client as
-  native (`LOCAL_ELIGIBLE` in `tools/wake_velocity.c`). Course bests keep the existing storage
+  native (`LOCAL_ELIGIBLE` in `apps/wake_velocity/wake_velocity.c`). Course bests keep the existing storage
   (IndexedDB in the browser).
 - Objectives and authoring stay on the browser's direct path with its isolated worker gate. A
   package with an objective, or one opened for authoring, never starts a local session. When the
@@ -1138,11 +1136,11 @@ Evidence (macOS 26.6.2, Apple M1 Max, emcc 6.0.12 MinSizeRel and AppleClang 21.0
 2026-11-11; headless Chromium 156 through Playwright 1.64.1 with SwiftShader):
 
 - `ctest --preset full -j8`: 536/536 (13 disabled). `tools/check_web_wasm.py`: no Lua in the game.
-- `tools/check_web_plugin_author.py --browser chromium` and `tools/check_web_scenery.py` pass.
+- `tests/web/check_web_plugin_author.py --browser chromium` and `tests/web/check_web_scenery.py` pass.
 - A scratch drive of the default Langedrag voyage printed `Local session: generation 1, 301 ticks
   in 93 chunks` on leaving, with no page errors; a console edit during it restarted play at the
   dock and continued on the direct path.
-- `tools/check_web_controls.py` and `tools/check_web_title.py` fail identically on a web build of
+- `tests/web/check_web_controls.py` and `tests/web/check_web_title.py` fail identically on a web build of
   `main` at `aaafd8d`: the first treats the plugin status line on stderr as a console error, the
   second's console edit `def.scene.marina.berths[1].x = 15` stages a syntax error. Neither comes
   from L4a.
@@ -1190,7 +1188,7 @@ Chromium 156 through Playwright 1.64.1 with SwiftShader):
   `isolated_quarantine` and `isolated_deadline` (see [TESTING](TESTING.md)). A mutation that
   never stages a worker UPDATE fails `isolated_objective`.
 - Browser game builds clean; `tools/check_web_wasm.py`: no Lua in the game.
-  `tools/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
+  `tests/web/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
   (22 normal callbacks, deadline across freeze, restart). A scratch drive of the default Langedrag
   voyage ran 309 ticks on the local authority with no page errors.
 
@@ -1241,7 +1239,7 @@ held candidate, panel, console) stays in `WakePlugin`, unchanged.
   the local session in the browser too, and a console promotion keeps playing.
 - **Retirement.** Once every step is in, the direct path's isolated evaluation
   (`WAKE_PLUGIN_ISOLATED_OBJECTIVE`, `begin_evaluation`/`poll_evaluation` in
-  `tools/wake_velocity_plugin.c`) and its validator `validate_wake_plugin_objective` (AR3e) are
+  `apps/wake_velocity/wake_velocity_plugin.c`) and its validator `validate_wake_plugin_objective` (AR3e) are
   deleted. The browser's direct path (only replay viewing, which has no objective) quarantines
   an objective with "no isolated objective evaluator" instead of evaluating it.
 - **Tests** (native, virtual time, the C model of the worker in `validate_boat_local`): a
@@ -1283,7 +1281,7 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0 Debug and emcc MinSizeRe
   `isolated_authoring` (slow)). Mutations caught: skipping the adoption (`isolated_migrate`),
   dropping the busy check or the cancel request (`isolated_authoring`).
 - Browser game and `plugin_stage` build clean; `tools/check_web_wasm.py`: no Lua in the game.
-  `tools/check_web_plugin_author.py` passes twice each on headless Chromium 156 (SwiftShader),
+  `tests/web/check_web_plugin_author.py` passes twice each on headless Chromium 156 (SwiftShader),
   Firefox 157 and WebKit 27.2 through Playwright 1.64.1, including the objective lifecycle
   (migration held and canceled by Undo, migrate, failing migration, restart, quarantine,
   deadline). Observed, not investigated: the objective's mean round trip is 61 ms on Chromium
@@ -1318,7 +1316,7 @@ was ever specified.
 | L5-1 | What L5 changes | (a) close L5 by evidence: rooms already share the authority and client libraries; rename `NetStudy` to a room client (`WakeRoom`), and record that the two glues differ by design (prediction-only private view against remote interpolation); (b) extract one shared view step (own boat, tick and presentation from a `BoatNetClient`) used by both glues, the rest stays room-only; (c) one client composition for every mode, a private or remote transport behind it, with mode adapters | (a): no behaviour or wire change, nothing to re-qualify in rooms; (b) touches multiplayer feel and needs human play to accept; (c) is a redesign |
 
 L5 closed by evidence, 2026-11-11 on `arch/ar7-rest`: `NetStudy` and its `net_study_*` calls
-are now the room client `WakeRoom` and `wake_room_*` (`tools/wake_velocity_net.[ch]`, whose
+are now the room client `WakeRoom` and `wake_room_*` (`apps/wake_velocity/wake_velocity_net.[ch]`, whose
 header records why it stays separate from `wake_velocity_local.c`). No behaviour, wire or test
 change; the `boat_net_study_*` test names stay. Evidence (macOS 26.6.2, AppleClang Debug,
 2026-11-11): the 91 net, room, host, connect, combat and hunt tests pass; the browser game target
@@ -1375,6 +1373,147 @@ Apply alongside each AR8 move, without unrelated build-policy changes:
 Done when source additions normally touch their owning module, unrelated headers are not
 inherited, boundary checks still reject deliberate violations, and quick/full lanes keep their
 coverage. Add focused negative checks, not tests that restate file lists.
+
+### AR8/AR9 design — 2026-11-11
+
+Accepted design on `arch/ar8-layout`, recorded before the moves; implementation status below.
+The user decided AR8-1 (b), AR8-2 (a), AR8-3 (a) and AR8-4 (a) on 2026-11-11.
+AR8 and AR9 form one milestone and one PR. Moves start once PR #186 (L4b) has merged, since
+it touches the application, plugin and net files that move.
+
+**Rule.** A directory owns libraries, not loose files: each static library lives in exactly
+one directory, and one directory may hold several libraries of the same module. Executables
+live with their application, test or tool. Header/implementation pairs stay together.
+
+| Directory | Contents (today's targets and files) |
+| --- | --- |
+| `src/core/` | `proteus_boat_core`, unchanged list |
+| `src/scenery/` | `proteus_boat_scenery` (`boat_scenery`, `boat_water_atlas`, `boat_ambient`) |
+| `src/render/` | `proteus_render`, `proteus_gpu`, `profiler.[ch]` (the F3 overlay draws) |
+| `src/audio/` | `boat_audio`, `xm_audio` (compiled into executables today; becomes `proteus_audio`) |
+| `src/net/` | `proteus_boat_net` (with `boat_local`), the ENet, WebRTC and browser transports |
+| `src/plugins/` | `proteus_plugin_data`, `proteus_plugins` with its stage backends, `proteus_plugin_catalog`, `boat_plugin_catalog_gen.c`, `boat_plugin_stage_worker.c` |
+| `src/json/` | `proteus_json` (manifests and the server directory) |
+| `src/session/` | `proteus_boat_session` (session, replay), sandbox save, work session, work local, work save and menu |
+| `src/room/` | `boat_server`, `boat_room_package`, `boat_room_objective`, `boat_fleet_bots.h` from `tools/` (shared by the game and `boat_server`; becomes `proteus_room`) |
+| `src/platform/` | `proteus_file`, `proteus_frame_pacer`, `boat_capture`, `boat_assets.h`, `cli_usage` |
+| `apps/wake_velocity/` | the game's `wake_velocity*`, `wake_console*`, `wake_command`, `boat_title`, `boat_directory`, `boat_music.h`, `boat_gpu_timer.h` sources; `proteus_boat_drive` with `boat_profile`, `proteus_local_drive`, `proteus_wake_objective`; `boat_plugin_worker` (links the game's plugin glue); `wake_study`, built from the same sources |
+| `apps/boat_server/`, `apps/cargo_sandbox/`, `apps/dance_study/` | each executable's main; the dance study takes `dance` and `choreography` |
+| `tests/` | validators, boundary/lint scripts, browser checks, test helpers and fixtures (AR8-2) |
+| `tools/` | developer utilities only: reviews, benchmark, bakes, generators, map pipeline, packaging and release, `plugin_author.py`, `boat_bot`, `boat_race_trial`, `gpu_fixture`, `title_backdrop`, `wake_baseline` |
+
+**Preserved.** Target, executable and test names, labels, presets and CI lanes; asset paths
+and running from the repository root; generated file paths; `tools/plugin_author.py` and the
+packaged plugin tools' layout. Relative includes of `assets/` and `third_party/` gain one
+`../`. Moves use `git mv` with no edits in the same file, so `git log --follow` keeps history.
+
+**Includes (AR8-1 b, AR9).** Every project include is qualified by its owning directory, also
+within a directory: `#include "core/boat.h"`, `"net/boat_net_server.h"`,
+`"wake_velocity/wake_velocity_local.h"`, `"support/boat_test_world.h"`. The include roots are
+`src/`, `apps/` and `tests/`, published by the libraries that own them. While moves are in
+progress each moved directory is a temporary include path, so flat includes still resolve and
+each move stays a pure rename; one commit then qualifies every include and drops the temporary
+paths. Since the roots expose every header, ownership is enforced by a check: a new one,
+`module_includes`, holds the allowed module graph, closed transitively (core → nothing;
+scenery, net → core; render → scenery, platform; plugins → core, json, platform; session → render,
+net, plugins; room → net, plugins, platform; apps and tests → anything), and rejects an unqualified
+project include or one into a module not allowed, with negative self-test cases. Existing gates become
+directory-based where a directory equals the boundary: `boat_core_boundary` covers every
+file in `src/core/` (a new file is checked without editing a list), and `boat_net_boundary`
+covers `src/net/` except its named transport files. `plugin_data_boundary` keeps its explicit
+list, because data and host share `src/plugins/`, and it reads `src/plugins/CMakeLists.txt`.
+
+**Commits** (one per row; each builds, passes `ctest --preset full` and keeps captures
+byte-identical to main):
+
+1. AR8a core, scenery, render, audio: `git mv`, the moved directories as temporary include
+   paths, path updates in the root CMake, scripts, CI and docs. Local `CMakeLists.txt` files
+   come in AR9 (row 7), so the moves leave target definitions untouched.
+2. AR8a net and json; 3. AR8a plugins.
+4. AR8b platform, session, room; 5. AR8b applications.
+6. AR8b tests and tools: validators and checks into `tests/`, registration with them.
+7. AR9 local `CMakeLists.txt` per module with its test registration, and the target changes
+   kept out of the moves: `proteus_audio`, `proteus_room`, `boat_profile` out of
+   `proteus_boat_drive`.
+8. AR8-1 qualified includes in every file; the temporary include paths removed.
+9. AR9 `module_includes` and the directory-based gates, with mutation evidence.
+10. Closing: owning docs, `AGENTS.md` layout section, plan status.
+
+Each move commit rewrites repository paths with a one-off script (kept in the scratchpad,
+not committed) across `docs/`, `README.md`, `AGENTS.md`, CMake, Python checks, CI workflows,
+packaging and `deploy/`, then `git grep` for stale `src/<moved>` and `tools/<moved>` paths.
+
+**Verification.** Fresh native configure and build, warning-clean; `ctest --preset full`;
+CPU captures of basin and outer byte-identical to main, and the generated catalog unchanged;
+the browser build, `check_web_wasm.py` and `check_web_plugin_author.py`; `package_web.py` and
+`tools/macos/package.py` dry runs. Windows and Linux are checked by CI after the push only.
+
+**Decisions (accepted 2026-11-11 as marked).**
+
+- **AR8-1 include style: (b) chosen.** (a, recommended) Flat names (`#include "boat.h"`) with per-library
+  include directories: moves need no source edits and the check enforces ownership. (b)
+  Qualified names (`#include "core/boat.h"`) from one `src/` root: ownership is visible in
+  every include, but nearly every file changes and the root still exposes all headers, so the
+  check is needed anyway.
+- **AR8-2 test layout: (a) chosen.** (a, recommended) `tests/<module>/` mirroring the owners (`core`,
+  `net`, `render`, `plugins`, `session`, `room`, `app`, `web`, `lint`, `tools`, plus
+  `tests/support/` for `boat_test_*.h`, `boat_fixtures` and fixture data), each with its own
+  test registration. (b) One flat `tests/` with one registration file. (c) Tests beside each
+  module (`src/core/tests/`).
+- **AR8-3 paths in dated history: (a) chosen.** (a, recommended) Rewrite paths in every document,
+  including dated sections, so links keep working; `git log --follow` recovers the old
+  name. (b) Rewrite only specs, guides and active plans; leave history with dead paths.
+- **AR8-4 quiet window: (a) chosen.** Thirty-odd unmerged local branches from October (adventure A2/A3,
+  `deathmatch-arsenal`, skins, HUD, graphics doc packages) predate the moves and would need
+  rebasing with rename detection. (a, recommended) Proceed after #186; none must land first.
+  (b) Name branches to merge first.
+
+**Defers** (Open loops): manual checks owed by AR7 rows, impaired-delivery qualification,
+the touch tap and pinned `saved_at` stay open; AR8 changes no behaviour.
+
+### AR8/AR9 implementation status — 2026-11-11
+
+Steps 1–6 are committed (module/application/test moves); step 7 localizes CMake and moves
+`boat_profile` beside its drive library. Step 8 qualifies project includes and removes the
+transition paths. Generated catalog output changes only its header include. Explicit raylib
+includes preserve vector type declaration order after include sorting.
+
+Native Debug build passes; full CTest with socket/process access passes 537/537 enabled tests
+(13 disabled), including the two pending step-9 module guards. Basin and outer CPU captures
+match a fresh build of `7f56188` byte for byte; catalog data matches apart from the include.
+Browser game/worker build and Wasm Lua check pass. Step 9 now adds the module graph guard
+and recursive core/net source discovery; negative controls cover forbidden, flat and relative
+includes and unregistered nested source files. Step 10 updates the owning guides, layout
+instructions and index; AR8/AR9 are complete locally. No new manual playback or user acceptance
+is claimed.
+
+Step 7 deviations: `proteus_audio` and `proteus_room` are deferred. Their sources are compiled
+by executables with different definitions (including server WebRTC selection); merging them
+into a library would change behavior. `boat_profile` stays in `proteus_boat_drive`, moved to
+its owning application directory. This milestone preserves targets and behavior.
+
+Closing verification (2026-11-11, arm64 macOS, AppleClang 21.0.0, Debug,
+`PROTEUS_GPU_TESTS=OFF`): a fresh configure and complete native build pass, reusing pinned
+raylib/ENet sources; the only warning is in raylib's bundled `stb_vorbis.c`. The final full
+preset passes 537/537 enabled tests (13 disabled) in 57.93 s with socket/process access.
+Basin/outer captures were inspected and match `7f56188` exactly. Web packaging and local
+macOS app ZIP packaging pass; the latter's ad-hoc signature verifies (the reused ENet source
+needed a build-only symlink for its license). All 1,270 local links in touched Markdown files
+resolve. No Windows/Linux CI or new windowed/manual playback was run.
+
+Browser automation: `tests/web/check_web_plugin_author.py --browser chromium` passes on
+headless Chromium 156.0.8078.4 (SwiftShader), with the default 20 validation cycles and three
+restored sessions. It covers authoring, isolated objectives, migration/Undo/restart, quarantine,
+freeze/deadline handling and cleanup. Evidence is local in `build/ar8-browser-check/results.json`;
+this is automated qualification, not manual playback or user acceptance. Firefox and WebKit
+were not rerun for this layout-only milestone.
+
+The supported browser targets are `web` (game, worker and packaging), `wake_velocity` and
+`plugin_stage`. An untargeted browser all-build also selects `boat_race_trial` and fails on
+`boat_water_radial_gpu_check`, whose implementation is native-only; source inspection confirms
+this target and mismatch already exist at merged baseline `adaea05`. Fixing that developer
+tool's browser selection is deferred; no build policy is changed here. AR10 remains a separate
+step to close the overall architecture specification, along with AR7's listed open items.
 
 ### AR10 — Close the plan as the architecture specification
 
@@ -1461,7 +1600,7 @@ application/server -> selected modules and platform adapters
 ```
 
 P5 adds `boat_marks` to core, protocol v14 and room definition v4, HUD/revision data to net,
-and the application-side `BoatRoomObjective` (`tools/boat_room_objective.c`) over
+and the application-side `BoatRoomObjective` (`src/room/boat_room_objective.c`) over
 `BoatNetRules`. Net invokes the adapter but does not link Lua. Rules callbacks must not touch
 the server (non-reentrancy). Each server tick runs: fleet step, match/race observation, mark
 events, rules `after_tick`, objective publication, revision processing, then births/snapshots.

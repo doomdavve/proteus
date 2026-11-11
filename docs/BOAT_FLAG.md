@@ -8,7 +8,7 @@ retain their existing models.
 
 ## Wind and cloth
 
-`src/boat_flag.[ch]` owns a 54-particle cloth sheet, 0.64 × 0.40 m, on a wooden
+`src/render/boat_flag.[ch]` owns a 54-particle cloth sheet, 0.64 × 0.40 m, on a wooden
 0.75 m starboard stern staff raked about 11° aft. Cross boundaries are mesh edges at the Swedish
 flag's 5:2:9 horizontal and 4:2:4 vertical divisions. Both faces show the selected skin's
 Nordic-cross pattern: Sweden blue/yellow, Finland white/blue, Denmark red/white, or Norway

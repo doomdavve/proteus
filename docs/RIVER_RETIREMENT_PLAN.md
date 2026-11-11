@@ -29,7 +29,7 @@ the crop's edge, hit it, and never saw the Gothenburg content. The user asked to
   build. Loading the outer location now also loads that pack. The crop's water atlas and ambient
   sidecars no longer ship in the browser bundle; validators still use them.
 - **Validators keep the crop as a fixture.** Map, physics, scenery, harbor, traffic and water
-  review checks drive it through `TEST_RIVER` (`tools/boat_test_location.h`), a test-only
+  review checks drive it through `TEST_RIVER` (`tests/support/boat_test_location.h`), a test-only
   definition with the retired record's values. Moving them to outer would have changed numeric
   expectations across about twenty validators and slowed the suite, for no player-visible gain.
   Race, room, network, plugin and minimap checks moved to outer.
@@ -56,9 +56,9 @@ Released in [v0.0.25](RELEASES.md#status-and-verification) and deployed to Winte
 - CPU and GPU (`--gpu-aa`) captures of `--location outer --time 3`, the `--title-start
   outer-standard` capture and a `boat_race_trial --plugin plugins/river-sprint` preview at 18 s
   were inspected: the dock, crane kit, quays and the sprint's buoys under Älvsborgsbron draw.
-- Browser: the `web` target builds with Emscripten 6.0.12. `tools/check_web_scenery.py` passed
+- Browser: the `web` target builds with Emscripten 6.0.12. `tests/web/check_web_scenery.py` passed
   against a local server with Chrome: the default outer place fetches the outer pack once
-  (5.3 MB) and a second session reuses it. `tools/check_web_title.py` passed its basin and Harbor
+  (5.3 MB) and a second session reuses it. `tests/web/check_web_title.py` passed its basin and Harbor
   life sessions, then timed out when its desktop console edit of Harbor life produced a Lua
   syntax error (`main.lua:127`). That path does not involve this change and was not checked on
   `main`.

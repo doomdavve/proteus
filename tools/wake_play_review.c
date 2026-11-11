@@ -1,9 +1,9 @@
 /* Complete opt-in workload: real boat/stern queries, field, audit, upload and GL completion. */
-#include "boat_gpu.h"
-#include "boat_test_scenery.h"
-#include "boat_test_session.h"
 #include "external/glad.h"
+#include "render/boat_gpu.h"
 #include "rlgl.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_session.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

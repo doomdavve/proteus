@@ -23,9 +23,9 @@ usage and rendering APIs.
 
 The main checkout was clean at preparation start and has not been edited by this work.
 During verification, concurrent uncommitted renderer edits appeared in main, including
-`src/renderer3d.[ch]`, `src/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
-`tools/validate_boat_water_benchmark.py` and `tools/validate_renderer3d.c` at the last check.
-Those edits are outside this package and were left untouched. `src/renderer_gpu.c` overlaps
+`src/render/renderer3d.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
+`tests/render/validate_boat_water_benchmark.py` and `tests/render/validate_renderer3d.c` at the last check.
+Those edits are outside this package and were left untouched. `src/render/renderer_gpu.c` overlaps
 the boat package, so a direct merge must wait until that renderer work is reconciled.
 Candidate verification covers committed main `642ca78`, not those concurrent working-tree edits.
 Preserve all
@@ -112,7 +112,7 @@ ctest --test-dir build -j 4 --output-on-failure
 Next, finish/reconcile the concurrent renderer work in its owning track. If it advances
 main, update the candidate onto that new committed tip, preserve the twin-motor draw loops
 alongside its renderer changes and repeat combined verification. Main currently has an
-overlapping uncommitted `src/renderer_gpu.c`; the merge command below is for after that work
+overlapping uncommitted `src/render/renderer_gpu.c`; the merge command below is for after that work
 is reconciled, not for overwriting it.
 
 Then fold the prepared branch in from the main checkout:

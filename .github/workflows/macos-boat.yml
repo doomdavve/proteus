@@ -35,7 +35,7 @@ jobs:
 
       - name: Check release publisher without network
         if: env.PROTEUS_QUALIFY == 'true'
-        run: python3 tools/test_publish_release.py
+        run: python3 tests/tools/test_publish_release.py
 
       - name: Configure Apple Silicon Release
         run: >-

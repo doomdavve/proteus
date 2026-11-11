@@ -9,13 +9,13 @@ source_dir=${WAKE_WEB_SOURCE_DIR:-"$repo_root/build/winterfell-web-source"}
 build_dir=${WAKE_WEB_BUILD_DIR:-"$repo_root/build/winterfell-web"}
 mkdir -p "$source_dir"
 git archive "$release_commit" | tar -x -C "$source_dir"
-for path in tools/boat_title.c web/index.html web/runtime.js web/server_directory.js \
+for path in apps/wake_velocity/boat_title.c web/index.html web/runtime.js web/server_directory.js \
     web/console_controls.js web/servers.json cmake/Web.cmake tools/package_web.py; do
     cp "$repo_root/$path" "$source_dir/$path"
 done
 # v0.0.17 predates the outer location; keep this UI backport on its two-location core.
 if [[ "$release_commit" == 2b55994a326350f8addc0431c36e0bb086c94b6b ]]; then
-    python3 - "$source_dir/tools/boat_title.c" <<'PY'
+    python3 - "$source_dir/apps/wake_velocity/boat_title.c" <<'PY'
 from pathlib import Path
 import sys
 path = Path(sys.argv[1])
@@ -42,8 +42,8 @@ source, output, commit = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 def constant(file, name):
     return int(re.search(r'^#define ' + name + r' (\d+)$', (source / file).read_text(), re.M)[1])
 metadata = {'commit': commit,
-            'protocol': constant('src/boat_net_protocol.h', 'BOAT_NET_VERSION'),
-            'physics': constant('src/boat.h', 'BOAT_PHYSICS_REVISION')}
+            'protocol': constant('src/net/boat_net_protocol.h', 'BOAT_NET_VERSION'),
+            'physics': constant('src/core/boat.h', 'BOAT_PHYSICS_REVISION')}
 (output / 'deployment.json').write_text(json.dumps(metadata, indent=2) + '\n')
 PY
 printf 'Browser UI with released protocol/physics: %s/site\n' "$build_dir"

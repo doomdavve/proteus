@@ -11,7 +11,7 @@ FetchContent_Declare(datachannel
   GIT_SUBMODULES deps/plog deps/libjuice deps/usrsctp
   GIT_SUBMODULES_RECURSE TRUE)
 FetchContent_MakeAvailable(datachannel)
-add_library(proteus_boat_net_rtc STATIC src/boat_net_rtc.c)
+add_library(proteus_boat_net_rtc STATIC src/net/boat_net_rtc.c)
 target_link_libraries(proteus_boat_net_rtc PUBLIC proteus_boat_net PRIVATE datachannel-static)
 target_compile_options(proteus_boat_net_rtc PRIVATE ${PROTEUS_WARNINGS})
 add_executable(boat_rtc_echo tools/boat_rtc_echo.c)

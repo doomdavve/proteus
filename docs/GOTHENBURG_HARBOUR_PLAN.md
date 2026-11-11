@@ -116,7 +116,7 @@ GH5 plays without GH2, but the tour shows the city properly only once the bridge
 
 ## GH1: rename to Gothenburg Harbour
 
-Read `tools/boat_title.c`, `tools/wake_velocity.c` and `plugins/outer-free/plugin.json`.
+Read `apps/wake_velocity/boat_title.c`, `apps/wake_velocity/wake_velocity.c` and `plugins/outer-free/plugin.json`.
 
 - Replace OUTER RIVER in the title's PLACE row (`boat_title.c`), its hints ("THE STANDARD OUTER
   RIVER", "RIVER RACES ALWAYS RUN ON THE OUTER RIVER") and the in-game location label
@@ -267,7 +267,7 @@ they cannot source measured heights or looks. Branch `feat/canal-bridges`, stack
 
 ## GH3: the canal boat
 
-Read `src/boat_skin.[ch]`, `src/boat_model.[ch]` and the
+Read `src/render/boat_skin.[ch]`, `src/core/boat_model.[ch]` and the
 [cabin boat return](BOATING_PLAN.md#cabin-boat-return--2026-10-30).
 
 - A new boat choice: low and flat, open passenger rows under a low windscreen, a helm aft and an
@@ -313,7 +313,7 @@ small to judge at 320×200), browser builds.
 
 ## GH4: tour format
 
-Read the [voyage schema](PLUGIN_API.md#voyage-schema), `src/boat_plugin*.[ch]` and the
+Read the [voyage schema](PLUGIN_API.md#voyage-schema), `src/plugins/boat_plugin*.[ch]` and the
 [objective transactions](PLUGIN_API.md#objective-transactions-p31--p32).
 
 A voyage allows 2–4 shelters, and the first must be the location's spawn (the Eriksberg dock).

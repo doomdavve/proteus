@@ -1,6 +1,6 @@
 #ifndef BOAT_RACE_PLUGIN_H
 #define BOAT_RACE_PLUGIN_H
-#include "boat_plugin_host.h"
+#include "plugins/boat_plugin_host.h"
 
 // Native local trial adapter. The application supplies wall time and input outside ticks.
 typedef struct {

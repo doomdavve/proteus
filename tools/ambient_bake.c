@@ -9,13 +9,13 @@
  *     ambient_bake --map river|outer --check FILE
  *     ambient_bake --map river|outer --stats      # value histogram only
  */
-#include "boat_ambient.h"
-#include "boat_location.h"
-#include "boat_map.h"
-#include "boat_scenery.h"
-#include "boat_test_location.h"
+#include "core/boat_location.h"
+#include "core/boat_map.h"
 #include "raylib.h"
-#include "waterfront_corner.h"
+#include "render/waterfront_corner.h"
+#include "scenery/boat_ambient.h"
+#include "scenery/boat_scenery.h"
+#include "support/boat_test_location.h"
 
 #include <math.h>
 #include <stdio.h>

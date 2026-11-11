@@ -337,7 +337,7 @@ preserve handling; the separately implemented river expansion adds playable geog
 Run `./build/wake_velocity`. Left/right or A/D adjust the wheel, clamped from full
 left to full right. Centre to either limit takes one second. Releasing keys lets an overdamped
 spring return the wheel smoothly to centre without overshooting; opposite input now unwinds
-full lock in about 0.33 seconds, then builds the new turn at the original rate. Return strength is set by `WHEEL_RETURN_RATE` in `src/boat.c` (initially 3/s,
+full lock in about 0.33 seconds, then builds the new turn at the original rate. Return strength is set by `WHEEL_RETURN_RATE` in `src/core/boat.c` (initially 3/s,
 about 1.5 seconds from full lock to within 1% of centre). Up/W raises signed thrust and down/S
 lowers it; releasing the keys holds the setting.
 The thrust range is -100% (reverse) through 0% (idle) to 100% (forward), with four seconds of
@@ -377,7 +377,7 @@ even on straight runs. Lateral slip throws turning spray from the sliding side o
 references but do not collide. Rendering is 320x200 with nearest-neighbour integer scaling. Losing
 focus pauses movement.
 
-The simulation uses fixed 120 Hz ticks. Handling constants live in `src/boat.c`. Screenshot mode
+The simulation uses fixed 120 Hz ticks. Handling constants live in `src/core/boat.c`. Screenshot mode
 runs a deterministic example without a graphics context when using CPU rendering; GPU captures
 require a desktop graphics context. See the README for commands.
 The 240x160-world-unit basin is a handling test area, not yet a representation of Gothenburg.
@@ -593,7 +593,7 @@ completed surface pass.
 
 ### Stern-wake implementation and verification — 2026-10-18
 
-Implemented in `src/boat.[ch]`: unequal, short-lived propeller-wash lobes with varied
+Implemented in `src/core/boat.[ch]`: unequal, short-lived propeller-wash lobes with varied
 rearward speed and outward drift; a deterministic separate foam-birth sequence varies
 the historical trail's spacing, width, lifetime, and spread. Wash first expands then
 shrinks as it fades, opening gaps instead of filling a central stripe. Foam size/colour
@@ -806,7 +806,7 @@ firing frequency, darker engine filtering, and water driven by real hull motion:
 - The mix fades in/out on focus and replay pause (about 40/100 ms smoothing constants),
   with continuous filters and noise state. A DC blocker and soft limiter bound output.
 
-`src/boat_audio.h` owns independently tunable engine settings for future higher-revving craft.
+`src/audio/boat_audio.h` owns independently tunable engine settings for future higher-revving craft.
 The default irregular six-event amplitude pattern is an artistic texture. Screenshots do not
 open audio. Replays reproduce speed-driven wash and recorded thrust at normal acoustic pitch;
 old recordings lack planing and wave-entry data, so their water sound has no wave-contact swells.

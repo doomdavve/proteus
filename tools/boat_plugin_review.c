@@ -1,6 +1,6 @@
 // Display-free P3 review: deterministic inputs, complete checkpoint and bounded inspection.
-#include "wake_velocity_plugin.h"
-#include "waterfront_traffic.h"
+#include "core/waterfront_traffic.h"
+#include "wake_velocity/wake_velocity_plugin.h"
 
 #include <errno.h>
 #include <stdlib.h>

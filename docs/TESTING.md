@@ -127,7 +127,7 @@ real-file trial controls with virtual time, and tick-for-tick four-boat fleet/ev
 reference. `boat_race_plugin_preview` renders a display-free CPU frame. See the
 [plugin API](PLUGIN_API.md#river-race-authoring-p2).
 
-`release_command` runs `tools/test_cut_release.py` in the full CPU suite on every platform.
+`release_command` runs `tests/tools/test_cut_release.py` in the full CPU suite on every platform.
 It uses temporary local Git repositories and mocked external commands to check immutable
 tags, detached worktrees, hosting baseline/push recovery, archive identity/integrity and
 failure gates. Workflow polling uses a virtual clock. These tests never publish a release,
@@ -358,7 +358,7 @@ covers the 0.5 s repeat, re-press and limits. See [the HUD guide](BOAT_HUD.md) f
 settings, visual fixtures and the remaining manual checks. When Node.js is installed,
 `web_mouse_controls` runs the browser event-contract tests without a browser.
 `web_console_controls` (`cpu;quick`) checks console clipboard writes, paste events, focus and
-queued Tab/Shift+Tab input; run it directly with `node tools/test_web_console_controls.cjs`.
+queued Tab/Shift+Tab input; run it directly with `node tests/web/test_web_console_controls.cjs`.
 `wake_command` covers the headless editor, completion and command semantics. Real Wasm
 checks use the opt-in [Playwright command](WEB_BUILD.md#mouse-and-scroll-qualification-2026-10-24).
 `web_rtc_transport` checks browser network bounds and reconnect callbacks; `boat_net_mux`
@@ -370,6 +370,12 @@ failure behavior under Node. The opt-in [directory browser check](WEB_BUILD.md#k
 joins the named room without typing and can simulate a failed list with manual fallback.
 
 ## Lanes, cases and timing
+
+**Where tests are registered.** Each `tests/<module>/` directory registers its own validators
+and tests in `tests.cmake`. `tests/tests.cmake` includes them from the project root rather than
+adding subdirectories, so every test stays in the root's directory scope: the lane loop, the CI
+selection, `PROTEUS_SLOW_TESTS` and working directories cover all of them at once. Libraries,
+applications and tools are real subdirectories with their own `CMakeLists.txt`.
 
 Every test carries exactly one lane label. `quick` tests take under about 100 ms on their own;
 `slow` holds everything heavier: long sweeps, soaks, the process smoke and every GPU test.
@@ -388,8 +394,8 @@ works. GPU tests share `RESOURCE_LOCK gpu`: they run one at a time, but CPU test
 beside them. CTest also runs the fixture setups a selected test requires, so a quick run can
 include a slow setup such as `boat_replay`.
 
-**Case tests.** The heavy validators are tables of small cases (`tools/boat_test_cases.h`).
-`proteus_add_case_tests(prefix target LABELS ...)` in `CMakeLists.txt` lists a target's cases
+**Case tests.** The heavy validators are tables of small cases (`tests/support/boat_test_cases.h`).
+`proteus_add_case_tests(prefix target LABELS ...)` in a `tests/<module>/tests.cmake` lists a target's cases
 after each build (`target --list`) and registers each as its own test, `prefix.case`, so cases
 run in parallel and a failure names the case. A case table entry is `TEST_CASE(fn)` or
 `SLOW_CASE(fn)`, where `fn` returns 0 on success. The binaries keep their old command line:
@@ -411,11 +417,11 @@ quick budget are listed in `PROTEUS_SLOW_TESTS`; configure warns about a name th
 
 **Keeping cases fast.**
 - Physics-only checks use `physics_session()` or `physics_basin_session()`
-  (`tools/boat_test_session.h`), which turn presentation off. The flag cloth was about 75–90% of
+  (`tests/support/boat_test_session.h`), which turn presentation off. The flag cloth was about 75–90% of
   a session tick. `boat_world_isolation.presentation_toggle` proves that physics stay
   bit-identical without presentation.
 - `test_world(id)` prepares a location on first use, so a basin-only case never builds a mapped
-  world. `TEST_RIVER` (`tools/boat_test_location.h`) selects the Eriksberg river crop, which is no
+  world. `TEST_RIVER` (`tests/support/boat_test_location.h`) selects the Eriksberg river crop, which is no
   longer a location (retired 2026-11-04) but remains the small mapped fixture for map, physics,
   scenery, harbor, traffic and water-review checks; race, room and network checks use `outer`.
 - A sweep can stop once its asserted end state holds. It keeps a hard cap and a fixed length
@@ -432,7 +438,7 @@ tests slow and flaky, and usually mean state that has not been extracted yet. Wa
 appear only as failure deadlines (a subprocess `timeout`, or a wait that returns as soon as its
 event arrives). Measured costs may be printed but never asserted.
 
-`test_time` (`tools/check_test_time.py`) enforces this. It scans the validators, the test
+`test_time` (`tests/lint/check_test_time.py`) enforces this. It scans the validators, the test
 headers, every script CMake registers as a test, and the `add_test` commands. It rejects
 sleeps and waits, wall-clock reads in test scripts, and `--seconds`/`--frames` runs. A wait
 bounded by a deadline must say so in a `deadline` comment on its line. `*_rejected` argument
@@ -497,7 +503,7 @@ checks as of 2026-10-24 (including the browser event contract; counted by the cu
 historical, before the case split). GPU cases run one at a time under `RESOURCE_LOCK gpu` while
 independent CPU checks run concurrently; fixture dependencies still govern capture/replay comparisons.
 
-The river frame benchmark has two checks in `tools/validate_boat_water_benchmark.py`.
+The river frame benchmark has two checks in `tests/render/validate_boat_water_benchmark.py`.
 `boat_river_benchmark_options` (`cpu`) checks option and output-path rejection without
 opening a window. With GPU tests enabled, `boat_river_benchmark_contract` (`gpu`;
 about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It checks row
@@ -519,7 +525,7 @@ See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-
 [G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
 
 `boat_lighting_qualification_contract` (`cpu;slow`, about 11 s in Debug on an M1 Max) runs the
-small deterministic `--lighting-qualify` stress audit in `tools/validate_boat_lighting_qualification.py`.
+small deterministic `--lighting-qualify` stress audit in `tests/render/validate_boat_lighting_qualification.py`.
 It rejects out-of-bounds sample counts, CPU high/HDR, `--daylight`, `--aa`, review/check mixing
 and unusable prefixes before a window. The 25-sample run must exclude eight warmup rows, span a
 virtual 900 s cycle with every hour bin and midnight wrap, hold the fixed hour, match the two
@@ -630,7 +636,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `water.h`; `outer` needs the river pack for its kit ground, and loading the outer location loads
   that pack (without the crop's sidecars); and unload clears them all. The
   map validators and review tools load the packs from the source tree
-  (`tools/boat_test_scenery.h`).
+  (`tests/support/boat_test_scenery.h`).
 - `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
   count and a pack round trip.
 - `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `outer`
@@ -645,16 +651,16 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   shelter/exposure/arrival/recovery events, the bearing cue's sign against real right steering,
   and two autopiloted sessions (coastal and direct, from the fjord turn) that must arrive at
   controlled speed. It prints both times, the exposed seconds and any capsizes.
-- `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
+- `boat_core_boundary` runs `tests/lint/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
-- `platform_bridges` runs `tools/check_platform_bridges.py`: inline JavaScript (`EM_JS`,
+- `platform_bridges` runs `tests/lint/check_platform_bridges.py`: inline JavaScript (`EM_JS`,
   `EM_ASM`, `emscripten_*run_script*`) lives only in CMake-selected `*_web.c` backends or in the
   listed legacy files, each at exactly its recorded count; files migrated onto an application
   service (title, game, input, console, plugin glue) do not reach its backends directly; and
-  `CMakeLists.txt` names `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
+  the build files name `*_web.c` sources only in EMSCRIPTEN branches or in its allowlisted
   native test targets (`validate_boat_plugin_stage_web`). `platform_bridges_detects` is its
   negative control.
-- `plugin_stage_backend` runs `tools/check_plugin_stage_backend.py`. With comments and string
+- `plugin_stage_backend` runs `tests/lint/check_plugin_stage_backend.py`. With comments and string
   literals blanked, common plugin staging (`boat_plugin_stage.c` and its headers) includes no
   OS/browser header and names no listed process, handle, Emscripten or platform-macro
   identifier. Each platform backend includes none of a listed set of other platforms' headers,
@@ -812,10 +818,10 @@ and disabled-far fallback. Fixture capture commands live in the [renderer guide]
 
 `boat_local` (AR6 ledger rows L0, L6, L2 and L1, labels `core;cpu`; quick except the slow-lane
 scripted drives, time trials and voyages) runs
-`tools/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
-glue, `tools/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
+`tests/app/validate_boat_local.c`, which links `proteus_local_drive` (the game's own local-session
+glue, `apps/wake_velocity/wake_velocity_local.c`, over `proteus_boat_net` and `proteus_boat_drive`). Every
 scenario drives the game's direct free-boating path (a `BoatSession` stepped by `timed_boat_step`
-with the arcade wake pool) beside a private local session (`src/boat_local.c`: one authority and
+with the arcade wake pool) beside a private local session (`src/net/boat_local.c`: one authority and
 one predicting client over the memory transport, driven by host grants) fed the same scripted
 frames through the glue, and requires bit-identical boats, presentations and wake pools at every
 predicted tick and at each frame's authority tick. Cases: `basin_1x`, `basin_quarter`, `basin_8x`, `outer_1x` and `outer_8x`
@@ -899,7 +905,7 @@ one changes nothing and its ready reply is inert; an unanswered one fails at the
 a tick granted during one fails it as an overrun, the objective running on),
 `isolated_failed_reply` (a worker that reports failure, or a truncated reply, quarantines with
 its own text and closes the job) and
-`isolated_authoring` (slow; the game's own host, `tools/wake_velocity_plugin.c`, on the isolated
+`isolated_authoring` (slow; the game's own host, `apps/wake_velocity/wake_velocity_plugin.c`, on the isolated
 authority beside the same host on the native one: controls answer busy while an update is in
 flight; F7 on a migration holds the clock until the worker answers and then commits the host's
 table; a rename applies at once; the page's cancel closes a migration in flight; Undo restarts
@@ -974,7 +980,7 @@ only a failure deadline. Cases:
   `race_room` and `mapped_rooms` (all three slow). `mapped_rooms` checks that clients take the
   server's location.
 
-**Processes.** `boat_net_process` runs `tools/boat_net_process.py` (about 0.25 s). It ends on
+**Processes.** `boat_net_process` runs `tests/room/boat_net_process.py` (about 0.25 s). It ends on
 events, not elapsed time:
 - `boat_server --until-empty` closes the room once every accepted player has left.
 - `boat_bot --snapshots 3` leaves after three snapshots.
@@ -985,10 +991,10 @@ wrong-token refusal, bot summaries and bounds, and the server's accept/leave/rej
 without faults. Its timeouts are failure deadlines. Run it alone with:
 
 ```sh
-python3 tools/boat_net_process.py --server build/boat_server --bot build/boat_bot
+python3 tests/room/boat_net_process.py --server build/boat_server --bot build/boat_bot
 ```
 
-`boat_host` runs `tools/boat_host_check.py` (about 0.3 s): `wake_velocity --serve --exit-with-stdin`
+`boat_host` runs `tests/app/boat_host_check.py` (about 0.3 s): `wake_velocity --serve --exit-with-stdin`
 on free ports and one `boat_bot --snapshots 3` session. It then closes the room's standard input,
 as the hosting game does when it leaves or dies. The room must report it, keep
 `accepted=1 left=1` and exit 0 within a 2 s deadline. With GPU tests enabled,
@@ -996,12 +1002,12 @@ as the hosting game does when it leaves or dies. The room must report it, keep
 frames and requires the room to close after the session. It is the one listed exception to
 [the no-wall-time rule](#no-wall-time): windowed frames follow the display.
 
-**Manual soak.** `tools/boat_net_session.py` is not a CTest test. It runs real processes on the
+**Manual soak.** `tests/room/boat_net_session.py` is not a CTest test. It runs real processes on the
 wall clock: three predicting bots stay while a fourth leaves, joins in progress, crashes, times
 out and is replaced. Use it for long churn runs:
 
 ```sh
-python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800
+python3 tests/room/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800
 ```
 
 `--peer-timeout` (1–60, default 5) sets the room's silence timeout through
@@ -1022,6 +1028,22 @@ prediction replay through GO matches the authority; discovery uses the complete 
 None of these tests impairs a real network interface, and none replaces the
 [planned matrix](MULTIPLAYER_PLAN.md#verification-matrix-and-telemetry).
 
+## Module include ownership
+
+Project headers use qualified paths from `src/`, `apps/` and `tests/`, including within their
+own module (`"core/boat.h"`, `"wake_velocity/wake_velocity_local.h"`,
+`"support/boat_test_world.h"`). Libraries publish their include roots; test/tool roots stay
+private to their consumers. Each module defines its targets in its own `CMakeLists.txt`;
+`tests/<module>/tests.cmake` owns test registration.
+
+`module_includes` recursively checks C sources and headers in `src`, `apps`, `tests` and
+`tools`. It rejects flat project includes, relative aliases and forbidden module dependencies.
+`tests/lint/check_module_includes.py` owns the allowed graph and closes it transitively.
+Applications, tests and tools may consume any module; source modules may consume only their
+own headers and that closure. `module_includes_self_test` plants violations in a newly added,
+nested source. Existing plugin data and backend checks enforce narrower private interfaces
+within the plugin module, including qualified header paths.
+
 ## Core boundary gate
 
 `proteus_boat_core` holds physics, pose, locations, world and shoreline queries, water queries,
@@ -1034,19 +1056,25 @@ libm, libc memory/sort/assert, `clock()` or the Accelerate DFT backend. The scri
 a self-test that each rule rejects a known violation:
 
 ```sh
-python3 tools/check_core_boundary.py --self-test
+python3 tests/lint/check_core_boundary.py --self-test
 ```
 
-Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `CMakeLists.txt`.
+The source gates discover every C source and header recursively in `src/core/` and `src/net/`,
+independently of CMake registration. Net excludes only the named ENet, RTC and web transport
+pairs at its module root; nested files are still checked. The checker self-test plants an
+unregistered nested header violation and a nested transport-name violation.
+
+Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `src/core/CMakeLists.txt`.
 Presentation, GPU, session/replay and the wake_velocity drive/profile code live in the
 `proteus_render`, `proteus_gpu`, `proteus_boat_session` and `proteus_boat_drive` libraries.
-Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES` and
-obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
+Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES`
+(`src/net/CMakeLists.txt`) and
+obey the same rules (`boat_net_boundary`); only `src/net/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
 
 The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)), its Lua-free data library
 (`proteus_plugin_data`) and the pinned interpreter (`proteus_lua`) sit outside both boundaries.
-`plugin_data_boundary` (`tools/check_plugin_data_boundary.py`) checks that the data library and
+`plugin_data_boundary` (`tests/lint/check_plugin_data_boundary.py`) checks that the data library and
 its data-only consumers (sandbox save, bundled catalog, `validate_boat_plugin_data`) include no
 evaluation, I/O or worker header and name no Lua, file, process or platform identifier, that
 their CMake targets link neither `proteus_lua` nor `proteus_plugins`, and that the
@@ -1058,7 +1086,7 @@ archives or allowlisted libc/libm/raymath symbols.
 entry and round-trips an objective checkpoint. Configure fails if `proteus_boat_core` or
 `proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
 or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
-for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).
+for the server directory and plugin manifests lives in `proteus_json` (`src/json/boat_json.c`).
 
 ## Long-session clock gate
 
@@ -1120,7 +1148,7 @@ oversubscribed `-j 40` runs passed. The longest tests are now sweeps:
 - `wake_objects_contracts_jumps`: 35 s became 0.12 s of quick cases plus 1.7 s of slow ones.
 - `boat_banking`: 22.3 s became 0.3 s quick plus 1.5 s slow.
 - `boat_world_isolation.view_binding`: 3.9 s → 73 ms; `city_dressing`: 4.2 s → 0.24 s. Both
-  come from the scenery ground index in `src/waterfront_corner.c`, which keeps the pinned
+  come from the scenery ground index in `src/render/waterfront_corner.c`, which keeps the pinned
   dressing digest and identical captures.
 - `boat_environment`: 2.9 s → 0.3 s.
 - `boat_net_session` and `boat_net_river`: 36 s → 16 s each, then replaced by
@@ -1208,7 +1236,7 @@ a graphics context for HUD compositing when the scene renderer is CPU.
 For a display-free WebGL2 comparison of both production radial shader recipes:
 
 ```sh
-python tools/check_web_combat_wave.py
+python tests/web/check_web_combat_wave.py
 ```
 
 This optional command needs Playwright and Chrome; its float probes independently check height,
@@ -1279,7 +1307,7 @@ late output and worker/exit/framing faults. PD4 adds `web_plugin_wire` (quick), 
 contract with scene and free/course imports plus room-kind rejection. `tools/package_web.py`
 runs `tools/check_web_wasm.py` on every packaged site: the game Wasm must lack Lua parser/VM
 strings, with `plugin_stage.wasm` as the positive control. The opt-in
-`python3 tools/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
+`python3 tests/web/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
 (also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import,
 capability rejection, scene/free/course staging and launch, repeated worker validations, launch,
 live rename and syntax failure, held water Apply/Undo, stale output, cancellation, navigation

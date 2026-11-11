@@ -1,7 +1,7 @@
 /* Isolated world-space source-packet / spectral-quadrature experiment.
  * No runtime imports this code. A fixed quadrature is NOT an unbounded-domain solver:
  * its implicit spatial replicas and growing reconstruction cost are measured here. */
-#include "boat_wake.h"
+#include "core/boat_wake.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -6,8 +6,8 @@ Current evidence and next task: [runtime feasibility checkpoint](WAKE_RUNTIME_RE
 The equations and measurements below describe that initial baseline; the commands show
 the workflow and reproduce those exact numbers only at that commit.
 
-Implementation: [boat_wake.h](../src/boat_wake.h), [boat_wake.c](../src/boat_wake.c),
-[validation tool](../tools/validate_boat_wake.c).
+Implementation: [boat_wake.h](../src/core/boat_wake.h), [boat_wake.c](../src/core/boat_wake.c),
+[validation tool](../tests/core/validate_boat_wake.c).
 
 The isolated C owner, signed energy ledger, snapshots and boundary/island fixtures are
 implemented. The existing D3 player/runtime is unchanged. **At this initial checkpoint, the solver/domain selection
@@ -127,9 +127,9 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ./build/validate_boat_wake build/wake-w2.ppm
 sips -s format png build/wake-w2.ppm --out build/wake-w2.png
-cc -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tools/validate_boat_wake.c src/boat_wake.c -lm -o build/validate_boat_wake_release
+cc -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tests/core/validate_boat_wake.c src/core/boat_wake.c -lm -o build/validate_boat_wake_release
 ./build/validate_boat_wake_release
-cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tools/validate_boat_wake.c src/boat_wake.c -lm -o build/validate_boat_wake_sanitize
+cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tests/core/validate_boat_wake.c src/core/boat_wake.c -lm -o build/validate_boat_wake_sanitize
 ./build/validate_boat_wake_sanitize
 ```
 

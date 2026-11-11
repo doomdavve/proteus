@@ -8,7 +8,7 @@ and capture through the runner's Python. See
 
 Multiplayer M3 (2026-10-23): `wake_velocity` now links the pinned ENet library (winsock,
 `ws2_32`/`winmm`) for the diagnostic `--connect` mode, and the package step copies
-`enet-LICENSE.txt`. MSVC first compiled ENet and `src/boat_net_enet.c` on 2026-10-24 (below).
+`enet-LICENSE.txt`. MSVC first compiled ENet and `src/net/boat_net_enet.c` on 2026-10-24 (below).
 [M6](MULTIPLAYER_PLAN.md) still owns MSVC
 qualification and firewall/Host documentation. The existing Windows verification limits below
 remain unresolved.
@@ -30,7 +30,7 @@ been compiled yet; the next CI run is its first check. See
 
 2026-10-24: the first MSVC build of the M3+ code,
 [run 40082682785](https://github.com/doomdavve/proteus/actions/runs/40082682785/job/120839290770),
-failed compiling `src/boat_net_enet.c`: ENet's headers include `windows.h` after raylib, so
+failed compiling `src/net/boat_net_enet.c`: ENet's headers include `windows.h` after raylib, so
 `Rectangle`, `CloseWindow` and `ShowCursor` were redeclared (C2365/C2371), the same clash
 `profiler.c` hit on 2026-10-20. `boat_net_enet.c` now defines `WIN32_LEAN_AND_MEAN`, `NOGDI` and
 `NOUSER` before `enet/enet.h`; its clock and sleep use only kernel32. MSVC is unavailable here,

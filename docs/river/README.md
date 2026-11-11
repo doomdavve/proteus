@@ -190,7 +190,7 @@ bridge's structural height. Path `ele=50` is not a deck profile or clearance sur
 1. Implemented: separately pinned source/crop, at first beside the Eriksberg output as an opt-in
    scene. Since 2026-10-25 it is the only mapped crop and the generator's only output.
 2. Implemented: water/land and coarse buildings preserve the water-first triangle ordering
-   required by `src/boat_map.c`. Incomplete building relations are explicitly omitted.
+   required by `src/core/boat_map.c`. Incomplete building relations are explicitly omitted.
 3. Implemented: shared CPU/GPU bridge blockout with open towers and separate solid leg footprints.
 4. Implemented: deterministic captures and actual boat traversal, including shoreline checks,
    reflections, shadows, and rendering timings. The existing 2,200 m camera far plane

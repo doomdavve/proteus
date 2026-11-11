@@ -1,7 +1,7 @@
 /* Finite scripted wake-return workload; no window, audio, replay or timed I/O. */
-#include "boat_test_scenery.h"
-#include "boat_test_world.h"
-#include "wake_velocity_state.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_world.h"
+#include "wake_velocity/wake_velocity_state.h"
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>

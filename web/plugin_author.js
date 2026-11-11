@@ -4,7 +4,7 @@
   const encoder = new TextEncoder();
   const FORMAT = 'wake-velocity-plugin';
   const STORAGE = 'wake-velocity-plugin-v1';
-  // Must equal BOAT_PLUGIN_WIRE_VERSION in src/boat_plugin_wire.h; web_plugin_wire checks it.
+  // Must equal BOAT_PLUGIN_WIRE_VERSION in src/plugins/boat_plugin_wire.h; web_plugin_wire checks it.
   const WIRE_MAGIC = 0x50535441;
   // Matches the Wasm host read buffer: source plus bounded decoded scenes and diagnostics.
   const RESULT_LIMIT = 163840;

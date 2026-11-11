@@ -4,8 +4,8 @@ Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
 validation rules and version policy of the boating network protocol. Task status, decisions
 and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
-[`src/boat_net_protocol.[ch]`](../src/boat_net_protocol.h) and its fixtures are in
-[`tools/validate_boat_net.c`](../tools/validate_boat_net.c).
+[`src/net/boat_net_protocol.[ch]`](../src/net/boat_net_protocol.h) and its fixtures are in
+[`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
 
 v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
 position validation to cover the mapped world, and fingerprints the complete compiled map
@@ -471,10 +471,10 @@ authority applies the same acceptance rules as InputBatch.
 `0xC1` PrivateState (channel 0, server to client): 1–256 opaque bytes, the private rules adapter's
 state after a grant (header tick: the authority's tick). The authority sends it at the end of a
 grant only when it differs from the last one sent; the client keeps the newest of its epoch. Its
-bytes belong to the adapter's own codec: the time trial's (`tools/wake_velocity_course.c`) is
+bytes belong to the adapter's own codec: the time trial's (`apps/wake_velocity/wake_velocity_course.c`) is
 `u8` next gate, `u8` flags (1 practice, 2 finished, 4 recording stopped), then `f64` elapsed,
 four `f64` splits and four `f64` crossings (74 bytes).
-The voyage's (`tools/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
+The voyage's (`apps/wake_velocity/wake_velocity_voyage.c`) is `u8` shelter, `u8` flags (1 exposed, 2 arrived,
 4 too fast, 8 observed, 16 weather begun), `u8` latest event, `u8` its shelter, `u32` recoveries,
 then `f64` weather start, start, arrival and latest event time (40 bytes, big-endian like the
 course's). The client derives the storm its water carries from these bytes and the route, which
@@ -520,7 +520,7 @@ to 1024 bytes of the text, at most 32 KiB in all. Chunks arrive in order on the 
 the client starts a text at index 0 and keeps the newest whole one. A chunk out of order is a
 decode error and drops the partial text.
 
-**Working harbour endpoint (L3).** The working harbour's private session (`src/boat_work_local.h`)
+**Working harbour endpoint (L3).** The working harbour's private session (`src/session/boat_work_local.h`)
 is not a fleet room: its authority owns a `BoatWorkSession` and its client a mirror with no
 prediction. It shares the header, the reliable control channel and the memory transport, and its
 payloads are opaque to the protocol (`boat_net_private_encode_payload`); the work endpoint's own

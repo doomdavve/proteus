@@ -369,7 +369,7 @@ predict credit.
 - Torpedo hull defeats, cannon capsizes and grenade-wave capsizes extend the causes above.
 
 **Credit.** When a boat first latches `BOAT_CAPSIZED` (the existing rule: 0.6 s inverted in
-water, `motion_step` in `src/boat.c`), the latest touch within a 5 s credit window scores +1
+water, `motion_step` in `src/core/boat.c`), the latest touch within a 5 s credit window scores +1
 for its slot. Without such a touch the victim scores −1 (self-capsize). Rows track score,
 kills, deaths and self-capsizes. Hull health reaching zero credits the lethal shooter immediately; the same per-life latch prevents a second capsize score.
 
@@ -391,27 +391,27 @@ pending credit to them is dropped. Ties share first place.
 
 ## Architecture
 
-- `src/boat_match.[ch]` (new, `proteus_boat_core`, obeys the core boundary): `BoatMatchRules`
+- `src/core/boat_match.[ch]` (new, `proteus_boat_core`, obeys the core boundary): `BoatMatchRules`
   (round, intermission, window, thresholds, grace, respawn delay, mechanic toggles) and
   `BoatMatch` (phase, phase end tick, score rows, last touches, lives and latches seen,
   respawn deadlines). `boat_match_observe` runs after each `boat_fleet_step`, returns bounded
   events (`CAPSIZE{victim, attacker|none, cause}`, `ROUND_START`, `ROUND_END`) and spawn
   requests for the server to apply. It never changes physics, the fleet hash or prediction.
-- `src/boat_fleet.[ch]`: diagnostic `pair_impulse[BOAT_FLEET_PAIRS]` in `BoatFleetStats`,
+- `src/core/boat_fleet.[ch]`: diagnostic `pair_impulse[BOAT_FLEET_PAIRS]` in `BoatFleetStats`,
   filled from the solver's accumulated impulses; physics never reads it.
-- `src/boat_wake_objects.[ch]`: read-only `boat_wake_objects_query_emitter`, the ordinary
+- `src/core/boat_wake_objects.[ch]`: read-only `boat_wake_objects_query_emitter`, the ordinary
   evaluation restricted to one emitter's 32 slots.
-- `src/boat_net_server.[ch]`: room mode and rules in `BoatNetServerConfig`, a `BoatMatch`
+- `src/net/boat_net_server.[ch]`: room mode and rules in `BoatNetServerConfig`, a `BoatMatch`
   beside the fleet, automatic respawns and bailouts through the spawn request handler.
 - Protocol v2 ([protocol](MULTIPLAYER_PROTOCOL.md)): reliable control messages
   `MATCH_STATE` (mode, phase, phase end tick, round, per-slot rows; also sent during bootstrap
   for join-in-progress) and `MATCH_EVENT` (tick, kind, victim, victim life, attacker, cause),
   with golden, round-trip, truncation and invalid-field fixtures.
-- `src/boat_net_client.[ch]`: latest match state and a six-entry event ring.
-- `tools/wake_velocity.c`, `src/boat_hud.c`: in deathmatch only, round timer and own score, a
+- `src/net/boat_net_client.[ch]`: latest match state and a six-entry event ring.
+- `apps/wake_velocity/wake_velocity.c`, `src/render/boat_hud.c`: in deathmatch only, round timer and own score, a
   four-line kill feed (5 s per entry, roster names), a Tab-held scoreboard also shown during
   intermission, and `CAPSIZED BY <name> / RESPAWN n`. Free mode HUD unchanged.
-- `tools/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
+- `src/room/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
   scripted deathmatch run. `tools/boat_bot.c`: a `--hunt` script that lays wakes across and
   rams the nearest boat.
 
@@ -425,7 +425,7 @@ offline `wake_velocity`.
 
 1. **D1 — match core.** `boat_match`, the impulse diagnostic, the per-emitter query, server
    mode, automatic respawn, bailout and scripted server output. New
-   `tools/validate_boat_match.c` (core label): synthetic credit-window edges, self −1, bailout,
+   `tests/core/validate_boat_match.c` (core label): synthetic credit-window edges, self −1, bailout,
    grace, leaving attacker, round transitions and ties; physical fleet cases where A's wake
    capsizes B (credited `WAKE`), an own-wake capsize (−1) and a contact touch expiring after
    5 s. Fleet/replay traces and single-player captures stay identical.
@@ -476,7 +476,7 @@ in dated handoff sections below.
 
 Implemented:
 
-- `src/boat_match.[ch]` in `proteus_boat_core`: `BoatMatchRules` (defaults as in the rules
+- `src/core/boat_match.[ch]` in `proteus_boat_core`: `BoatMatchRules` (defaults as in the rules
   above), `boat_match_observe`, `boat_match_reset` and `boat_match_rank`. Presence is derived
   from the fleet (active or pending), lives from `BoatFleetSlot.life`.
 - `BoatFleetStats.pair_impulse`, the solver's accumulated impulse per pair (diagnostic), and
@@ -530,7 +530,7 @@ Implemented:
   changed; a joining peer gets MatchState right after Roster, before the checkpoint.
 - `boat_net_client`: `match`, `result` (the finished round's scoreboard as first announced) and a
   six-entry feed that keeps the roster names of the moment, so a leaver's name survives.
-- `wake_velocity --connect` in deathmatch rooms (`tools/wake_velocity_net.c`): round clock, own score
+- `wake_velocity --connect` in deathmatch rooms (`apps/wake_velocity/wake_velocity_net.c`): round clock, own score
   and place at the top centre (orange under 30 s), a four-line kill feed under the player list
   (5 s per entry; orange when you were capsized, green when you scored), `CAPSIZED BY <name> /
   RESPAWN n` (or `/ -1` for a self-capsize, and `/ R TO SKIP` once R may skip the wait), a
@@ -544,7 +544,7 @@ Deviations and choices:
 
 - The room mode lives in Accept, not MatchState; free rooms send no match messages at all.
 - The HUD is drawn at window resolution beside the roster and network line in
-  `tools/wake_velocity_net.c`, not in the 320×200 `boat_hud.c` panel, so it has no display-free
+  `apps/wake_velocity/wake_velocity_net.c`, not in the 320×200 `boat_hud.c` panel, so it has no display-free
   CPU/GPU capture; it was inspected in screen captures of a windowed run instead.
 - The capsize countdown uses the event's tick, or for an unscored capsize (warmup, intermission)
   the mirror tick the client first saw it capsized.

@@ -1,4 +1,4 @@
-#include "boat_race_plugin.h"
+#include "tools/boat_race_plugin.h"
 
 #include <stdio.h>
 #include <string.h>

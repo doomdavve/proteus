@@ -55,7 +55,7 @@ package's.
 
 ## Bundled catalog (PD1)
 
-`tools/boat_plugin_catalog_gen.c` links `proteus_plugins` and evaluates every bundled package
+`src/plugins/boat_plugin_catalog_gen.c` links `proteus_plugins` and evaluates every bundled package
 during the native build. For each it runs the same checks as staging (manifest, schema, the
 location's map and the full traffic sweep), rejects objective callbacks (except a free package's
 [work-site job](#work-site-job-s1c), whose init it probes), and embeds the decoded
@@ -274,7 +274,7 @@ the water for an objective that runs on a multiplayer room's authority
 stay fixed for the room's life; the script can be [reloaded](#room-objective-reload-p5e).
 
 `boat_server` (and the game's HOST A ROOM child) loads the objective with
-`boat_room_package_load_objective` and runs it in `tools/boat_room_objective.c` behind
+`boat_room_package_load_objective` and runs it in `src/room/boat_room_objective.c` behind
 `BoatNetServerConfig.rules`, so `proteus_boat_net` never links Lua. The objective starts at tick
 zero with generation 1 and updates at every 12-tick boundary with the queued events, under the
 [P3 transaction](#objective-transactions-p31--p32) and default budgets. A failing callback, or more
@@ -755,7 +755,7 @@ existing host slots; the scene definition is copied into each revision and adds 
 
 ### Eriksberg marina layout (verified fixture)
 
-`tools/validate_scene_site.c` loads the package's two-row marina against the compiled
+`tests/render/validate_scene_site.c` loads the package's two-row marina against the compiled
 `outer` water, the registered hull recipes and the registered module recipes. It checks the
 native placement, attachment/boundary rejection, a fully placed capacity fixture and wave-time
 join/contact/camera behavior. It loads the actual Lua package.
@@ -1067,17 +1067,17 @@ submits the same lines through the same state.
 
 ## Native interface
 
-`src/boat_plugin.h` works on immutable bytes and does no I/O. The plugin data library
+`src/plugins/boat_plugin.h` works on immutable bytes and does no I/O. The plugin data library
 `proteus_plugin_data` holds it with the other data headers: `boat_plugin_decode.h` (descriptor
 data as an evaluator returned it, and its Lua-free decoders), `boat_plugin_revision.h`,
 `boat_plugin_objective.h` (checkpoint values, codec and digest) and `boat_plugin_wire.h`.
 `proteus_plugins` adds evaluation: `boat_plugin_load.h` (the `boat_plugin_load_*` calls that run
 Lua), `boat_plugin_lua.h`, `boat_plugin_state.h` (objective transitions) and the host.
 `plugin_data_boundary` keeps Lua, files and processes out of the data library and its data-only
-consumers (the sandbox save and the bundled catalog). `src/boat_plugin_io.h` acquires package files;
-`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport: request and
+consumers (the sandbox save and the bundled catalog). `src/plugins/boat_plugin_io.h` acquires package files;
+`src/plugins/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport: request and
 reply framing, limits, deadlines and revision validity. One CMake-selected backend behind the
-private `src/boat_plugin_stage_backend.h` launches, polls, transfers bytes and terminates the
+private `src/plugins/boat_plugin_stage_backend.h` launches, polls, transfers bytes and terminates the
 worker: `boat_plugin_stage_posix.c`, `boat_plugin_stage_windows.c` or `boat_plugin_stage_web.c`.
 
 ```c
@@ -1110,7 +1110,7 @@ package or host installs its own route. The global location record is never modi
 `boat_session_restart_voyage` begins a route at the current time and keeps the weather
 (`boat_voyage_restart`); a session restart begins whatever `voyage_route` names.
 
-`src/boat_plugin_host.h` owns one plugin's revisions and does no I/O and reads no clock:
+`src/plugins/boat_plugin_host.h` owns one plugin's revisions and does no I/O and reads no clock:
 
 ```c
 BoatPluginHost host; // Static or long-lived: the session borrows its active route.
@@ -1129,7 +1129,7 @@ rebinds every borrower at once; a slot is reused only by a later stage, after th
 been rebound away from it. A commit is refused if the revision it was staged against is no
 longer active. `BoatPluginWatch` is the save poller's state machine; the application passes
 the time (`GetTime()` in the game, a virtual clock in tests) and keys each read with
-`boat_plugin_read_key`. The game's glue is `tools/wake_velocity_plugin.[ch]`.
+`boat_plugin_read_key`. The game's glue is `apps/wake_velocity/wake_velocity_plugin.[ch]`.
 
 ### Limits
 
@@ -1183,7 +1183,7 @@ node build-web/validate_boat_plugin.js
 
 ## Objective transactions (P3.1 / P3.2)
 
-[`boat_plugin_state.h`](../src/boat_plugin_state.h) exposes the transaction operations.
+[`boat_plugin_state.h`](../src/plugins/boat_plugin_state.h) exposes the transaction operations.
 P3.2 grants opt-in `objective.hud` for native solo voyages; race packages remain descriptors.
 The [P3.2 result](PLUGIN_PLAN.md#p32-result-2026-10-29) owns current integration status and limits.
 Run the deterministic native checks with:

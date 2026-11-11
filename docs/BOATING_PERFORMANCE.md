@@ -53,10 +53,10 @@ user play/acceptance and browser/Windows/Linux rendering remain open.
 
 ## Shared driver extraction — 2026-10-23
 
-`tools/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
+`apps/wake_velocity/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
 It preserves advance → boat step → stern track, float time arithmetic, optional D3/field
 paths and the rival's existing route/contact/reset sequence. There is no fleet scheduler.
-`tools/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.
+`tests/support/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.
 
 Apple Silicon/macOS, Debug: `boat_drive_extraction` matches named physical/wake hashes at
 all 3840 ticks against that driver and matches CPU pixels at ticks 1080 and 2400.
@@ -207,7 +207,7 @@ and spinning the rest. macOS `usleep()` usually oversleeps by more than that 5% 
 standalone probe on this machine exceeded it in 179–199 of 200 sleeps. Each oversleep is lost
 because the next wait starts from the late frame end, so the cadence settles below 60 Hz.
 
-`src/frame_pacer.[ch]` replaces the cap in `wake_velocity` (session and title) with a chain of
+`src/platform/frame_pacer.[ch]` replaces the cap in `wake_velocity` (session and title) with a chain of
 absolute deadlines. `frame_pacer_wait()` runs just before `EndDrawing()` with
 `SetTargetFPS(0)`, so input is still polled right after the swap. It sleeps to 1 ms before the
 deadline and spins the rest. A late frame is repaid by the next one, and a stall of more than one

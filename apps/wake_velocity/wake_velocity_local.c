@@ -1,0 +1,299 @@
+#include "wake_velocity/wake_velocity_local.h"
+#include "raylib.h"
+#include "session/boat_time_control.h"
+
+#include <math.h>
+#include <string.h>
+
+// The course definition of the host's course revision NUMBER.
+static const BoatCourseDefinition *course_revision(void *context, unsigned number)
+{
+    const WakeLocal *local = context;
+    const BoatPluginRevision *r
+        = local->resolve ? local->resolve(local->resolve_context, number) : NULL;
+    return r && !strcmp(r->manifest.kind, "course") ? &r->course.course : NULL;
+}
+
+// The configuration of a new generation; a time trial's course adapter starts over with it.
+static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
+    const ObjectStudy *objects, const BoatWorldResources *worlds)
+{
+    BoatWater water = session->world.water;
+    water.objects = NULL; // Each endpoint's fleet owns its pool.
+    local->course_active = session->course.enabled;
+    BoatLocalConfig config = { .resources = worlds,
+        .location = session->world.definition->id,
+        .scene = session->world.scene,
+        .world = { .water = water,
+            .handling = session->handling,
+            .wake_life_ticks = objects->wakes.life_ticks,
+            .crest_height = objects->wakes.crest_height,
+            .spawn = session->boat } };
+    if (local->course_active) {
+        // A course always runs the speedboat, as boat_session_step does. The local session has
+        // one player in slot zero.
+        config.world.handling = &boat_handling_speedboat;
+        wake_course_init(&local->course, session, 0);
+        local->course.resolve = course_revision;
+        local->course.resolve_context = local;
+        config.rules = wake_course_rules(&local->course);
+    } else {
+        wake_course_destroy(&local->course);
+    }
+    local->voyage_active = !local->course_active && session->voyage.route;
+    local->objective = (WakeObjectiveView) { 0 };
+    local->hold = false;
+    if (local->voyage_active) {
+        wake_voyage_init(&local->voyage, session, 0);
+        local->voyage.worker = local->worker;
+        wake_voyage_revision(&local->voyage, local->revision, local->generation, session->tick,
+            local->resolve, local->resolve_context);
+        config.rules = wake_voyage_rules(&local->voyage);
+        config.weather = wake_voyage_weather;
+        config.weather_context = (void *)session->voyage.route;
+    }
+    return config;
+}
+
+// The client's view of the authority's course after a frame, and the finish the frame settled;
+// or the client's view of the authority's voyage after a frame.
+static void course_sync(WakeLocal *local, BoatSession *session)
+{
+    if (!local->course_active && !local->voyage_active)
+        return;
+    size_t size;
+    uint64_t tick;
+    const uint8_t *state = boat_local_state(&local->local, &size, &tick);
+    // Sent only when it changes, so the newest describes the authority's tick.
+    if (state && local->course_active)
+        wake_course_view(state, size, session);
+    else if (state)
+        wake_voyage_view(state, size, session);
+    if (local->voyage_active && state)
+        wake_voyage_objective_view(
+            state, size, boat_local_objective(&local->local), &local->objective);
+    if (local->course_active)
+        wake_course_take(&local->course, &session->runs);
+}
+
+bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectStudy *objects,
+    const BoatWorldResources *worlds, double now)
+{
+    BoatLocalConfig config = config_of(local, session, objects, worlds);
+    local->active = boat_local_start(&local->local, &config, 1, now);
+    return local->active;
+}
+
+bool wake_local_restart(
+    WakeLocal *local, const BoatSession *session, const ObjectStudy *objects, double now)
+{
+    BoatLocalConfig config = config_of(local, session, objects, local->local.config.resources);
+    local->active = boat_local_restart(&local->local, &config, now);
+    return local->active;
+}
+
+typedef struct {
+    WakeLocal *local;
+    BoatSession *session;
+} Present;
+
+// The client's predicted boat at TICK becomes the session's, and its presentation follows as
+// boat_session_step steps it: against WATER, the pool before the tick's emission.
+static void present(void *context, const BoatFleet *view, unsigned slot, uint64_t tick,
+    const BoatWakeObjects *water)
+{
+    Present *p = context;
+    BoatSession *session = p->session;
+    session->boat = view->state.slots[slot].boat;
+    boat_session_set_tick(session, tick);
+    if (session->presentation_enabled) {
+        BoatWorld world = session->world;
+        world.water.objects = water;
+        boat_presentation_step(
+            &session->presentation, &session->boat, &world, boat_tick_seconds(tick));
+    }
+    if (p->local->traced)
+        p->local->traced(p->local->traced_context, session, view);
+}
+
+// The scripted drive's helm: demo_input at the tick before TICK, from the predicted boat.
+static BoatInput scripted(void *context, const Boat *predicted, uint64_t tick)
+{
+    const BoatSession *session = context;
+    return demo_input(predicted, &session->world.water, true, (int)(tick - 1));
+}
+
+// One grant of the player's helm, or of the scripted drive's when SCRIPT.
+static bool run(WakeLocal *local, BoatSession *session, ObjectStudy *objects, unsigned grant,
+    BoatInput input, float thrust_target, float steering_target, bool script, double now,
+    BoatFrameMetrics *metrics)
+{
+    double started = boat_profile_time(IsWindowReady());
+    if (local->course_active && session->runs.practice)
+        wake_course_practice(&local->course);
+    Present context = { local, session };
+    BoatLocalObserver observer = { &context, present };
+    BoatLocalScript drive = { session, scripted };
+    const BoatLocalScript *source = local->script ? local->script : &drive;
+    bool ok = script ? boat_local_frame_scripted(&local->local, now, grant, source, &observer)
+                     : boat_local_frame(&local->local, now, grant, input, thrust_target,
+                           steering_target, &observer);
+    if (ok && grant)
+        objects->wakes = boat_local_view(&local->local)->state.wakes;
+    if (ok)
+        course_sync(local, session);
+    local->hold = false; // The view now shows a deferred migration pending, or its outcome.
+    float elapsed = (float)((boat_profile_time(IsWindowReady()) - started) * 1000.0);
+    if (metrics && grant) {
+        metrics->physics_ms += elapsed;
+        metrics->physics_max_ms = fmaxf(metrics->physics_max_ms, elapsed);
+        metrics->ticks += grant;
+    }
+    local->active = ok;
+    return ok;
+}
+
+// L4b: an objective the authority evaluates on its isolated worker: as the client last saw it,
+// or before its first view, the revision the session started with.
+static bool isolated(const WakeLocal *local)
+{
+    if (!local->worker || !local->voyage_active)
+        return false;
+    if (local->objective.valid)
+        return local->objective.initialized || local->objective.pending;
+    return local->revision && local->revision->voyage.manifest.objective;
+}
+
+bool wake_local_waiting(const WakeLocal *local)
+{
+    return local->active
+        && (local->hold
+            || (isolated(local) && (!local->objective.valid || local->objective.pending)));
+}
+
+// The frame's grant from ACCUMULATOR; see wake_local_frame.
+static unsigned frame_grant(const WakeLocal *local, double *accumulator)
+{
+    if (wake_local_waiting(local)) {
+        *accumulator = 0;
+        return 0;
+    }
+    unsigned most = BOAT_LOCAL_MAX_GRANT;
+    if (isolated(local)) {
+        unsigned left
+            = WAKE_OBJECTIVE_CADENCE - (unsigned)(local->local.tick % WAKE_OBJECTIVE_CADENCE);
+        most = left < most ? left : most;
+    }
+    return boat_time_grant(accumulator, most);
+}
+
+bool wake_local_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    double *accumulator, BoatInput input, float thrust_target, float steering_target, double now,
+    BoatFrameMetrics *metrics)
+{
+    unsigned grant = frame_grant(local, accumulator);
+    return run(
+        local, session, objects, grant, input, thrust_target, steering_target, false, now, metrics);
+}
+
+bool wake_local_scripted_frame(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    double *accumulator, double now, BoatFrameMetrics *metrics)
+{
+    unsigned grant = frame_grant(local, accumulator);
+    return run(local, session, objects, grant, (BoatInput) { 0 }, NAN, NAN, true, now, metrics);
+}
+
+bool wake_local_scripted_drive(
+    WakeLocal *local, BoatSession *session, ObjectStudy *objects, uint64_t ticks)
+{
+    while (local->local.tick < ticks) {
+        uint64_t left = ticks - local->local.tick;
+        unsigned grant = left < BOAT_LOCAL_MAX_GRANT ? (unsigned)left : BOAT_LOCAL_MAX_GRANT;
+        double now = boat_tick_seconds(local->local.tick);
+        if (!run(local, session, objects, grant, (BoatInput) { 0 }, NAN, NAN, true, now, NULL))
+            return false;
+    }
+    return true;
+}
+
+bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *objects)
+{
+    if (!local->voyage_active || !session->voyage.route)
+        return true;
+    // The authority's adapter makes the same recovery from the same voyage state.
+    BoatVoyage voyage = session->voyage;
+    Boat boat = session->boat;
+    boat_voyage_recover(&voyage, &boat, boat_session_time(session));
+    if (!boat_local_recover(&local->local, boat)) {
+        local->active = false;
+        return false;
+    }
+    session->boat = boat;
+    session->voyage = voyage;
+    session->voyage_events
+        = (BoatVoyageEvents) { .items = { { BOAT_VOYAGE_RECOVERED, voyage.shelter } }, .count = 1 };
+    boat_presentation_reset(&session->presentation);
+    objects->wakes = boat_local_view(&local->local)->state.wakes;
+    return true;
+}
+
+bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
+    const BoatPluginRevision *revision, BoatPluginChange change, bool moved)
+{
+    uint8_t code;
+    BoatNetCommitResult predicted = { 0 };
+    if (local->voyage_active && session->voyage.route) {
+        code = change == BOAT_PLUGIN_LIVE          ? WAKE_VOYAGE_LIVE
+            : change == BOAT_PLUGIN_MIGRATE        ? WAKE_VOYAGE_MIGRATE
+            : change == BOAT_PLUGIN_RESTART_VOYAGE ? WAKE_VOYAGE_RESTART
+                                                   : WAKE_VOYAGE_REBIND;
+        // The session already shows the commit: its boat when it moved and the bound scene.
+        predicted = (BoatNetCommitResult) { .boat = session->boat,
+            .moved = moved,
+            .rescene = change != BOAT_PLUGIN_MIGRATE,
+            .scene = session->world.scene };
+    } else if (local->course_active
+        && (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)) {
+        code = WAKE_COURSE_REBIND;
+    } else {
+        return true; // Nothing on the authority borrows this revision.
+    }
+    if (!boat_local_commit(
+            &local->local, revision->number, code, &predicted, session->world.water.storm)) {
+        local->active = false;
+        return false;
+    }
+    // L4b: a migration, or a restart's INIT, on the worker starts at the next frame's start; that
+    // frame grants nothing, and the view keeps the clock held until the outcome arrives.
+    if ((code == WAKE_VOYAGE_MIGRATE || code == WAKE_VOYAGE_RESTART) && local->voyage_active
+        && local->worker)
+        local->hold = true;
+    if (moved)
+        objects->wakes = boat_local_view(&local->local)->state.wakes;
+    return true;
+}
+
+bool wake_local_cancel(WakeLocal *local, const BoatSession *session, unsigned revision)
+{
+    if (!local->voyage_active)
+        return true;
+    BoatNetCommitResult predicted = { .boat = session->boat };
+    local->active = boat_local_commit(
+        &local->local, revision, WAKE_VOYAGE_CANCEL, &predicted, session->world.water.storm);
+    return local->active;
+}
+
+bool wake_local_inspect(WakeLocal *local)
+{
+    local->active = boat_local_inspect(&local->local);
+    return local->active;
+}
+
+void wake_local_close(WakeLocal *local)
+{
+    boat_local_stop(&local->local);
+    wake_course_destroy(&local->course);
+    wake_voyage_close(&local->voyage);
+    local->active = local->course_active = local->voyage_active = false;
+    local->voyage.objective.trace_count = 0; // The session's inspection history ends with it.
+}

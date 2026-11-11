@@ -161,7 +161,7 @@ behavior rather than silently bundling an artistic fix into the upload migration
 
 ### Sky rendering and GPU uploads (T2 prerequisite for T4)
 
-Before T2a, `draw_scene()` in `src/renderer_gpu.c` called `waterfront_sky_image()` and
+Before T2a, `draw_scene()` in `src/render/renderer_gpu.c` called `waterfront_sky_image()` and
 `UpdateTexture()` whenever `waterfront_lighting_same_sky()` detected a change. That is a
 1024×512 RGBA8 image: **2 MiB per update**, about **120 MiB/s at 60 updates/s**, before
 driver overhead. The recorded ~25 ms Debug cost is CPU panorama painting, not a measured
@@ -984,7 +984,7 @@ controls or change replay persistence; the existing renderer/readability limits 
 
 ### Fixed preset result, 2026-11-03
 
-**Completed (steps 1–2):** `src/waterfront_lighting.[ch]` evaluates one
+**Completed (steps 1–2):** `src/render/waterfront_lighting.[ch]` evaluates one
 caller-owned `WaterfrontLighting` from an explicit phase (0 day, 0.5 sunset, 1 dusk, linear
 between them). `WaterfrontSceneFrame.lighting` carries it to the GPU sky, city lighting, fog,
 shadow direction, water and reflections and the CPU sky, flat shading, displaced water and

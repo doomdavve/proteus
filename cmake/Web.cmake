@@ -110,7 +110,7 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/web/plugin_author.js")
 
 # Imported descriptors and callbacks compile only in isolated browser Web Workers.
-add_executable(plugin_stage tools/boat_plugin_stage_worker.c)
+add_executable(plugin_stage src/plugins/boat_plugin_stage_worker.c)
 target_link_libraries(plugin_stage PRIVATE proteus_plugins)
 target_compile_options(plugin_stage PRIVATE -Os ${PROTEUS_WARNINGS})
 set_target_properties(plugin_stage PROPERTIES SUFFIX ".js")
@@ -134,7 +134,7 @@ add_custom_target(web-serve
 
 # Lua plugins P0 preflight (docs/PLUGIN_API.md): the same validator under Node, reading the
 # source tree through NODERAWFS. Not part of `web` or the site.
-add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
+add_executable(validate_boat_plugin tests/plugins/validate_boat_plugin.c)
 target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins proteus_boat_fixtures)
 target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-test")

@@ -1,5 +1,5 @@
 /* Isolated runtime checkpoint: temporal convergence and bounded CPU workload. */
-#include "boat_wake.h"
+#include "core/boat_wake.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

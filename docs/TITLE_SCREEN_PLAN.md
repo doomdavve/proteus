@@ -219,7 +219,7 @@ bounds. No new generated art or asset changes are required. There is no runtime 
 
 The Escape menu uses the selected palette, m5x7 and a fixed chevron in place of the older
 bobbing `(*)`. Gameplay overlays/help/scoreboard text use the same m5x7, scaled only by whole
-integers; instrument labels use m3x6. `src/boat_ui.[ch]` owns shared colours and the game font
+integers; instrument labels use m3x6. `src/render/boat_ui.[ch]` owns shared colours and the game font
 lifetime, loaded only after a graphics context exists and released before it closes.
 Standalone instrument primitive review tools retain their built-in fallback lettering when
 UI fonts have not been loaded. Core/session simulation and world lighting are unchanged.
@@ -318,7 +318,7 @@ and error captures were inspected; the explicit river `--demo --frames 120` smok
 exited cleanly. Final title lettering was captured and inspected again.
 
 Emscripten MinSizeRel packaging passed. Chrome/SwiftShader's existing
-`tools/check_web_title.py` passed keyboard navigation, settings save/reload, two solo
+`tests/web/check_web_title.py` passed keyboard navigation, settings save/reload, two solo
 sessions and return to title, plus the audio-context assertions; captures were inspected.
 It reported ScriptProcessorNode deprecation and ReadPixels performance warnings, with
 no failing runtime/shader errors. Local documentation links, clang-format and diff checks
@@ -438,7 +438,7 @@ the native and web flows have been reviewed together.
 ## In-game Escape menu, 2026-10-25
 
 Completed task: Escape during a `wake_velocity` session no longer switches mouse steering back to
-the keyboard or leaves. It opens a menu in the scene's 320x200 grid (`tools/wake_velocity_menu.[ch]`,
+the keyboard or leaves. It opens a menu in the scene's 320x200 grid (`apps/wake_velocity/wake_velocity_menu.[ch]`,
 styled like the title) with RESUME, STEERING `< MOUSE / KEYBOARD >`, CONTROLS (the `?` guide over
 the menu; Esc returns) and a leave row: BACK TO TITLE from the title, LEAVE ROOM in a room, QUIT
 for explicit-option launches, absent in browsers. Esc or RESUME closes it; the frame that closes
@@ -473,7 +473,7 @@ Scope was cut to what multiplayer playtesting needs (user request, 2026-10-24): 
 nick, pick a livery where supported, and enter an address to join. Everything else in
 the menu table above remains a later proposal.
 
-- `tools/boat_title.[ch]` owns the title: the prototype's bowed logo, footer and
+- `apps/wake_velocity/boat_title.[ch]` owns the title: the prototype's bowed logo, footer and
   `assets/title/river-backdrop.png`, drawn at 320x200 and integer-scaled. Rows: SINGLE
   PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / SOUNDTRACK / BACK
   (2026-10-24; NAME and BOAT were main rows before). STEERING picks KEYBOARD or MOUSE for the
@@ -491,7 +491,7 @@ the menu table above remains a later proposal.
   `soundtrack=a-little-boat|acid-wake|off`), saved
   when leaving SETTINGS, choosing a session or exiting. The default address is
   `127.0.0.1:24680` and the default name `player`.
-- `tools/wake_velocity.c`: the former `main` is `study(argc, argv)`; it reuses an open window and
+- `apps/wake_velocity/wake_velocity.c`: the former `main` is `study(argc, argv)`; it reuses an open window and
   leaves it open. The new `main` shows the title only for no arguments or `--title`, runs
   SINGLE PLAYER as the former macOS app arguments plus `--skin`, and MULTIPLAYER as
   `--connect ADDRESS --name NAME`. Escape in a session returns to the title; the title
@@ -516,8 +516,8 @@ then failed against an unused port with the message returned to the title.
 FINLAND (YOU)"). `boat_server --bind 0.0.0.0` accepted a bot. Not verified: interactive
 keyboard/mouse use of the title (synthetic key events did not reach the window),
 packaged macOS/Windows launches, Windows/Linux builds, two-machine play, and user
-acceptance. The marine HUD branch is not merged; it also edits `tools/wake_velocity.c`
-and `tools/wake_velocity_net.[ch]` (input/draw paths), so expect small textual conflicts.
+acceptance. The marine HUD branch is not merged; it also edits `apps/wake_velocity/wake_velocity.c`
+and `apps/wake_velocity/wake_velocity_net.[ch]` (input/draw paths), so expect small textual conflicts.
 
 Release naming, 2026-10-24: native packages now present **Wake Velocity** with
 `wake_velocity` executables and versioned archive/Actions artifact names. This ships
@@ -531,7 +531,7 @@ This sequence records the original integration proposal. The dated results above
 its prototype appearance and initial flow limitations; volume/live scenery remain deferred.
 
 1. **Title slice:** Put menu input, screen state, and rendering behind a small interface
-   used by `tools/wake_velocity.c`. Keep the letter shapes owned by the title module.
+   used by `apps/wake_velocity/wake_velocity.c`. Keep the letter shapes owned by the title module.
    Reuse the existing 320×200 render target and integer scaling.
    Use the worktree prototype and its real river sample as the review baseline. Capture
    idle and selected frames and inspect them at native size and 3× scale.
@@ -566,7 +566,7 @@ time and has no effect on deterministic sessions or replay compatibility.
   smoke the packaged macOS/Windows/web launch paths when the executable promotion lands.
 
 Initial planning verification, 2026-10-23, macOS, before the prototype: inspected `CMakeLists.txt`,
-`tools/wake_velocity.c`, `cmake/Web.cmake`, the project README, and the multiplayer and
+`apps/wake_velocity/wake_velocity.c`, `cmake/Web.cmake`, the project README, and the multiplayer and
 foundations plans. The existing app has a direct gameplay loop, Escape closes its native
 window, CLI modes enter gameplay, and web packaging targets `wake_velocity`. No art, audio,
 runtime, or user acceptance check is claimed for this proposal. The document links and

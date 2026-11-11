@@ -1,6 +1,7 @@
-#include "boat_gpu.h"
-#include "boat_test_session.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
+#include "support/boat_test_session.h"
 
 #include <math.h>
 #include <stdio.h>

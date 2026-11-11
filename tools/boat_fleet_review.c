@@ -4,18 +4,19 @@
  * wake_velocity --connect. --check is the display-free CTest gate: every rival changes the CPU
  * image, a repeated render is identical and drawing leaves the fleet and presentations
  * untouched. */
-#include "boat_fleet.h"
-#include "boat_gpu.h"
-#include "boat_rearview.h"
-#include "boat_test_scenery.h"
-#include "boat_test_world.h"
+#include "core/boat_fleet.h"
+#include "raylib.h"
 #include "raymath.h"
+#include "render/boat_gpu.h"
+#include "render/boat_rearview.h"
+#include "support/boat_test_scenery.h"
+#include "support/boat_test_world.h"
 
+#include "support/boat_fixtures.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \

@@ -23,48 +23,49 @@ playground for iterating on effects, timing, audio, and presentation.
 
 ## Layout
 
-- `tools/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
-- `src/waterfront_scene.[ch]`, `src/waterfront.c`: river scenery, sky, gulls and street actors
+- `apps/wake_velocity/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
+- `src/render/waterfront_scene.[ch]`, `src/render/waterfront.c`: river scenery, sky, gulls and street actors
   evaluated into a frame shared by the CPU (`renderer3d`) and GPU (`renderer_gpu`) renderers.
-- `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
-- `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
-- `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
+- `src/core/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
+- `src/core/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
+- `src/core/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
+- `src/core/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
   outer map holds the same water): its scenery pack lays out the river kit on the outer map, and
-  validators use it as a small mapped fixture (`tools/boat_test_location.h`).
-- `src/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
+  validators use it as a small mapped fixture (`tests/support/boat_test_location.h`).
+- `src/scenery/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
   `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
   compiled water in `water.h`. Collision and the server need the compiled water and maps; room
   definitions supply the course, rules and optional scene as data.
-- Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
+- Boating code builds as static libraries, each defined in its module's `CMakeLists.txt`
+  (`src/<module>/`); tests register in `tests/<module>/tests.cmake`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
-  windows or audio, or touch files; `tools/check_core_boundary.py` enforces this in CTest.
-  `tools/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
+  windows or audio, or touch files; `tests/lint/check_core_boundary.py` enforces this in CTest.
+  `tests/support/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
   validators only; production targets never link it. See `docs/TESTING.md` for the libraries and
   test labels.
-- `src/boat_net_*.[ch]`, `src/boat_prediction.[ch]`, `src/boat_remote_view.[ch]`: multiplayer
+- `src/net/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
   protocol codec, authority/client sessions, client prediction, remote boat view and transports.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
-  ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
+  ENet and sockets. `src/room/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
-- `src/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
+- `src/session/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
   and resume, autosave watch) shared by `cargo_sandbox` and the game; no drawing, input or files.
-  `src/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
-  `src/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
+  `src/session/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
+  `src/session/boat_work_local.[ch]` (`proteus_work_local`) runs it as a private local authority and
   client mirror for the game (ledger L3).
-- `tools/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
+- `apps/wake_velocity/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.
-- `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
+- `src/plugins/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
   over a pinned Lua 5.4.9 in `proteus_lua`; P1 revisions, reload policies and Undo in
   `boat_plugin_host`) and reference packages; core and net never link it. The game's native
-  `--plugin` glue is `tools/wake_velocity_plugin.[ch]`.
+  `--plugin` glue is `apps/wake_velocity/wake_velocity_plugin.[ch]`.
   `docs/PLUGIN_API.md` owns the contract and `docs/PLUGIN_PLAN.md` the roadmap.
-- `src/profiler.c`: rolling frame statistics and the F3 overlay.
-- `src/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
+- `src/render/profiler.c`: rolling frame statistics and the F3 overlay.
+- `src/audio/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
 - `assets/music/`: XM music for the boating game and the dance study.
 - `assets/samples/`: source WAV samples for tracker editing.
 - `tools/generate_audio.py`: deterministic generator for the starter samples and XM.
-- `tools/validate_xm.c`: XM parser/render smoke test used by CTest.
+- `tests/audio/validate_xm.c`: XM parser/render smoke test used by CTest.
 - `docs/`: focused workflow notes, including music and editor setup.
 
 ## Build and verify
@@ -89,7 +90,7 @@ workflow cap; exhaustive checks and packaging are manual/release qualification. 
 
 Tests never wait for wall-clock time. Code that depends on time takes `now` as an input, and its
 test drives a virtual clock; wall-clock limits are only failure deadlines. The `test_time` test
-(`tools/check_test_time.py`) enforces this.
+(`tests/lint/check_test_time.py`) enforces this.
 
 The routine suite disables retired physical wake-field experiments by default
 (`PROTEUS_WAKE_FIELD_TESTS=OFF`); re-enable them only when revisiting that work.
@@ -123,6 +124,11 @@ xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
 ```
 
 ## Conventions
+
+- Qualify project includes by their owner, even within a module (`"core/boat.h"`,
+  `"wake_velocity/wake_velocity_app.h"`, `"support/boat_test_world.h"`). Module CMake files own
+  targets; `tests/<module>/tests.cmake` owns registration. `module_includes` enforces the
+  transitive module graph; plugin data/backend checks enforce narrower private interfaces.
 
 - Format C with the checked-in `.clang-format`; use four spaces and keep lines near 100 columns.
 - Keep the project warning-clean under the compiler flags in `CMakeLists.txt`.

@@ -1,11 +1,11 @@
 // Fixed shelter-hunt presentation fixture (P5d): the CPU scene with the room's marks as rings of
 // buoys, the objective panel and the minimap marks. Offline capture only; never joins a room.
-#include "boat_location.h"
-#include "boat_minimap.h"
-#include "boat_test_scenery.h"
-#include "boat_ui.h"
-#include "boat_view.h"
-#include "wake_velocity_net.h"
+#include "core/boat_location.h"
+#include "render/boat_minimap.h"
+#include "render/boat_ui.h"
+#include "render/boat_view.h"
+#include "support/boat_test_scenery.h"
+#include "wake_velocity/wake_velocity_net.h"
 #include <stdio.h>
 #include <string.h>
 

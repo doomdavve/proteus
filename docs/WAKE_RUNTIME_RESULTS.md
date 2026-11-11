@@ -23,7 +23,7 @@ cadence/default change. The D3 player, water queries, rendering and audio are un
 
 ## Source work and bounded ownership
 
-[boat_wake.c](../src/boat_wake.c) now uses symmetry of the same positive operator A:
+[boat_wake.c](../src/core/boat_wake.c) now uses symmetry of the same positive operator A:
 
 `delta H = rho dx^2 (psi + delta_psi/2)^T A delta_psi`.
 
@@ -151,10 +151,10 @@ ctest --test-dir build --output-on-failure
 Optimized CPU measurements on this native compiler:
 
 ```sh
-clang -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tools/wake_runtime_review.c src/boat_wake.c -o build/wake_runtime_review_optimized
+clang -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc tools/wake_runtime_review.c src/core/boat_wake.c -o build/wake_runtime_review_optimized
 ./build/wake_runtime_review_optimized --check > build/wake-runtime-cadence.json
 ./build/wake_runtime_review_optimized --costs > build/wake-runtime-cpu-costs.json
-clang -std=c17 -O2 -Isrc tools/wake_field_review.c src/boat_wake.c -o build/wake_field_review_optimized
+clang -std=c17 -O2 -Isrc tools/wake_field_review.c src/core/boat_wake.c -o build/wake_field_review_optimized
 ./build/wake_field_review_optimized --costs-fast > build/wake-runtime-costs.json
 ```
 
@@ -164,7 +164,7 @@ reports correctness, not performance acceptance. GPU CTest registration is condi
 on `PROTEUS_GPU_TESTS=ON`; it is not part of the default CPU suite.
 
 ```sh
-clang -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc -Ibuild/_deps/raylib-src/src tools/wake_gpu_runtime_review.c src/boat_wake.c build/_deps/raylib-build/raylib/libraylib.a -framework OpenGL -framework Cocoa -framework IOKit -framework CoreFoundation -o build/wake_gpu_runtime_review_optimized
+clang -std=c17 -O2 -Wall -Wextra -Wpedantic -Isrc -Ibuild/_deps/raylib-src/src tools/wake_gpu_runtime_review.c src/core/boat_wake.c build/_deps/raylib-build/raylib/libraylib.a -framework OpenGL -framework Cocoa -framework IOKit -framework CoreFoundation -o build/wake_gpu_runtime_review_optimized
 ./build/wake_gpu_runtime_review_optimized > build/wake-runtime-gpu-optimized.json
 ./build/wake_gpu_runtime_review --check
 ./build/wake_gpu_runtime_review --capture build/wake-runtime-gpu.png

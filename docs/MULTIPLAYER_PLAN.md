@@ -139,18 +139,18 @@ Only three product questions materially remain open; the plan proceeds with thes
 
 | Source / symbols inspected | Reuse and consequence |
 | --- | --- |
-| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`tools/wake_velocity.c`](../tools/wake_velocity.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `wake_velocity`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
-| [`src/boat.h`](../src/boat.h): `Boat`, `BOAT_STEP`; [`src/boat.c`](../src/boat.c): `boat_step`, `buoyancy_step`, `motion_step`, `boat_wake_stern` | Reuse the 120 Hz force recipe, steering/throttle **rates**, engine response, six support points, air yaw, landing and inversion timers. `Boat` also owns flag, particles, camera, course, location, water copies and borrowed wake pointers. It is not a packet or prediction checkpoint. |
+| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`apps/wake_velocity/wake_velocity.c`](../apps/wake_velocity/wake_velocity.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `wake_velocity`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
+| [`src/core/boat.h`](../src/core/boat.h): `Boat`, `BOAT_STEP`; [`src/core/boat.c`](../src/core/boat.c): `boat_step`, `buoyancy_step`, `motion_step`, `boat_wake_stern` | Reuse the 120 Hz force recipe, steering/throttle **rates**, engine response, six support points, air yaw, landing and inversion timers. `Boat` also owns flag, particles, camera, course, location, water copies and borrowed wake pointers. It is not a packet or prediction checkpoint. |
 | `boat_collide_pair`, `hull_vertical_bounds`, `resolve_hull_contact`, `resolve_traffic` in `boat.c` | Reuse OBB/SAT geometry, mutual planar/yaw impulses and mass-weighted separation. Vertical intervals reject clear jumps. This is not a full 3D solver: no vertical boat-on-boat impulse or deck landing, and pair response does not itself perform a final shoreline check. Sequential pair mutation is insufficient as the fleet scheduler. M2 (2026-10-23): `boat_collide_pair` now composes pure `boat_pair_contact`/`_speed`/`_impulse`/`_apply` helpers with unchanged arithmetic; `boat_fleet_solve` uses them simultaneously and holds separations at the shore. |
-| [`src/boat_water.c`](../src/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
-| [`src/boat_wake_objects.[ch]`](../src/boat_wake_objects.h): `BoatWakeObjects`, `boat_wake_objects_advance`, `boat_wake_objects_track`, `boat_wake_objects_query`, `boat_wake_objects_pack` | Caller-owned world already exists. Four emitters ×32 objects; cadence 60 ticks, maximum lifetime 1920 ticks, default crest 1.8 m; propagation 2.4 m/s. Immutable records evolve analytically with age. Emission is conditional on wetness/speed/span, not simply one event every 60 ticks. Emitter filters/start/cursor are future-affecting state. |
+| [`src/core/boat_water.c`](../src/core/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
+| [`src/core/boat_wake_objects.[ch]`](../src/core/boat_wake_objects.h): `BoatWakeObjects`, `boat_wake_objects_advance`, `boat_wake_objects_track`, `boat_wake_objects_query`, `boat_wake_objects_pack` | Caller-owned world already exists. Four emitters ×32 objects; cadence 60 ticks, maximum lifetime 1920 ticks, default crest 1.8 m; propagation 2.4 m/s. Immutable records evolve analytically with age. Emission is conditional on wetness/speed/span, not simply one event every 60 ticks. Emitter filters/start/cursor are future-affecting state. |
 | `timed_boat_step` and [`tools/wake_objects_review.c`](../tools/wake_objects_review.c): `local_fleet`, `gameplay_envelope` | Rival and four-boat tests share a world. The app tracks player emission before stepping the rival; the fleet test tracks inside its boat loop and solves pairs afterward. Neither is the new authoritative schedule. Current births have a zero birth envelope on that tick, mitigating immediate surface-order effects; do not claim an observed order bug from inspection alone. |
-| [`src/boat_replay.[ch]`](../src/boat_replay.h): `BoatReplaySample`, `boat_replay_pose`, `boat_replay_sample` | Pose recording omits vertical/angular velocities, planing, motion timers/state, complete wake/emitter state and session state. Keep ghosts/replays as views. At this source assessment file format was `REPLAY_VERSION 1` and handling compatibility was `BOAT_PHYSICS_REVISION 5`; C1 later advanced these to 2 and 6. Neither equals the future protocol version. |
-| [`src/boat_map.c`](../src/boat_map.c): `shore`, `init`; [`src/waterfront_scene.c`](../src/waterfront_scene.c): `river_enabled`, `waterfront_scene_select_river`; `boat_water.c`: `surfaces`, `patches` | Map selection and caches are still global. Separate immutable map/query data from render resources through foundations work. Basin first avoids making mapped-world extraction a hidden first-slice prerequisite. S4 basin slice (2026-10-23): the selector is now `waterfront_city_select_river` in `waterfront_city.c` and the surface/patch caches are in `boat_water_mesh.c`, both still global. |
-| [`src/waterfront_harbor.c`](../src/waterfront_harbor.c): `waterfront_harbor_contact_height`; [`src/waterfront_traffic.c`](../src/waterfront_traffic.c): `waterfront_traffic_motion`, `waterfront_traffic_contact_height` | Shared posed contact envelopes are useful. Ordinary traffic remains on authored routes, with one-way collision response and visual trails; it does not emit into the four-player arcade pool. Evaluate authoritative routes/obstacle poses at a common tick. |
-| [`src/boat_gpu.c`](../src/boat_gpu.c): `boat_gpu_draw_with_ghost`; [`src/waterfront_scene.h`](../src/waterfront_scene.h): `WaterfrontSceneFrame`; [`src/renderer_gpu.c`](../src/renderer_gpu.c): `draw_ghost` | One player plus one special ghost is not a fleet renderer. Ghosts omit shadows/reflections. Add bounded ordinary vessel views; keep race ghosts separate. The frame's “owned/no mutable pointers” comment is no longer literally true: copied `BoatWater` contains a borrowed `objects` pointer. Freeze/copy the render wake records before passes. |
+| [`src/session/boat_replay.[ch]`](../src/session/boat_replay.h): `BoatReplaySample`, `boat_replay_pose`, `boat_replay_sample` | Pose recording omits vertical/angular velocities, planing, motion timers/state, complete wake/emitter state and session state. Keep ghosts/replays as views. At this source assessment file format was `REPLAY_VERSION 1` and handling compatibility was `BOAT_PHYSICS_REVISION 5`; C1 later advanced these to 2 and 6. Neither equals the future protocol version. |
+| [`src/core/boat_map.c`](../src/core/boat_map.c): `shore`, `init`; [`src/render/waterfront_scene.c`](../src/render/waterfront_scene.c): `river_enabled`, `waterfront_scene_select_river`; `boat_water.c`: `surfaces`, `patches` | Map selection and caches are still global. Separate immutable map/query data from render resources through foundations work. Basin first avoids making mapped-world extraction a hidden first-slice prerequisite. S4 basin slice (2026-10-23): the selector is now `waterfront_city_select_river` in `waterfront_city.c` and the surface/patch caches are in `boat_water_mesh.c`, both still global. |
+| [`src/core/waterfront_harbor.c`](../src/core/waterfront_harbor.c): `waterfront_harbor_contact_height`; [`src/core/waterfront_traffic.c`](../src/core/waterfront_traffic.c): `waterfront_traffic_motion`, `waterfront_traffic_contact_height` | Shared posed contact envelopes are useful. Ordinary traffic remains on authored routes, with one-way collision response and visual trails; it does not emit into the four-player arcade pool. Evaluate authoritative routes/obstacle poses at a common tick. |
+| [`src/render/boat_gpu.c`](../src/render/boat_gpu.c): `boat_gpu_draw_with_ghost`; [`src/render/waterfront_scene.h`](../src/render/waterfront_scene.h): `WaterfrontSceneFrame`; [`src/render/renderer_gpu.c`](../src/render/renderer_gpu.c): `draw_ghost` | One player plus one special ghost is not a fleet renderer. Ghosts omit shadows/reflections. Add bounded ordinary vessel views; keep race ghosts separate. The frame's “owned/no mutable pointers” comment is no longer literally true: copied `BoatWater` contains a borrowed `objects` pointer. Freeze/copy the render wake records before passes. |
 | [`CMakeLists.txt`](../CMakeLists.txt), [`cmake/Web.cmake`](../cmake/Web.cmake) | C17 and pinned raylib 6.0; common source lists are repeatedly compiled, simulation validators pull presentation. Emscripten builds `wake_velocity` then returns before native targets/tests. A headless core/server target and optional native transport dependency must respect this split. S4 basin slice (2026-10-23): static libraries replace the repeated lists, and `proteus_boat_core` has a display-free validator and boundary check; most simulation validators still link session and presentation. |
-| [`tools/validate_boat.c`](../tools/validate_boat.c): `validate_flight_outcomes`, `validate_dynamic_pair`; environment, banking, replay, traffic and object validators | Preserve ballistic/dry control, capsize, vertical clearance, momentum/energy, banked handling, wake derivatives, expiry and shader parity checks. Extend with network histories/authority tests; do not replace physical checks with screenshots. |
+| [`tests/core/validate_boat.c`](../tests/core/validate_boat.c): `validate_flight_outcomes`, `validate_dynamic_pair`; environment, banking, replay, traffic and object validators | Preserve ballistic/dry control, capsize, vertical clearance, momentum/energy, banked handling, wake derivatives, expiry and shader parity checks. Extend with network histories/authority tests; do not replace physical checks with screenshots. |
 
 The [2026-10-19 architecture review](ARCHITECTURE_REVIEW.md) is a dated baseline: its
 64-entry shader discussion describes D3, and its struct sizes predate current state. Current
@@ -662,7 +662,7 @@ Dependencies: current accepted arcade baseline. Deliver as three reviewable step
 
 1. **M1a / foundations P2a then P3a:** benchmark/report and freeze named physical/wake traces;
    reuse `boat_profile_time`, `demo_step` and the production app's step sequence. Likely
-   `tools/boat_benchmark.c`, a small tools-only fixture helper, `src/boat_profile.[ch]`, CMake,
+   `tools/boat_benchmark.c`, a small tools-only fixture helper, `apps/wake_velocity/boat_profile.[ch]`, CMake,
    and `docs/BOATING_PERFORMANCE.md`. Exact first task below.
 2. **M1b / C1–C3:** integer authority and exact accumulator duration, bounded double-derived
    phases, revisioned offline replay compatibility. Likely `boat_clock.h`, `boat.[ch]`, water,
@@ -683,8 +683,8 @@ pass a new performance target; it must produce truthful repeatable data.
 
 ### M2 — four-boat local authority and resumable checkpoints
 
-Depends on M1 core. Likely `src/boat_world.[ch]`, extracted pair-contact helpers from `boat.c`,
-`boat_wake_objects.[ch]`, `tools/validate_boat_world.c`, `tools/boat_server.c`, CMake. Add
+Depends on M1 core. Likely `src/core/boat_world.[ch]`, extracted pair-contact helpers from `boat.c`,
+`boat_wake_objects.[ch]`, `tests/core/validate_boat_world.c`, `src/room/boat_server.c`, CMake. Add
 `boat_world_step(world, inputs[4])`, the staged order above, spawn/life rules and explicit
 checkpoint save/restore without pointers. First keep one-boat output equivalent, then qualify
 two boats, then the existing local four-boat scenario. Add bounded server CLI scripted mode
@@ -700,16 +700,16 @@ Acceptance: six pair candidates max/pass, <=128 live objects, four solver passes
 no lost wake histories on one-boat reset, full checkpoint <=8 KiB and no allocations per tick.
 Record CPU against the proposed budget; network and multi-view presentation are non-goals.
 
-Status, 2026-10-23: implemented as `BoatFleet`/`boat_fleet_step` in `src/boat_fleet.[ch]`,
-`tools/validate_boat_fleet.c` and `tools/boat_server.c`; automated checks pass and the user
+Status, 2026-10-23: implemented as `BoatFleet`/`boat_fleet_step` in `src/core/boat_fleet.[ch]`,
+`tests/core/validate_boat_fleet.c` and `src/room/boat_server.c`; automated checks pass and the user
 played the fleet crossing rival on 2026-10-23. Details, deviations and evidence are in the
 [M2 handoff](#m2-local-authority-handoff--2026-10-23).
 
 ### M3 — protocol, transport and process boundary
 
-Depends on M2. Likely new `src/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
-`boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `tools/boat_server.c`,
-`tools/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
+Depends on M2. Likely new `src/net/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
+`boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `src/room/boat_server.c`,
+`tests/net/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
 warnings. Implement handshake/version rejection, bounded queues, input/snapshot/control codec,
 initial world/wake checkpoint and in-memory delivery impairment before real sockets.
 Proposed diagnostic commands: `boat_server --bind 127.0.0.1 --port 24680 --location basin`
@@ -732,7 +732,7 @@ layout is in [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md).
 ### M4 — first playable: two people collide and jump each other's wakes
 
 Depends on M3. Likely `boat_net_client`, new `boat_prediction.[ch]`, `boat_world`,
-`boat_wake_objects`, `tools/wake_velocity.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
+`boat_wake_objects`, `apps/wake_velocity/wake_velocity.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
 `renderer_gpu.c` and corresponding CPU path. Deliver in small steps: checkpoint/input replay;
 wake births/repair and provisional-own reconciliation; remote interpolation/proximity view;
 ordinary fleet rendering and safe reset UI. Use two player colors, ordinary opaque hulls with
@@ -827,7 +827,7 @@ builds now run on Winterfell. The role rerun reported `changed=0`; native/browse
 weapon inputs/combat pages passed. The [routine operator workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)
 owns future upgrades; human weapons balance/audio and wider soak acceptance remain pending.
 
-Depends on M5. Likely `tools/boat_server.c`, Host launcher/client connection UI, native
+Depends on M5. Likely `src/room/boat_server.c`, Host launcher/client connection UI, native
 packagers/workflows, CMake server-only Linux configuration, README, platform/release/test guides.
 Deliver direct host/port plus room token, graceful exit/disconnect, child-process Host lifecycle,
 firewall/NAT help and a minimal dedicated service/run guide. Prefer a standalone server package
@@ -1054,7 +1054,7 @@ Started from `1ed6b70`; only the unrelated untracked `docs/TITLE_SCREEN_PLAN.md`
 | --- | --- | --- | --- |
 | Fleet step, simultaneous contacts, spawn/life, checkpoints, scripted server, crossing rival on the fleet | `boat_fleet`, `boat_server_scripted`, full suite and HEAD comparison below | Scripted CPU captures and windowed runs | User played the crossing rival, 2026-10-23: "Seems to work great!" |
 
-**API.** `src/boat_fleet.[ch]` is part of `proteus_boat_core`. `BoatFleet` holds the immutable
+**API.** `src/core/boat_fleet.[ch]` is part of `proteus_boat_core`. `BoatFleet` holds the immutable
 world (definition and water settings), a pointer-free `BoatFleetState` and per-step
 diagnostics. The state holds the tick, four `BoatFleetSlot`s (boat, life generation, active
 and pending flags, request order and tick) and the shared `BoatWakeObjects` pool by value.
@@ -1296,7 +1296,7 @@ Started from `c547f92` (M3 committed). The untracked `docs/TITLE_SCREEN_PLAN.md`
 | --- | --- | --- | --- |
 | `boat_prediction` speculative fleet with own-command history, correction and replay; predicting `BoatNetClient`; `wake_velocity --connect` draws the predicted fleet with blended corrections | `boat_net` (replay exactness, three predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | 2026-10-24: the user drove `wake_velocity --connect` beside `boat_bot`, interacting with its wakes: "Works really well!" |
 
-**Module.** `src/boat_prediction.[ch]` is in `proteus_boat_net` and obeys the core boundary. A
+**Module.** `src/net/boat_prediction.[ch]` is in `proteus_boat_net` and obeys the core boundary. A
 `BoatPrediction` holds a speculative `BoatFleet` (its tick is the predicted tick), the own
 commands of the last 240 ticks keyed by tick and life, and the rates the authority last used
 for each remote slot. `boat_prediction_advance` steps it toward the newest command's target
@@ -1439,7 +1439,7 @@ Started from `55c1ce1`. The title-screen row in `docs/README.md` and the untrack
 | --- | --- | --- | --- |
 | `boat_remote_view` snapshot history, interpolation/extrapolation and proximity blend; `wake_velocity --connect` draws the other boat with it | `boat_net` (`remote_view` fixture, gated predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
 
-**Module.** `src/boat_remote_view.[ch]` is in `proteus_boat_net` (core boundary). The client keeps
+**Module.** `src/net/boat_remote_view.[ch]` is in `proteus_boat_net` (core boundary). The client keeps
 the last 16 authoritative snapshots' slots (`BoatNetClient.remotes`, about 0.5 s) and exposes
 `boat_net_client_server_tick()`. `boat_remote_history_pose` returns a slot's pose at a fractional
 tick: interpolated between the bracketing snapshots (heading the short way round, pitch and roll
@@ -1800,14 +1800,14 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
 (a Windows title-bar drag blocks it) would freeze and then burst-correct every player.
 
 **Behaviour.**
-- `boat_server.c`'s entry point is now `boat_server_main` (`tools/boat_server.h`).
-  `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `wake_velocity --serve ARGS`
+- `boat_server.c`'s entry point is now `boat_server_main` (`src/room/boat_server.h`).
+  `boat_server` is a two-line wrapper (`apps/boat_server/boat_server_main.c`). `wake_velocity --serve ARGS`
   runs the same command line before any window, audio or asset work.
 - `boat_server --exit-with-stdin` closes the room gracefully once its standard input ends.
   POSIX polls `poll`/`read` on stdin. Windows uses `PeekNamedPipe`, which fails once the
   writer has gone. The hosting game holds the only write end, so the room closes when the game
   leaves or dies.
-- `tools/wake_velocity_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
+- `apps/wake_velocity/wake_velocity_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
   [--location L] [--waves] --exit-with-stdin`. POSIX uses `posix_spawn` and finds its own path
   through `_NSGetExecutablePath` or `/proc/self/exe`. Windows uses `CreateProcess` with
   `CREATE_NO_WINDOW` and `GetModuleFileName`. The room's merged stdout/stderr come back
@@ -1838,7 +1838,7 @@ CTests:
 - `wake_velocity_serve_scripted`.
 - Three argument rejections: `--host race --location basin`, `--host` with `--connect`, and
   `--port` without `--host`.
-- `boat_host` (`tools/boat_host_check.py`): `wake_velocity --serve` on private ports, a 1 s
+- `boat_host` (`tests/app/boat_host_check.py`): `wake_velocity --serve` on private ports, a 1 s
   `boat_bot` session, then closing stdin. The room must exit cleanly within 2 s.
 - GPU-labelled `wake_velocity_host_gpu`: a windowed 120-frame river deathmatch host on port 24779.
 
@@ -1864,10 +1864,10 @@ Not checked:
 - Keyboard/title navigation by a human.
 
 **Executable renamed to `wake_velocity` — 2026-10-25.** The game target, its
-`tools/boat_study*.{c,h}` sources (now `tools/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
+`tools/boat_study*.{c,h}` sources (now `apps/wake_velocity/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
 macros, CTest names and commands, `tools/macos/package.py`, the Windows/Linux workflows,
-`cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tools/check_wayland.sh`,
-`tools/check_web_controls.py` and every document now use `wake_velocity`; package copies
+`cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tests/lint/check_wayland.sh`,
+`tests/web/check_web_controls.py` and every document now use `wake_velocity`; package copies
 no longer rename the executable. `boat_server` keeps its name. There is no `boat_study`
 alias, and dated records were updated to the new command rather than kept verbatim. Internal
 identifiers such as `NetStudy`, `ObjectStudy` and the `boat_net_study_*` tests were not
@@ -1967,7 +1967,7 @@ P2. It freezes the current feel and supplies honest cost/state evidence before c
 Coding-agent brief:
 
 > Implement only foundations P2a. Read AGENTS.md, the P2a contract and the current
-> `tools/wake_velocity.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
+> `apps/wake_velocity/wake_velocity.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
 > existing arcade one-boat driver without changing update order or float time. Emit bounded
 > JSON/CSV and named-field state evidence. Keep existing app behavior and every current
 > mode compiling. Add the small CTest contracts described there, build and run CTest,

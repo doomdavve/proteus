@@ -1,5 +1,6 @@
 // W1 diagnostic sampler: production water query, prescribed source paths, no hull dynamics.
-#include "boat_water.h"
+#include "core/boat_water.h"
+#include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>

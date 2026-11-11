@@ -56,17 +56,17 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 ## Starting point in the code
 
 - **Objectives.** `BoatPluginObjective` and `boat_plugin_objective_step`
-  (`src/boat_plugin_state.h:80`) run `init`/`update` as a P3 transaction with a 12-tick cadence;
-  the solo glue turns voyage notices into events (`tools/wake_velocity_plugin.c:371`).
+  (`src/plugins/boat_plugin_state.h:80`) run `init`/`update` as a P3 transaction with a 12-tick cadence;
+  the solo glue turns voyage notices into events (`apps/wake_velocity/wake_velocity_plugin.c:371`).
 - **Free packages** have no objective grant unless they author work sites
   ([free schema](PLUGIN_API.md#free-schema)).
-- **Rooms.** `BoatRoomDefinition` (`src/boat_room_definition.h:32`) carries mode, location, course,
+- **Rooms.** `BoatRoomDefinition` (`src/core/boat_room_definition.h:32`) carries mode, location, course,
   rules and an optional scene; modes are free, deathmatch and race. `boat_room_package_load`
-  (`tools/boat_room_package.h:20`) builds it on the authority. The server observes match or race
-  rules after each fleet step (`src/boat_net_server.c`).
+  (`src/room/boat_room_package.h:20`) builds it on the authority. The server observes match or race
+  rules after each fleet step (`src/net/boat_net_server.c`).
 - **Boundaries.** `proteus_boat_net` may not link Lua or the plugin host (`CMakeLists.txt`);
-  `tools/boat_server.c` links `proteus_plugins` and can.
-- **Wire.** Protocol v12 before P5c, v13 after it (`src/boat_net_protocol.h`), message types up to
+  `src/room/boat_server.c` links `proteus_plugins` and can.
+- **Wire.** Protocol v12 before P5c, v13 after it (`src/net/boat_net_protocol.h`), message types up to
   `BOAT_NET_DEFINITION_END` (24); reliable control channel for match and race state.
 
 ## Design
@@ -75,7 +75,7 @@ any free room. Marks show on the minimap (as shelters do) and as markers in the 
 
 A free package granted `objective.hud` may author `marks`: up to 16 entries of
 `{ id, name, x, z, radius }` (radius 10–200 m, on open water, non-overlapping). They travel in the
-room definition as data. A small core module (`src/boat_marks.[ch]`, in `proteus_boat_core`)
+room definition as data. A small core module (`src/core/boat_marks.[ch]`, in `proteus_boat_core`)
 keeps, per fleet slot, which mark the boat is inside, and after each fleet step emits
 `mark.reached { id, crew }` on entry (outside → inside). A respawn or a new life clears that slot's
 inside flag, so re-entering counts as a new event; whether it scores is the script's business.
@@ -88,7 +88,7 @@ empties. Solo voyages are untouched: `crew` is a new optional field that only ro
 `BoatNetServerConfig` gains an optional **rules adapter**: function pointers with a context, the
 same pattern as `BoatNetTransport`. After each tick the server hands it the tick's events; at a
 12-tick boundary the adapter runs the objective update and returns the committed HUD (rows,
-quarantine flag, revision), which the server sends when it changes. `tools/boat_server.c`
+quarantine flag, revision), which the server sends when it changes. `src/room/boat_server.c`
 implements the adapter over `BoatPluginObjective`; net stays Lua-free.
 
 The P3 transaction holds: a script error quarantines the objective, the room keeps running, and
@@ -148,7 +148,7 @@ by default, and a diagnostic mode re-runs the pinned source and compares.
 - **HOST A ROOM**: a SHELTER HUNT choice (`--host hunt`, a free room with the `proteus.outer-hunt`
   package) on LAN. This is the first playable path.
 - **Browsers** need no Lua: the room sends data. Release builds are ENet-only, so browser joining
-  is qualified on a locally built WebRTC server (`tools/check_web_multiplayer.py`).
+  is qualified on a locally built WebRTC server (`tests/web/check_web_multiplayer.py`).
 - **Winterfell** keeps its one deathmatch room; no hunt room in P5.
 - **No room save.** A hunt is a session: it starts over when the room starts. The working
   harbour's room save is deferred with it.
@@ -165,15 +165,15 @@ and pass the `test_time` lint. Each updates this status header.
 The `marks` schema for free packages with `objective.hud`, its validation (open water, radius,
 overlap, count), the core detector over fleet slots, and the bundled `plugins/outer-hunt`
 package (five marks, the script above). No networking yet.
-Files: new `src/boat_marks.[ch]`, the free-package loader and validator, `plugins/outer-hunt/`,
-`tools/validate_boat_marks.c` (or a case in an existing validator), `docs/PLUGIN_API.md`.
+Files: new `src/core/boat_marks.[ch]`, the free-package loader and validator, `plugins/outer-hunt/`,
+`tests/core/validate_boat_marks.c` (or a case in an existing validator), `docs/PLUGIN_API.md`.
 Tests: the package loads and its marks validate on `outer`; invalid marks are refused with field
 diagnostics; a scripted fleet driving through marks emits exactly one `mark.reached` per entry
 with the right crew, and a respawn re-arms the slot; evaluating the script over scripted events
 yields the expected HUD rows, `FIRST`, and the restart; core boundary check.
 Gate: headless events and HUD match the expected tables.
 
-**P5a result, 2026-11-08 (commit on `feat/plugin-p5`).** `src/boat_marks.[ch]` in
+**P5a result, 2026-11-08 (commit on `feat/plugin-p5`).** `src/core/boat_marks.[ch]` in
 `proteus_boat_core` (validation, digest, the per-slot entry detector); `free.marks` parsed,
 decoded, map-checked and carried over the browser wire; `objective.hud` may now follow
 `free.define` directly; objective events gain an optional `crew`; `plugins/outer-hunt` (five river
@@ -187,10 +187,10 @@ change, so no captures; nothing is playable yet.
 ### P5b: the objective on the authority
 
 The rules adapter in `BoatNetServerConfig`, called from the server tick; its implementation in
-`tools/boat_server.c` over `BoatPluginObjective`; join/leave events; quarantine.
+`src/room/boat_server.c` over `BoatPluginObjective`; join/leave events; quarantine.
 `boat_room_package_load` accepts the hunt package for free rooms (marks stay server-side until
 v13). `boat_server --scripted --package outer-hunt` drives scripted boats and prints the HUD.
-Files: `src/boat_net_server.[ch]`, `tools/boat_server.c`, `tools/boat_room_package.[ch]`.
+Files: `src/net/boat_net_server.[ch]`, `src/room/boat_server.c`, `src/room/boat_room_package.[ch]`.
 Tests: scripted one- and two-crew hunts produce the expected HUD per tick; an injected script
 error quarantines the objective while boats keep moving; join/leave rows appear and disappear;
 `proteus_boat_net` still links no Lua.
@@ -200,7 +200,7 @@ Gate: the objective runs headless on the authority.
 `marks` (free rooms only) and a `BoatNetRules` adapter: crew joins and leaves are reported
 between ticks, mark entries after the tick that made them, then `after_tick`. The server keeps a
 `BoatMarkTracker` and runs no scripts. `boat_room_package_load_objective` returns the package's
-marks and source (the plain loader refuses objectives), and `tools/boat_room_objective.[ch]`
+marks and source (the plain loader refuses objectives), and `src/room/boat_room_objective.[ch]`
 runs the P3 transaction every 12 ticks, quarantining on a callback error or more than 64 queued
 events. `boat_server` (also the game's `--serve` child) prints `objective tick N: ...` on each HUD
 change. Instead of a `--scripted --package` flag (scripted mode has no peers to join or leave),
@@ -214,8 +214,8 @@ on leave; full suite results are in the PR.
 
 Room definition v4 with marks; ObjectiveState; version bump; client stores the HUD; `boat_bot`
 prints it.
-Files: `src/boat_net_protocol.[ch]`, `src/boat_room_definition.[ch]`, `src/boat_net_server.c`,
-`src/boat_net_client.[ch]`, `tools/boat_bot.c`, `tools/validate_boat_net.c`,
+Files: `src/net/boat_net_protocol.[ch]`, `src/core/boat_room_definition.[ch]`, `src/net/boat_net_server.c`,
+`src/net/boat_net_client.[ch]`, `tools/boat_bot.c`, `tests/net/validate_boat_net.c`,
 `docs/MULTIPLAYER_PROTOCOL.md` (v13).
 Tests: golden bytes and round trips; every truncation; v12 Hello rejected; definition and
 message sizes within the budget; on the memory transport two bots hunt and both see identical
@@ -229,7 +229,7 @@ definition's marks (`BoatNetServerConfig.marks` is gone; `boat_room_package` cop
 ObjectiveState (type 25, control channel, server to client) and `boat_net_objective_state_equal`
 are new. `BoatNetRules.state` is polled at init and after every `after_tick`; the server assigns
 the revision, broadcasts on change and sends the current state to each joiner after Roster.
-`tools/boat_room_objective.c` implements `state` from `hud_changes` and quarantine. The client
+`src/room/boat_room_objective.c` implements `state` from `hud_changes` and quarantine. The client
 keeps `objective` and `objective_valid` (newest revision wins) and `boat_bot` prints
 `boat_bot objective: LABEL=value ... [suspended]`. The wire is big-endian like the rest of the
 codec. Measured: the hunt's room definition is 213 bytes (5 marks); a definition with 16
@@ -245,7 +245,7 @@ exercised the `boat_bot` print, and the game draws nothing until P5d.
 
 The game draws marks (world markers, minimap) and the objective HUD in rooms; SHELTER HUNT in the
 host panel and `--host hunt`.
-Files: `tools/wake_velocity.c`, `tools/wake_velocity_host.[ch]`, `tools/boat_title.c`,
+Files: `apps/wake_velocity/wake_velocity.c`, `apps/wake_velocity/wake_velocity_host.[ch]`, `apps/wake_velocity/boat_title.c`,
 the minimap, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`, `docs/BOAT_HUD.md`.
 Tests: `boat_net_process.py` hunt case (server + two bots, ENet, event-driven); title menu
 validator for the new row; a CPU capture of marks and HUD (validator frame dump, since
@@ -289,7 +289,7 @@ a two-machine run is still worth doing before the closing step.
 `--package-reload` on the host: source changes staged at an objective boundary with the P3
 contract, revision bumped in ObjectiveState, failure keeps the running revision. No protocol
 change.
-Files: `tools/boat_server.c`, `docs/PLUGIN_API.md`.
+Files: `src/room/boat_server.c`, `docs/PLUGIN_API.md`.
 Tests (virtual time): same-`state_version` reload keeps counts; a migrating reload; a broken
 candidate keeps the running revision and reports it; the revision reaches clients.
 Gate: a live script edit on a hosted hunt reaches both players without a restart.
@@ -322,8 +322,8 @@ within about a second and keep their counts.
 
 RevisionBegin/Page/End, RevisionReady, the commit tick and the `REVISION` leave reason, in all
 modes, committing at round boundaries (race, deathmatch) or empty free rooms.
-Files: `src/boat_net_protocol.[ch]`, `src/boat_net_server.c`, `src/boat_net_client.c`,
-`src/boat_prediction.c`, `tools/boat_server.c`, `docs/MULTIPLAYER_PROTOCOL.md` (v14).
+Files: `src/net/boat_net_protocol.[ch]`, `src/net/boat_net_server.c`, `src/net/boat_net_client.c`,
+`src/net/boat_prediction.c`, `src/room/boat_server.c`, `docs/MULTIPLAYER_PROTOCOL.md` (v14).
 Tests: success; a joiner mid-download; a missing readiness disconnects only that client; an
 invalid candidate keeps the running revision; duplicate and stale announcements; a commit exactly
 on a round boundary; prediction history never crosses a commit.
@@ -375,7 +375,7 @@ modes); the browser build was not exercised. Next task: [P5g](#p5g-recording-and
 ### P5g: recording and reconstruction
 
 `--record PATH`, the session file and a reconstruction validator mode with seek.
-Files: new `src/boat_session_record.[ch]` (codec, no files), `tools/boat_server.c`,
+Files: new `src/boat_session_record.[ch]` (codec, no files), `src/room/boat_server.c`,
 `tools/validate_boat_session_record.c`.
 Tests: record a two-bot hunt with a reload and a reconnect; reconstruct every keyframe and compare
 fleet hash, objective digest and HUD; seek; a truncated file fails cleanly; no Lua by default;
@@ -387,7 +387,7 @@ Gate: bit-identical reconstruction on the recording build.
 Four crews; reconnect and leave cases; loss, reordering, duplication and delay; the web build
 draws marks and the HUD; `check_web_multiplayer.py` gains a hunt case with one native and one
 browser player on a local WebRTC server.
-Files: `tools/validate_boat_net.c`, `tools/check_web_multiplayer.py`, `docs/TESTING.md`,
+Files: `tests/net/validate_boat_net.c`, `tests/web/check_web_multiplayer.py`, `docs/TESTING.md`,
 `docs/WEB_BUILD.md`.
 Tests: HUD equal on every client including late joiners; server tick cost with the Lua update
 measured against the deathmatch baseline; mixed clients finish a hunt; an old browser bundle is
