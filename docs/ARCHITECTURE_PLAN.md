@@ -17,7 +17,7 @@ until every L* row is done.
 L5 closed by evidence ([L5](#l5-decision)); L4b objectives implemented ([L4b](#l4b-status)).
 The user accepted [L4-1, L4-2](#l4b-decision) and [L5-1](#l5-decision) on 2026-11-11.
 **Next:** L4b authoring (L4-2 (b)) on `arch/l4b-authoring`: [design](#l4b-authoring-design),
-step 3 (the adapter's isolated migration).
+step 4 (the host and the game).
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1265,7 +1265,10 @@ held candidate, panel, console) stays in `WakePlugin`, unchanged.
 Steps (one commit each): 1 this design; 2 the server's deferred commit; 3 the adapter's
 isolated migration and cancel; 4 the host and game on the authority in the browser; 5 retire the
 direct path's isolated evaluation and AR3e; 6 browser qualification and the plan's status.
-Progress: 1 and 2 done (`boat_local.deferred_commit`).
+Progress: 1 to 3 done (`boat_local.deferred_commit`, `isolated_migrate`; a mutation that skips
+the adoption fails `isolated_migrate`). Found while building step 3: the frame that carries a
+migration request must grant nothing too, or its first tick overruns the job it starts
+(`WakeLocal.hold`).
 
 <a id="l5-decision"></a>L5 (hosted rooms), decision 2026-11-11; the user accepted L5-1 (a) as
 recommended on 2026-11-11. AR1's ledger names no

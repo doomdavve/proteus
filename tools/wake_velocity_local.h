@@ -33,6 +33,8 @@ typedef struct {
     // L4b: the authority's isolated objective evaluator (the browser's worker; NULL natively,
     // where the authority evaluates at once). Set by the game before opening.
     const WakeObjectiveWorker *worker;
+    // L4b: a migration request is on its way to the worker; the next frame grants nothing.
+    bool hold;
     // Test seam: called after each predicted tick has filled the session (NULL in the game).
     void (*traced)(void *context, const BoatSession *session, const BoatFleet *view);
     void *traced_context;
@@ -51,8 +53,8 @@ bool wake_local_open(WakeLocal *local, const BoatSession *session, const ObjectS
 bool wake_local_restart(
     WakeLocal *local, const BoatSession *session, const ObjectStudy *objects, double now);
 // L4b: whether the host must hold the clock: with a worker, until the client has seen the
-// authority's objective after a start, and while it reports an evaluation pending. Read from the
-// client's view only.
+// authority's objective after a start, while it reports an evaluation pending, and in the frame
+// that carries a migration request. Read from the client's view only.
 bool wake_local_waiting(const WakeLocal *local);
 // Grant the ticks ACCUMULATOR holds (boat_time_grant, at most BOAT_LOCAL_MAX_GRANT; any excess
 // stays for the next frame) and run them. L4b: with a worker and an objective, a grant ends at
@@ -80,9 +82,14 @@ bool wake_local_recover(WakeLocal *local, BoatSession *session, ObjectStudy *obj
 // voyage rebound or restarted, the boat at the tour start when MOVED), the authority installs
 // the same revision before the next frame's first tick. A migration's outcome arrives in
 // LOCAL's objective view after that frame (its commit and commit_status); until then SESSION's
-// revision must not change. False on an endpoint failure.
+// revision must not change. L4b: with a worker the migration runs there, the clock is held from
+// the request until the outcome, which can take several frames. False on an endpoint failure.
 bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *objects,
     const BoatPluginRevision *revision, BoatPluginChange change, bool moved);
+// L4b: between frames, cancel the migration to REVISION the authority's worker is running (the
+// host discarded its candidate); the authority closes it at the next frame's start, keeping its
+// revision and objective. False on an endpoint failure.
+bool wake_local_cancel(WakeLocal *local, const BoatSession *session, unsigned revision);
 // L1b: ask the authority for its objective's inspection lines; they arrive within the next frame
 // (boat_local_inspection). False on an endpoint failure.
 bool wake_local_inspect(WakeLocal *local);

@@ -157,11 +157,28 @@ void wake_objective_cancel(WakeObjectiveJob *job, const WakeObjectiveWorker *wor
     *job = (WakeObjectiveJob) { 0 };
 }
 
+// A migration that cannot run keeps everything: its diagnostic and a trace under ACTIVE, as
+// wake_objective_migrate's failure leaves them.
+static void migration_failed(
+    WakeObjective *run, unsigned active, BoatPluginStatus status, const char *message)
+{
+    run->objective_diagnostic = (BoatPluginDiagnostic) { .status = status };
+    snprintf(run->objective_diagnostic.message, sizeof(run->objective_diagnostic.message), "%s",
+        message);
+    wake_objective_trace(run, active, BOAT_PLUGIN_OBJECTIVE_MIGRATE,
+        boat_plugin_objective_digest(&run->objective), &run->objective, 0);
+}
+
 bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
     const WakeObjectiveWorker *worker, BoatPluginTransition action,
-    const BoatPluginRevision *revision, uint64_t epoch, uint64_t tick, double now)
+    const BoatPluginRevision *revision, unsigned active, uint64_t epoch, uint64_t tick, double now)
 {
     static uint64_t serial;
+    bool migrate = action == BOAT_PLUGIN_OBJECTIVE_MIGRATE;
+    if (migrate && (tick > INT64_MAX || run->generation == UINT_MAX)) {
+        migration_failed(run, active, BOAT_PLUGIN_LIMIT, "objective clock or generation exhausted");
+        return false;
+    }
     BoatPluginEvalRequest *r = NULL;
     unsigned char *bytes = NULL;
     unsigned started = 0;
@@ -172,14 +189,15 @@ bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
     if (r && bytes) {
         r->serial = ++serial;
         r->epoch = epoch;
-        r->revision = r->candidate = revision->number;
+        r->revision = migrate ? active : revision->number;
+        r->candidate = revision->number;
         r->transition = action;
         r->tick = (int64_t)tick;
         r->objective = run->objective;
         r->source_size = revision->source_size;
         memcpy(r->source, revision->source, r->source_size);
         r->version = revision->voyage.manifest.state_version;
-        r->generation = run->generation;
+        r->generation = migrate ? run->generation + 1 : run->generation;
         r->timers = revision->voyage.manifest.timers;
         if (action == BOAT_PLUGIN_OBJECTIVE_UPDATE) {
             r->event_count = run->event_count;
@@ -192,9 +210,13 @@ bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
     free(bytes);
     if (!started) {
         free(r);
-        limit(run, BOAT_PLUGIN_IO,
-            action == BOAT_PLUGIN_OBJECTIVE_INIT ? "cannot start isolated objective initialization"
-                                                 : "cannot start isolated objective update");
+        if (migrate)
+            migration_failed(run, active, BOAT_PLUGIN_IO, "cannot start isolated migration");
+        else
+            limit(run, BOAT_PLUGIN_IO,
+                action == BOAT_PLUGIN_OBJECTIVE_INIT
+                    ? "cannot start isolated objective initialization"
+                    : "cannot start isolated objective update");
         return false;
     }
     *job = (WakeObjectiveJob) {
@@ -203,14 +225,18 @@ bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
     return true;
 }
 
-bool wake_objective_poll(
-    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker, double now)
+// JOB's reply at NOW into RESULT and D: false while it is pending; true when it resolved, with
+// *ACCEPTED when a matched reply arrived in time for the unchanged checkpoint (D then says whether
+// the callback succeeded). The job stays open; the caller closes it.
+static bool collect(const WakeObjective *run, WakeObjectiveJob *job,
+    const WakeObjectiveWorker *worker, double now, BoatPluginObjective *result,
+    BoatPluginDiagnostic *d, bool *accepted)
 {
-    if (!job->job)
-        return false;
     const BoatPluginEvalRequest *r = job->request;
     int status = worker->status(job->job);
-    bool stale = run->generation != r->generation
+    unsigned generation
+        = r->transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE ? r->generation - 1 : r->generation;
+    bool stale = run->generation != generation
         || run->objective.quarantined != r->objective.quarantined
         || boat_plugin_objective_digest(&run->objective)
             != boat_plugin_objective_digest(&r->objective);
@@ -221,18 +247,31 @@ bool wake_objective_poll(
         return false;
     unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REPLY_MAX);
     int size = status == 1 && bytes ? worker->read(job->job, bytes) : -1;
-    static BoatPluginObjective result;
-    BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
-    bool accepted = !stale && !expired && size > 0
-        && boat_plugin_eval_result(r, bytes, (size_t)size, &result, &d);
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
+    *accepted = !stale && !expired && size > 0
+        && boat_plugin_eval_result(r, bytes, (size_t)size, result, d);
     free(bytes);
-    if (!accepted) {
-        d.status = BOAT_PLUGIN_IO;
-        snprintf(d.message, sizeof(d.message), "%s",
+    if (!*accepted) {
+        d->status = BOAT_PLUGIN_IO;
+        snprintf(d->message, sizeof(d->message), "%s",
             stale         ? "stale objective receipt"
                 : expired ? "isolated objective deadline"
                           : "invalid or failed objective worker reply");
     }
+    return true;
+}
+
+bool wake_objective_poll(
+    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker, double now)
+{
+    if (!job->job || job->request->transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE)
+        return false;
+    static BoatPluginObjective result;
+    BoatPluginDiagnostic d;
+    bool accepted;
+    if (!collect(run, job, worker, now, &result, &d, &accepted))
+        return false;
+    const BoatPluginEvalRequest *r = job->request;
     BoatPluginTransition action = r->transition;
     bool update = action == BOAT_PLUGIN_OBJECTIVE_UPDATE;
     unsigned number = r->candidate, events = update ? r->event_count : 0;
@@ -255,6 +294,37 @@ bool wake_objective_poll(
     if (update)
         run->trace[run->trace_count - 1].tick = tick;
     return true;
+}
+
+int wake_objective_poll_migration(WakeObjective *run, WakeObjectiveJob *job,
+    const WakeObjectiveWorker *worker, double now, BoatPluginObjective *migrated)
+{
+    if (!job->job || job->request->transition != BOAT_PLUGIN_OBJECTIVE_MIGRATE)
+        return 0;
+    BoatPluginDiagnostic d;
+    bool accepted;
+    if (!collect(run, job, worker, now, migrated, &d, &accepted))
+        return 0;
+    unsigned active = job->request->revision;
+    wake_objective_cancel(job, worker);
+    if (accepted && d.status == BOAT_PLUGIN_OK)
+        return 1;
+    migration_failed(run, active, d.status, d.message);
+    return -1;
+}
+
+void wake_objective_overrun(
+    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker)
+{
+    if (!job->job)
+        return;
+    bool migrate = job->request->transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE;
+    unsigned active = job->request->revision;
+    wake_objective_cancel(job, worker);
+    if (migrate)
+        migration_failed(run, active, BOAT_PLUGIN_IO, "migration overrun");
+    else
+        limit(run, BOAT_PLUGIN_IO, "objective evaluation overrun");
 }
 
 void wake_objective_adopt(

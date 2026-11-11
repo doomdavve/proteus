@@ -42,6 +42,7 @@ static BoatLocalConfig config_of(WakeLocal *local, const BoatSession *session,
     }
     local->voyage_active = !local->course_active && session->voyage.route;
     local->objective = (WakeObjectiveView) { 0 };
+    local->hold = false;
     if (local->voyage_active) {
         wake_voyage_init(&local->voyage, session, 0);
         local->voyage.worker = local->worker;
@@ -141,6 +142,7 @@ static bool run(WakeLocal *local, BoatSession *session, ObjectStudy *objects, un
         objects->wakes = boat_local_view(&local->local)->state.wakes;
     if (ok)
         course_sync(local, session);
+    local->hold = false; // The view now shows a deferred migration pending, or its outcome.
     float elapsed = (float)((boat_profile_time(IsWindowReady()) - started) * 1000.0);
     if (metrics && grant) {
         metrics->physics_ms += elapsed;
@@ -151,17 +153,22 @@ static bool run(WakeLocal *local, BoatSession *session, ObjectStudy *objects, un
     return ok;
 }
 
-// L4b: an objective the authority evaluates on its isolated worker.
+// L4b: an objective the authority evaluates on its isolated worker: as the client last saw it,
+// or before its first view, the revision the session started with.
 static bool isolated(const WakeLocal *local)
 {
-    return local->worker && local->voyage_active && local->revision
-        && local->revision->voyage.manifest.objective;
+    if (!local->worker || !local->voyage_active)
+        return false;
+    if (local->objective.valid)
+        return local->objective.initialized || local->objective.pending;
+    return local->revision && local->revision->voyage.manifest.objective;
 }
 
 bool wake_local_waiting(const WakeLocal *local)
 {
-    return local->active && isolated(local)
-        && (!local->objective.valid || local->objective.pending);
+    return local->active
+        && (local->hold
+            || (isolated(local) && (!local->objective.valid || local->objective.pending)));
 }
 
 // The frame's grant from ACCUMULATOR; see wake_local_frame.
@@ -256,9 +263,23 @@ bool wake_local_commit(WakeLocal *local, BoatSession *session, ObjectStudy *obje
         local->active = false;
         return false;
     }
+    // L4b: a migration on the worker starts at the next frame's start; that frame grants nothing,
+    // and the view keeps the clock held until the outcome arrives.
+    if (code == WAKE_VOYAGE_MIGRATE && local->worker)
+        local->hold = true;
     if (moved)
         objects->wakes = boat_local_view(&local->local)->state.wakes;
     return true;
+}
+
+bool wake_local_cancel(WakeLocal *local, const BoatSession *session, unsigned revision)
+{
+    if (!local->voyage_active)
+        return true;
+    BoatNetCommitResult predicted = { .boat = session->boat };
+    local->active = boat_local_commit(
+        &local->local, revision, WAKE_VOYAGE_CANCEL, &predicted, session->world.water.storm);
+    return local->active;
 }
 
 bool wake_local_inspect(WakeLocal *local)

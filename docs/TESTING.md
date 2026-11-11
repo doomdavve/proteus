@@ -894,7 +894,12 @@ after zero to three frames at 1x and 8x; held frames grant nothing and no grant 
 update boundary; a restart closes the job in flight and starts INIT again), `isolated_quarantine`
 (slow; a failing callback quarantines at the same boundary with the same text) and
 `isolated_deadline` (an unanswered INIT quarantines after 5 s of virtual elapsed time and play
-resumes; a tick granted past a pending boundary quarantines as an overrun). Each
+resumes; a tick granted past a pending boundary quarantines as an overrun) and
+`isolated_migrate` (slow; migrations on the worker are deferred commits: the host grants nothing
+from the request until the outcome; an accepted one adopts the migrated objective and a failing
+one keeps everything, both equal to the native authority's digests, traces and text; a canceled
+one changes nothing and its ready reply is inert; an unanswered one fails at the 5 s deadline and
+a tick granted during one fails it as an overrun, the objective running on). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports

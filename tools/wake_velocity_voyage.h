@@ -22,15 +22,20 @@
 
 #define WAKE_VOYAGE_STATE_BYTES 40
 // The objective's tail after the voyage's bytes: generation (4), active revision (4), the latest
-// commit's revision (4), commits handled (4), the latest commit's status (1), whether an isolated
-// evaluation is pending (1, L4b), diagnostic text length (1) and that many bytes of text.
+// commit's revision (4), commits handled (4), the latest commit's status (1), flags (1, L4b:
+// WAKE_VOYAGE_PENDING, WAKE_VOYAGE_INITIALIZED), diagnostic text length (1) and that many bytes
+// of text.
 #define WAKE_VOYAGE_OBJECTIVE_BYTES 19
+#define WAKE_VOYAGE_PENDING 1 // An isolated evaluation (or migration) is in flight.
+#define WAKE_VOYAGE_INITIALIZED 2 // The objective's INIT has completed.
 
 // The adapter's commit codes on the wire.
 typedef enum {
+    WAKE_VOYAGE_CANCEL = 0, // L4b: close the migration in flight to this revision; nothing changes.
     WAKE_VOYAGE_REBIND = 1, // Unchanged or renamed: the same route, the new revision's storage.
     WAKE_VOYAGE_LIVE, // A live route edit: progress kept, the latest shelter found by its id.
-    WAKE_VOYAGE_MIGRATE, // The candidate's migrate runs on the objective; it may fail.
+    WAKE_VOYAGE_MIGRATE, // The candidate's migrate runs on the objective; it may fail. With a
+    // worker (L4b) the commit is deferred until the result arrives.
     WAKE_VOYAGE_RESTART, // The voyage restarts at its start shelter with a new objective.
 } WakeVoyageCommit;
 
@@ -58,6 +63,11 @@ typedef struct {
     const WakeObjectiveWorker *worker;
     WakeObjectiveJob job;
     double now;
+    // L4b: the candidate whose migration runs on the worker (NULL for none), and the settled
+    // outcome the server has not collected yet (completion).
+    const BoatPluginRevision *migrating;
+    BoatNetCommitResult completed;
+    bool has_completed;
 } WakeVoyageAuthority;
 
 // A new generation from SESSION's voyage (its route and start state). The objective's trace and

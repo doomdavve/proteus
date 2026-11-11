@@ -2193,9 +2193,14 @@ static const BoatLocalScript full_ahead_script = { NULL, full_ahead };
 
 static int open_isolated(bool failing)
 {
-    objective_revision = objective_test(failing);
+    // Both authorities resolve commits in the same revision table.
+    memset(revisions, 0, sizeof(revisions));
+    revisions[0] = *objective_test(failing);
+    objective_revision = &revisions[0];
+    game.resolve = isolated_game.resolve = resolve;
     if (open_voyage(OUTER, false))
         return 1;
+    revisions[0].voyage.route = test_route; // A migration's revision brings this route.
     memset(&model, 0, sizeof(model));
     game.script = &full_ahead_script;
     wake_local_close(&isolated_game);
@@ -2283,6 +2288,151 @@ static void close_isolated(void)
     objective_revision = NULL;
     game.revision = NULL;
     game.script = NULL;
+    game.resolve = isolated_game.resolve = NULL;
+}
+
+// Isolated frames (the model answering at once) until no job is open, so a commit can be taken.
+static int isolated_idle(void)
+{
+    unsigned held = 0;
+    for (unsigned n = 0;
+        n < 8 && (isolated_game.voyage.job.job || wake_local_waiting(&isolated_game)); ++n)
+        if (isolated_drive(1, BOAT_TIME_NORMAL, 0, &held))
+            return 1;
+    CHECK(!isolated_game.voyage.job.job && !wake_local_waiting(&isolated_game));
+    return 0;
+}
+
+// A zero grant on the native authority: it takes the requests sent since its last frame.
+static int native_zero_frame(void)
+{
+    double none = 0;
+    CHECK(wake_local_scripted_frame(&game, &play.session, &play.objects, &none, now, NULL));
+    return 0;
+}
+
+// Commit NEXT with CHANGE on both authorities (the native one takes it at once).
+static int commit_isolated(const BoatPluginRevision *next, BoatPluginChange change, bool native)
+{
+    if (native) {
+        CHECK(wake_local_commit(&game, &play.session, &play.objects, next, change, false));
+        if (native_zero_frame())
+            return 1;
+    }
+    CHECK(wake_local_commit(
+        &isolated_game, &isolated_play.session, &isolated_play.objects, next, change, false));
+    return 0;
+}
+
+// Isolated frames until the migration in flight settles; the model answers LAG frames after the
+// job started (never, for UINT_MAX). Returns the frames held, or 0 on failure.
+static unsigned isolated_migration(unsigned lag)
+{
+    unsigned frames = 0, waited = 0;
+    uint64_t tick = isolated_game.local.tick, commits = isolated_game.objective.commits;
+    while (frames < 400 && (frames == 0 || wake_local_waiting(&isolated_game))) {
+        isolated_play.accumulator += 1.0 / 60;
+        now += 1.0 / 60;
+        if (!wake_local_scripted_frame(&isolated_game, &isolated_play.session,
+                &isolated_play.objects, &isolated_play.accumulator, now, NULL)
+            || isolated_game.local.tick != tick)
+            return 0;
+        ++frames;
+        if (model_open() && lag != UINT_MAX && ++waited > lag)
+            model_reply_all();
+    }
+    return isolated_game.objective.commits == commits + 1 ? frames : 0;
+}
+
+// L4b: migrations on the worker. The commit is deferred: the host grants nothing from the request
+// until the outcome, then the authority adopts the migrated objective as the native one does
+// (equal digests, traces and HUD), or keeps everything when the callback fails. A canceled
+// migration changes nothing and its late reply is inert; an unanswered one fails at the 5 s
+// deadline and a tick granted during one fails it as an overrun, the objective running on.
+static int isolated_migrate(void)
+{
+    unsigned held = 0;
+    int failed = open_isolated(false) || isolated_drive(120, BOAT_TIME_NORMAL, 1, &held)
+        || isolated_idle();
+    if (failed) {
+        close_isolated();
+        return 1;
+    }
+    const WakeObjectiveView *view = &isolated_game.objective;
+    const BoatNetServerStats *stats = &isolated_game.local.server.stats;
+    // Accepted, answered three frames late.
+    BoatPluginRevision *r2 = revision_from(2, &revisions[0], NULL,
+        "p.migrate=function(c,s) s.reached=s.reached+100; return s, "
+        "{{kind='hud.set', generation=c.generation, id='reached', label='REACHED',"
+        " value=s.reached}} end");
+    CHECK(!commit_isolated(r2, BOAT_PLUGIN_MIGRATE, true));
+    CHECK(game.objective.commit == 2 && game.objective.commit_status == WAKE_COMMIT_APPLIED);
+    unsigned frames = isolated_migration(3), accepted = frames;
+    CHECK(frames >= 4 && view->commit == 2 && view->commit_status == WAKE_COMMIT_APPLIED);
+    CHECK(view->revision == 2 && view->generation == 2 && !view->pending);
+    CHECK(stats->commits_deferred == 1 && stats->commits_completed == 1 && stats->commits == 1);
+    CHECK(isolated_game.voyage.revision == r2 && same_isolated());
+    CHECK(view->hud_count >= 1 && !strcmp(view->hud[0].id, "reached") && view->hud[0].value >= 100);
+    failed = isolated_drive(60, BOAT_TIME_NORMAL, 1, &held) || isolated_idle();
+    // A failing callback: both keep revision 2 and say why.
+    BoatPluginRevision *r3
+        = revision_from(3, r2, NULL, "p.migrate=function(c,s) error('no migrate') end");
+    CHECK(!failed && !commit_isolated(r3, BOAT_PLUGIN_MIGRATE, true));
+    CHECK(isolated_migration(1));
+    CHECK(view->commit == 3 && view->commit_status == WAKE_COMMIT_FAILED);
+    CHECK(strstr(view->message, "no migrate") && view->revision == 2 && view->generation == 2);
+    CHECK(game.objective.commit_status == WAKE_COMMIT_FAILED && same_isolated());
+    CHECK(!strcmp(view->message, game.objective.message));
+    failed = isolated_drive(30, BOAT_TIME_NORMAL, 1, &held) || isolated_idle();
+    // Canceled while in flight: nothing changes, and the reply that arrives after is inert.
+    BoatPluginRevision *r4 = revision_from(4, &revisions[0], NULL,
+        "p.migrate=function(c,s) s.reached=s.reached+1000; return s, {} end");
+    CHECK(!failed && !commit_isolated(r4, BOAT_PLUGIN_MIGRATE, false));
+    uint64_t tick = isolated_game.local.tick, commits = view->commits;
+    for (unsigned n = 0; n < 3; ++n) {
+        isolated_play.accumulator += 1.0 / 60;
+        now += 1.0 / 60;
+        CHECK(wake_local_scripted_frame(&isolated_game, &isolated_play.session,
+            &isolated_play.objects, &isolated_play.accumulator, now, NULL));
+    }
+    CHECK(view->pending && model_open() == 1 && isolated_game.local.tick == tick);
+    CHECK(wake_local_cancel(&isolated_game, &isolated_play.session, 4));
+    unsigned closed = model.closed;
+    model_reply_all(); // The reply is ready before the cancel lands; it must not apply.
+    CHECK(isolated_migration(0) == 1);
+    CHECK(view->commits == commits + 1 && view->commit == 4
+        && view->commit_status == WAKE_COMMIT_CANCELED && view->revision == 2);
+    CHECK(model.closed == closed + 1 && isolated_game.local.server.deferred_slot < 0);
+    CHECK(same_isolated());
+    failed = isolated_drive(30, BOAT_TIME_NORMAL, 1, &held) || isolated_idle();
+    CHECK(!failed && view->revision == 2 && game.objective.revision == 2);
+    // Unanswered: the deadline (5 s of elapsed time, virtual here) fails it; the objective runs
+    // on unchanged. From here the isolated trace holds a failed migration the native one lacks.
+    CHECK(!commit_isolated(r4, BOAT_PLUGIN_MIGRATE, false));
+    frames = isolated_migration(UINT_MAX);
+    CHECK(frames > 290 && frames < 310 && view->commit_status == WAKE_COMMIT_FAILED);
+    CHECK(strstr(view->message, "isolated objective deadline") && !view->suspended);
+    CHECK(model_open() == 0 && isolated_game.local.server.deferred_slot < 0);
+    const WakeObjective *a = &game.voyage.objective, *b = &isolated_game.voyage.objective;
+    CHECK(
+        boat_plugin_objective_digest(&a->objective) == boat_plugin_objective_digest(&b->objective));
+    CHECK(b->trace[b->trace_count - 1].transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE);
+    // Overrun: the host grants ticks during the migration; it fails, the objective runs on.
+    CHECK(!commit_isolated(r4, BOAT_PLUGIN_MIGRATE, false));
+    double none = 0;
+    CHECK(wake_local_scripted_frame(
+        &isolated_game, &isolated_play.session, &isolated_play.objects, &none, now, NULL));
+    CHECK(view->pending && model_open() == 1);
+    CHECK(boat_local_frame_scripted(&isolated_game.local, now, 6, &full_ahead_script, NULL));
+    CHECK(wake_local_scripted_frame(
+        &isolated_game, &isolated_play.session, &isolated_play.objects, &none, now, NULL));
+    CHECK(view->commit_status == WAKE_COMMIT_FAILED && strstr(view->message, "migration overrun"));
+    CHECK(!view->suspended && !b->objective.quarantined && model_open() == 0);
+    CHECK(isolated_game.local.server.deferred_slot < 0 && view->revision == 2);
+    printf("isolated migrations: %" PRIu64 " deferred; held %u frames (accepted), %u (deadline)\n",
+        stats->commits_deferred, accepted, frames);
+    close_isolated();
+    return 0;
 }
 
 // L4b: the authority evaluates the objective on the isolated worker and stays equal to the native
@@ -2416,6 +2566,7 @@ int main(int argc, char **argv)
         SLOW_CASE(isolated_objective),
         SLOW_CASE(isolated_quarantine),
         TEST_CASE(isolated_deadline),
+        SLOW_CASE(isolated_migrate),
     };
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     boat_local_stop(lp);

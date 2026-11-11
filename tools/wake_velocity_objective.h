@@ -42,6 +42,7 @@ typedef enum {
     WAKE_COMMIT_NONE,
     WAKE_COMMIT_APPLIED,
     WAKE_COMMIT_FAILED, // A migration failed; the authority kept its revision.
+    WAKE_COMMIT_CANCELED, // L4b: the host canceled a migration in flight; nothing changed.
 } WakeCommitStatus;
 
 typedef struct {
@@ -51,6 +52,7 @@ typedef struct {
     // and the latest one's result.
     WakeCommitStatus commit_status;
     bool pending; // L4b: an isolated evaluation is in flight; the host must hold the clock.
+    bool initialized; // L4b: the objective's INIT has completed.
     bool suspended;
     // The suspension's, or a failed migration's, diagnostic text.
     char message[sizeof(((BoatPluginDiagnostic *)0)->message)];
@@ -100,19 +102,31 @@ typedef struct {
     BoatPluginEvalRequest *request; // Owned while the job is open.
 } WakeObjectiveJob;
 
-// Start ACTION (INIT after wake_objective_clear returned true, or UPDATE after
-// wake_objective_queue did) of REVISION at TICK on WORKER at NOW; EPOCH identifies the run.
+// Start ACTION (INIT after wake_objective_clear returned true, UPDATE after wake_objective_queue
+// did, or MIGRATE to candidate REVISION) of REVISION at TICK on WORKER at NOW; ACTIVE is the
+// active revision's number (REVISION's own but for a migration) and EPOCH identifies the run.
 // NOW may be NaN: the deadline then counts from the first poll. False when no job could start:
-// then the objective is quarantined, as a failed callback would.
+// then an INIT or UPDATE quarantines the objective, as a failed callback would; a MIGRATE keeps
+// it, with its diagnostic and trace as wake_objective_migrate's failure leaves them.
 bool wake_objective_begin(WakeObjective *run, WakeObjectiveJob *job,
     const WakeObjectiveWorker *worker, BoatPluginTransition action,
-    const BoatPluginRevision *revision, uint64_t epoch, uint64_t tick, double now);
-// Collect JOB's reply at NOW. True when it resolved: an INIT's result becomes the objective, an
-// UPDATE's is staged for the next tick (as wake_objective_init and wake_objective_update leave
-// them), with the same trace; a failed callback, an invalid or stale reply or the deadline
-// quarantines it. False while the job is pending.
+    const BoatPluginRevision *revision, unsigned active, uint64_t epoch, uint64_t tick, double now);
+// Collect an INIT or UPDATE JOB's reply at NOW. True when it resolved: an INIT's result becomes
+// the objective, an UPDATE's is staged for the next tick (as wake_objective_init and
+// wake_objective_update leave them), with the same trace; a failed callback, an invalid or stale
+// reply or the deadline quarantines it. False while the job is pending (or is a migration).
 bool wake_objective_poll(
     WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker, double now);
+// L4b: collect a MIGRATE JOB's reply at NOW: 1 with MIGRATED (the next generation, for
+// wake_objective_adopt), -1 when it failed (the callback, an invalid or stale reply or the
+// deadline; diagnostic and trace as wake_objective_migrate's failure), 0 while pending. Nothing
+// else changes; a pending batch stays pending.
+int wake_objective_poll_migration(WakeObjective *run, WakeObjectiveJob *job,
+    const WakeObjectiveWorker *worker, double now, BoatPluginObjective *migrated);
+// A tick committed while JOB was open: close it. An INIT or UPDATE quarantines the objective
+// ("objective evaluation overrun"); a migration fails and keeps it ("migration overrun").
+void wake_objective_overrun(
+    WakeObjective *run, WakeObjectiveJob *job, const WakeObjectiveWorker *worker);
 // Close JOB (if open) without applying anything.
 void wake_objective_cancel(WakeObjectiveJob *job, const WakeObjectiveWorker *worker);
 // The objective's inspection text under REVISION (the active revision's number) into OUT (at most
