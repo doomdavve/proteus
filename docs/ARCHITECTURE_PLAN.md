@@ -1,15 +1,13 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-11:** AR0–AR6 merged (PRs #177, #178). AR7's ledger is implemented: L6, L0's
-removal and L2 (#181), L1 with L9 (#184), L7, L8, L3, L4a, L5 and L4b objectives (#185), and L4b
-authoring on `arch/l4b-authoring` ([L4b authoring](#l4b-authoring-status)): every shipped solo
-mode, native and browser, runs on the local authority; no direct gameplay path is left in the
-browser. The user played up to #181 on macOS; nothing browser-built or Windows-built.
-**Open:** the deferred manual checks (native windowed, browser, Windows; listed per row); the
-menu-gated touch tap (AR7); impaired-delivery qualification; pinned `saved_at` (L3).
-**Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
-directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-**Next:** the user's review of `arch/l4b-authoring` and the owed manual checks; then AR8.
+**Status, 2026-11-11:** AR0–AR7 merged through PR #186; every shipped solo mode uses the
+local authority. AR8a, AR8b and AR9 are implemented locally on `arch/ar8-layout`:
+module/application/test moves, local CMake, qualified includes and enforced module boundaries.
+**Open:** AR7's deferred manual checks, menu-gated touch tap, impaired-delivery qualification
+and pinned `saved_at`; AR10 specification closure. Audio/room library extraction is deferred.
+**Done when:** the migrated authority/client system and owning modules are documented in
+`docs/ARCHITECTURE.md` (AR10), with remaining qualifications explicitly assigned.
+**Next:** review the local AR8/AR9 milestone; AR10 closes the overall architecture plan.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1378,8 +1376,8 @@ coverage. Add focused negative checks, not tests that restate file lists.
 
 ### AR8/AR9 design — 2026-11-11
 
-Proposed on `arch/ar8-layout` before any move. The user decided AR8-1 (b), AR8-2 (a), AR8-3 (a)
-and AR8-4 (a) on 2026-11-11.
+Accepted design on `arch/ar8-layout`, recorded before the moves; implementation status below.
+The user decided AR8-1 (b), AR8-2 (a), AR8-3 (a) and AR8-4 (a) on 2026-11-11.
 AR8 and AR9 form one milestone and one PR. Moves start once PR #186 (L4b) has merged, since
 it touches the application, plugin and net files that move.
 
@@ -1417,7 +1415,7 @@ progress each moved directory is a temporary include path, so flat includes stil
 each move stays a pure rename; one commit then qualifies every include and drops the temporary
 paths. Since the roots expose every header, ownership is enforced by a check: a new one,
 `module_includes`, holds the allowed module graph, closed transitively (core → nothing;
-scenery, net → core; render → scenery, platform; plugins → core, json; session → render,
+scenery, net → core; render → scenery, platform; plugins → core, json, platform; session → render,
 net, plugins; room → net, plugins, platform; apps and tests → anything), and rejects an unqualified
 project include or one into a module not allowed, with negative self-test cases. Existing gates become
 directory-based where a directory equals the boundary: `boat_core_boundary` covers every
@@ -1485,12 +1483,37 @@ Native Debug build passes; full CTest with socket/process access passes 537/537 
 match a fresh build of `7f56188` byte for byte; catalog data matches apart from the include.
 Browser game/worker build and Wasm Lua check pass. Step 9 now adds the module graph guard
 and recursive core/net source discovery; negative controls cover forbidden, flat and relative
-includes and unregistered nested source files. Step 10 closing documentation is next. No new manual playback or user acceptance is claimed.
+includes and unregistered nested source files. Step 10 updates the owning guides, layout
+instructions and index; AR8/AR9 are complete locally. No new manual playback or user acceptance
+is claimed.
 
 Step 7 deviations: `proteus_audio` and `proteus_room` are deferred. Their sources are compiled
 by executables with different definitions (including server WebRTC selection); merging them
 into a library would change behavior. `boat_profile` stays in `proteus_boat_drive`, moved to
 its owning application directory. This milestone preserves targets and behavior.
+
+Closing verification (2026-11-11, arm64 macOS, AppleClang 21.0.0, Debug,
+`PROTEUS_GPU_TESTS=OFF`): a fresh configure and complete native build pass, reusing pinned
+raylib/ENet sources; the only warning is in raylib's bundled `stb_vorbis.c`. The final full
+preset passes 537/537 enabled tests (13 disabled) in 57.93 s with socket/process access.
+Basin/outer captures were inspected and match `7f56188` exactly. Web packaging and local
+macOS app ZIP packaging pass; the latter's ad-hoc signature verifies (the reused ENet source
+needed a build-only symlink for its license). All 1,270 local links in touched Markdown files
+resolve. No Windows/Linux CI or new windowed/manual playback was run.
+
+Browser automation: `tests/web/check_web_plugin_author.py --browser chromium` passes on
+headless Chromium 156.0.8078.4 (SwiftShader), with the default 20 validation cycles and three
+restored sessions. It covers authoring, isolated objectives, migration/Undo/restart, quarantine,
+freeze/deadline handling and cleanup. Evidence is local in `build/ar8-browser-check/results.json`;
+this is automated qualification, not manual playback or user acceptance. Firefox and WebKit
+were not rerun for this layout-only milestone.
+
+The supported browser targets are `web` (game, worker and packaging), `wake_velocity` and
+`plugin_stage`. An untargeted browser all-build also selects `boat_race_trial` and fails on
+`boat_water_radial_gpu_check`, whose implementation is native-only; source inspection confirms
+this target and mismatch already exist at merged baseline `adaea05`. Fixing that developer
+tool's browser selection is deferred; no build policy is changed here. AR10 remains a separate
+step to close the overall architecture specification, along with AR7's listed open items.
 
 ### AR10 — Close the plan as the architecture specification
 

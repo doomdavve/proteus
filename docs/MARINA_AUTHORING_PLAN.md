@@ -318,7 +318,7 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 ## M3: authored routes and docking motion
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
-validation in `src/core/boat_scene_definition.[ch]`, `src/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
+validation in `src/core/boat_scene_definition.[ch]`, `src/net/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
 
 Add bounded plugin-authored waypoint routes with native smooth turns, speed limits, stops,
 slow docking approaches and departure maneuvers. Define open versus looping routes, heading

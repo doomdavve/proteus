@@ -1864,7 +1864,7 @@ Not checked:
 - Keyboard/title navigation by a human.
 
 **Executable renamed to `wake_velocity` — 2026-10-25.** The game target, its
-`tools/boat_study*.{c,h}` sources (now `tools/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
+`tools/boat_study*.{c,h}` sources (now `apps/wake_velocity/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
 macros, CTest names and commands, `tools/macos/package.py`, the Windows/Linux workflows,
 `cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tests/lint/check_wayland.sh`,
 `tests/web/check_web_controls.py` and every document now use `wake_velocity`; package copies

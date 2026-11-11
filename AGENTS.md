@@ -43,7 +43,7 @@ playground for iterating on effects, timing, audio, and presentation.
   `tests/support/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
   validators only; production targets never link it. See `docs/TESTING.md` for the libraries and
   test labels.
-- `src/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
+- `src/net/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
   protocol codec, authority/client sessions, client prediction, remote boat view and transports.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
   ENet and sockets. `src/room/boat_server.c` and `tools/boat_bot.c` are the server and scripted
@@ -55,7 +55,7 @@ playground for iterating on effects, timing, audio, and presentation.
   client mirror for the game (ledger L3).
 - `apps/wake_velocity/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.
-- `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
+- `src/plugins/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
   over a pinned Lua 5.4.9 in `proteus_lua`; P1 revisions, reload policies and Undo in
   `boat_plugin_host`) and reference packages; core and net never link it. The game's native
   `--plugin` glue is `apps/wake_velocity/wake_velocity_plugin.[ch]`.
@@ -124,6 +124,11 @@ xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
 ```
 
 ## Conventions
+
+- Qualify project includes by their owner, even within a module (`"core/boat.h"`,
+  `"wake_velocity/wake_velocity_app.h"`, `"support/boat_test_world.h"`). Module CMake files own
+  targets; `tests/<module>/tests.cmake` owns registration. `module_includes` enforces the
+  transitive module graph; plugin data/backend checks enforce narrower private interfaces.
 
 - Format C with the checked-in `.clang-format`; use four spaces and keep lines near 100 columns.
 - Keep the project warning-clean under the compiler flags in `CMakeLists.txt`.

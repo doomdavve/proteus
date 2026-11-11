@@ -313,7 +313,7 @@ small to judge at 320×200), browser builds.
 
 ## GH4: tour format
 
-Read the [voyage schema](PLUGIN_API.md#voyage-schema), `src/boat_plugin*.[ch]` and the
+Read the [voyage schema](PLUGIN_API.md#voyage-schema), `src/plugins/boat_plugin*.[ch]` and the
 [objective transactions](PLUGIN_API.md#objective-transactions-p31--p32).
 
 A voyage allows 2–4 shelters, and the first must be the location's spawn (the Eriksberg dock).
