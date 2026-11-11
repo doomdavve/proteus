@@ -567,11 +567,8 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   session with identical input to Långedrag and compares the boat, the water and every voyage
   field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
   check that `--plugin` is refused with a room, the course, another location or a missing package.
-  `wake_plugin_objective` runs `validate_wake_plugin_objective`, which compiles the game's browser
-  objective policy natively (`WAKE_PLUGIN_ISOLATED_OBJECTIVE=1`) over a C model of the page
-  bridges and checks, on virtual time, a reply first accepted exactly at its 5 s deadline
-  (rejected) and just before it (accepted, published at T+1), stale and failed receipts, BUSY
-  controls, and reset/close cleanup over repeated sessions.
+  The browser evaluates objectives only on its local authority's isolated worker; the
+  `boat_local.isolated_*` cases check that path natively over a C model of the worker.
 - `boat_plugin_catalog` (PD1/PD5) decodes every generated entry and proves it equals evaluating
   its embedded source, that the basin-free, outer-voyage and time-trial defaults equal
   the shipped `proteus_boat_fixtures` values, and that catalog decoding creates no Lua state (the
@@ -883,7 +880,10 @@ reader, the objective tail and the PrivateRecover, PrivateCommit, PrivateInspect
 PrivateInspection messages, which the v14 and
 input decoders reject);
 `recover_ignored` (a free-boating authority without a voyage adapter ignores a request, and the
-next snapshot corrects the client; a client refuses a request for another tick); and the L4b
+next snapshot corrects the client; a client refuses a request for another tick);
+`deferred_commit` (a fake adapter defers a commit: the authority applies nothing until the
+adapter's completion reports the outcome after a later grant, then relocates the boat and installs
+the scene; a request taken while one is deferred settles it); and the L4b
 cases, which give a second session's authority a C model of the browser's objective worker:
 `isolated_objective` (slow; beside the native authority on the same per-tick script, equal
 boats, voyages, objectives, staged batches and traces at every frame while the model answers
@@ -891,7 +891,20 @@ after zero to three frames at 1x and 8x; held frames grant nothing and no grant 
 update boundary; a restart closes the job in flight and starts INIT again), `isolated_quarantine`
 (slow; a failing callback quarantines at the same boundary with the same text) and
 `isolated_deadline` (an unanswered INIT quarantines after 5 s of virtual elapsed time and play
-resumes; a tick granted past a pending boundary quarantines as an overrun). Each
+resumes; a tick granted past a pending boundary quarantines as an overrun) and
+`isolated_migrate` (slow; migrations on the worker are deferred commits: the host grants nothing
+from the request until the outcome; an accepted one adopts the migrated objective and a failing
+one keeps everything, both equal to the native authority's digests, traces and text; a canceled
+one changes nothing and its ready reply is inert; an unanswered one fails at the 5 s deadline and
+a tick granted during one fails it as an overrun, the objective running on),
+`isolated_failed_reply` (a worker that reports failure, or a truncated reply, quarantines with
+its own text and closes the job) and
+`isolated_authoring` (slow; the game's own host, `tools/wake_velocity_plugin.c`, on the isolated
+authority beside the same host on the native one: controls answer busy while an update is in
+flight; F7 on a migration holds the clock until the worker answers and then commits the host's
+table; a rename applies at once; the page's cancel closes a migration in flight; Undo restarts
+the voyage with INIT on the worker; equal revisions, generations, outcomes and objectives, and
+the browser checkpoint read from the authority's inspection). Each
 drive also requires zero rate-limited, late, future, duplicate or stale-life commands, every tick
 integrating a received command, no resync and zero prediction correction error. Frame time is a
 scripted value, never wall time. `./build/validate_boat_local --bench` (not a test) reports

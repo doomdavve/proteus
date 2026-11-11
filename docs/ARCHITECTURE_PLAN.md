@@ -1,22 +1,15 @@
 # Architecture restructuring plan
 
-**Status, 2026-11-11:** AR0 complete at `1fb9950`; AR1 [design](ARCHITECTURE_AR1.md) and
-[decisions D1–D10](ARCHITECTURE_AR1.md#product-decisions) merged (PR #177). AR2–AR6 milestone
-(AR2a/b, AR3a–f, AR4, AR5, AR6 pilot) merged as PR #178. AR7's L6, L0's removal and L2 (time
-trial on the wake pool and the local authority, [D11](ARCHITECTURE_AR1.md#product-decisions))
-merged as PR #181 ([AR7 status](#ar7-status)). The user played both on macOS; nothing
-browser-built or Windows-built.
-**Open:** remaining manual native, browser and Windows checks per step; the menu-gated touch
-tap (AR7); untested MIGRATE evaluation paths (AR3e); impaired-delivery qualification; pinned `saved_at` (L3).
+**Status, 2026-11-11:** AR0–AR6 merged (PRs #177, #178). AR7's ledger is implemented: L6, L0's
+removal and L2 (#181), L1 with L9 (#184), L7, L8, L3, L4a, L5 and L4b objectives (#185), and L4b
+authoring on `arch/l4b-authoring` ([L4b authoring](#l4b-authoring-status)): every shipped solo
+mode, native and browser, runs on the local authority; no direct gameplay path is left in the
+browser. The user played up to #181 on macOS; nothing browser-built or Windows-built.
+**Open:** the deferred manual checks (native windowed, browser, Windows; listed per row); the
+menu-gated touch tap (AR7); impaired-delivery qualification; pinned `saved_at` (L3).
 **Done when:** every shipped mode runs as authority/client (AR7), modules sit in owning
 directories with enforced boundaries (AR8/AR9), and this plan has become `docs/ARCHITECTURE.md`.
-L1 (voyages, tours, objectives and authoring, L9 folded in) merged as PR #184
-([L1 status](#l1b-status)). L7, L8 and L3 implemented on `arch/ar7-rest`
-([L7/L8](#l7-l8-status), [L3](#l3-status), [L4a](#l4-status)). The user defers windowed checks
-until every L* row is done.
-L5 closed by evidence ([L5](#l5-decision)); L4b objectives implemented ([L4b](#l4b-status)).
-The user accepted [L4-1, L4-2](#l4b-decision) and [L5-1](#l5-decision) on 2026-11-11.
-**Next:** L4b authoring (L4-2 (b)): browser staging, migration and Undo on the authority.
+**Next:** the user's review of `arch/l4b-authoring` and the owed manual checks; then AR8.
 
 This file owns restructuring status, contracts, evidence and limitations. It subsumes the
 [architecture review](ARCHITECTURE_REVIEW.md), which stays a dated baseline until AR10 replaces
@@ -1203,6 +1196,111 @@ Chromium 156 through Playwright 1.64.1 with SwiftShader):
 
 Not verified: Firefox and WebKit, an objective voyage on the browser's authority (unreachable in
 shipped play until authoring moves), any manual play.
+
+<a id="l4b-authoring-design"></a>L4b authoring (L4-2 (b)), design 2026-11-11, on `arch/l4b-authoring`
+(from `main` after PR #185). Browser authoring (page and console staging, Apply, Undo, live
+edits and migrations) runs on the browser's local authority, as native authoring does (L1b);
+no direct path is left in the browser. Host management (staging workers, revision table, Undo,
+held candidate, panel, console) stays in `WakePlugin`, unchanged.
+
+- **Deferred commit.** A migration on the isolated worker cannot finish inside
+  `BoatNetRules.commit`. The adapter may answer a commit request with
+  `BoatNetCommitResult.deferred`: the server applies nothing yet, counts it and remembers the
+  slot. A new rules hook, `completion`, called by every grant after `service`, returns the
+  outcome when it is ready (applied: the scene, relocation and storm the server installs then,
+  as `private_commit` does; or failed/canceled: nothing). Timeliness: the request is firm (it
+  names its tick, as today); an admitted migration is must-complete with the terminal outcomes
+  applied, failed (callback failure, invalid or stale reply, the 5 s elapsed deadline, an
+  overrun) or canceled by the host. Bounded: one deferred commit at a time; any other request
+  while it is open is ignored, apart from a cancel.
+- **The voyage adapter.** `WAKE_VOYAGE_MIGRATE` with a worker starts a MIGRATE job on the
+  committed checkpoint (`wake_objective_begin`, now taking the active revision for the
+  request's pins); the private state reports it pending, so the host grants nothing
+  (`wake_local_waiting`, L4-1 (a)). `service` collects it (`wake_objective_poll_migration`):
+  success adopts the migrated objective with native's trace, failure keeps everything with
+  native's trace and diagnostic, as `wake_objective_migrate` does. `commits` and the commit
+  status change only when the outcome is known, so the host's existing wait (L1-3) works
+  unchanged. A tick granted while it is open fails the migration ("migration overrun"). A new
+  change code, `WAKE_VOYAGE_CANCEL` (0), closes an open migration (status 3, canceled); the
+  request is refused while an UPDATE or INIT is open (host busy, below). Without a worker
+  (native) nothing changes: the migration still runs inside `commit`.
+- **The host.** One code path for native and browser: with an authority, `wake_plugin_frame`
+  never evaluates. While the authority's view reports an evaluation pending, staging results,
+  Apply, Undo and the page's actions answer "OBJECTIVE EVALUATION BUSY", as the browser's
+  direct path does. While a migration is in flight, Undo or the page's cancel sends the cancel
+  and discards the held candidate ("MIGRATION CANCELED"), keeping the browser's current
+  behaviour; natively the result always arrives within the frame, so F6 never meets one in
+  flight. The page's actions reach `wake_plugin_frame` through a field the game fills each
+  frame (`WakePlugin.actions`), so the native validators drive them. A tiny private-state
+  change: the pending byte becomes flags (1 pending, 2 initialized).
+- **Browser checkpoint** (`Module.boatPluginCheckpoint`, read only by the browser checks): the
+  game builds it from the authority's view and its latest inspection (tick, queue, state bytes),
+  asking for a new inspection each frame while authoring an objective voyage (one in flight at
+  a time; the text is at most 32 KiB). It can lag the authority by a frame.
+- **The game.** `LOCAL_PLATFORM_ELIGIBLE` and L4a's restart on promotion go: authoring runs on
+  the local session in the browser too, and a console promotion keeps playing.
+- **Retirement.** Once every step is in, the direct path's isolated evaluation
+  (`WAKE_PLUGIN_ISOLATED_OBJECTIVE`, `begin_evaluation`/`poll_evaluation` in
+  `tools/wake_velocity_plugin.c`) and its validator `validate_wake_plugin_objective` (AR3e) are
+  deleted. The browser's direct path (only replay viewing, which has no objective) quarantines
+  an objective with "no isolated objective evaluator" instead of evaluating it.
+- **Tests** (native, virtual time, the C model of the worker in `validate_boat_local`): a
+  deferred commit through a fake adapter (`deferred_commit`, quick); `isolated_migrate`: the
+  isolated authority beside the native one through an accepted, a failing, a canceled, a
+  late (deadline) and an overrun migration, equal objective digests and traces where both
+  finish; `isolated_authoring`: `WakePlugin` hosts on the isolated and native authorities
+  through stage, Apply with the migration held for several frames, busy controls while an
+  update is pending, cancel, Undo to a voyage restart and a live edit, with equal outcomes,
+  revisions, generations and HUD, and the checkpoint against the native objective.
+- Browser checks: `check_web_plugin_author.py` on Chromium, Firefox and WebKit.
+
+Steps (one commit each): 1 this design; 2 the server's deferred commit; 3 the adapter's
+isolated migration and cancel; 4 the host and game on the authority in the browser; 5 retire the
+direct path's isolated evaluation and AR3e; 6 browser qualification and the plan's status.
+<a id="l4b-authoring-status"></a>L4b authoring, implemented 2026-11-11 on `arch/l4b-authoring` as designed above
+(steps 1–6, one commit each), with these refinements found while building it:
+
+- The frame that carries a migration or voyage-restart request grants nothing
+  (`WakeLocal.hold`); otherwise its first tick overruns the job the request starts.
+- A paused frame (menu, help, focus loss, the browser's authoring panel) now runs a zero-grant
+  local frame, native too, so a commit, cancel or inspection made while paused reaches the
+  authority at once rather than when play resumes.
+- The browser checkpoint takes tick, generation, suspension, queue and state from the
+  inspection and is not refreshed while the inspection is of an older generation than the view
+  (Firefox and WebKit read a migrated generation with the previous state otherwise).
+- Removed: `WAKE_PLUGIN_ISOLATED_OBJECTIVE`, the direct path's `begin_evaluation`,
+  `poll_evaluation` and `wake_plugin_waiting`, and `validate_wake_plugin_objective` (AR3e). Its
+  deadline, failed-reply, busy and reset cases have authority-path counterparts
+  (`isolated_deadline`, `isolated_failed_reply`, `isolated_authoring`, `isolated_objective`); its
+  stale-receipt case has none, because the authority neither ticks nor commits while a job is
+  open. The browser's direct path (replay viewing) quarantines an objective with "no isolated
+  objective evaluator". Nothing had to stay.
+
+Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0 Debug and emcc MinSizeRel, 2026-11-11):
+
+- `ctest --preset full -j8`: 535/535 (the 8 AR3e cases gone; `boat_local` gains
+  `deferred_commit`, `isolated_failed_reply` (quick), `isolated_migrate` and
+  `isolated_authoring` (slow)). Mutations caught: skipping the adoption (`isolated_migrate`),
+  dropping the busy check or the cancel request (`isolated_authoring`).
+- Browser game and `plugin_stage` build clean; `tools/check_web_wasm.py`: no Lua in the game.
+  `tools/check_web_plugin_author.py` passes twice each on headless Chromium 156 (SwiftShader),
+  Firefox 157 and WebKit 27.2 through Playwright 1.64.1, including the objective lifecycle
+  (migration held and canceled by Undo, migrate, failing migration, restart, quarantine,
+  deadline). Observed, not investigated: the objective's mean round trip is 61 ms on Chromium
+  against 3 ms on Firefox and WebKit (page time, polled once a frame).
+
+Limitations: in the browser a migration or restart holds the clock until the worker answers
+(one or more frames, at most the 5 s deadline); the checkpoint (a test hook) lags the authority
+by up to a frame; F6 natively never meets a migration in flight, so the cancel path is
+browser-only in practice.
+
+Owed manual checks (deferred by the user until every L row is done, all still owed): native
+windowed L1a voyage and tour play, L1b authoring (panel HUD, F7 migration, failing migration,
+F6 Undo, live route and marina edits, console promotion, `plugin_author.py live-inspect`), L3
+working harbour (keys, crane and helm feel, autosave, RESTART JOB, RETURN CRATE, pause and focus
+loss), L7's `--replay` restart; browser play of a voyage, a time trial and authoring (stage,
+Apply, Undo, Cancel, console edits without a restart) on desktop Chromium, Firefox and Safari
+and on mobile touch; and Windows builds of all of it.
 
 <a id="l5-decision"></a>L5 (hosted rooms), decision 2026-11-11; the user accepted L5-1 (a) as
 recommended on 2026-11-11. AR1's ledger names no

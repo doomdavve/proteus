@@ -481,9 +481,10 @@ course's). The client derives the storm its water carries from these bytes and t
 both endpoints borrow as an immutable resource. A voyage with a plugin revision appends its
 objective's tail: `u32` generation, `u32` the authority's active revision, `u32` the latest
 commit request's revision, `u32` commit requests handled, `u8` the latest one's status (0 none, 1
-applied, 2 migration failed), `u8` text length (at most 159), then that many bytes of text: the
-suspension's diagnostic when the objective is suspended, else a failed migration's (58 bytes plus
-the text). The objective's HUD and
+applied, 2 migration failed, 3 migration canceled), `u8` flags (1 an isolated evaluation or
+migration is in flight, 2 the objective is initialized), `u8` text length (at most 159), then that
+many bytes of text: the suspension's diagnostic when the objective is suspended, else a failed
+migration's (59 bytes plus the text). The objective's HUD and
 suspension travel as ObjectiveState, as a room objective's do; Lua state never leaves the
 authority.
 
@@ -501,8 +502,13 @@ moves the boat relocates it in the same life; a commit that brings a new scene (
 borrowed scenery) installs it on the authority's world. The client predicts the relocation and the
 scene. The voyage adapter's changes are 1 rebind, 2 live route edit, 3 migrate (the candidate's
 `migrate` runs on the authority; a failure keeps the active revision and its scene, and reports
-it in PrivateState) and 4 restart the voyage; the course adapter's only change is 1 rebind (an
-unchanged or renamed course). A request for another tick, from a peer that is not ready, for an unknown revision or to
+it in PrivateState), 4 restart the voyage and 0 cancel the migration to that revision still in
+flight on the browser's worker; the course adapter's only change is 1 rebind (an
+unchanged or renamed course). An adapter may defer a commit it cannot finish at once (the
+browser's migration on its isolated worker, `BoatNetCommitResult.deferred`): nothing is applied
+until a later grant collects its outcome (`BoatNetRules.completion`), which installs the scene,
+relocation and storm then, or nothing when it failed or was canceled. One commit is deferred at a
+time. A request for another tick, from a peer that is not ready, for an unknown revision or to
 a server whose adapter has no commit is counted and ignored.
 
 `0xC4` PrivateInspect (channel 0, client to server): header only. The rules adapter

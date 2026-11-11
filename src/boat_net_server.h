@@ -72,6 +72,12 @@ typedef struct {
     // ticks (also when it grants none), so the adapter can collect an asynchronous evaluation;
     // the HUD (state) is read again afterwards. Optional.
     void (*service)(void *context, double now);
+    // L4b, private sessions only: the outcome of the commit the adapter deferred
+    // (BoatNetCommitResult.deferred), asked after every grant's service while one is open. RESULT
+    // holds the deferred commit's slot's boat; true when the commit finished: applied (RESULT as
+    // commit fills it) or failed or canceled (nothing set). False while it is still running.
+    // Optional; without it a deferred commit is never completed.
+    bool (*completion)(void *context, BoatNetCommitResult *result);
 } BoatNetRules;
 
 typedef struct {
@@ -145,6 +151,7 @@ typedef struct {
     uint64_t private_states; // Private state messages sent (L2).
     uint64_t recoveries, recoveries_ignored; // Private recover requests (L1).
     uint64_t commits, commits_ignored; // Private commit requests (L1b).
+    uint64_t commits_deferred, commits_completed; // Deferred commits begun and finished (L4b).
     uint64_t inspections; // Private inspection texts sent (L1b).
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
@@ -191,6 +198,7 @@ typedef struct {
     BoatMarkTracker marks; // Which mark each slot is inside; used when ROOM has marks.
     BoatNetObjectiveState objective; // The HUD clients last received (revision 0: none yet).
     bool has_objective;
+    int deferred_slot; // The slot of the commit the adapter deferred (L4b), or -1.
     uint8_t private_sent[BOAT_NET_PRIVATE_STATE_BYTES]; // The private state last sent (L2).
     size_t private_sent_size;
     BoatNetServerStats stats;
@@ -207,7 +215,8 @@ bool boat_net_server_service(BoatNetServer *server, double now);
 // AR6: a private session's service. Handle waiting messages (at most
 // BOAT_NET_MESSAGES_PER_SERVICE, private input batches included), then run exactly TICKS ticks
 // (the host's grant; zero while paused), refilling the input and spawn rate limits per tick, then
-// send the rules adapter's private state when it changed. No
+// send the rules adapter's private state when it changed. Before the ticks it services the rules
+// adapter and collects a deferred commit's outcome (L4b). No
 // peer timeout, catch-up or overload: NOW only stamps operational deadlines (resync rate limit).
 // False for a hosted room.
 bool boat_net_server_grant(BoatNetServer *server, double now, unsigned ticks);

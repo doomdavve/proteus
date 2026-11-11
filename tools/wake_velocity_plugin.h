@@ -9,9 +9,10 @@
 #include "wake_velocity_objective.h"
 #include <stdio.h>
 
-// L1b: the native game's local authority runs the objective and installs every commit. The
+// L1b: the game's local authority runs the objective and installs every commit. The
 // game sets it (wake_plugin_attach) while a local session runs this plugin and fills VIEW and the
-// inspection after each frame; NULL on the direct path (the browser, the review tools).
+// inspection after each frame; NULL on the direct path (the review tools, and replay viewing).
+// L4b: the browser's runs the objective on its isolated worker; the host never evaluates there.
 typedef struct WakePluginAuthority {
     void *context;
     // After the host committed REVISION with CHANGE into SESSION (MOVED: the boat went to a tour's
@@ -21,6 +22,10 @@ typedef struct WakePluginAuthority {
         BoatPluginChange change, bool moved);
     // Ask for a fresh inspection; it arrives within the next frame. False on an endpoint failure.
     bool (*inspect)(void *context);
+    // L4b: the host discarded REVISION, whose migration is still in flight on the authority's
+    // isolated worker: ask it to close that migration before the next tick. False on an endpoint
+    // failure.
+    bool (*cancel)(void *context, BoatSession *session, unsigned revision);
     WakeObjectiveView view; // The authority's objective after the latest frame.
     const char *inspection; // The newest inspection text (borrowed), its size and count.
     size_t inspection_size;
@@ -29,14 +34,22 @@ typedef struct WakePluginAuthority {
     // request was sent. Staging, Undo and Apply wait until its result arrives (L1-3).
     unsigned migrating, migrate_seen;
     bool failed; // A request could not be sent; the game stops the session.
+    // L4b (browser): the inspection count when the checkpoint last asked for one (0: never).
+    uint64_t checkpoint_asked;
+    bool checkpoint_pending;
 } WakePluginAuthority;
+
+// The browser page's authoring actions (wake_web_plugin_actions), for WakePlugin.actions.
+enum {
+    WAKE_PLUGIN_ACTION_STAGE = 1,
+    WAKE_PLUGIN_ACTION_UNDO = 2,
+    WAKE_PLUGIN_ACTION_APPLY = 4,
+    WAKE_PLUGIN_ACTION_CANCEL = 8, // Cancel staging, or a migration in flight.
+};
 
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
-    struct WakePluginEvaluation *evaluation; // Browser callback receipt, never checkpointed.
     struct BoatPluginStageJob *query; // PC console query in the isolated worker.
-    double frame_now;
-    bool evaluation_migrated;
     BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
     const char *directory;
     bool authoring; // --plugin DIR: file watch, staging worker, bridge, hotkeys and panel.
@@ -50,6 +63,9 @@ typedef struct {
     unsigned requests; // Staging requests begun, by saves, F5 or the tool bridge.
     WakeObjective run; // The objective transaction on the direct path.
     WakePluginAuthority *authority; // L1b: set while a local authority runs the objective.
+    // L4b: the page's actions since the last frame (WAKE_PLUGIN_ACTION_*), which the game sets
+    // before wake_plugin_frame and the frame consumes.
+    unsigned actions;
 } WakePlugin;
 
 // Persistent native owner (all revision slots, file buffers, state/pending output, events,
@@ -68,12 +84,13 @@ bool wake_plugin_open_catalog(
 // Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
 // evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session);
-// Browser callback at T must finish before solo simulation may step T+1.
-bool wake_plugin_waiting(const WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.
 bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
-// on UNDO (or discard a held one), and commit a held migration/restart on APPLY. A rename applies
+// on UNDO (or discard a held one), and commit a held migration/restart on APPLY. The page's
+// ACTIONS join them; Undo or the page's cancel during a migration still in flight on the
+// authority cancels it. With an authority whose evaluation is pending, every control answers
+// busy. A rename applies
 // at once. True when the caller must restart the session for a new exposure; SESSION's voyage route
 // is already the new revision's.
 bool wake_plugin_frame(
@@ -121,6 +138,25 @@ bool wake_plugin_preview_seek(const WakePluginPreview *checkpoint, WakePlugin *p
 // Developer inspection: canonical state bytes (hex), queued events, accepted commands and
 // transition hashes. No persistent UI in ordinary play.
 void wake_plugin_inspect(const WakePlugin *plugin, FILE *output);
+// L4b: the objective checkpoint the browser's authoring checks read (Module.boatPluginCheckpoint).
+typedef struct {
+    int64_t tick; // The objective's checkpoint tick.
+    uint64_t native_tick; // The session's.
+    unsigned generation, events; // Events: the queue's length.
+    bool initialized, quarantined, waiting;
+    unsigned state_size;
+    unsigned char state[BOAT_PLUGIN_STATE_BYTES];
+} WakePluginCheckpoint;
+
+// The checkpoint: the direct path's objective, or with an authority its latest inspection (tick,
+// generation, suspension, queue and state, which can lag the view by a frame) and its view
+// (initialized, waiting). False before an authority's first inspection, and while that
+// inspection is of an older generation than the view.
+bool wake_plugin_checkpoint(
+    const WakePlugin *plugin, const BoatSession *session, WakePluginCheckpoint *out);
+// L4b: in the browser while authoring, publish the checkpoint and, with an authority, ask for the
+// next inspection (one in flight). Natively nothing.
+void wake_plugin_publish(WakePlugin *plugin, const BoatSession *session);
 // The authoring panel, in screen pixels, with its last line ending above BOTTOM.
 void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom);
 
