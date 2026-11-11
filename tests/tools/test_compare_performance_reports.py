@@ -11,9 +11,9 @@ import sys
 import tempfile
 import zipfile
 
-ROOT = pathlib.Path(__file__).resolve().parent
-ANALYZER = ROOT / 'compare_performance_reports.py'
-FIXTURES = ROOT / 'fixtures' / 'performance'
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+ANALYZER = ROOT / 'tools' / 'compare_performance_reports.py'
+FIXTURES = ROOT / 'tests' / 'support' / 'fixtures' / 'performance'
 
 
 def run(*args):

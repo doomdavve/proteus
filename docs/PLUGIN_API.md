@@ -755,7 +755,7 @@ existing host slots; the scene definition is copied into each revision and adds 
 
 ### Eriksberg marina layout (verified fixture)
 
-`tools/validate_scene_site.c` loads the package's two-row marina against the compiled
+`tests/render/validate_scene_site.c` loads the package's two-row marina against the compiled
 `outer` water, the registered hull recipes and the registered module recipes. It checks the
 native placement, attachment/boundary rejection, a fully placed capacity fixture and wave-time
 join/contact/camera behavior. It loads the actual Lua package.

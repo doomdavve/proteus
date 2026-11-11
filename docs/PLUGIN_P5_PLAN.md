@@ -148,7 +148,7 @@ by default, and a diagnostic mode re-runs the pinned source and compares.
 - **HOST A ROOM**: a SHELTER HUNT choice (`--host hunt`, a free room with the `proteus.outer-hunt`
   package) on LAN. This is the first playable path.
 - **Browsers** need no Lua: the room sends data. Release builds are ENet-only, so browser joining
-  is qualified on a locally built WebRTC server (`tools/check_web_multiplayer.py`).
+  is qualified on a locally built WebRTC server (`tests/web/check_web_multiplayer.py`).
 - **Winterfell** keeps its one deathmatch room; no hunt room in P5.
 - **No room save.** A hunt is a session: it starts over when the room starts. The working
   harbour's room save is deferred with it.
@@ -166,7 +166,7 @@ The `marks` schema for free packages with `objective.hud`, its validation (open 
 overlap, count), the core detector over fleet slots, and the bundled `plugins/outer-hunt`
 package (five marks, the script above). No networking yet.
 Files: new `src/core/boat_marks.[ch]`, the free-package loader and validator, `plugins/outer-hunt/`,
-`tools/validate_boat_marks.c` (or a case in an existing validator), `docs/PLUGIN_API.md`.
+`tests/core/validate_boat_marks.c` (or a case in an existing validator), `docs/PLUGIN_API.md`.
 Tests: the package loads and its marks validate on `outer`; invalid marks are refused with field
 diagnostics; a scripted fleet driving through marks emits exactly one `mark.reached` per entry
 with the right crew, and a respawn re-arms the slot; evaluating the script over scripted events
@@ -215,7 +215,7 @@ on leave; full suite results are in the PR.
 Room definition v4 with marks; ObjectiveState; version bump; client stores the HUD; `boat_bot`
 prints it.
 Files: `src/net/boat_net_protocol.[ch]`, `src/core/boat_room_definition.[ch]`, `src/net/boat_net_server.c`,
-`src/net/boat_net_client.[ch]`, `tools/boat_bot.c`, `tools/validate_boat_net.c`,
+`src/net/boat_net_client.[ch]`, `tools/boat_bot.c`, `tests/net/validate_boat_net.c`,
 `docs/MULTIPLAYER_PROTOCOL.md` (v13).
 Tests: golden bytes and round trips; every truncation; v12 Hello rejected; definition and
 message sizes within the budget; on the memory transport two bots hunt and both see identical
@@ -387,7 +387,7 @@ Gate: bit-identical reconstruction on the recording build.
 Four crews; reconnect and leave cases; loss, reordering, duplication and delay; the web build
 draws marks and the HUD; `check_web_multiplayer.py` gains a hunt case with one native and one
 browser player on a local WebRTC server.
-Files: `tools/validate_boat_net.c`, `tools/check_web_multiplayer.py`, `docs/TESTING.md`,
+Files: `tests/net/validate_boat_net.c`, `tests/web/check_web_multiplayer.py`, `docs/TESTING.md`,
 `docs/WEB_BUILD.md`.
 Tests: HUD equal on every client including late joiners; server tick cost with the Lua update
 measured against the deathmatch baseline; mixed clients finish a hunt; an old browser bundle is

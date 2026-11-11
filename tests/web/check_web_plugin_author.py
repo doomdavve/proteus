@@ -30,7 +30,7 @@ def main():
     if args.executable and args.browser != 'chromium':
         parser.error('--executable applies only to --browser chromium')
     args.output.mkdir(parents=True, exist_ok=True)
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parents[2]
     errors, logs, checks, evidence = [], [], [], {}
     chromium = args.browser == 'chromium'
     current = {}

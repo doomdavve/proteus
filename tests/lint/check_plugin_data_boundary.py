@@ -26,10 +26,10 @@ DATA_FILES = ("src/plugins/boat_plugin.c", "src/plugins/boat_plugin.h", "src/plu
               "src/plugins/boat_plugin_wire.c", "src/plugins/boat_plugin_wire.h")
 CONSUMER_FILES = ("src/session/boat_sandbox_save.c", "src/session/boat_sandbox_save.h",
                   "src/plugins/boat_plugin_catalog.c", "src/plugins/boat_plugin_catalog.h",
-                  "tools/validate_boat_plugin_data.c")
+                  "tests/plugins/validate_boat_plugin_data.c")
 FILES = DATA_FILES + CONSUMER_FILES
 MACHO = sys.platform == "darwin"
-TEST_PROGRAM = "tools/validate_boat_plugin_data.c"
+TEST_PROGRAM = "tests/plugins/validate_boat_plugin_data.c"
 
 EXECUTION_HEADERS = frozenset({
     "boat_plugin_lua.h", "boat_plugin_load.h", "boat_plugin_host.h", "boat_plugin_io.h",

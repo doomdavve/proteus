@@ -8,6 +8,8 @@ from types import SimpleNamespace
 from unittest import mock
 import json
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))  # The tool under test.
 import cut_release as release
 import unittest
 import zipfile

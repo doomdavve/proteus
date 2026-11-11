@@ -56,7 +56,7 @@ user play/acceptance and browser/Windows/Linux rendering remain open.
 `apps/wake_velocity/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
 It preserves advance → boat step → stern track, float time arithmetic, optional D3/field
 paths and the rival's existing route/contact/reset sequence. There is no fleet scheduler.
-`tools/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.
+`tests/support/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.
 
 Apple Silicon/macOS, Debug: `boat_drive_extraction` matches named physical/wake hashes at
 all 3840 ticks against that driver and matches CPU pixels at ticks 1080 and 2400.

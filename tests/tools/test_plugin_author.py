@@ -11,9 +11,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))  # The tool under test.
 import plugin_author as author
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 WORKER = None
 GAME = None
 BRIDGE_SERVER = None

@@ -425,7 +425,7 @@ offline `wake_velocity`.
 
 1. **D1 — match core.** `boat_match`, the impulse diagnostic, the per-emitter query, server
    mode, automatic respawn, bailout and scripted server output. New
-   `tools/validate_boat_match.c` (core label): synthetic credit-window edges, self −1, bailout,
+   `tests/core/validate_boat_match.c` (core label): synthetic credit-window edges, self −1, bailout,
    grace, leaving attacker, round transitions and ties; physical fleet cases where A's wake
    capsizes B (credited `WAKE`), an own-wake capsize (−1) and a contact touch expiring after
    5 s. Fleet/replay traces and single-player captures stay identical.

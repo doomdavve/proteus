@@ -22,7 +22,7 @@ BACKEND_FILES = ("src/plugins/boat_plugin_stage_posix.c", "src/plugins/boat_plug
                  "src/plugins/boat_plugin_stage_web.c")
 PRIVATE_HEADER = "boat_plugin_stage_backend.h"
 PRIVATE_HEADER_ALLOWED = set(COMMON_FILES[:1]) | set(BACKEND_FILES) | {
-    "tools/validate_boat_plugin_stage_web.c"}
+    "tests/plugins/validate_boat_plugin_stage_web.c"}
 
 COMMON_HEADERS = ("windows.h", "io.h", "fcntl.h", "unistd.h", "spawn.h", "signal.h",
                   "emscripten.h")

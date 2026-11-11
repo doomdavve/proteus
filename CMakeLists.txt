@@ -68,7 +68,8 @@ set(PROTEUS_TRANSITION_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}/apps/wake_velocity
   ${CMAKE_CURRENT_SOURCE_DIR}/apps/boat_server
   ${CMAKE_CURRENT_SOURCE_DIR}/apps/cargo_sandbox
-  ${CMAKE_CURRENT_SOURCE_DIR}/apps/dance_study)
+  ${CMAKE_CURRENT_SOURCE_DIR}/apps/dance_study
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/support)
 include_directories(${PROTEUS_TRANSITION_INCLUDES})
 
 set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -106,7 +107,7 @@ target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 
 # Fixture data for validators and review tools: the shipped voyage, course, race course and rule
 # values that packages replace. Production targets never link this library.
-add_library(proteus_boat_fixtures STATIC tools/boat_fixtures.c tools/boat_fixtures.h)
+add_library(proteus_boat_fixtures STATIC tests/support/boat_fixtures.c tests/support/boat_fixtures.h)
 target_include_directories(proteus_boat_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 target_link_libraries(proteus_boat_fixtures PUBLIC proteus_boat_core)
 target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
@@ -116,7 +117,7 @@ target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 add_library(proteus_boat_scenery STATIC src/scenery/boat_scenery.c src/scenery/boat_scenery.h
   src/scenery/boat_water_atlas.c src/scenery/boat_water_atlas.h src/scenery/boat_ambient.c src/scenery/boat_ambient.h)
 target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
-# Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
+# Validators and review tools load the packs from the source tree (tests/support/boat_test_scenery.h).
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_options(proteus_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
 
@@ -311,12 +312,12 @@ add_library(proteus_frame_pacer STATIC src/platform/frame_pacer.c src/platform/f
 target_include_directories(proteus_frame_pacer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(proteus_frame_pacer PUBLIC raylib)
 target_compile_options(proteus_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
-add_executable(validate_frame_pacer tools/validate_frame_pacer.c)
+add_executable(validate_frame_pacer tests/platform/validate_frame_pacer.c)
 target_link_libraries(validate_frame_pacer PRIVATE proteus_frame_pacer)
 target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME frame_pacer COMMAND validate_frame_pacer)
 
-add_executable(validate_boat_capture tools/validate_boat_capture.c
+add_executable(validate_boat_capture tests/platform/validate_boat_capture.c
   apps/wake_velocity/wake_velocity_performance.c src/platform/boat_capture.c)
 target_include_directories(validate_boat_capture PRIVATE ${raylib_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -475,7 +476,7 @@ if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE apps/wake_velocity/boat_directory.c apps/wake_velocity/boat_directory.h
     apps/wake_velocity/wake_velocity_servers.c apps/wake_velocity/wake_velocity_servers.h)
   target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads proteus_json)
-  add_executable(validate_boat_directory tools/validate_boat_directory.c apps/wake_velocity/boat_directory.c)
+  add_executable(validate_boat_directory tests/app/validate_boat_directory.c apps/wake_velocity/boat_directory.c)
   target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl
     Threads::Threads proteus_json)
   target_compile_options(validate_boat_directory PRIVATE ${PROTEUS_WARNINGS})
@@ -529,7 +530,7 @@ endif()
 # build-tree data directory keeps the player's settings out of the test.
 set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
 file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
-add_executable(validate_boat_title tools/validate_boat_title.c apps/wake_velocity/boat_title.c
+add_executable(validate_boat_title tests/app/validate_boat_title.c apps/wake_velocity/boat_title.c
   apps/wake_velocity/wake_velocity_input.c apps/wake_velocity/wake_velocity_controls.c)
 target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # The title reaches discovery only through wake_velocity_servers.h (stubbed here), so it links
@@ -563,7 +564,7 @@ target_compile_options(gpu_fixture PRIVATE
 add_dependencies(gpu_fixture proteus_assets)
 
 add_executable(validate_xm
-  tools/validate_xm.c
+  tests/audio/validate_xm.c
   src/audio/xm_audio.c
 )
 target_include_directories(validate_xm PRIVATE
@@ -579,13 +580,13 @@ enable_testing()
 include(cmake/CaseTests.cmake)
 if(NOT EMSCRIPTEN)
   # The room command line wake_velocity --host passes to its --serve child.
-  add_executable(validate_wake_velocity_host tools/validate_wake_velocity_host.c
+  add_executable(validate_wake_velocity_host tests/app/validate_wake_velocity_host.c
     apps/wake_velocity/wake_velocity_host.c)
   target_include_directories(validate_wake_velocity_host PRIVATE tools)
   target_compile_options(validate_wake_velocity_host PRIVATE ${PROTEUS_WARNINGS})
   proteus_add_case_tests(wake_velocity_host validate_wake_velocity_host LABELS cpu quick)
 endif()
-add_executable(validate_boat_wake tools/validate_boat_wake.c)
+add_executable(validate_boat_wake tests/core/validate_boat_wake.c)
 target_link_libraries(validate_boat_wake PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_wake PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -639,57 +640,57 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_gpu_runtime COMMAND wake_gpu_runtime_review --check)
   set_tests_properties(wake_gpu_runtime PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
 endif()
-add_executable(validate_boat_flag tools/validate_boat_flag.c)
+add_executable(validate_boat_flag tests/render/validate_boat_flag.c)
 target_link_libraries(validate_boat_flag PRIVATE proteus_render)
 target_compile_options(validate_boat_flag PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME boat_flag_cloth COMMAND validate_boat_flag)
-add_executable(validate_boat_cargo tools/validate_boat_cargo.c)
+add_executable(validate_boat_cargo tests/core/validate_boat_cargo.c)
 target_link_libraries(validate_boat_cargo PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_cargo PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_cargo COMMAND validate_boat_cargo)
-add_executable(validate_cargo_decal tools/validate_cargo_decal.c)
+add_executable(validate_cargo_decal tests/render/validate_cargo_decal.c)
 target_link_libraries(validate_cargo_decal PRIVATE proteus_render)
 target_compile_options(validate_cargo_decal PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME cargo_shadow_geometry COMMAND validate_cargo_decal)
 set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
-add_executable(validate_boat_sandbox_save tools/validate_boat_sandbox_save.c)
+add_executable(validate_boat_sandbox_save tests/session/validate_boat_sandbox_save.c)
 target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
 target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
 set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
 # AR5: a data-only consumer. It links the catalog and plugin data only; no Lua or workers.
-add_executable(validate_boat_plugin_data tools/validate_boat_plugin_data.c)
+add_executable(validate_boat_plugin_data tests/plugins/validate_boat_plugin_data.c)
 target_link_libraries(validate_boat_plugin_data PRIVATE proteus_plugin_catalog)
 target_compile_options(validate_boat_plugin_data PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_plugin_data COMMAND validate_boat_plugin_data)
 set_tests_properties(boat_plugin_data PROPERTIES LABELS "cpu;quick")
-add_executable(validate_boat_file tools/validate_boat_file.c)
+add_executable(validate_boat_file tests/platform/validate_boat_file.c)
 target_link_libraries(validate_boat_file PRIVATE proteus_file)
 target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_file COMMAND validate_boat_file ${CMAKE_CURRENT_BINARY_DIR}/file-tests)
 set_tests_properties(boat_file PROPERTIES LABELS "cpu;quick")
 # SV1h: discovery over build-tree directories and the SAVE row's confirmations.
-add_executable(validate_boat_work_menu tools/validate_boat_work_menu.c)
+add_executable(validate_boat_work_menu tests/session/validate_boat_work_menu.c)
 target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_plugin_catalog)
 target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
 set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
 # The pause menu's input handling, driven by synthetic BoatAppInput values (no window or raylib
 # input reads).
-add_executable(validate_app_input tools/validate_app_input.c apps/wake_velocity/wake_velocity_menu.c)
+add_executable(validate_app_input tests/app/validate_app_input.c apps/wake_velocity/wake_velocity_menu.c)
 target_link_libraries(validate_app_input PRIVATE proteus_render)
 target_compile_options(validate_app_input PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME app_input COMMAND validate_app_input)
 set_tests_properties(app_input PROPERTIES LABELS "cpu;quick")
 # L3: the working harbour on its private local endpoint against the direct session.
-add_executable(validate_boat_work_local tools/validate_boat_work_local.c)
+add_executable(validate_boat_work_local tests/session/validate_boat_work_local.c)
 target_link_libraries(validate_boat_work_local PRIVATE proteus_work_local proteus_render
   proteus_plugin_catalog)
 target_compile_options(validate_boat_work_local PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_work_local validate_boat_work_local LABELS core cpu)
 # The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
-add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
+add_executable(validate_boat_work_clock tests/session/validate_boat_work_clock.c)
 target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
 target_compile_options(validate_boat_work_clock PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_clock COMMAND validate_boat_work_clock)
@@ -765,7 +766,7 @@ if(NOT EMSCRIPTEN)
   endforeach()
   list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_scene_survives_reset)
 endif()
-add_executable(validate_boat_audio tools/validate_boat_audio.c src/audio/boat_audio.c)
+add_executable(validate_boat_audio tests/audio/validate_boat_audio.c src/audio/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(validate_boat_audio PRIVATE raylib)
 target_compile_options(validate_boat_audio PRIVATE
@@ -832,12 +833,12 @@ target_compile_definitions(boat_benchmark PRIVATE
 target_compile_options(boat_benchmark PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 
-add_executable(validate_boat_drive tools/validate_boat_drive.c)
+add_executable(validate_boat_drive tests/app/validate_boat_drive.c)
 target_link_libraries(validate_boat_drive PRIVATE proteus_boat_drive)
 target_compile_options(validate_boat_drive PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME boat_drive_extraction COMMAND validate_boat_drive)
-add_executable(validate_boat_clock tools/validate_boat_clock.c)
+add_executable(validate_boat_clock tests/core/validate_boat_clock.c)
 target_link_libraries(validate_boat_clock PRIVATE proteus_boat_drive)
 target_compile_options(validate_boat_clock PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -848,18 +849,18 @@ add_test(NAME boat_clock_soak_smoke
   COMMAND validate_boat_clock --soak 60 ${BOAT_CLOCK_TEST_DIR} --waves)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME release_command COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_cut_release.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_cut_release.py)
 set_tests_properties(release_command PROPERTIES LABELS "cpu")
 add_test(NAME web_endpoint_configuration COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_configure_web_endpoint.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_configure_web_endpoint.py)
 add_test(NAME performance_analyzer COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_compare_performance_reports.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_compare_performance_reports.py)
 set_tests_properties(performance_analyzer PROPERTIES LABELS "cpu")
 set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
 add_test(NAME boat_benchmark_contract COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)
 add_test(NAME boat_lighting_qualification_contract COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_lighting_qualification.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/render/validate_boat_lighting_qualification.py
   $<TARGET_FILE:boat_water_review>)
 set_tests_properties(boat_lighting_qualification_contract PROPERTIES LABELS "cpu;slow"
   TIMEOUT 240)
@@ -897,13 +898,13 @@ add_test(NAME wake_candidate_map_rejected COMMAND wake_study --wake-field --loca
 add_test(NAME wake_candidate_current_rejected COMMAND wake_study --wake-field --current)
 set_tests_properties(wake_candidate_course_rejected wake_candidate_map_rejected
   wake_candidate_current_rejected PROPERTIES WILL_FAIL TRUE)
-add_executable(validate_boat tools/validate_boat.c)
-add_executable(validate_boat_banking tools/validate_boat_banking.c)
-add_executable(validate_boat_turn_entry tools/validate_boat_turn_entry.c)
-add_executable(validate_boat_profile tools/validate_boat_profile.c)
-add_executable(validate_boat_environment tools/validate_boat_environment.c)
-add_executable(validate_boat_replay tools/validate_boat_replay.c)
-add_executable(validate_boat_world tools/validate_boat_world.c)
+add_executable(validate_boat tests/core/validate_boat.c)
+add_executable(validate_boat_banking tests/core/validate_boat_banking.c)
+add_executable(validate_boat_turn_entry tests/core/validate_boat_turn_entry.c)
+add_executable(validate_boat_profile tests/session/validate_boat_profile.c)
+add_executable(validate_boat_environment tests/core/validate_boat_environment.c)
+add_executable(validate_boat_replay tests/session/validate_boat_replay.c)
+add_executable(validate_boat_world tests/core/validate_boat_world.c)
 add_executable(wake_baseline tools/wake_baseline.c)
 add_executable(boat_water_review tools/boat_water_review.c)
 add_dependencies(boat_water_review proteus_assets)
@@ -912,7 +913,7 @@ target_compile_definitions(boat_water_review PRIVATE
   BOAT_BENCH_PLATFORM="${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
 add_executable(boat_banking_review tools/boat_banking_review.c)
 add_dependencies(boat_banking_review proteus_assets)
-add_executable(validate_boat_skin tools/validate_boat_skin.c)
+add_executable(validate_boat_skin tests/render/validate_boat_skin.c)
 target_link_libraries(validate_boat_skin PRIVATE proteus_render)
 target_compile_options(validate_boat_skin PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_skin COMMAND validate_boat_skin)
@@ -922,32 +923,32 @@ set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
 add_test(NAME web_plugin_wire COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_web_wire.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/check_web_wire.py)
 set_tests_properties(web_plugin_wire PROPERTIES LABELS "cpu;quick"
   PASS_REGULAR_EXPRESSION "web_plugin_wire=ok")
 if(PROTEUS_NODE_EXECUTABLE)
   add_test(NAME web_plugin_author COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_plugin_author.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_plugin_author.cjs)
   set_tests_properties(web_plugin_author PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_plugin_author=ok")
   add_test(NAME web_server_directory COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_server_directory.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_server_directory.cjs)
   set_tests_properties(web_server_directory PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_server_directory=ok")
   add_test(NAME web_rtc_transport COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_rtc_transport.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_rtc_transport.cjs)
   set_tests_properties(web_rtc_transport PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_rtc_transport=ok")
   add_test(NAME web_mobile_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mobile_controls.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_mobile_controls.cjs)
   set_tests_properties(web_mobile_controls PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_mobile_controls=ok")
   add_test(NAME web_console_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_console_controls.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_console_controls.cjs)
   set_tests_properties(web_console_controls PROPERTIES LABELS "cpu;quick"
     PASS_REGULAR_EXPRESSION "web_console_controls=ok")
   add_test(NAME web_mouse_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mouse_controls.cjs)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web/test_web_mouse_controls.cjs)
   set_tests_properties(web_mouse_controls PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_mouse_controls=ok")
 endif()
@@ -978,28 +979,28 @@ foreach(target validate_boat validate_boat_banking validate_boat_turn_entry vali
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()
 # Display-free core gate: links the core library alone and checks its source/symbol boundary.
-add_executable(validate_boat_core tools/validate_boat_core.c)
+add_executable(validate_boat_core tests/core/validate_boat_core.c)
 target_link_libraries(validate_boat_core PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_core PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_core COMMAND validate_boat_core)
 # Adventure A1.1: explicit map descriptions and independently owned collision caches.
-add_executable(validate_boat_map tools/validate_boat_map.c)
+add_executable(validate_boat_map tests/scenery/validate_boat_map.c)
 target_link_libraries(validate_boat_map PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_map PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_map validate_boat_map LABELS core cpu)
 # Adventure A3.1: the baked first outer-river slice answers the A0.3 route and shelter queries.
-add_executable(validate_boat_outer_map tools/validate_boat_outer_map.c)
+add_executable(validate_boat_outer_map tests/scenery/validate_boat_outer_map.c)
 target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_outer_map PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_outer_map COMMAND validate_boat_outer_map)
 set_tests_properties(boat_outer_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_outer_map=ok")
 # Play-testing rates preserve fixed-tick physics.
-add_executable(validate_boat_time_control tools/validate_boat_time_control.c)
+add_executable(validate_boat_time_control tests/session/validate_boat_time_control.c)
 target_link_libraries(validate_boat_time_control PRIVATE proteus_boat_session)
 target_compile_options(validate_boat_time_control PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_time_control COMMAND validate_boat_time_control)
 # Adventure A3.4: the outer voyage's shelters, exposed water, arrival and recovery.
-add_executable(validate_boat_voyage tools/validate_boat_voyage.c)
+add_executable(validate_boat_voyage tests/session/validate_boat_voyage.c)
 target_link_libraries(validate_boat_voyage PRIVATE proteus_boat_session)
 target_compile_options(validate_boat_voyage PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_voyage COMMAND validate_boat_voyage)
@@ -1007,11 +1008,11 @@ set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage
 # Lua plugins P0: manifest, restricted evaluation, voyage decoding and parity with the compiled
 # route; its file cases work in a scratch directory under the build tree.
 # Plugin P5a: mark validation and the fleet entry detector, core only.
-add_executable(validate_boat_marks tools/validate_boat_marks.c)
+add_executable(validate_boat_marks tests/core/validate_boat_marks.c)
 target_link_libraries(validate_boat_marks PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_marks PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_marks validate_boat_marks LABELS core cpu)
-add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
+add_executable(validate_boat_plugin tests/plugins/validate_boat_plugin.c)
 target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins)
 target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})
 set(BOAT_PLUGIN_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-test")
@@ -1021,7 +1022,7 @@ target_compile_definitions(validate_boat_plugin PRIVATE
 proteus_add_case_tests(boat_plugin validate_boat_plugin LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # P3.1: isolated objective transactions; P3.2 live adapter checks are in boat_plugin_session.
-add_executable(validate_boat_plugin_state tools/validate_boat_plugin_state.c)
+add_executable(validate_boat_plugin_state tests/plugins/validate_boat_plugin_state.c)
 target_link_libraries(validate_boat_plugin_state PRIVATE proteus_plugins)
 target_compile_options(validate_boat_plugin_state PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_plugin_state validate_boat_plugin_state LABELS core cpu
@@ -1029,7 +1030,7 @@ proteus_add_case_tests(boat_plugin_state validate_boat_plugin_state LABELS core 
 # Lua plugins P1: staging against the map, reload policies on a live session, Undo, save polling
 # on a virtual clock, and tick-for-tick parity with the compiled voyage.
 # Its game_controls case drives wake_velocity's --plugin glue on files in a scratch directory.
-add_executable(validate_boat_plugin_session tools/validate_boat_plugin_session.c
+add_executable(validate_boat_plugin_session tests/plugins/validate_boat_plugin_session.c
   apps/wake_velocity/wake_velocity_plugin.c)
 target_link_libraries(validate_boat_plugin_session PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_plugin_session PRIVATE ${PROTEUS_WARNINGS})
@@ -1040,26 +1041,26 @@ target_compile_definitions(validate_boat_plugin_session PRIVATE
 proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # PD1: bundled catalog entries equal their evaluated sources and compiled defaults; no Lua VM.
-add_executable(validate_boat_plugin_catalog tools/validate_boat_plugin_catalog.c)
+add_executable(validate_boat_plugin_catalog tests/plugins/validate_boat_plugin_catalog.c)
 target_link_libraries(validate_boat_plugin_catalog PRIVATE proteus_plugins proteus_plugin_catalog)
 target_compile_options(validate_boat_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_plugin_catalog validate_boat_plugin_catalog LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME boat_plugin_catalog_invalid COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_catalog_gen.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_plugin_catalog_gen.py
   --generator $<TARGET_FILE:boat_plugin_catalog_gen>)
 set_tests_properties(boat_plugin_catalog_invalid PROPERTIES LABELS "cpu" TIMEOUT 120)
 if(NOT EMSCRIPTEN)
   # PD5: compiled selection is gone from production sources and executables; fixtures are test-only.
   add_test(NAME compiled_selection_guard COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_compiled_selection.py
     --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
     --binary $<TARGET_FILE:wake_velocity> --binary $<TARGET_FILE:boat_server>)
   set_tests_properties(compiled_selection_guard PROPERTIES LABELS "cpu;quick" TIMEOUT 60)
   if(CMAKE_NM AND NOT MSVC)
     # Negative control: a validator that links the fixtures must trip the executable check.
     add_test(NAME compiled_selection_guard_detects COMMAND ${Python3_EXECUTABLE}
-      ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_compiled_selection.py
       --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
       --binary $<TARGET_FILE:validate_boat_voyage>)
     set_tests_properties(compiled_selection_guard_detects PROPERTIES LABELS "cpu;quick" TIMEOUT 60
@@ -1075,12 +1076,12 @@ if(NOT EMSCRIPTEN)
   add_executable(boat_plugin_worker apps/wake_velocity/boat_plugin_worker.c apps/wake_velocity/wake_velocity_plugin.c)
   target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
-  add_executable(validate_boat_plugin_eval tools/validate_boat_plugin_eval.c)
+  add_executable(validate_boat_plugin_eval tests/plugins/validate_boat_plugin_eval.c)
   target_link_libraries(validate_boat_plugin_eval PRIVATE proteus_plugins)
   target_compile_options(validate_boat_plugin_eval PRIVATE ${PROTEUS_WARNINGS})
   add_test(NAME boat_plugin_eval COMMAND validate_boat_plugin_eval)
   set_tests_properties(boat_plugin_eval PROPERTIES LABELS "cpu;quick" TIMEOUT 10)
-  add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
+  add_executable(validate_boat_plugin_stage tests/plugins/validate_boat_plugin_stage.c
     apps/wake_velocity/wake_velocity_plugin.c)
   target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_boat_plugin_stage PRIVATE ${PROTEUS_WARNINGS})
@@ -1092,7 +1093,7 @@ if(NOT EMSCRIPTEN)
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   # AR4: the browser backend and common staging, compiled natively against a C model of the
   # page transport; the archive's own staging objects are not pulled in.
-  add_executable(validate_boat_plugin_stage_web tools/validate_boat_plugin_stage_web.c
+  add_executable(validate_boat_plugin_stage_web tests/plugins/validate_boat_plugin_stage_web.c
     src/plugins/boat_plugin_stage.c src/plugins/boat_plugin_stage_web.c)
   target_link_libraries(validate_boat_plugin_stage_web PRIVATE proteus_plugins)
   target_compile_options(validate_boat_plugin_stage_web PRIVATE ${PROTEUS_WARNINGS})
@@ -1100,7 +1101,7 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_plugin_stage_web PROPERTIES LABELS "cpu;quick"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 10)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
-  add_executable(validate_wake_bridge tools/validate_wake_bridge.c apps/wake_velocity/wake_velocity_bridge.c
+  add_executable(validate_wake_bridge tests/app/validate_wake_bridge.c apps/wake_velocity/wake_velocity_bridge.c
     apps/wake_velocity/wake_velocity_plugin.c apps/wake_velocity/wake_command.c)
   target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_wake_bridge PRIVATE ${PROTEUS_WARNINGS})
@@ -1112,7 +1113,7 @@ if(NOT EMSCRIPTEN)
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   # PC: the command layer, console input/scrollback and live scene application, headless under a
   # virtual clock and through the real isolated worker.
-  add_executable(validate_wake_command tools/validate_wake_command.c
+  add_executable(validate_wake_command tests/app/validate_wake_command.c
     apps/wake_velocity/wake_velocity_plugin.c apps/wake_velocity/wake_command.c apps/wake_velocity/wake_console.c
     apps/wake_velocity/wake_console_bridge.c)
   target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog
@@ -1125,7 +1126,7 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(wake_command PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 60)
   add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>
     --bridge-server $<TARGET_FILE:validate_wake_bridge>)
   # Four packages are previewed twice; Debug CI can exceed the old 10 s child deadline.
@@ -1133,7 +1134,7 @@ if(NOT EMSCRIPTEN)
   # P4.5 pinned frame captures through the game's CPU screenshot path, also from a P4.7
   # release layout of the authoring tools.
   add_test(NAME boat_plugin_capture COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker> --game $<TARGET_FILE:wake_velocity> Capture
     Packaged)
   set_tests_properties(boat_plugin_capture PROPERTIES LABELS "render" TIMEOUT 120)
@@ -1145,7 +1146,7 @@ target_link_libraries(boat_plugin_bench PRIVATE proteus_plugins proteus_boat_ses
 target_compile_options(boat_plugin_bench PRIVATE ${PROTEUS_WARNINGS})
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
 # Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
-add_executable(validate_boat_scenery tools/validate_boat_scenery.c)
+add_executable(validate_boat_scenery tests/scenery/validate_boat_scenery.c)
 target_link_libraries(validate_boat_scenery PRIVATE proteus_render)
 target_compile_options(validate_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_scenery COMMAND validate_boat_scenery)
@@ -1173,41 +1174,41 @@ foreach(map river outer)
   set_tests_properties(ambient_${map} PROPERTIES PASS_REGULAR_EXPRESSION "ambient=ok")
 endforeach()
 
-add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
+add_executable(validate_boat_minimap tests/render/validate_boat_minimap.c)
 target_link_libraries(validate_boat_minimap PRIVATE proteus_render)
 target_compile_options(validate_boat_minimap PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_minimap COMMAND validate_boat_minimap)
 set_tests_properties(boat_minimap PROPERTIES PASS_REGULAR_EXPRESSION "boat_minimap=ok")
 # Adventure A2.2: in-memory tile catalogue and indexed collision, exact against the full scan.
-add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
+add_executable(validate_boat_map_index tests/scenery/validate_boat_map_index.c)
 target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_map_index validate_boat_map_index LABELS core cpu)
 # Adventure A2.5: the local view's queries, tiles and water do not grow with distant map.
-add_executable(validate_boat_map_scaling tools/validate_boat_map_scaling.c)
+add_executable(validate_boat_map_scaling tests/render/validate_boat_map_scaling.c)
 target_link_libraries(validate_boat_map_scaling PRIVATE proteus_render)
 target_compile_options(validate_boat_map_scaling PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_map_scaling COMMAND validate_boat_map_scaling)
 set_tests_properties(boat_map_scaling PROPERTIES PASS_REGULAR_EXPRESSION "boat_map_scaling=ok")
 # Multiplayer M2: the local four-boat authority and its scripted server, also core-only.
-add_executable(validate_boat_fleet tools/validate_boat_fleet.c)
+add_executable(validate_boat_fleet tests/core/validate_boat_fleet.c)
 target_link_libraries(validate_boat_fleet PRIVATE proteus_boat_core)
 # Capsize deathmatch rules: credit, respawns, bailouts and rounds over a core-only fleet.
-add_executable(validate_boat_combat tools/validate_boat_combat.c)
+add_executable(validate_boat_combat tests/core/validate_boat_combat.c)
 target_link_libraries(validate_boat_combat PRIVATE proteus_boat_net)
 add_test(NAME boat_combat COMMAND validate_boat_combat)
 set_tests_properties(boat_combat PROPERTIES PASS_REGULAR_EXPRESSION "boat_combat=ok")
-add_executable(validate_boat_match tools/validate_boat_match.c)
+add_executable(validate_boat_match tests/core/validate_boat_match.c)
 target_link_libraries(validate_boat_match PRIVATE proteus_boat_core)
 # River sprint rules: gates, grid hold, places, recovery, deadlines and a four-bot ferry race.
 # P2: the native race-rule suite also runs against the owned Lua reference.
-add_executable(validate_boat_race_plugin tools/validate_boat_race.c)
+add_executable(validate_boat_race_plugin tests/core/validate_boat_race.c)
 target_compile_definitions(validate_boat_race_plugin PRIVATE BOAT_RACE_PLUGIN_FIXTURE=1)
 target_link_libraries(validate_boat_race_plugin PRIVATE proteus_plugins)
 target_compile_options(validate_boat_race_plugin PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_race_plugin validate_boat_race_plugin LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_executable(validate_boat_plugin_race tools/validate_boat_plugin_race.c tools/boat_race_plugin.c)
+add_executable(validate_boat_plugin_race tests/plugins/validate_boat_plugin_race.c tools/boat_race_plugin.c)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/race-plugin-test")
 target_compile_definitions(validate_boat_plugin_race PRIVATE
   BOAT_RACE_PLUGIN_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/race-plugin-test")
@@ -1216,7 +1217,7 @@ target_compile_options(validate_boat_plugin_race PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_plugin_race validate_boat_plugin_race LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(validate_boat_race tools/validate_boat_race.c)
+add_executable(validate_boat_race tests/core/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
@@ -1231,13 +1232,13 @@ target_link_libraries(boat_server PRIVATE proteus_plugins proteus_plugin_catalog
 if(PROTEUS_WEBRTC)
   include(cmake/WebRTC.cmake)
 endif()
-add_executable(validate_boat_net_mux tools/validate_boat_net_mux.c)
+add_executable(validate_boat_net_mux tests/net/validate_boat_net_mux.c)
 target_link_libraries(validate_boat_net_mux PRIVATE proteus_boat_net)
 target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 # AR6 (L0): the private local session against the game's direct free-boating path.
-add_executable(validate_boat_local tools/validate_boat_local.c apps/wake_velocity/wake_velocity_plugin.c)
+add_executable(validate_boat_local tests/app/validate_boat_local.c apps/wake_velocity/wake_velocity_plugin.c)
 target_link_libraries(validate_boat_local PRIVATE proteus_local_drive proteus_boat_fixtures
   proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
 target_compile_options(validate_boat_local PRIVATE ${PROTEUS_WARNINGS})
@@ -1246,11 +1247,11 @@ target_compile_definitions(validate_boat_local PRIVATE
   BOAT_LOCAL_PLUGIN="${CMAKE_CURRENT_SOURCE_DIR}/plugins/shelter-tour")
 proteus_add_case_tests(boat_local validate_boat_local LABELS core cpu)
 
-add_executable(validate_boat_net tools/validate_boat_net.c)
+add_executable(validate_boat_net tests/net/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 # The same room harness over real ENet sockets on 127.0.0.1, still on a virtual clock. Cases
 # that need the memory network's impairment are left out, hence -Wno-unused-function.
-add_executable(validate_boat_net_enet tools/validate_boat_net.c)
+add_executable(validate_boat_net_enet tests/net/validate_boat_net.c)
 target_link_libraries(validate_boat_net_enet PRIVATE proteus_boat_net_enet)
 target_compile_definitions(validate_boat_net_enet PRIVATE BOAT_NET_TEST_ENET)
 target_compile_options(validate_boat_net_enet PRIVATE ${PROTEUS_WARNINGS}
@@ -1325,7 +1326,7 @@ add_test(NAME wake_velocity_host_connect_rejected
   COMMAND wake_velocity --host free --connect 127.0.0.1:24680)
 add_test(NAME wake_velocity_port_without_host_rejected COMMAND wake_velocity --port 24680)
 add_test(NAME boat_host COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_host_check.py --study $<TARGET_FILE:wake_velocity>
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/app/boat_host_check.py --study $<TARGET_FILE:wake_velocity>
   --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_host PROPERTIES PASS_REGULAR_EXPRESSION "boat_host=ok" TIMEOUT 30)
 if(PROTEUS_GPU_TESTS)
@@ -1346,7 +1347,7 @@ set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_
 proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)
 # PD2/PD3: a room built from an edited package reaches clients as data.
-add_executable(validate_boat_room_package tools/validate_boat_room_package.c
+add_executable(validate_boat_room_package tests/room/validate_boat_room_package.c
   src/room/boat_room_package.c)
 target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus_plugin_catalog
   proteus_boat_net)
@@ -1354,7 +1355,7 @@ target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # P5b: a free package's room objective runs only behind the authority's rules adapter.
-add_executable(validate_boat_room_objective tools/validate_boat_room_objective.c
+add_executable(validate_boat_room_objective tests/room/validate_boat_room_objective.c
   src/room/boat_room_package.c src/room/boat_room_objective.c)
 target_link_libraries(validate_boat_room_objective PRIVATE proteus_plugins proteus_plugin_catalog
   proteus_boat_net)
@@ -1372,12 +1373,12 @@ foreach(target validate_boat validate_boat_banking validate_boat_clock validate_
 endforeach()
 # No networked client path may read the compiled river course.
 add_test(NAME boat_room_course_source COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_room_course_source.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/room/check_room_course_source.py)
 set_tests_properties(boat_room_course_source PROPERTIES LABELS "cpu;quick")
 # Event-driven process smoke: boat_server and boat_bot connect, discover and exit. Session rules
 # over the real transport are the boat_net_enet cases, on a virtual clock.
 add_test(NAME boat_net_process COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_process.py --server $<TARGET_FILE:boat_server>
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/room/boat_net_process.py --server $<TARGET_FILE:boat_server>
   --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_net_process PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_process=ok"
   TIMEOUT 60)
@@ -1387,25 +1388,25 @@ if(CMAKE_NM AND NOT MSVC)
 endif()
 # No test may wait for wall-clock time to pass (docs/TESTING.md, "No wall time").
 add_test(NAME test_time COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_test_time.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_test_time.py --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(test_time PROPERTIES PASS_REGULAR_EXPRESSION "test_time=ok")
 # AR3: browser bridges live in CMake-selected *_web.c backends; migrated files use their services.
 add_test(NAME platform_bridges COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_platform_bridges.py --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(platform_bridges PROPERTIES LABELS "cpu;quick"
   PASS_REGULAR_EXPRESSION "platform_bridges=ok")
 add_test(NAME platform_bridges_detects COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_platform_bridges.py --self-test)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_platform_bridges.py --self-test)
 set_tests_properties(platform_bridges_detects PROPERTIES LABELS "cpu;quick"
   PASS_REGULAR_EXPRESSION "platform_bridges_self_test=ok")
 # AR4: common plugin staging holds no OS handles, process launch or JavaScript bridges.
 add_test(NAME plugin_stage_backend COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_stage_backend.py
   --root ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(plugin_stage_backend PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_stage_backend=ok")
 add_test(NAME plugin_stage_backend_self_test COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_stage_backend.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_stage_backend.py
   --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
 set_tests_properties(plugin_stage_backend_self_test PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_stage_backend self-test=ok")
@@ -1418,17 +1419,17 @@ if(CMAKE_NM AND NOT MSVC)
     --consumer-archive $<TARGET_FILE:proteus_plugin_catalog>)
 endif()
 add_test(NAME plugin_data_boundary COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_data_boundary.py
   --root ${CMAKE_CURRENT_SOURCE_DIR} ${PLUGIN_DATA_BOUNDARY_NM})
 set_tests_properties(plugin_data_boundary PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_data_boundary=ok")
 add_test(NAME plugin_data_boundary_self_test COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_data_boundary.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_data_boundary.py
   --root ${CMAKE_CURRENT_SOURCE_DIR} --self-test)
 set_tests_properties(plugin_data_boundary_self_test PROPERTIES PASS_REGULAR_EXPRESSION
   "plugin_data_boundary self-test=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
 set_tests_properties(boat_core_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
 # The net library (codec, sessions, memory transport) obeys the same rules, with no sockets.
@@ -1438,7 +1439,7 @@ if(CMAKE_NM AND NOT MSVC)
     --archive $<TARGET_FILE:proteus_boat_net>)
 endif()
 add_test(NAME boat_net_boundary COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_NET_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES} ${PROTEUS_BOAT_NET_SOURCES})
 set_tests_properties(boat_net_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
 # Neither boundary library may link Lua or the plugin host (docs/PLUGIN_PLAN.md).
@@ -1510,7 +1511,7 @@ add_test(NAME boat_river_route COMMAND boat_water_review --check)
 add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --waves)
 add_test(NAME boat_outer_route COMMAND boat_water_review --check --scenario outer --waves)
 add_test(NAME boat_river_benchmark_options COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/render/validate_boat_water_benchmark.py
   $<TARGET_FILE:boat_water_review> --options)
 set(BOAT_REPLAY_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/replay-tests")
 add_test(NAME boat_replay COMMAND validate_boat_replay ${BOAT_REPLAY_TEST_DIR})
@@ -1644,7 +1645,7 @@ target_compile_options(dance_study PRIVATE
 )
 add_dependencies(dance_study proteus_assets)
 
-add_executable(validate_dance tools/validate_dance.c apps/dance_study/dance.c apps/dance_study/choreography.c)
+add_executable(validate_dance tests/app/validate_dance.c apps/dance_study/dance.c apps/dance_study/choreography.c)
 target_link_libraries(validate_dance PRIVATE proteus_render)
 target_compile_options(validate_dance PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
@@ -1652,7 +1653,7 @@ target_compile_options(validate_dance PRIVATE
 add_test(NAME dance_constraints COMMAND validate_dance)
 add_test(NAME house_dance_constraints COMMAND validate_dance ${CMAKE_CURRENT_SOURCE_DIR}/assets/dance/house.dance)
 add_test(NAME house_groove_constraints COMMAND validate_dance ${CMAKE_CURRENT_SOURCE_DIR}/assets/dance/house-groove.dance)
-add_executable(validate_choreography tools/validate_choreography.c apps/dance_study/choreography.c
+add_executable(validate_choreography tests/app/validate_choreography.c apps/dance_study/choreography.c
   apps/dance_study/dance.c)
 target_link_libraries(validate_choreography PRIVATE proteus_render)
 target_compile_options(validate_choreography PRIVATE
@@ -1664,34 +1665,34 @@ add_test(NAME dance_screenshot
   COMMAND dance_study --time 8.8 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/dance-screenshot.png
 )
 
-add_executable(validate_waterfront_actors tools/validate_waterfront_actors.c)
+add_executable(validate_waterfront_actors tests/render/validate_waterfront_actors.c)
 target_link_libraries(validate_waterfront_actors PRIVATE proteus_render)
 target_compile_options(validate_waterfront_actors PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 add_test(NAME waterfront_actors COMMAND validate_waterfront_actors)
 
-add_executable(validate_city_dressing tools/validate_city_dressing.c)
+add_executable(validate_city_dressing tests/render/validate_city_dressing.c)
 target_link_libraries(validate_city_dressing PRIVATE proteus_render)
 target_compile_options(validate_city_dressing PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 add_test(NAME city_dressing COMMAND validate_city_dressing)
 
-add_executable(validate_harbor tools/validate_harbor.c)
+add_executable(validate_harbor tests/core/validate_harbor.c)
 target_link_libraries(validate_harbor PRIVATE proteus_boat_session)
 target_compile_options(validate_harbor PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME harbor_geometry COMMAND validate_harbor)
-add_executable(validate_harbor_view tools/validate_harbor_view.c)
+add_executable(validate_harbor_view tests/render/validate_harbor_view.c)
 target_link_libraries(validate_harbor_view PRIVATE proteus_render)
 target_compile_options(validate_harbor_view PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME harbor_view COMMAND validate_harbor_view)
 set_tests_properties(harbor_view PROPERTIES LABELS "cpu;quick")
 
 # M1 marina site: shipped layout, dimension/attachment rejection and maximum-capacity checks.
-add_executable(validate_scene_site tools/validate_scene_site.c)
-add_executable(validate_harbor_life tools/validate_harbor_life.c)
+add_executable(validate_scene_site tests/render/validate_scene_site.c)
+add_executable(validate_harbor_life tests/plugins/validate_harbor_life.c)
 target_link_libraries(validate_harbor_life PRIVATE proteus_plugins proteus_boat_session)
 target_compile_options(validate_harbor_life PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME harbor_life_qualification COMMAND validate_harbor_life)
@@ -1703,7 +1704,7 @@ target_compile_options(validate_scene_site PRIVATE
 add_test(NAME scene_site COMMAND validate_scene_site)
 set_tests_properties(scene_site PROPERTIES LABELS "cpu;slow" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(validate_traffic tools/validate_traffic.c)
+add_executable(validate_traffic tests/core/validate_traffic.c)
 target_link_libraries(validate_traffic PRIVATE proteus_boat_session)
 target_compile_options(validate_traffic PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
@@ -1719,26 +1720,26 @@ target_link_libraries(harbor_review PRIVATE proteus_gpu)
 target_compile_options(harbor_review PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 
-add_executable(validate_renderer3d tools/validate_renderer3d.c)
+add_executable(validate_renderer3d tests/render/validate_renderer3d.c)
 target_link_libraries(validate_renderer3d PRIVATE proteus_render)
 target_compile_options(validate_renderer3d PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 add_test(NAME renderer3d_is_valid COMMAND validate_renderer3d)
-add_executable(validate_waterfront_lighting tools/validate_waterfront_lighting.c)
+add_executable(validate_waterfront_lighting tests/render/validate_waterfront_lighting.c)
 target_link_libraries(validate_waterfront_lighting PRIVATE proteus_render)
 target_compile_options(validate_waterfront_lighting PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_lighting COMMAND validate_waterfront_lighting)
 add_test(NAME waterfront_lighting_sky COMMAND validate_waterfront_lighting --sky-check)
-add_executable(validate_boat_screen tools/validate_boat_screen.c)
+add_executable(validate_boat_screen tests/render/validate_boat_screen.c)
 target_link_libraries(validate_boat_screen PRIVATE proteus_render)
 target_compile_options(validate_boat_screen PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_screen COMMAND validate_boat_screen)
-add_executable(validate_waterfront_grade tools/validate_waterfront_grade.c)
+add_executable(validate_waterfront_grade tests/render/validate_waterfront_grade.c)
 target_link_libraries(validate_waterfront_grade PRIVATE proteus_render)
 target_compile_options(validate_waterfront_grade PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_grade COMMAND validate_waterfront_grade)
-add_executable(validate_waterfront_lights tools/validate_waterfront_lights.c)
+add_executable(validate_waterfront_lights tests/render/validate_waterfront_lights.c)
 target_link_libraries(validate_waterfront_lights PRIVATE proteus_render)
 target_compile_options(validate_waterfront_lights PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_lights COMMAND validate_waterfront_lights)
@@ -1810,7 +1811,7 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/render/validate_boat_water_benchmark.py
     $<TARGET_FILE:boat_water_review>)
   set_tests_properties(boat_river_benchmark_contract PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     TIMEOUT 240)
@@ -1888,7 +1889,7 @@ endforeach()
 
 # Lanes: quick tests take under about 100 ms on their own (ctest --preset quick); everything
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
-# in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
+# in C (tests/support/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
   cargo_shadow_wave_cpu ${PROTEUS_RESUME_TESTS}
   cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot

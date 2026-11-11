@@ -5,7 +5,7 @@ Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 validation rules and version policy of the boating network protocol. Task status, decisions
 and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`src/net/boat_net_protocol.[ch]`](../src/net/boat_net_protocol.h) and its fixtures are in
-[`tools/validate_boat_net.c`](../tools/validate_boat_net.c).
+[`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
 
 v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
 position validation to cover the mapped world, and fingerprints the complete compiled map

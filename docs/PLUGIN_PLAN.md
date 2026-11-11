@@ -517,7 +517,7 @@ to owned native data and reject bad packages. No game-loop integration or behavi
    parsing and the `BoatVoyageRoute` decoder. Input is immutable bytes; filesystem acquisition
    belongs to `boat_plugin_io`. One file and one capability suffice. Decide exact version,
    invalid-field, allocation and text-only loading behavior in a short API reference.
-3. Add a proposed `tools/validate_boat_plugin.c` and minimal fixtures. Exercise valid data,
+3. Add a proposed `tests/plugins/validate_boat_plugin.c` and minimal fixtures. Exercise valid data,
    syntax errors, forbidden facilities, bad coordinates/counts/IDs, malformed/deep data,
    memory/instruction exhaustion and a nonterminating top-level script. Test cleanup and
    repeated failed loads; add the library to relevant boundary checks without weakening them.
@@ -628,7 +628,7 @@ without rebuilding C. Preserve existing C arrival/recovery/exposure behavior.
 3. Implement native candidate staging, compatible pointer rebinding, restart-voyage versus
    restart-session policy and safe retirement. Invalid file saves do not remove the voyage.
    Copy descriptor strings before destroying Lua. Undo follows the same transaction path.
-4. Extend [`validate_boat_voyage.c`](../tools/validate_boat_voyage.c) or its fixtures to drive
+4. Extend [`validate_boat_voyage.c`](../tests/session/validate_boat_voyage.c) or its fixtures to drive
    the compiled and Lua definitions with identical input/virtual time, comparing progress,
    recovery, arrival and physical traces. Exercise reload while inside a shelter/arrival
    radius, while exposed and after arrival; changed ordered IDs must never retain an invalid
@@ -695,7 +695,7 @@ Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
   **264/264 active tests** in 13.6 s, with 13 retired wake-field tests disabled. That includes
   the eleven new `boat_plugin_session.*` cases, the five new `wake_velocity_plugin_*` launch
   tests, `boat_voyage`, `test_time` and both boundary checks.
-- `validate_boat_plugin_session` (`tools/validate_boat_plugin_session.c`):
+- `validate_boat_plugin_session` (`tests/plugins/validate_boat_plugin_session.c`):
   - `compiled_parity` drives a compiled and a plugin session with identical inputs from the
     fjord turn through the exposed flank to Långedrag, with a forced recovery. Over 15 505 ticks
     the boat, storm and every voyage field (arrival 129.21 s, 3 298 exposed ticks, recovery,
@@ -755,7 +755,7 @@ again.
 
 Add bounded race decoding with the existing eight-gate/four-slot capacities and native
 validation. Extend [`boat_race_trial.c`](../tools/boat_race_trial.c) and
-[`validate_boat_race.c`](../tools/validate_boat_race.c) to use an owned candidate definition;
+[`validate_boat_race.c`](../tests/core/validate_boat_race.c) to use an owned candidate definition;
 keep the C race engine and compiled fixture as reference. A local trial or headless fleet
 is sufficient: production network races remain compiled until P5. Expose a preview of gates,
 the ferry and the existing storm, with source clearance and reasonable world-envelope checks.
@@ -865,7 +865,7 @@ continuous background reload. This milestone owns the first real behavior script
 
 P3 is split into reviewable steps. **P3.1 implements the isolated transaction foundation** in
 [`boat_plugin_state.[ch]`](../src/plugins/boat_plugin_state.h), exercised by
-[`validate_boat_plugin_state`](../tools/validate_boat_plugin_state.c). P3 as a whole remains
+[`validate_boat_plugin_state`](../tests/plugins/validate_boat_plugin_state.c). P3 as a whole remains
 in progress. At this historical step no manifest capability or gameplay callback was enabled;
 P3.2 below adds that integration.
 
@@ -1560,7 +1560,7 @@ unspecified. P3 human migration/Undo/recovery acceptance remains open.
 
 Qualified what an agent and CI can check without physical devices or a human player:
 
-- `tools/check_web_plugin_author.py` takes `--browser chromium|firefox|webkit` and uses
+- `tests/web/check_web_plugin_author.py` takes `--browser chromium|firefox|webkit` and uses
   Playwright's engines; `--executable` still selects a Chromium-family binary such as system
   Chrome. Besides the P4.3 transactions, it now checks:
   - **Repeated validations:** 20 in a row (`--cycles`). Each runs in a fresh worker, and every
@@ -1938,7 +1938,7 @@ lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning
   Four dock modules cover the three compiled parts plus one spare; L2.3 raises the rope-array
   capacity from the compiled 42 lines to 60 for four authored gangway/rail groups. The two-berth example needs only berth pose/draw, hull/pontoon contact and camera exclusion;
   no new mesh, light, wake or actor pool is introduced by L1–L2.
-- **Site fixture:** [`tools/validate_scene_site.c`](../tools/validate_scene_site.c) checks the
+- **Site fixture:** [`tests/render/validate_scene_site.c`](../tests/render/validate_scene_site.c) checks the
   planned site with the compiled `outer` water and native skiff/runabout recipes. It passes with
   two berths at simulation `(13, 167)` and `(13, 173)` heading `−π/2`, a 14 × 2.35 m pontoon at
   `(20, 170)`, a gangway from land at `(34.1, 170)` to the pontoon landing `(21, 170)`, an 8 m
@@ -2448,7 +2448,7 @@ pontoon/gangway, the passing craft, the retained ferry with an edited dwell, the
 schooner/lift and the authored gull flock/cues. Its README carries editable recipes, pinned
 camera/time recipes, worker/live-bridge commands and a human-review checklist.
 
-- **Deterministic fixture:** new [`validate_harbor_life`](../tools/validate_harbor_life.c) loads the
+- **Deterministic fixture:** new [`validate_harbor_life`](../tests/plugins/validate_harbor_life.c) loads the
   real package, drives the `x = 6` entrance approach at throttle, idles/turns, exits south, checks
   player clearance on every tick, inspects the combined frame, checks feeding versus alarm height,
   walks one ferry dwell/departure and seeks the 1,200 s service. It also renders the compiled and
@@ -2528,7 +2528,7 @@ clear in motion? No acceptance is inferred from the captures.
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
 | --- | --- | --- |
-| L2.1 — parameterize existing moored hulls | Add caller-owned berth inputs to `waterfront_harbor.[ch]`; retain compiled wrappers while callers migrate. Start with existing hull recipes, positions/headings and native attachment points. Route generated meshes, bobbing poses, ropes, static hull envelopes and camera queries through the same accepted berth list. Do not add pontoons or arbitrary attachments yet. | `tools/validate_harbor.c` proves default parity, zero/two/seven berths, reordered IDs and independent instances. Move/remove one berth and verify its mesh, ropes, contact and camera exclusion all move/disappear together. No invisible compiled hull remains. |
+| L2.1 — parameterize existing moored hulls | Add caller-owned berth inputs to `waterfront_harbor.[ch]`; retain compiled wrappers while callers migrate. Start with existing hull recipes, positions/headings and native attachment points. Route generated meshes, bobbing poses, ropes, static hull envelopes and camera queries through the same accepted berth list. Do not add pontoons or arbitrary attachments yet. | `tests/core/validate_harbor.c` proves default parity, zero/two/seven berths, reordered IDs and independent instances. Move/remove one berth and verify its mesh, ropes, contact and camera exclusion all move/disappear together. No invisible compiled hull remains. |
 | L2.2 — expose berths and first package | Add bounded `scene.marina.berths` decoding/validation and discovery; implement the two-berth `plugins/harbor-life` example at L1.1's verified site, using the existing outer voyage. Validate hull footprints plus mooring excursion against water/shore, other berths and declared entrance clearance. Use actual map queries; where depth is unavailable, report depth as unverified rather than inventing a bathymetry test. Reject unsupported structure fields. | Bad shore/overlap/entrance and unsafe restart candidates preserve the old revision. Add a deterministic boat approach/exit fixture proving the lane is usable and both hulls block at visible positions. Capture the same site before/after a berth edit; live restart Apply/Undo restores the whole layout. |
 | L2.3 — registered dock modules | Extract the existing pontoon/gangway/quay recipes into bounded supported modules with attachment IDs and explicit anchor/end rules. Add matching contact/camera geometry where missing before exposing a module. Keep the large docked ferry independent. Update site validation and schema with module/rope/mesh bounds; no freeform jetty mesh editor. | One small pontoon and gangway attach correctly at the two-berth site; wave movement preserves shore anchoring and ropes. Inspect water/shore joins, player/camera clearance and both renderer passes. Reject detached, overlapping or over-budget modules. Static occupancy is complete here; arriving/departing moored occupants need a separate future ownership transfer task. |
 
@@ -2536,7 +2536,7 @@ clear in motion? No acceptance is inferred from the captures.
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
 | --- | --- | --- |
-| L3.1 — native route definitions with compiled parity | Extract route segments and timetable inputs from `waterfront_traffic.[ch]` and `waterfront_upstream.[ch]` into caller-owned native data. Preserve the current straight/arc motion, smooth departures, four river craft, upstream service and 1,200-second timetable. Set ceilings of 32 route segments and eight stops per actor initially; validate count/length arithmetic and measure storage before accepting them. Expose no Lua route fields yet. | Extend `tools/validate_traffic.c`: default poses, velocities, periods, contact hulls, visual trails and bridge lift agree at stops, departures, negative time and wrap. Direct seek and stepped evaluation agree. Keep wrappers only until all consumers can select the accepted data. |
+| L3.1 — native route definitions with compiled parity | Extract route segments and timetable inputs from `waterfront_traffic.[ch]` and `waterfront_upstream.[ch]` into caller-owned native data. Preserve the current straight/arc motion, smooth departures, four river craft, upstream service and 1,200-second timetable. Set ceilings of 32 route segments and eight stops per actor initially; validate count/length arithmetic and measure storage before accepting them. Expose no Lua route fields yet. | Extend `tests/core/validate_traffic.c`: default poses, velocities, periods, contact hulls, visual trails and bridge lift agree at stops, departures, negative time and wrap. Direct seek and stepped evaluation agree. Keep wrappers only until all consumers can select the accepted data. |
 | L3.2 — one authored small-craft route | Decode registered vessel recipe, route/segment IDs, speed, phase and period for one craft; native code computes motion and trails. Define full-collection replacement with explicit retained defaults within the eight-actor ceiling. Validate swept hull corridors against shore, marina/access lane and other scheduled craft; reject unsupported intersections rather than implementing avoidance. | The first package adds one visibly passing craft. Tests check segment joins, zero/negative lengths or speed, discontinuous loops, invalid arc radii, phase wrap, capacity+1 and route conflicts. Verify shared draw/contact/camera/wake-source identity after reorder, restart Apply and removal. Physical traffic wakes remain off unless an existing independently budgeted recipe is explicitly selected and tested. |
 | L3.3 — ferry stops and service schedule | Add named existing pier anchors, ordered stops, dwell/departure offsets and positive repeat periods. Use the native acceleration/braking profile and reject travel times too short for distance/speed limits. Start with one existing upstream ferry; retain other dependencies explicitly. Update discovery and the example to change one stop's dwell and departure. | Evaluate one tick before/at/after arrival, dwell end, departure and period wrap. Verify continuous position/heading and the intended native velocity profile, stationary dwell hull/contact, visual trail decay at stops and no duplicated ferry after reload. No boarding, passenger counts or real transit feed. |
 | L3.4 — coordinated lift and integrated route safety | Bind tall-vessel routes and bridge clearance/lift windows as one validated dependency group. Preserve the compiled schooner/lift when untouched; refuse partial replacement that breaks it. Account for hull height, lift transition time and scheduled occupancy; include stationary berths and ferry stops in conflicts. | Test too-early passage, insufficient lift, overlapping passage windows and malformed references; each rejects atomically. Inspect all lift phase boundaries, reflections/shadows and collider agreement. Demonstrate the first package's small craft plus departing ferry without breaking the existing schooner passage. No tram closure logic yet. |
@@ -2551,7 +2551,7 @@ Do not let an implementation model silently turn this task into a general path p
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
 | --- | --- | --- |
-| L4.1 — native flock definitions | Extract the four group anchors, per-bird phase/seed, circling/feeding/alarm envelopes from `waterfront_scene.c` into caller-owned bounded definitions. Keep 32 birds total, at most four flocks and current mesh recipes. Rebind avoidance to the accepted traffic definition and current player input; no hidden time accumulation or global random state. | `tools/validate_waterfront_actors.c` checks compiled parity, zero/max counts, two simultaneous scenes and forward/backward seek with identical explicit player/traffic inputs. Check nearby player and authored craft reactions, velocity/wing continuity and bird/terrain/building clearance at the chosen site. |
+| L4.1 — native flock definitions | Extract the four group anchors, per-bird phase/seed, circling/feeding/alarm envelopes from `waterfront_scene.c` into caller-owned bounded definitions. Keep 32 birds total, at most four flocks and current mesh recipes. Rebind avoidance to the accepted traffic definition and current player input; no hidden time accumulation or global random state. | `tests/render/validate_waterfront_actors.c` checks compiled parity, zero/max counts, two simultaneous scenes and forward/backward seek with identical explicit player/traffic inputs. Check nearby player and authored craft reactions, velocity/wing continuity and bird/terrain/building clearance at the chosen site. |
 | L4.2 — flock descriptor and timed cues | Decode flock ID, center/region, count, recipe, deterministic seed/phase and at most 16 feeding/alarm cue intervals per flock. Define overlap priority (alarm before feeding before circling), bounded amplitude and fade durations in schema. Evaluate envelopes natively at requested ticks; no timer-driven spawn/despawn or new objective commands. | Move the example's flock near the marina and schedule one feeding/alarm event. Test invalid habitat/count, cue overlap/priority, boundary ticks, wrap and repeated seek/reload. Apply/Undo preserves time for compatible cosmetic changes; count/layout changes follow the documented restart classification. Inspect readable flight and actual clipping separately from numeric acceptance. |
 | L4.3 — first playable harbor qualification | Combine the two berths, dock module, small craft, scheduled ferry and flock in `plugins/harbor-life`. Add editable README instructions, recipe/anchor discovery, a deterministic approach/idle/departure input fixture, inspection expectations and pinned camera/time recipes. Exercise the actual worker/live bridge path, not just native evaluator calls. | Build/full CTest plus CPU/GPU captures and a windowed motion demo. Watch at least one complete ferry dwell/departure and the gull cue; inspect a full timetable by virtual-time seeks. Record baseline vs populated frame p50/p95, staging/Apply latency, mesh/light/wake counts and retained memory at typical/max counts using the same camera/input. Human review asks whether activity is noticeable from the boat, the entrance stays clear and the result feels alive. Record pending human acceptance explicitly. |
 

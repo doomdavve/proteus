@@ -7,6 +7,8 @@ import tempfile
 import unittest
 import wave
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))  # The tool under test.
 import generate_audio as audio
 
 

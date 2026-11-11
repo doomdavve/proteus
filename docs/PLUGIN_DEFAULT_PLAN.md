@@ -945,7 +945,7 @@ and desktop browsers get the console. Imported voyages may carry scenes. Normal 
 Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 [browser source bundles](PLUGIN_API.md#browser-source-bundles-p43), `web/plugin_author.js`,
 `web/plugin_worker.js`, `src/plugins/boat_plugin_stage.c`, `apps/wake_velocity/wake_velocity_plugin.c`, `cmake/Web.cmake`,
-`tools/package_web.py`, `tools/check_web_plugin_author.py`.
+`tools/package_web.py`, `tests/web/check_web_plugin_author.py`.
 
 ### Settled from the source and a trial, 2026-10-31
 
@@ -1143,7 +1143,7 @@ Other findings:
 
 - **Definitions:** Hello's location digest loop (`src/net/boat_net_protocol.c:1122`) reads named fields and not
   `voyage`, so removing that field should leave the content digest unchanged and needs no protocol bump. Prove it.
-- **Equality cases:** they live in `tools/validate_boat_plugin_catalog.c:129-147`, not in the generator as this
+- **Equality cases:** they live in `tests/plugins/validate_boat_plugin_catalog.c:129-147`, not in the generator as this
   plan first said. The generator links only `proteus_plugins`, so it stays clean.
 - **Production uses to replace:**
   - `boat_session.c:21` and `:38`
@@ -1163,8 +1163,8 @@ Other findings:
 - **Keep:** a room with no scene falls back to the compiled harbour contacts. This is the registered default the
   decisions table allows, not compiled selection. Physics paths also stay: `RIVER_SPAWNS` and the recipes.
 - **Moving contact seams:** moving craft do collide, through `waterfront_traffic_contact_height_scene` at
-  `src/core/boat.c:183`. `tools/validate_boat_room_package.c:458` has the room harness. `room.server.tick_limit` in
-  `snapshot_resync` (`tools/validate_boat_net.c:1018`) forces a resync.
+  `src/core/boat.c:183`. `tests/room/validate_boat_room_package.c:458` has the room harness. `room.server.tick_limit` in
+  `snapshot_resync` (`tests/net/validate_boat_net.c:1018`) forces a resync.
 - **First hosted build with the Node generator:** v0.0.23 predates it. The role configures with `emsdk_env.sh`
   sourced, then builds `--target web` with only `EMSDK` and `EM_CONFIG` added. The Node emulator is cached as an
   absolute path, so this should work, but it has never run that way. Task 9 reproduces it.
@@ -1189,7 +1189,7 @@ hits a stop rule.
      rendering can never look like a room failure again.
 2. **Survive a stall during join.** When the queue is full and a reliable message arrives, drop the oldest
    disposable event instead of failing, and fail only when every queued event is reliable. Keep reliable order.
-   Update `tools/test_web_rtc_transport.cjs` for both cases. After this, SwiftShader deathmatch must no longer
+   Update `tests/web/test_web_rtc_transport.cjs` for both cases. After this, SwiftShader deathmatch must no longer
    report a full queue, though the frame-rate guard will still refuse to qualify it. The 5-second timeout for a
    silent client stays. Document in [WEB_BUILD.md](WEB_BUILD.md) that a hidden browser tab leaves the room, and
    do not change that here.
@@ -1221,7 +1221,7 @@ hits a stop rule.
    use compiled content" message. Delete `plugin_default_parity` and its script, and replace its session coverage
    as in task 6.
 6. **Remove compiled selection,** in this order, with a building tree and a green quick lane at each commit:
-   1. **Fixtures.** Add `proteus_boat_fixtures` (`tools/boat_fixtures.[ch]`) holding `boat_voyage_outer`, the course
+   1. **Fixtures.** Add `proteus_boat_fixtures` (`tests/support/boat_fixtures.[ch]`) holding `boat_voyage_outer`, the course
       table and default, `RIVER`, and the race, match and combat default rules. Validators link it. Nothing else
       moves yet.
    2. **Course.** Add `BOAT_COURSE_STANDARD_DIGEST` to core, and use it in `boat_replay_best_path` and the
@@ -1282,7 +1282,7 @@ and physical Safari, and a browser marina play check. None of these blocks the P
 
 ### PD5 result, 2026-10-31
 
-**Implemented.** `tools/check_web_multiplayer.py` now uses one local-room join helper for every
+**Implemented.** `tests/web/check_web_multiplayer.py` now uses one local-room join helper for every
 client, adds a 100 ms torpedo press delay, maps `wake.davve.net` to `NOTFOUND`, rejects any page
 log naming the hosted room, chooses Metal on macOS and SwiftShader elsewhere, and refuses to
 qualify a room below 20 fps. `web/rtc_transport.js` drops the oldest disposable event when a
@@ -1293,7 +1293,7 @@ authored moving craft and through a snapshot-stall resync; the steady contact bo
 to 0.00025 m.
 
 `--no-plugins`, `PROTEUS_BOAT_PLUGINS` and `plugin_default_parity` are gone. `proteus_boat_fixtures`
-(`tools/boat_fixtures.[ch]`) holds the shipped voyage, course, race course and rule values for
+(`tests/support/boat_fixtures.[ch]`) holds the shipped voyage, course, race course and rule values for
 validators only. `BOAT_COURSE_STANDARD_DIGEST` (`0xa27ccadf8bd7a754`) keeps legacy best paths and
 the `--replay`/`--ghost` gate; an enabled course requires a bound definition. `BoatWorldDefinition`
 and sessions have no compiled voyage, and `boat_combat_enable` requires rules. `boat_server

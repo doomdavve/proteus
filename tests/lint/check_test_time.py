@@ -31,7 +31,7 @@ ALLOWED_TESTS = {
 
 
 def scripts(cmake):
-    return sorted(set(re.findall(r"\$\{CMAKE_CURRENT_SOURCE_DIR\}/(tools/[\w.]+\.(?:py|cjs|mjs))",
+    return sorted(set(re.findall(r"\$\{CMAKE_CURRENT_SOURCE_DIR\}/((?:tools|tests)/[\w./]+\.(?:py|cjs|mjs))",
                                  cmake)))
 
 
@@ -53,7 +53,7 @@ def scan_lines(path, text, pattern, comment):
 def check(root):
     cmake = (root / "CMakeLists.txt").read_text()
     problems = []
-    sources = sorted(root.glob("tools/validate_*.c")) + sorted(root.glob("tools/boat_test_*.h"))
+    sources = sorted(root.glob("tests/**/*.c")) + sorted(root.glob("tests/**/*.h"))
     for path in sources:
         problems += scan_lines(path.relative_to(root), path.read_text(), C_WAITS, "//")
     for name in scripts(cmake):
@@ -91,7 +91,7 @@ def self_test():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args()
     self_test()
     problems = check(args.root)

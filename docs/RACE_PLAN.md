@@ -360,7 +360,7 @@ natural.
 ## R1 race core — 2026-10-24
 
 Implemented [`boat_race.[ch]`](../src/core/boat_race.h) in `proteus_boat_core` and
-[`validate_boat_race`](../tools/validate_boat_race.c) (CTest `boat_race`). The race is an
+[`validate_boat_race`](../tests/core/validate_boat_race.c) (CTest `boat_race`). The race is an
 authority-side observer like the deathmatch `boat_match`, but it also owns race placements:
 it grids and holds entrants, recovers them and sets the course ferry's clock. A `BoatRace` is
 pointer-free; with a fleet checkpoint and `boat_race_bind`, it resumes identically.

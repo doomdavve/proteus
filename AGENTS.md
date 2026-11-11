@@ -31,15 +31,15 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/core/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
 - `src/core/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
   outer map holds the same water): its scenery pack lays out the river kit on the outer map, and
-  validators use it as a small mapped fixture (`tools/boat_test_location.h`).
+  validators use it as a small mapped fixture (`tests/support/boat_test_location.h`).
 - `src/scenery/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
   `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
   compiled water in `water.h`. Collision and the server need the compiled water and maps; room
   definitions supply the course, rules and optional scene as data.
 - Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
-  windows or audio, or touch files; `tools/check_core_boundary.py` enforces this in CTest.
-  `tools/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
+  windows or audio, or touch files; `tests/lint/check_core_boundary.py` enforces this in CTest.
+  `tests/support/boat_fixtures.[ch]` keeps the shipped voyage, course, race course and rule values for
   validators only; production targets never link it. See `docs/TESTING.md` for the libraries and
   test labels.
 - `src/boat_net_*.[ch]`, `src/net/boat_prediction.[ch]`, `src/net/boat_remote_view.[ch]`: multiplayer
@@ -64,7 +64,7 @@ playground for iterating on effects, timing, audio, and presentation.
 - `assets/music/`: XM music for the boating game and the dance study.
 - `assets/samples/`: source WAV samples for tracker editing.
 - `tools/generate_audio.py`: deterministic generator for the starter samples and XM.
-- `tools/validate_xm.c`: XM parser/render smoke test used by CTest.
+- `tests/audio/validate_xm.c`: XM parser/render smoke test used by CTest.
 - `docs/`: focused workflow notes, including music and editor setup.
 
 ## Build and verify
@@ -89,7 +89,7 @@ workflow cap; exhaustive checks and packaging are manual/release qualification. 
 
 Tests never wait for wall-clock time. Code that depends on time takes `now` as an input, and its
 test drives a virtual clock; wall-clock limits are only failure deadlines. The `test_time` test
-(`tools/check_test_time.py`) enforces this.
+(`tests/lint/check_test_time.py`) enforces this.
 
 The routine suite disables retired physical wake-field experiments by default
 (`PROTEUS_WAKE_FIELD_TESTS=OFF`); re-enable them only when revisiting that work.

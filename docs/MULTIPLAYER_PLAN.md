@@ -150,7 +150,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 | [`src/core/waterfront_harbor.c`](../src/core/waterfront_harbor.c): `waterfront_harbor_contact_height`; [`src/core/waterfront_traffic.c`](../src/core/waterfront_traffic.c): `waterfront_traffic_motion`, `waterfront_traffic_contact_height` | Shared posed contact envelopes are useful. Ordinary traffic remains on authored routes, with one-way collision response and visual trails; it does not emit into the four-player arcade pool. Evaluate authoritative routes/obstacle poses at a common tick. |
 | [`src/render/boat_gpu.c`](../src/render/boat_gpu.c): `boat_gpu_draw_with_ghost`; [`src/render/waterfront_scene.h`](../src/render/waterfront_scene.h): `WaterfrontSceneFrame`; [`src/render/renderer_gpu.c`](../src/render/renderer_gpu.c): `draw_ghost` | One player plus one special ghost is not a fleet renderer. Ghosts omit shadows/reflections. Add bounded ordinary vessel views; keep race ghosts separate. The frame's “owned/no mutable pointers” comment is no longer literally true: copied `BoatWater` contains a borrowed `objects` pointer. Freeze/copy the render wake records before passes. |
 | [`CMakeLists.txt`](../CMakeLists.txt), [`cmake/Web.cmake`](../cmake/Web.cmake) | C17 and pinned raylib 6.0; common source lists are repeatedly compiled, simulation validators pull presentation. Emscripten builds `wake_velocity` then returns before native targets/tests. A headless core/server target and optional native transport dependency must respect this split. S4 basin slice (2026-10-23): static libraries replace the repeated lists, and `proteus_boat_core` has a display-free validator and boundary check; most simulation validators still link session and presentation. |
-| [`tools/validate_boat.c`](../tools/validate_boat.c): `validate_flight_outcomes`, `validate_dynamic_pair`; environment, banking, replay, traffic and object validators | Preserve ballistic/dry control, capsize, vertical clearance, momentum/energy, banked handling, wake derivatives, expiry and shader parity checks. Extend with network histories/authority tests; do not replace physical checks with screenshots. |
+| [`tests/core/validate_boat.c`](../tests/core/validate_boat.c): `validate_flight_outcomes`, `validate_dynamic_pair`; environment, banking, replay, traffic and object validators | Preserve ballistic/dry control, capsize, vertical clearance, momentum/energy, banked handling, wake derivatives, expiry and shader parity checks. Extend with network histories/authority tests; do not replace physical checks with screenshots. |
 
 The [2026-10-19 architecture review](ARCHITECTURE_REVIEW.md) is a dated baseline: its
 64-entry shader discussion describes D3, and its struct sizes predate current state. Current
@@ -684,7 +684,7 @@ pass a new performance target; it must produce truthful repeatable data.
 ### M2 — four-boat local authority and resumable checkpoints
 
 Depends on M1 core. Likely `src/core/boat_world.[ch]`, extracted pair-contact helpers from `boat.c`,
-`boat_wake_objects.[ch]`, `tools/validate_boat_world.c`, `src/room/boat_server.c`, CMake. Add
+`boat_wake_objects.[ch]`, `tests/core/validate_boat_world.c`, `src/room/boat_server.c`, CMake. Add
 `boat_world_step(world, inputs[4])`, the staged order above, spawn/life rules and explicit
 checkpoint save/restore without pointers. First keep one-boat output equivalent, then qualify
 two boats, then the existing local four-boat scenario. Add bounded server CLI scripted mode
@@ -701,7 +701,7 @@ no lost wake histories on one-boat reset, full checkpoint <=8 KiB and no allocat
 Record CPU against the proposed budget; network and multi-view presentation are non-goals.
 
 Status, 2026-10-23: implemented as `BoatFleet`/`boat_fleet_step` in `src/core/boat_fleet.[ch]`,
-`tools/validate_boat_fleet.c` and `src/room/boat_server.c`; automated checks pass and the user
+`tests/core/validate_boat_fleet.c` and `src/room/boat_server.c`; automated checks pass and the user
 played the fleet crossing rival on 2026-10-23. Details, deviations and evidence are in the
 [M2 handoff](#m2-local-authority-handoff--2026-10-23).
 
@@ -709,7 +709,7 @@ played the fleet crossing rival on 2026-10-23. Details, deviations and evidence 
 
 Depends on M2. Likely new `src/net/boat_net_protocol.[ch]`, `boat_net_transport.[ch]`,
 `boat_net_enet.c`, `boat_net_server.[ch]`, `boat_net_client.[ch]`, `src/room/boat_server.c`,
-`tools/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
+`tests/net/validate_boat_net.c`, CMake. Pin ENet and license; isolate build flags from project
 warnings. Implement handshake/version rejection, bounded queues, input/snapshot/control codec,
 initial world/wake checkpoint and in-memory delivery impairment before real sockets.
 Proposed diagnostic commands: `boat_server --bind 127.0.0.1 --port 24680 --location basin`
@@ -1838,7 +1838,7 @@ CTests:
 - `wake_velocity_serve_scripted`.
 - Three argument rejections: `--host race --location basin`, `--host` with `--connect`, and
   `--port` without `--host`.
-- `boat_host` (`tools/boat_host_check.py`): `wake_velocity --serve` on private ports, a 1 s
+- `boat_host` (`tests/app/boat_host_check.py`): `wake_velocity --serve` on private ports, a 1 s
   `boat_bot` session, then closing stdin. The room must exit cleanly within 2 s.
 - GPU-labelled `wake_velocity_host_gpu`: a windowed 120-frame river deathmatch host on port 24779.
 
@@ -1866,8 +1866,8 @@ Not checked:
 **Executable renamed to `wake_velocity` — 2026-10-25.** The game target, its
 `tools/boat_study*.{c,h}` sources (now `tools/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
 macros, CTest names and commands, `tools/macos/package.py`, the Windows/Linux workflows,
-`cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tools/check_wayland.sh`,
-`tools/check_web_controls.py` and every document now use `wake_velocity`; package copies
+`cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tests/lint/check_wayland.sh`,
+`tests/web/check_web_controls.py` and every document now use `wake_velocity`; package copies
 no longer rename the executable. `boat_server` keeps its name. There is no `boat_study`
 alias, and dated records were updated to the new command rather than kept verbatim. Internal
 identifiers such as `NetStudy`, `ObjectStudy` and the `boat_net_study_*` tests were not

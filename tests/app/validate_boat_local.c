@@ -169,7 +169,7 @@ static void pilot_reset(Pilot *p, const Boat *boat)
         .previous = boat->position };
 }
 
-// The banked-course controller (tools/validate_boat_replay.c) at a time trial's pace: the next
+// The banked-course controller (tests/session/validate_boat_replay.c) at a time trial's pace: the next
 // gate from the boat's own crossings, full throttle on the straights.
 static BoatInput pilot_input(Pilot *p, const Boat *b)
 {

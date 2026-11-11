@@ -28,7 +28,7 @@ function setup(permission = 'granted', secure = true, sensor = true, coarse = tr
     requests++; return permission === 'reject' ? Promise.reject(Error()) : Promise.resolve(permission);
   } };
   const context = vm.createContext({ Number, Math, Map, Promise, NaN });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/mobile_controls.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../../web/mobile_controls.js'), 'utf8'), context);
   const module = {boatCanFullscreen: true, boatFullscreen() { fullscreen++; }};
   context.installBoatMobileControls(module, canvas, document, window);
   const mobile = module.boatMobile;

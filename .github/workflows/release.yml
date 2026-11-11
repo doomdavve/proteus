@@ -35,8 +35,8 @@ jobs:
 
       - name: Check release publisher without network
         run: |
-          python3 tools/test_publish_release.py
-          python3 tools/test_cut_release.py
+          python3 tests/tools/test_publish_release.py
+          python3 tests/tools/test_cut_release.py
 
       - uses: actions/download-artifact@v4
         with:

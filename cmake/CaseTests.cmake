@@ -1,4 +1,4 @@
-# One CTest entry per case of a validator built on tools/boat_test_cases.h.
+# One CTest entry per case of a validator built on tests/support/boat_test_cases.h.
 #
 #   proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu [WORKING_DIRECTORY dir]
 #     [ARGS arguments...])

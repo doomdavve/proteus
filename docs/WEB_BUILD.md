@@ -69,7 +69,7 @@ The title's PLACE ring is now OUTER RIVER (default), BASIN and BASIN TRIAL; the
 [retirement plan](RIVER_RETIREMENT_PLAN.md) owns the decision. The page still preloads
 `geometry/river/scenery.bin`, now only because the outer map lays out its river kit from it; the
 crop's water atlas and ambient sidecars left the bundle. A default START therefore fetches the
-outer pack (5.3 MB) before the first session. `tools/check_web_scenery.py` passed against a local
+outer pack (5.3 MB) before the first session. `tests/web/check_web_scenery.py` passed against a local
 build on 2026-11-04; the other browser checks were updated for the new PLACE order but not run.
 Older notes below that describe preloading the river's sidecars or a River PLACE are history.
 
@@ -239,8 +239,8 @@ Check it against a served build (Playwright and Chrome; the script is optional a
 
 ```sh
 python3 -m http.server 8000 --directory build-web/site &
-python3 tools/check_web_scenery.py --output build/web-scenery
-python3 tools/check_web_scenery.py --output build/web-scenery-slow --throttle-kbps 200
+python3 tests/web/check_web_scenery.py --output build/web-scenery
+python3 tests/web/check_web_scenery.py --output build/web-scenery-slow --throttle-kbps 200
 ```
 
 Verified 2026-10-28 on macOS arm64, headless Chrome with SwiftShader: one outer fetch, only at
@@ -285,9 +285,9 @@ and the [WebKit fullscreen issue](https://bugs.webkit.org/show_bug.cgi?id=206854
 Automated checks:
 
 ```sh
-node tools/test_web_mobile_controls.cjs
-python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --output build-web/mobile-review
-python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --android --output build-web/android-review
+node tests/web/test_web_mobile_controls.cjs
+python3 tests/web/check_web_mobile.py --url http://127.0.0.1:8000/ --output build-web/mobile-review
+python3 tests/web/check_web_mobile.py --url http://127.0.0.1:8000/ --android --output build-web/android-review
 ```
 
 Android review: Chrome-style orientation access is enabled by the same explicit Tilt button;
@@ -352,7 +352,7 @@ The optional browser check plays HIGH RES on the river with float targets, with 
 through a mobile rotation, and checks the WebGL viewports and the saved setting:
 
 ```sh
-python3 tools/check_web_resolution.py --url http://127.0.0.1:8000/ --output build-web/resolution
+python3 tests/web/check_web_resolution.py --url http://127.0.0.1:8000/ --output build-web/resolution
 ```
 
 Verification on 2026-11-03, M1 Max/macOS, headless Chrome with SwiftShader against a local
@@ -375,7 +375,7 @@ fresh browser profiles, once with smoothing ON and once OFF. It checks actual We
 viewports, captures settings/gameplay and rejects runtime or shader errors:
 
 ```sh
-python3 tools/check_web_aa.py --url http://127.0.0.1:8000/ \
+python3 tests/web/check_web_aa.py --url http://127.0.0.1:8000/ \
   --room-url ws://127.0.0.1:24443 --output build-web/aa-review
 ```
 
@@ -430,13 +430,13 @@ and wider browser/platform checks remain.
 Run the directory contract check with Node, or test a served released-compatible client:
 
 ```sh
-node tools/test_web_server_directory.cjs
-python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --output build/directory-review
-python3 tools/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
+node tests/web/test_web_server_directory.cjs
+python3 tests/web/check_web_server_directory.py --url https://wake.davve.net/ --output build/directory-review
+python3 tests/web/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
   --directory-url https://wake.davve.net/servers.json --output build/pages-preview
-python3 tools/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
+python3 tests/web/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
   --output build/pages-live
-python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --unavailable --output build/directory-fallback
+python3 tests/web/check_web_server_directory.py --url https://wake.davve.net/ --unavailable --output build/directory-fallback
 ```
 
 The optional Playwright check joins the named room without text input; `--directory-url`
@@ -456,7 +456,7 @@ The dated mouse/scroll qualification below remains historical: its adapter still
 normalizes scroll for its event contract, but scroll no longer affects propulsion.
 
 ```sh
-python3 tools/check_web_pedals.py --url http://127.0.0.1:8000/ --output build-web/pedals
+python3 tests/web/check_web_pedals.py --url http://127.0.0.1:8000/ --output build-web/pedals
 ```
 
 This optional Playwright check samples the actual rendered thrust needle for power/neutral,
@@ -615,11 +615,11 @@ and lazy; the packaged site now includes `lua-LICENSE.txt`. Deploy the complete 
 
 ```sh
 python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
-node tools/test_web_plugin_author.cjs
+node tests/web/test_web_plugin_author.cjs
 # With a built site served on port 8000, Playwright installed and its engines downloaded
 # (`playwright install chromium firefox webkit`); --executable selects system Chrome instead:
 for engine in chromium firefox webkit; do
-  python3 tools/check_web_plugin_author.py --browser $engine --url http://127.0.0.1:8000/ \
+  python3 tests/web/check_web_plugin_author.py --browser $engine --url http://127.0.0.1:8000/ \
     --output build-web/plugin-browser-check/$engine
 done
 ```
@@ -751,17 +751,17 @@ Chromium binary). The title check covers saves/reload, audio startup and repeate
 the multiplayer check starts and cleans up its own native room and bot:
 
 ```sh
-python3 tools/check_web_rtc_echo.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/rtc-echo
-python3 tools/check_web_title.py --url http://127.0.0.1:8000/ --output build-web/title-review
-python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/net-free
-python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --four-players --output build-web/net-four
-python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode deathmatch --output build-web/net-deathmatch
-python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode race --output build-web/net-race
+python3 tests/web/check_web_rtc_echo.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/rtc-echo
+python3 tests/web/check_web_title.py --url http://127.0.0.1:8000/ --output build-web/title-review
+python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/net-free
+python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --four-players --output build-web/net-four
+python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode deathmatch --output build-web/net-deathmatch
+python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode race --output build-web/net-race
 ```
 
 `boat_rtc_echo [PORT]` is the standalone 120-second protocol-byte echo gate;
 `boat_rtc_echo --fixture FILE` writes its C-codec PING fixture. The Node contract test
-`node tools/test_web_rtc_transport.cjs` checks reliability options, queue/backpressure bounds,
+`node tests/web/test_web_rtc_transport.cjs` checks reliability options, queue/backpressure bounds,
 oversize messages and stale callbacks after reconnect; it also runs in native CTest when Node
 is present and before the Wasm build in Pages CI. `boat_net_mux` tests cross-transport peer-ID collisions, routing across all delivery
 classes, disconnect isolation and aggregate statistics without sockets.
@@ -814,10 +814,10 @@ Run the display-free event contract with Node (registered as CTest `web_mouse_co
 Node is found), and optionally drive an actual served Wasm build using Playwright:
 
 ```sh
-node tools/test_web_mouse_controls.cjs
-python3 tools/check_web_controls.py --url http://127.0.0.1:8000/ --browser chromium --output build-web/controls-chromium
-python3 tools/check_web_controls.py --url http://127.0.0.1:8000/ --browser firefox --headed --output build-web/controls-firefox
-python3 tools/check_web_controls.py --url http://127.0.0.1:8000/ --browser webkit --headed --output build-web/controls-webkit
+node tests/web/test_web_mouse_controls.cjs
+python3 tests/web/check_web_controls.py --url http://127.0.0.1:8000/ --browser chromium --output build-web/controls-chromium
+python3 tests/web/check_web_controls.py --url http://127.0.0.1:8000/ --browser firefox --headed --output build-web/controls-firefox
+python3 tests/web/check_web_controls.py --url http://127.0.0.1:8000/ --browser webkit --headed --output build-web/controls-webkit
 ```
 
 The optional script needs Playwright and its browser binaries. `--executable` selects an

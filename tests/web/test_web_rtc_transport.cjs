@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { installBoatRtcTransport } = require('../web/rtc_transport.js');
+const { installBoatRtcTransport } = require('../../web/rtc_transport.js');
 let peer;
 class Peer {
   constructor() { peer = this; this.channels = []; }

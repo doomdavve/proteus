@@ -222,7 +222,7 @@ def verify(root, args, commit):
         html = run('curl', '-fsS', '--max-time', '30', url)
         if f'Version {args.tag}<' not in html:
             raise RuntimeError(f'Browser release mismatch: {url}')
-        run(args.browser_python, root / 'tools/check_web_server_directory.py',
+        run(args.browser_python, root / 'tests/web/check_web_server_directory.py',
             '--url', url, '--output', args.output / name, '--executable', args.chrome,
             log=args.output / f'{name}.log', timeout=180)
     native = run(root / 'build/boat_bot', '--connect', room['native'], '--name',

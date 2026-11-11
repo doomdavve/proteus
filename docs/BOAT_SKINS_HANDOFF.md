@@ -24,7 +24,7 @@ usage and rendering APIs.
 The main checkout was clean at preparation start and has not been edited by this work.
 During verification, concurrent uncommitted renderer edits appeared in main, including
 `src/render/renderer3d.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
-`tools/validate_boat_water_benchmark.py` and `tools/validate_renderer3d.c` at the last check.
+`tests/render/validate_boat_water_benchmark.py` and `tests/render/validate_renderer3d.c` at the last check.
 Those edits are outside this package and were left untouched. `src/render/renderer_gpu.c` overlaps
 the boat package, so a direct merge must wait until that renderer work is reconciled.
 Candidate verification covers committed main `642ca78`, not those concurrent working-tree edits.

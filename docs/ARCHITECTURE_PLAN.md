@@ -128,7 +128,7 @@ take over, block or complete:
 Read-only source review on 2026-11-08 against `e25b47a`, macOS (historical; AR0 supersedes it):
 
 - Core and networking have source and archive-symbol boundary checks in
-  [check_core_boundary.py](../tools/check_core_boundary.py).
+  [check_core_boundary.py](../tests/lint/check_core_boundary.py).
 - [BoatNetTransport](../src/net/boat_net_transport.h) is an existing small backend interface.
 - The root [CMakeLists.txt](../CMakeLists.txt) exports the entire `src` include directory from
   core. The flat tree obscures ownership and private headers.
@@ -460,7 +460,7 @@ call waits, and state keeps its previous owner (free functions, rule 10):
 | Scenery deferral, `wake_scenery_deferred` (scenery service) | Whether acquisition waits for the window | False | True: the first CPU draw and its capture wait for `scenery_ready` | `study()` |
 | Console bridge, `wake_console_bridge.h` | Transcript sync; closed; clipboard step; queued completions; whether Tab completes; text-entry availability; page state | Nothing; nothing; Ctrl/Cmd+C/V through raylib; nothing; yes; yes; nothing | Page transcript; drop queued Tab and paste; page paste and clipboard notice; page Tab queue; no; physical keyboard only; `Module.boatConsole*` | `wake_console.c`; console availability and state in `study()` |
 
-Enforcement: `platform_bridges` (quick) runs `tools/check_platform_bridges.py`. Inline JavaScript
+Enforcement: `platform_bridges` (quick) runs `tests/lint/check_platform_bridges.py`. Inline JavaScript
 lives only in `*_web.c` backends or in listed legacy files at exactly their recorded counts
 (`wake_velocity.c` had 14 for AR2b touch, mouse and viewport capabilities, now 0 and delisted; the
 native stage worker `src/plugins/boat_plugin_stage_worker.c` 1; AR4's merge brought
@@ -1138,11 +1138,11 @@ Evidence (macOS 26.6.2, Apple M1 Max, emcc 6.0.12 MinSizeRel and AppleClang 21.0
 2026-11-11; headless Chromium 156 through Playwright 1.64.1 with SwiftShader):
 
 - `ctest --preset full -j8`: 536/536 (13 disabled). `tools/check_web_wasm.py`: no Lua in the game.
-- `tools/check_web_plugin_author.py --browser chromium` and `tools/check_web_scenery.py` pass.
+- `tests/web/check_web_plugin_author.py --browser chromium` and `tests/web/check_web_scenery.py` pass.
 - A scratch drive of the default Langedrag voyage printed `Local session: generation 1, 301 ticks
   in 93 chunks` on leaving, with no page errors; a console edit during it restarted play at the
   dock and continued on the direct path.
-- `tools/check_web_controls.py` and `tools/check_web_title.py` fail identically on a web build of
+- `tests/web/check_web_controls.py` and `tests/web/check_web_title.py` fail identically on a web build of
   `main` at `aaafd8d`: the first treats the plugin status line on stderr as a console error, the
   second's console edit `def.scene.marina.berths[1].x = 15` stages a syntax error. Neither comes
   from L4a.
@@ -1190,7 +1190,7 @@ Chromium 156 through Playwright 1.64.1 with SwiftShader):
   `isolated_quarantine` and `isolated_deadline` (see [TESTING](TESTING.md)). A mutation that
   never stages a worker UPDATE fails `isolated_objective`.
 - Browser game builds clean; `tools/check_web_wasm.py`: no Lua in the game.
-  `tools/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
+  `tests/web/check_web_plugin_author.py --browser chromium` passes, including its objective lifecycle
   (22 normal callbacks, deadline across freeze, restart). A scratch drive of the default Langedrag
   voyage ran 309 ticks on the local authority with no page errors.
 
@@ -1283,7 +1283,7 @@ Evidence (macOS 26.6.2, Apple M1 Max, AppleClang 21.0.0 Debug and emcc MinSizeRe
   `isolated_authoring` (slow)). Mutations caught: skipping the adoption (`isolated_migrate`),
   dropping the busy check or the cancel request (`isolated_authoring`).
 - Browser game and `plugin_stage` build clean; `tools/check_web_wasm.py`: no Lua in the game.
-  `tools/check_web_plugin_author.py` passes twice each on headless Chromium 156 (SwiftShader),
+  `tests/web/check_web_plugin_author.py` passes twice each on headless Chromium 156 (SwiftShader),
   Firefox 157 and WebKit 27.2 through Playwright 1.64.1, including the objective lifecycle
   (migration held and canceled by Undo, migrate, failing migration, restart, quarantine,
   deadline). Observed, not investigated: the objective's mean round trip is 61 ms on Chromium

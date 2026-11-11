@@ -48,8 +48,8 @@ Source audit at `7d5fd48`, with a clean starting worktree:
 | `src/core/boat.c`, `hull_rotation`, `hull_motion`, `boat_player_pose` | Shared rolled pose and attachment velocities already exist. Rendering reflects simulation X. Test physical sides, not Euler-component guesses. |
 | `src/core/boat.h` | Owns `roll`, `roll_velocity`, `planing`; add only the filtered turn-load state if using the specified filter. |
 | `src/session/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
-| `tools/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
-| `tools/validate_boat_environment.c`, `tools/validate_boat_replay.c`, `tools/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
+| `tests/core/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
+| `tests/core/validate_boat_environment.c`, `tests/session/validate_boat_replay.c`, `tests/session/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
 | `apps/wake_velocity/wake_velocity.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |
 
 Within T1–T5, use C17/raylib and the existing tick rate. Preserve steering response, propulsion, drag,
@@ -196,7 +196,7 @@ requested. Never advance the foundations, trim/loading, or harbor tracks as part
 
 ### T1 — Make the behavior measurable
 
-Add a focused deterministic validator (`tools/validate_boat_banking.c`, using the existing
+Add a focused deterministic validator (`tests/core/validate_boat_banking.c`, using the existing
 validator linkage pattern). Add a small `--report <path>` mode if useful; check write errors.
 Keep artifacts under `build/`. Do not change production physics in this task.
 
@@ -361,7 +361,7 @@ change. Implementation, manual banking review, and user feel acceptance all rema
 
 Starting revision: `7d5fd48`, macOS Apple Silicon. Existing dirty files were
 `docs/BOAT_PHYSICS_PLAN.md`, `docs/README.md`, and the untracked copy of this plan;
-those planning edits were preserved. T1 adds `tools/validate_boat_banking.c`, its
+those planning edits were preserved. T1 adds `tests/core/validate_boat_banking.c`, its
 shared-world/harbor linkage in CMake, and the headless `boat_banking` CTest. Production
 physics, tuning, rendering and replay revision remain unchanged. T2 is next; T3–T5 and
 manual/user banking review remain pending.
@@ -677,7 +677,7 @@ continuing and committing each step. T4 implements presentation/replay review to
 T5 is next. No banking coefficients, horizontal handling, camera settings, physics revision
 or replay layout changed. Hands-on banking acceptance remains pending.
 
-`tools/boat_banking_fixture.h` now owns the existing T1/T3 free-drive reset, tick counts and
+`tests/support/boat_banking_fixture.h` now owns the existing T1/T3 free-drive reset, tick counts and
 inputs, shared by the dynamics validator and new `boat_banking_review`. The new tool checks
 every driven tick and selects deterministic straight, established left/right, S reversal,
 coast peak and gentle-wave/turn peak snapshots. The coast and wave captures select the

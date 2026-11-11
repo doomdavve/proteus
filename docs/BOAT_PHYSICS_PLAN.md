@@ -218,7 +218,7 @@ Likely entry points (verify against the current tree):
 - `src/core/boat_map.c`: navigable water and shoreline boundaries.
 - `src/render/boat_gpu.c`, `src/render/renderer_gpu.c`, `src/render/waterfront_scene.h`: GPU integration.
 - `apps/wake_velocity/wake_velocity.c`: input, HUD, deterministic preview and capture options.
-- `tools/validate_boat.c`: handling regression tests; `CMakeLists.txt`: test registration.
+- `tests/core/validate_boat.c`: handling regression tests; `CMakeLists.txt`: test registration.
 - `README.md`: public controls and launch commands.
 
 Keep simulation deterministic at the existing 120 Hz. Express tuning constants in named groups.
@@ -649,7 +649,7 @@ These motivate models, not exact coefficients or a requirement to adopt another 
 
 
 - 2026-10-18: D1/D2 implemented as the authored basin profiles above. Added
-  `tools/validate_boat_environment.c`: smooth compact field boundaries, uniform-current
+  `tests/core/validate_boat_environment.c`: smooth compact field boundaries, uniform-current
   equivalence through steering, neutral drift, basin containment, bounded wake amplitude,
   finite-difference spatial/time derivatives (including current travel along slopes),
   deterministic repeat crossings at 0/3/9 units/s and 0/45/90-degree headings, and stable
@@ -689,7 +689,7 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   engine steering, and original horizontal drag/skeg terms are unchanged. Orbital flow/current,
   hull-pressure simulation, ventilation, and capsize behavior were outside this phase.
   The subsequent arcade pass adds capsize rules and water-contact handling gates.
-  `tools/validate_boat.c` tests negative relative work and dry/exit limits separately from energy
+  `tests/core/validate_boat.c` tests negative relative work and dry/exit limits separately from energy
   transfer by moving water; controlled 2/12-unit/s head-on, beam and following encounters;
   repeatability, lower slow-speed angular motion/vertical acceleration/spray load; particle
   surface alignment; shoreline containment; bounded neutral drift; and a recorded C2 calm-water
@@ -780,7 +780,7 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   remains. Foam stays on the water while spray originates at a hull attachment.
   `apps/wake_velocity/wake_velocity.c` now holds straight cruise before turning at 3s and lowering thrust at 4s;
   README and boating notes document the visual approximation and revised preview.
-  `tools/validate_boat.c` covers transition rise/cruise settling, smooth return to rest/reset,
+  `tests/core/validate_boat.c` covers transition rise/cruise settling, smooth return to rest/reset,
   attachment alignment through 16 headings (including Euler singularities), planing spray,
   camera stability, and independence from horizontal handling. Debug configure/build and all
   24 CTests passed, including GPU review. Inspected CPU and Eriksberg GPU+AA captures at

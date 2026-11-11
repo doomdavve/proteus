@@ -43,7 +43,7 @@ Do not add a general rigid-body engine, a new weapon, difficulty menus or hostin
 | --- | --- | --- |
 | Grenade | 7 m astern, 1 s fuse, 4 m crest, 10 m/s propagation, 70 m range, 8 s recharge. Creates a radial wave; **no hull damage**. Wave amplitude already falls as `(1 - radius/range)^2`. | `src/core/boat_combat.[ch]`: default rules, `boat_combat_advance`; `src/core/boat_water.c`: `boat_water_radial_query` |
 | Stability | Ordinary wet-turn guard starts at 25 degrees; object worlds also receive automatic airborne and wet roll recovery. Capsize latches after 0.6 s of inverted wet contact. Several independent assists can erase a wave upset. | `src/core/boat.c`: constants, `hull_wet`, `motion_step`, `buoyancy_step`; `src/core/boat_pose.c` |
-| Torpedo | 40 damage against 100 health; 32 m/s, three per life, 0.25 s arming. Actual health removed drives damage feedback. | `src/core/boat_combat.c`: defaults, `boat_combat_hits`; `tools/validate_boat_combat.c`: `hits`, `torpedoes` |
+| Torpedo | 40 damage against 100 health; 32 m/s, three per life, 0.25 s arming. Actual health removed drives damage feedback. | `src/core/boat_combat.c`: defaults, `boat_combat_hits`; `tests/core/validate_boat_combat.c`: `hits`, `torpedoes` |
 | Boat pairs | Whole-boat transformed vertical intervals reject separated boats, then heading-only rectangles choose a **horizontal** separation/impulse. A cabin corner can make intervals overlap even where hulls clear. No vertical pair response. | `src/core/boat.c`: `hull_vertical_bounds`, `boat_pair_*`; `src/core/boat.h`: `BoatPairContact`; `src/core/boat_fleet.c`: `boat_fleet_solve` |
 | Projectile hits | Moving-position slab sweep uses final heading and one box; pitch/roll are ignored. “3D” here means a height slab, not full-pose collision. | `src/core/boat_combat.c`: `hull_hit` |
 | Defeats | Match observation hard-codes hull destruction with a killer as **torpedo**. Grenade attribution currently comes from wave exposure. New grenade hull damage needs a real cause path. | `src/core/boat_match.c`: `touches`, `boat_match_observe`; `src/core/boat_match.h` |
@@ -55,7 +55,7 @@ Branch from current main. Change test/review fixtures and documentation only.
 
 1. Extend existing combat/fleet validators and review tools rather than building a parallel
    simulator. Reuse `boat_fleet_step`, real inputs and virtual time. Add named cases using
-   `tools/boat_test_cases.h` when needed; keep heavy sweeps outside the quick lane.
+   `tests/support/boat_test_cases.h` when needed; keep heavy sweeps outside the quick lane.
 2. Capture fixed-input encounters in open basin water: stern grenade chase, an armed torpedo
    hit/miss, crossing another boat's wake at 0/5/12 m/s with head/beam/oblique headings, a
    clear airborne crossing, a pitched near-clearance crossing and a landing onto another boat.
@@ -74,8 +74,8 @@ as passing or weaken an existing physical bound to make the baseline pass.
 
 ## Step 1 — one armed torpedo hit sinks a healthy boat
 
-Parent: step 0. Primary files: `src/core/boat_combat.c`, `tools/validate_boat_combat.c`,
-`tools/validate_boat_match.c`, the deathmatch plan and `docs/PLAYING.md`.
+Parent: step 0. Primary files: `src/core/boat_combat.c`, `tests/core/validate_boat_combat.c`,
+`tests/core/validate_boat_match.c`, the deathmatch plan and `docs/PLAYING.md`.
 
 1. Set default torpedo damage to default full hull health (100 at this baseline). Continue
    using `min(remaining_health, configured_damage)` for actual damage and HUD numbers.
@@ -182,7 +182,7 @@ scoped follow-up; do not improvise a client-only deathmatch multiplier.
 
 Parent: step 3. Change geometry/detection first; vertical response follows in step 5.
 Primary files: `src/core/boat.[ch]`, `src/core/boat_pose.[ch]`, `src/core/boat_model.[ch]`,
-`tools/validate_boat_fleet.c`, `tools/boat_fleet_review.c`. A small core contact module is
+`tests/core/validate_boat_fleet.c`, `tools/boat_fleet_review.c`. A small core contact module is
 acceptable if these helpers would otherwise overgrow `boat.c`; no general framework.
 
 1. Define a shared, skin-independent physical hull plus smaller cabin as a fixed compound
@@ -344,7 +344,7 @@ files resolve. Existing review-tool argument names were checked against their pa
 
 The initial sandboxed full run passed 308/321 enabled tests: twelve socket/hosting tests
 failed without socket access, and `boat_plugin_session.game_controls` failed its expected
-status-text assertion at `tools/validate_boat_plugin_session.c:867` (reported marina layout
+status-text assertion at `tests/plugins/validate_boat_plugin_session.c:867` (reported marina layout
 rather than exposed water). The complete rerun with local socket access passed all **321**
 enabled tests in 33.12 s, including that plugin case; 13 retired field tests were disabled.
 The plugin assertion discrepancy was not investigated or fixed in this documentation change.

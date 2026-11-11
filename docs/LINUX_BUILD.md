@@ -73,7 +73,7 @@ as `GLFW - Wayland` or `GLFW - X11`.
 Run from the repository root after building:
 
 ```sh
-bash tools/check_wayland.sh build-linux
+bash tests/lint/check_wayland.sh build-linux
 XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/wake_velocity \
   --verbose --location basin --mouse-steering --frames 120
 ```

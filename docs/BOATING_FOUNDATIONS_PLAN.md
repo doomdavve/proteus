@@ -367,7 +367,7 @@ files intact. C1 alone is not completion of the long-session fix: C2 must remove
 
 Read/edit: `src/core/boat_water.[ch]`, `src/render/waterfront_scene.[ch]`, `src/core/waterfront_harbor.[ch]`,
 `src/core/waterfront_traffic.[ch]`, `src/render/renderer_gpu.c`, both `waterfront_water` shaders, and
-`tools/validate_boat_environment.c`'s production-shader probe.
+`tests/core/validate_boat_environment.c`'s production-shader probe.
 
 1. Carry double evaluation time through water/traffic/scene APIs and the scene frame; wake birth
    times become double. Compute wake age by subtracting doubles before narrowing bounded age to
@@ -486,7 +486,7 @@ and remove old no-context APIs rather than leaving hidden alternate behavior.
 
 ### W4 — lifecycle gate
 
-Add `tools/validate_boat_world.c` with CPU tests registered in CTest. In one process test
+Add `tests/core/validate_boat_world.c` with CPU tests registered in CTest. In one process test
 basin → Eriksberg → river → Eriksberg → basin; compare a freshly initialized world to each
 revisited world, including shoreline queries, spawn, water settings, and patch topology. Test
 invalid definition/partial-init cleanup. Keep two worlds alive for the isolation tests.
@@ -885,7 +885,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
 - **Limits:** GPU tolerances were measured on one Apple GPU; Windows/Linux/browser were not run.
   No simulated hour was run (C3). The benchmark trace CSV and profiler overlay still print
   `Boat.time` as float (diagnostic display only). The frozen P2a oracle
-  `tools/boat_drive_baseline.h` restores only the derived `time` cache after its crossing
+  `tests/support/boat_drive_baseline.h` restores only the derived `time` cache after its crossing
   boat's recovery reset, whereas production restores the tick; C3 should decide whether the
   oracle needs a C1-era revision. Specific pause/focus/replay and long-session playback
   were not separately reported.
@@ -941,7 +941,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   existing arcade handling, unrelated to the clock; gameplay tuning, if wanted, belongs to
   the boating plan, not C3.
 - **Limits:** One machine; Windows/Linux/browser not run. Soak frames are CPU only. The frozen
-  P2a oracle `tools/boat_drive_baseline.h` still restores only the derived `time` after a
+  P2a oracle `tests/support/boat_drive_baseline.h` still restores only the derived `time` after a
   crossing-boat recovery; production restores the tick. It remains an untouched oracle; the
   calm-independence check uses the production driver. The benchmark CSV/profiler display
   print `Boat.time` as float (diagnostic only).
@@ -982,12 +982,12 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   the [S1/S2 basin slice](#s1s2-basin-slice-handoff--2026-10-23)). The
   scripted crossing boat keeps its original calm basin (`ObjectStudy.other_world`, sharing only
   the arcade wakes) and steps at the session's time; the multi-boat schedule belongs to
-  multiplayer M2. Test-only `tools/boat_test_session.h` (`basin_session`) wraps authored
+  multiplayer M2. Test-only `tests/support/boat_test_session.h` (`basin_session`) wraps authored
   fixture boats in a fresh calm basin session. There is no default-world singleton. The frozen
-  P2a oracle `tools/boat_drive_baseline.h` had only its calls ported; its order is unchanged.
+  P2a oracle `tests/support/boat_drive_baseline.h` had only its calls ported; its order is unchanged.
 - **Automated verification:** Apple M1 Max/macOS 26.6.2, Debug common recipe: 88 active CTests
   pass (20 GPU) in 110.20 s; fifteen retired field cases stay disabled. New
-  `boat_world_isolation` (`tools/validate_boat_world.c`, 1.7 s) steps basin calm+D3,
+  `boat_world_isolation` (`tests/core/validate_boat_world.c`, 1.7 s) steps basin calm+D3,
   basin waves+current+D3 and Eriksberg-waves sessions interleaved for 2400 ticks and requires
   each to equal its solo run byte for byte; checks that cloned sessions diverge without
   aliasing; and checks that scene/CPU draw leave the session unchanged and respawn keeps clock
@@ -1048,7 +1048,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
 - **Equivalence:** moving the camera update from mid-tick to after buoyancy is equivalent
   because only contacts change heading. Particles and cloth already ran after all physics;
   the course step between them touches neither. The frozen P2a oracle
-  (`tools/boat_drive_baseline.h`) was not edited: it does not step the crossing boat's
+  (`tests/support/boat_drive_baseline.h`) was not edited: it does not step the crossing boat's
   presentation, which affects no hashed or drawn value in its comparison.
 - **Benchmark:** `boat_benchmark --presentation on|off` (default on, matching P3a); the report
   records `presentation`. The contract test requires identical traces and hashes for off.
@@ -1107,7 +1107,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   GPU, scene-frame, player-pose and replay-flag APIs consume it. `Boat.time` and
   `Boat.replay_view` are gone: physics/presentation have no view flag, and a sampled view
   is a distinct type. Replay interpolation is unchanged and continuous. The crossing boat is
-  drawn as a view at session time. Tests use `SESSION_VIEW()` from `tools/boat_test_session.h`.
+  drawn as a view at session time. Tests use `SESSION_VIEW()` from `tests/support/boat_test_session.h`.
 - **Tools:** `wake_velocity_state_hash` takes the session time explicitly, in the position the
   cached field used, so traces and hashes are unchanged. The frozen P2a oracle had only its
   time sources ported; its float-narrowed crossing-boat recovery time is kept as a local.
@@ -1176,7 +1176,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
     `boat_water_query_borrowed`, the same query without copying the settings.
   - `boat.c` includes the harbor/traffic contact headers rather than `waterfront.h`.
   - No formulas changed, and no transitional wrappers or forwarding headers exist.
-- **Boundary check:** `boat_core_boundary` runs `tools/check_core_boundary.py`.
+- **Boundary check:** `boat_core_boundary` runs `tests/lint/check_core_boundary.py`.
   - Includes: core may include only core headers, `raylib.h`/`raymath.h`, compiled map geometry
     and a system-header allowlist without `<stdio.h>`.
   - Calls: PascalCase calls must be raymath. C library console/file/process calls, `rl*` and
@@ -1247,7 +1247,7 @@ and `clang-format` pass.
   keyboard and applies it to every catch-up tick, as before.
 - **Callers:** every validator, review tool, the shared drive and the scripted crossing boat
   pass compound literals with the same expressions in the same order. The frozen P2a oracle
-  (`tools/boat_drive_baseline.h`) was ported only at its two step calls. Fixture helpers that
+  (`tests/support/boat_drive_baseline.h`) was ported only at its two step calls. Fixture helpers that
   take two floats (`core_step`, `baseline_step`, the banking/turn-entry fixtures) keep their
   signatures. The wheel-update local in `boat_step` was renamed from `input` to `rate`. No
   formulas changed, and there are no wrappers.

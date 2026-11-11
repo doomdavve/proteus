@@ -28,7 +28,7 @@ with (args.output / 'echo.log').open('w') as log:
             browser = playwright.chromium.launch(executable_path=args.executable, headless=True)
             page = browser.new_page()
             page.goto(args.url)
-            page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / 'web/rtc_transport.js'))
+            page.add_script_tag(path=str(Path(__file__).resolve().parents[2] / 'web/rtc_transport.js'))
             page.evaluate('''url => {
                 window.rtc = installBoatRtcTransport({});
                 window.received = [];

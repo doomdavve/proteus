@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const context = vm.createContext({Promise});
-vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/console_controls.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../../web/console_controls.js'), 'utf8'), context);
 function fixture(clipboard = {writeText: async value => { writes.push(value); }}) {
   const listeners = {}, canvas = {addEventListener: (name, cb) => { listeners[name] = cb; }};
   const module = {boatConsoleOpen: true, boatConsoleCopy: '> /status\nR1\n',

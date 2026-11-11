@@ -1,12 +1,12 @@
 add_test(NAME ci_lane_budget COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_ci_lane.py)
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/test_ci_lane.py)
 set_tests_properties(ci_lane_budget PROPERTIES LABELS "cpu;quick;ci")
 
 # The routine CI lane is deliberately curated. Build only the game and the validators it
 # actually runs; broad simulations, tool integration, repeated captures and benchmarks stay
 # in the full suite. Keep this list small rather than silently promoting every new test.
 add_custom_target(ci
-  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_ci_lane.py
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_ci_lane.py
     --build-dir ${CMAKE_CURRENT_BINARY_DIR} --config $<CONFIG> --ctest ${CMAKE_CTEST_COMMAND}
   DEPENDS wake_velocity
   VERBATIM)

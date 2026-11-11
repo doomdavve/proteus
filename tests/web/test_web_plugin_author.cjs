@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 const assert = require('node:assert/strict');
-const {bundle, decode, encode, frame, Transport, message, scenes, WIRE_MAGIC} = require('../web/plugin_author.js');
-const {ObjectiveTransport} = require('../web/plugin_objective.js');
+const {bundle, decode, encode, frame, Transport, message, scenes, WIRE_MAGIC} = require('../../web/plugin_author.js');
+const {ObjectiveTransport} = require('../../web/plugin_objective.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -25,7 +25,7 @@ function fixture() {
   return {transport, workers, timers};
 }
 async function main() {
-  const root = path.resolve(__dirname, '..');
+  const root = path.resolve(__dirname, '../..');
   const original = bundle(fs.readFileSync(path.join(root, 'plugins/langedrag/plugin.json'), 'utf8'),
     fs.readFileSync(path.join(root, 'plugins/langedrag/main.lua'), 'utf8'));
   assert.deepEqual(decode(encode(original)), original);

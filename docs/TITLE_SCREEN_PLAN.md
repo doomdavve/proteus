@@ -318,7 +318,7 @@ and error captures were inspected; the explicit river `--demo --frames 120` smok
 exited cleanly. Final title lettering was captured and inspected again.
 
 Emscripten MinSizeRel packaging passed. Chrome/SwiftShader's existing
-`tools/check_web_title.py` passed keyboard navigation, settings save/reload, two solo
+`tests/web/check_web_title.py` passed keyboard navigation, settings save/reload, two solo
 sessions and return to title, plus the audio-context assertions; captures were inspected.
 It reported ScriptProcessorNode deprecation and ReadPixels performance warnings, with
 no failing runtime/shader errors. Local documentation links, clang-format and diff checks

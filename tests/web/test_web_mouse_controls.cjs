@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const context = vm.createContext({ Number });
-vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/mouse_controls.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../../web/mouse_controls.js'), 'utf8'), context);
 function target() {
   const listeners = new Map();
   return {

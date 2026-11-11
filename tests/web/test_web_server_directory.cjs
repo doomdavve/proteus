@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
-const { installBoatServerDirectory } = require('../web/server_directory.js');
-const manifest = require('../web/servers.json');
+const { installBoatServerDirectory } = require('../../web/server_directory.js');
+const manifest = require('../../web/servers.json');
 
 (async () => {
   let data = manifest, fail = false, calls = 0;

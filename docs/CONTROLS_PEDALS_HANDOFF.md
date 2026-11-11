@@ -56,8 +56,8 @@ quantized-settling bounds, and deliberate capsize replay coverage.
 Reproduce the browser checks after serving the worktree build:
 
 ```sh
-python3 tools/check_web_pedals.py --url http://127.0.0.1:8026/ --output build-web/pedals
-python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8026/ --build-dir build-rtc --output build-web/pedals-network
+python3 tests/web/check_web_pedals.py --url http://127.0.0.1:8026/ --output build-web/pedals
+python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8026/ --build-dir build-rtc --output build-web/pedals-network
 ```
 
 The optional WebRTC authority build is described in [browser setup](WEB_BUILD.md#webrtc-rooms).

@@ -386,7 +386,7 @@ safe to destroy and must report failure before the first mapped simulation tick.
 ## A1.1 — explicit map data and collision-cache construction
 
 **Edit:** `src/core/boat_location.[ch]`, `src/core/waterfront_city.[ch]`, `src/core/boat_map.[ch]`,
-`tools/validate_boat_world.c` or a focused map validator, and its CMake registration.
+`tests/core/validate_boat_world.c` or a focused map validator, and its CMake registration.
 
 1. Add a read-only map description containing the existing mesh and bridge-triangle metadata;
    bind it to the river definition, with no map for the basin. Keep current compiled arrays,
@@ -434,7 +434,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
   `waterfront_city_is_bridge_triangle()` also remain. They are used by `boat_net_protocol.c`
   (content digest, A1.2), `boat_water_mesh.c` (A1.3), and `waterfront.c`,
   `waterfront_corner.c` and `renderer_gpu.c` (A1.4). Review/validator tools also use them.
-- **Test:** the new `boat_map` CTest (`tools/validate_boat_map.c`, labels `core;cpu`, core
+- **Test:** the new `boat_map` CTest (`tests/scenery/validate_boat_map.c`, labels `core;cpu`, core
   library only) does the following:
   - Checks definition binding and bridge metadata.
   - Covers zeroed, NULL, mesh-less, empty and land-only preparation, which must fail cleanly
@@ -520,7 +520,7 @@ Started from a clean `ef2be24`.
   worlds use the session's owner. `boat_server` owns the room location's resources.
   `boat_bot` owns all locations, because the room picks one, and releases them after the
   session loop. Validators and review tools open per-location owners in `main` through
-  `tools/boat_test_world.h`. Fixed river-geometry checks use its river map
+  `tests/support/boat_test_world.h`. Fixed river-geometry checks use its river map
   (`test_river_water`), and session/fleet checks use the world's own map.
 - **Removed:** `boat_map_legacy_water()`, `boat_map_legacy_water_contact()`,
   `boat_map_legacy_destroy()`, and the process-global cache behind them. No physical caller
@@ -748,7 +748,7 @@ Started from a clean `d73688a`.
     clearance-grid digests recorded from the old global (`8a15797b4f84d3f3`,
     `081bde4a44942f73`; 7,944 boxes).
   - The same test checks a second river owner alive together (equal content, separate
-    storage), the basin owner, and the synthetic harbor (`tools/boat_test_maps.h`): 139
+    storage), the basin owner, and the synthetic harbor (`tests/support/boat_test_maps.h`): 139
     derived boxes, 24 of them waterline, none outside the harbor.
   - It also checks failed init, double destroy, and rebinding harbor → river → harbor →
     basin with the survivor unchanged.
@@ -787,7 +787,7 @@ Started from a clean `d73688a`.
 
 ## A1.5 — prove lifecycle parity and hand off to tiling
 
-**Edit:** `tools/validate_boat_world.c`, focused map/water tests, a GPU lifecycle review if
+**Edit:** `tests/core/validate_boat_world.c`, focused map/water tests, a GPU lifecycle review if
 needed, `CMakeLists.txt`, `docs/BOATING_FOUNDATIONS_PLAN.md`, `docs/BOATING_PERFORMANCE.md`,
 this ledger and the adventure/index status.
 
@@ -1001,7 +1001,7 @@ harness throughout.
 ## A2.1 — application submission and triangle counters
 
 **Edit:** `src/render/renderer3d.[ch]`, `src/render/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
-`tools/validate_renderer3d.c`, `tools/validate_boat_water_benchmark.py` and the benchmark
+`tests/render/validate_renderer3d.c`, `tests/render/validate_boat_water_benchmark.py` and the benchmark
 guide. Counting must not change pixels, traces or the benchmark's timed work beyond a few
 integer additions.
 
@@ -1079,7 +1079,7 @@ Started from a clean `642ca78`.
 ## A2.2 — tile catalogue and indexed collision
 
 **Edit:** `src/core/boat_map.[ch]`, a tile module if `boat_map.c` would otherwise mix concerns,
-`tools/validate_boat_map.c`, the core boundary test inventory, and the review tool for
+`tests/scenery/validate_boat_map.c`, the core boundary test inventory, and the review tool for
 counts. Keep everything in `proteus_boat_core`: no drawing or file I/O.
 
 1. Build a tile catalogue from a `BoatMapDescription` in memory: a fixed grid origin and
@@ -1164,7 +1164,7 @@ Started from a clean `0fc2517`.
   with a normal: **0.035 µs indexed against 3.43 µs** for the scan (a scratch tool, not
   checked in). Six hull samples per tick drop from about 21 to 0.2 µs. That is small for
   today's crop, but it no longer grows with the map.
-- **Parity test:** the new `boat_map_index` CTest (`tools/validate_boat_map_index.c`,
+- **Parity test:** the new `boat_map_index` CTest (`tests/scenery/validate_boat_map_index.c`,
   labels `core;cpu`, about 14 s in Debug) compares 8, 16 and 32 m grids with the exhaustive
   scan. At clearances 0, 0.5, 3 and 12 m it compares the boolean, the clearance-only result
   and the normal bit for bit, on these point sets:
@@ -1392,7 +1392,7 @@ Started from a clean `65434fc` (v0.0.17) on branch `adventure-a2-4`, in a worktr
 ## A2.4 — water bounded by intersecting tiles
 
 **Edit:** `src/render/boat_water_mesh.[ch]`, `src/render/boat_view.c`, `src/render/boat_gpu.c` (if callers pass
-the catalogue), the review tool, `tools/validate_boat_map_index.c` or a new water-mesh test,
+the catalogue), the review tool, `tests/scenery/validate_boat_map_index.c` or a new water-mesh test,
 and `docs/3D.md`. The bake, the collision grid and the A2.3 land tiles stay as they are.
 
 Today the GPU wave patch (`boat_water_patch[_arcade]`, a 192 m square around the boat,
@@ -1433,7 +1433,7 @@ explained.
 
 Started from `origin/main` at `d66a8a8` (A2.4 merged) on branch `adventure-a2-5`.
 
-- **Synthetic corridors:** `tools/validate_boat_map_scaling.c` (CTest `boat_map_scaling`,
+- **Synthetic corridors:** `tests/render/validate_boat_map_scaling.c` (CTest `boat_map_scaling`,
   about 5 s in Debug) copies the river 1, 2, 4, 5 (about 25 km), 8 and 16 times along its long
   (map east) axis at a stride of 5,120 m, a whole number of tiles, so the first copy keeps the
   river's tile grid and indices. Water, land and bridge triangles are ordered as a description
@@ -1739,7 +1739,7 @@ Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was reb
   shelter; [`boat_voyage_view.c`](../src/render/boat_voyage_view.c)), and Backspace / Esc > RECOVER
   BOAT returns to the last shelter. Rooms (`--host`, `--connect`, `boat_server`) are unchanged:
   calm water, no voyage, no protocol or digest change.
-- **Tests:** new `boat_voyage` CTest (`tools/validate_boat_voyage.c`, under 1 s): shelters and
+- **Tests:** new `boat_voyage` CTest (`tests/session/validate_boat_voyage.c`, under 1 s): shelters and
   harbour are navigable with an 8 m envelope; the patch crosses the direct leg but not the
   coastal line (checked as water), the shelters or the harbour; it is rough at its centre and
   the harbour water stays flat; events; recovery pose and clock; right steering increases the
@@ -2352,7 +2352,7 @@ plus a tile cache; Ortofoto later, for colours only.
     that commit are unverified. GPU resident memory was not measured.
   - New tests `boat_scenery` and `map_pack` pass.
   - Web (Emscripten MinSizeRel, headless Chrome with SwiftShader):
-    `tools/check_web_scenery.py` passed: no outer pack request before an outer session, one
+    `tests/web/check_web_scenery.py` passed: no outer pack request before an outer session, one
     fetch when it starts, the Långedrag HUD drawn, and no second fetch on a second session; a
     throttled run captured the loading line with its percentage.
 - **Limitations:**

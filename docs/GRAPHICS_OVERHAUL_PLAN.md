@@ -485,7 +485,7 @@ and fallback requirements are preserved when checkpoints share a delivery PR.
 Stage coverage: G0. **Depends on:** current main.
 Human review: No human gate; establishes all three review batches.
 
-**Read first:** `tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`,
+**Read first:** `tools/boat_water_review.c`, `tests/render/validate_boat_water_benchmark.py`,
 `src/render/renderer_gpu.[ch]`, [performance](BOATING_PERFORMANCE.md), [testing](TESTING.md).
 
 **Tasks, in order:**
@@ -556,7 +556,7 @@ at batches A/B/C, without adding another full artistic playtest. Tool implementa
 before that hardware run; Windows performance remains unqualified until actual reports return.
 
 **Read first:** `src/render/profiler.[ch]`, `src/session/boat_profile.[ch]`, `apps/wake_velocity/wake_velocity.c`,
-`tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
+`tools/boat_water_review.c`, `tests/render/validate_boat_water_benchmark.py`, `src/render/renderer_gpu.[ch]`,
 `CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
 `tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),
 [testing](TESTING.md) and [releases](RELEASES.md). Proposed new tool names below are design targets,
@@ -1318,7 +1318,7 @@ and basin the same day. Owner: P2.
   atlas at ≤ 1/255 per 10 m (this caught stepped chop, now blurred in the bake). Debug full
   preset 384/384 passed (15 disabled).
 - **Portability:** Chrome 156 on ANGLE Metal: 430 depth blits with no GL or shader errors;
-  `tools/check_web_scenery.py` saw one outer pack and one outer atlas request, none on a second
+  `tests/web/check_web_scenery.py` saw one outer pack and one outer atlas request, none on a second
   session, no errors (the script's menu steps were updated for the SMOOTHING row).
 - **Agent playback:** review captures with each layer switched off (`build/graphics/g4/`), and
   320x200 clips at 60 Hz of an outer-harbour crossing toward the sun with the camera swinging

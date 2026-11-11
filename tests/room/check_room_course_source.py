@@ -18,7 +18,7 @@ NEEDLE = "boat_race_river_course"
 
 
 def main() -> int:
-    root = pathlib.Path(__file__).resolve().parent.parent
+    root = pathlib.Path(__file__).resolve().parents[2]
     failures = []
     for name in FILES:
         text = (root / name).read_text(encoding="utf-8")

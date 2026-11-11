@@ -41,7 +41,7 @@ if command == os.environ.get('TEST_GH_FAIL'):
                     "TEST_GH_LOG": str(self.log), "TEST_GH_EXISTS": "0", "TEST_GH_FAIL": ""})
         env.update(options)
         result = subprocess.run(
-            ["bash", str(Path(__file__).with_name("publish_release.sh")), tag, str(self.assets)],
+            ["bash", str(Path(__file__).resolve().parents[2] / "tools" / "publish_release.sh"), tag, str(self.assets)],
             env=env, capture_output=True, text=True)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
         return result, calls

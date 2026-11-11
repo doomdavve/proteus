@@ -198,6 +198,6 @@
  "web": {
   "browser": "Chrome 156, ANGLE Metal",
   "river_smoke": "430 depth blits, no blit or GL errors, no shader failures",
-  "lazy_load": "tools/check_web_scenery.py: one outer pack and one water-atlas-outer request, none on a second session, no errors"
+  "lazy_load": "tests/web/check_web_scenery.py: one outer pack and one water-atlas-outer request, none on a second session, no errors"
  }
 }
