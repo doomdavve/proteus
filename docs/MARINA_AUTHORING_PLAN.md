@@ -7,7 +7,7 @@ Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traf
 [protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
 Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
 Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
-Next task: prepare M4 berth/vessel ownership and schedules; no M4 implementation is included.
+Next task: M4 O1 native ownership core (branch `feat/marina-m4`); decisions recorded in the M4 section.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -37,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; decisions made 2026-11-14, O1 next |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
@@ -721,6 +721,20 @@ Reserve slips over arrival/dwell/departure intervals, including maneuver clearan
 conflicting reservations rather than inventing slip-selection or avoidance AI. Integrate
 these schedules into M3's swept checks, allowing the occupying vessel's legitimate berth
 approach without exempting unrelated boats from collision.
+
+### M4 decisions — 2026-11-14
+
+- Route cap: lift M3's one authored route to a small N (initially 4 independent `open` paths),
+  one path per vessel. A resident round trip is one path that starts and ends at its berth; a
+  visitor's stay is the path's dwell piece at the berth. Moving-survey work stays under the
+  existing cap, so N is bounded by the proof budget, not by a constant alone.
+- Outside its service window a resident is moored at its berth and a visitor is absent (no hull,
+  contact, camera exclusion or wake). A visitor parked elsewhere before arrival is deferred: it
+  needs a second resting place and ownership rule.
+- Berth binding: the berth is the single source of the terminal pose. Authors name the berth ID;
+  the path's berth endpoint is derived or checked against it, never authored independently.
+- Services are one-shot (no repeat) in M4; repeat is deferred explicitly.
+- Ownership is one pure function of (vessel, tick): moored, travelling or absent.
 
 Acceptance:
 
