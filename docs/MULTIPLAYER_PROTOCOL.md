@@ -782,6 +782,12 @@ only as trustworthy as that machine.
   its waiting data 64 KiB per peer.
 - **Scheduling.** 120 Hz from a monotonic clock, with at most eight catch-up ticks per service
   call and never a larger step. A room more than 500 ms behind for a second closes.
+  Ordinary standalone rooms pause after ten seconds with no transport peers; handshakes count
+  as connected. Pending definition revisions prevent suspension. While paused, maintenance
+  wakes are scheduled every 50 ms and incoming ENet events can wake it sooner. Joining resumes the
+  frozen tick with a rebased monotonic origin, without catching up elapsed empty time.
+  Explicit tick/time limits and authority recording disable this pause. ENet waits round
+  positive fractional milliseconds up to avoid busy-polling before tick deadlines.
 
 ## Safety envelope
 

@@ -37,6 +37,13 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | Human input/audio and wider network review; Firefox deadline | 2026-11-01 | [releases](RELEASES.md#status-and-verification) |
 
+## Empty-room server CPU
+
+[Idle server work](SERVER_IDLE_PLAN.md) fixes fractional-millisecond polling and pauses ordinary
+empty rooms after ten seconds while keeping connections and maintenance alive. Implemented
+locally; the Debug build and all 571 CTests passed on macOS on 2026-11-15, including real-ENet
+pause/resume checks. Winterfell CPU and native/browser qualification remain after release.
+
 ## Building architecture overhaul — 2026-11-11
 
 The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot followed by

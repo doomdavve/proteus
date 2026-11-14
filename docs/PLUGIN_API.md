@@ -320,7 +320,7 @@ change on a running room, with no client change and no new protocol field. It ne
 naming a directory (or a bundled ID that has a `plugins/` directory, run from the repository
 root) whose package has a room objective.
 
-- **Trigger.** Every 120 server ticks (one second) the server re-reads the package with the same
+- **Trigger.** Every wall-clock second the server re-reads the package with the same
   loader as start-up. When the source bytes, `state_version` or the presence of `migrate` differ
   from the last candidate seen, whether accepted or refused, it stages the candidate; each distinct
   candidate is judged once. A package that no longer loads prints `objective reload rejected:
