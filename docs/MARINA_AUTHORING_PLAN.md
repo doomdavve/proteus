@@ -752,6 +752,7 @@ Traffic frames hide a serviced route actor (no mesh, lights or wake); contacts a
 exclusion use the same service hull, naming the route actor. Moored and travelling hulls both use
 `boat_water_pose`, so the handoff has no wave pop by construction (test: ≤5 cm across it). Test
 `waterfront_service` checks exact ticks around every handoff; the full run passed 571/571.
+
 O3 status, 2026-11-15 (macOS Debug, local): Lua `empty` berths, `marina.vessels` and
 `marina.services` decode with field paths; the staging wire is PSTC and the room definition v6
 inside protocol v16 (golden bytes and digest updated), and old content is refused by version.
@@ -760,9 +761,8 @@ a service vessel uses its own hull, may touch only its berth's pier during docki
 empty berths are open water. Cases `marina_service_decode` and `marina_service_survey`; the full
 run passed 573/573. The JSON schema tool lists the new fields. Not yet done: the example package,
 CPU/GPU frames, browser/Wasm and room end-to-end runs, and a loop-path service.
-Limits: a serviced vessel has no visual wake yet; no CPU/GPU frame has been rendered because
-no plugin can author a service until O3; the harbor-view model cache path is unchanged and
-untested with a service.
+Limits: a serviced vessel has no visual wake yet; no CPU/GPU frame has been rendered yet; the
+harbor-view model cache path is unchanged and untested with a service.
 
 Acceptance:
 
