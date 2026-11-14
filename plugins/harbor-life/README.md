@@ -137,9 +137,10 @@ native work before Lua can author them:
   available, but packages cannot import concrete sculpture or custom mesh geometry.
 - **Moored occupancy.** Authored berths are static. There is no slip assignment, arrival,
   departure, fuel stop or owner schedule.
-- **Freeform traffic routes and departures.** Travelling craft select registered route presets
-  (`marina_pass`, `river_*`, `alvsnabben`, `frihamnen`, `schooner`) and timetable values. A
-  package cannot draw a new route or make a boat leave its authored berth.
+- **Berth departures and handoffs.** Traffic supports registered route presets and one authored
+  open/loop route with up to four tangent line/arc pieces, dwell and bounded motion. See the
+  [route demo](../marina-route-demo/README.md) and [API](../../docs/PLUGIN_API.md#location-life-scene-contract-l11l43).
+  A static berth occupant cannot leave its berth or transfer to traffic; M4 owns that lifecycle.
 - **Lighting and weather.** Gameplay uses the compiled daylight. Fixed overcast/dusk and lighting
   schedules are planned in L5/L6 but are not scriptable yet, so the reference photograph's grey
   sky and wet quay are not reproducible.

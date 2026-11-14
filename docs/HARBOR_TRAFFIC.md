@@ -9,15 +9,17 @@ The compact ferry replaces the original large Stena vessel proposal for this pas
 
 ## Routes and shared state
 
-`src/core/waterfront_traffic.[ch]` owns four stable actor IDs, generated meshes, continuous routes,
-velocities, lights, and wake histories. Since L3.1 (2026-10-30), the route/timetable inputs live
-in `src/core/waterfront_route.[ch]` as a bounded caller-owned definition; `NULL` selects these compiled
-defaults. L3.2 (2026-10-30) exposes one authored `marina_pass` loop and explicit retained compiled
-actors through `scene.traffic.vessels`; added craft share the same pose, contact, camera and visual
-trail data, and their wakes remain visual. `waterfront_scene_evaluate_actors` gathers cars, lamps,
-moored boats, and travelling vessels at explicit scene time. CPU/GPU drawing, reflections,
-and shadows consume the evaluated transforms. Direct/backward seeks require no warm-up.
-The old one-way box launch has been removed. Main-demo camera and music timing are unchanged.
+`src/core/waterfront_traffic.[ch]` owns the compiled fleet's stable actor IDs, generated meshes,
+continuous routes, velocities, lights and wake histories. The route/timetable inputs live in
+`src/core/waterfront_route.[ch]` as a bounded caller-owned definition; `NULL` selects the compiled
+defaults. `scene.traffic.vessels` supplies explicit retained actors, registered presets or one
+bounded authored path. Added craft share pose, contact, camera and visual trail data; their
+wakes remain visual. `waterfront_scene_evaluate_actors` gathers cars, lamps, moored boats and
+travelling vessels at explicit scene time. CPU/GPU drawing, reflections and shadows consume
+the evaluated transforms. Direct/backward seeks require no warm-up.
+
+The following table describes the four compiled river craft. Plugin stopped services and
+open/loop paths use their own declared stops and dwell intervals.
 
 | Vessel | Route | Pace |
 | --- | --- | --- |
@@ -28,7 +30,8 @@ The old one-way box launch has been removed. Main-demo camera and music timing a
 River circuits share centre world (50, -290) and axis (0.8, 0.6) in X/Z. The outer
 corridor separates the ferry from the smaller craft. Routes fit both map crops and avoid
 moored boats, shores, bridge supports, and the authored camera paths. Traffic follows its
-schedule regardless of player position; it has no navigation AI, yielding, or docking stops.
+schedule regardless of player position; it has no navigation AI or yielding. These four
+compiled circuits have no docking stops.
 
 The [boat generator](HARBOR_BOATS.md) supplies hulls and the new 24 m passenger-ferry
 recipe: cream/navy livery, segmented cabin windows, upper bridge, red funnel, open aft deck,
@@ -50,6 +53,32 @@ opts the four passing scenery boats into a separate bounded physical wake pool w
 foam trails, including the slow runabout. Run `./build/boat_race_trial --play` to try it.
 These physical scenery wakes are local to the trial; ordinary free boating and rooms retain
 their existing visual trails.
+
+## Plugin-authored paths
+
+The [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43) owns the strict route schema
+and clearance contract. One `route = "open"` actor per scene has one to four tangent line/arc
+pieces at 120 Hz, optional dwell and bounded speed/acceleration; `loop = true` repeats the
+complete travel/dwell schedule. Finite paths hold their terminal pose. The eight-actor scene
+budget includes retained services. There is no interactive route editor.
+
+Native evaluation supplies the same pose for hull rendering, contacts, camera and visual wakes.
+Zero-dwell joins preserve speed; a positive dwell holds the endpoint and tangent heading.
+Restart Apply/Undo installs the complete scene revision atomically. Room definition v5 and
+[protocol v15](MULTIPLAYER_PROTOCOL.md#room-definition) carry finite/loop paths; browser staging
+uses PSTB checked data.
+
+The conservative survey checks water, static hulls/structures and scheduled craft between
+samples. Finite routes include terminal occupancy over a full period of each periodic obstacle.
+Loops first try spatial separation, then simultaneous poses over a bounded exact-tick common
+schedule for supported POINTS obstacles. Unsupported repeat semantics, overflow and exhausted
+200,000-actor-evaluation work reject explicitly. Legacy preset pairs keep the 4,160-second
+sampled check; it is separate from this authored-path proof. Safe paths can reject conservatively.
+
+The [route demo](../plugins/marina-route-demo/README.md) provides a platform approach, two turns,
+a pause and departure with retained ferry/bridge services. It maintains stand-off clearance;
+berth occupancy, reservations, ropes/handoffs and snug docking belong to M4. Depth remains
+unverified. Reactive avoidance and physical traffic wakes are outside this contract.
 
 ## Player contacts
 

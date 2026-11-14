@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-11-03: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; its README lists the native scene capabilities still missing (crane/building restyling, occupancy and lighting).
+**P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; M3 adds one bounded authored open/loop line/arc traffic path with stops and schedule clearance. Its README lists the remaining native scene gaps (crane/building restyling, occupancy and lighting).
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
@@ -529,12 +529,11 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (L1.1–L4.3)
 
-Status, 2026-11-01: **L1.1–L1.4 and L2–L4.3 complete; the first playable harbor-life scene is
+**L1.1–L1.4 and L2–L4.3 complete; the first playable harbor-life scene is
 implemented, with scene decoding, binding, staging wire, marina berths/modules, travelling-craft
 routes, named ferry stops and gull flocks/cues.** [`plugins/harbor-life`](../plugins/harbor-life/)
-now uses seven hulls along one long pontoon with three finger piers to approximate the real
-Eriksberg marina; traffic supports registered presets and bounded open line/arc paths. There is no
-interactive route editor. Human play acceptance is pending. The
+uses twelve hulls in a two-row Eriksberg marina; traffic supports registered presets and
+bounded open line/arc paths. There is no interactive route editor. Human play acceptance is pending. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
@@ -685,10 +684,12 @@ anchor, a water landing, a 2–20 m span and an existing pontoon target. Invalid
 IDs, unknown recipes, a berth or pontoon ashore, overlapping solid modules, a blocked entrance,
 non-finite values and capacity + 1 are rejected with their field paths. Authored craft are sampled
 over the 4,160 s combined river timetable and must clear compiled water, the declared entrance,
-berths, solid modules, other authored craft and compiled traffic; retained actors keep their
-compiled route. An open path is evaluated on 120 Hz ticks, stops only at positive dwells and
-clamps at its final pose. Looping paths wrap the absolute simulation tick by their total
-travel/dwell tick count; direct and reverse seeks to the same tick select the same pose.
+berths, solid modules, other authored craft and compiled traffic; this legacy sampled check applies
+to registered presets. Retained actors keep their compiled route. Authored open/loop paths use
+the separate bounded survey below. An open path is evaluated on 120 Hz ticks, stops at positive
+dwells and clamps before departure at its start pose and after arrival at its final pose.
+A dwell holds the preceding piece's endpoint and tangent heading. Looping paths wrap the absolute
+simulation tick by their total travel/dwell tick count; direct and reverse seeks to the same tick select the same pose.
 Consecutive piece endpoints and headings must agree within 1 mm and
 0.001 radians, including the last-to-first join for loops; native bounds enforce the requested speed and acceleration. Its conservative
 survey checks a hull-enclosing circle against water, moored hulls and structures at up to
@@ -707,8 +708,10 @@ bounded float arithmetic receive additional conservative margins. A second open 
 whose speed cannot be bounded rejects. Stopped POINTS actors must also have nonoverlapping
 acceleration/deceleration ramps on every built leg; otherwise all path-clearance proofs reject
 them because the legacy evaluator can jump internally. This proof check leaves runtime motion
-and retained-service timetables unchanged. An entrance may be crossed. Open paths restart when applied;
-they do not bind to berth occupancy, and depth is unverified. Ordinary traffic wakes stay visual.
+and retained-service timetables unchanged. An entrance may be crossed. Open-path edits are held
+for Apply and restart the session; Undo restores the complete prior route revision under the
+same restart rule. Visible hull, contact, camera and visual wake queries share the native pose.
+Open paths do not bind to berth occupancy, and depth is unverified. Ordinary traffic wakes stay visual.
 Every table is strict; lists are dense. There
 is no silent clamp, index merge or partial installation. Depth is unavailable, so discovery and
 diagnostics report **depth unverified** instead of inventing a
@@ -886,10 +889,11 @@ worker's wire (`PSTB`) carries tours and captions.
 
 ### Scene authoring not exposed yet
 
-Crane/building restyling, sculptures, arbitrary meshes, occupancy schedules, freeform routes
-and lighting remain outside this contract. M1 supplies larger marinas and fixed/floating deck
-geometry; M2 supplies bounded hull appearance. [M3–M5](MARINA_AUTHORING_PLAN.md) own routes,
-occupancy and local modules.
+Crane/building restyling, sculptures, arbitrary meshes, berth occupancy schedules, an interactive
+route editor and lighting remain outside this contract. M1 supplies larger marinas and
+fixed/floating deck geometry; M2 supplies bounded hull appearance; M3 supplies the bounded
+open/loop line/arc paths specified above. [M4–M5](MARINA_AUTHORING_PLAN.md) own vessel/berth
+ownership schedules and local source modules. No berth handoff or traffic avoidance is implied.
 
 
 ## River race authoring (P2)
