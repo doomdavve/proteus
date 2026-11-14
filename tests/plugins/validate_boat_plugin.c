@@ -524,31 +524,40 @@ static int free_scene_location(void)
     path->period = 5;
     path->open_path.count = 2;
     BoatRouteLeg line = { .start_x = 0,
-        .start_z = 0,
+        .start_z = -100,
         .end_x = 0,
-        .end_z = -10,
+        .end_z = -110,
         .duration_ticks = 240,
         .tick_seconds = BOAT_TICK_SECONDS,
         .max_speed = 20,
         .max_acceleration = 100 };
     path->open_path.pieces[0].shape.line = line;
     path->open_path.pieces[0].dwell_ticks = 120;
-    line.start_z = -10;
-    line.end_z = -20;
+    line.start_z = -110;
+    line.end_z = -120;
     path->open_path.pieces[1].shape.line = line;
     CHECK(waterfront_route_validate(&internal_path, &route));
     internal_free.scene.traffic = internal_path;
     internal_voyage.scene.traffic = internal_path;
-    // A safe, finite path clears the static survey, then still reports the missing package proof.
+    // A surveyed path that avoids traffic still reaches the final unsupported-shape guard.
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
     show("free internal open path", &d);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal")
-        && !strstr(d.message, "open water"));
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
     CHECK(
         boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal")
-        && !strstr(d.message, "open water"));
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+
+    // Open water alone is insufficient: this path ends inside the compiled runabout's circuit.
+    WaterfrontRouteDefinition conflict_path = internal_path;
+    conflict_path.actors[0].open_path.pieces[0].shape.line.start_z = 0;
+    conflict_path.actors[0].open_path.pieces[0].shape.line.end_z = -10;
+    conflict_path.actors[0].open_path.pieces[1].shape.line.start_z = -10;
+    conflict_path.actors[0].open_path.pieces[1].shape.line.end_z = -20;
+    internal_free.scene.traffic = conflict_path;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "traffic vessel"));
 
     // A path clearly ashore fails the static survey itself, before the unsupported-shape
     // diagnostic. The same indexed actor path names the fault for both package kinds.

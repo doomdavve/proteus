@@ -358,8 +358,13 @@ in-memory candidates; focused free/voyage regression tests passed on macOS Debug
 Before that rejection, internal paths now receive a bounded static survey: enclosing hull circles
 are inflated by half an interval's maximum translation plus a numerical margin and checked against
 water, berth and module envelopes over at most three minutes. Focused free and voyage tests cover
-an open-water path, land and a budget overrun. Moving traffic, entrance semantics, route authoring
-and the full proof remain open; this preliminary survey alone does not authorize a package.
+an open-water path, land and a budget overrun. Entrance semantics, route authoring and the full
+proof remain open; this preliminary survey alone does not authorize a package.
+The survey now also checks the finite path against each compiled and authored periodic actor,
+then checks the stationary terminal pose for one full period of each actor. It uses conservative
+circle and speed bounds with a 200,000-sample budget. On macOS Debug 2026-11-14, focused checks
+passed for a separated path, a compiled-traffic conflict, shore rejection and the path budget.
+It is still preliminary: multiple open paths, authoring and end-to-end qualification remain open.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

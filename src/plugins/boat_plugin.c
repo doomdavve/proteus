@@ -735,6 +735,82 @@ static BoatPluginStatus check_scene_modules(const BoatSceneDefinition *scene, co
 // author this shape, so the unconditional rejection in check_scene_traffic below still stands.
 #define OPEN_PATH_SAMPLE_TICKS 12
 #define OPEN_PATH_SAMPLE_BUDGET 1800 // ceil(ticks / 12): three minutes at 120 Hz.
+#define OPEN_PATH_TRAFFIC_BUDGET 200000
+
+// The centre-speed bound is independent of hull heading. The dock circuit is continuous only
+// at its native 14 m radius; point routes with implicit speed cannot yet be bounded here.
+static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed)
+{
+    if (!isfinite(a->period) || a->period <= 0 || a->period > WATERFRONT_ROUTE_MAX_PERIOD)
+        return false;
+    if (a->shape == WATERFRONT_ROUTE_ELLIPSE)
+        *speed = 2 * 3.14159265358979323846 * fmax(a->long_radius, a->short_radius) / a->period;
+    else if (a->shape == WATERFRONT_ROUTE_DOCK_CIRCUIT && fabs(a->turn_radius - 14) < .001)
+        *speed = a->speed;
+    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->speed > 0)
+        *speed = a->speed;
+    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->point_count >= 3
+        && a->point_count <= WATERFRONT_ROUTE_POINT_CAPACITY && !a->stop_count) {
+        double length = 0;
+        for (unsigned i = 0; i < a->point_count; ++i) {
+            const WaterfrontRoutePoint *p = &a->points[i];
+            const WaterfrontRoutePoint *q = &a->points[(i + 1) % a->point_count];
+            if (!isfinite(p->x) || !isfinite(p->z) || !isfinite(p->radius) || p->radius < 0)
+                return false;
+            length += hypot((double)p->x - q->x, (double)p->z - q->z)
+                + 3.14159265358979323846 * p->radius;
+        }
+        *speed = length / a->period;
+    } else
+        return false;
+    return isfinite(*speed) && *speed > 0 && *speed <= 40;
+}
+
+// Survey against one periodic actor during the finite path and a complete period after its
+// endpoint. Circle envelopes remove any dependence on hull orientation; the Lipschitz margin
+// covers travel to the nearest sample. This is independent of other actors' periods.
+static BoatPluginStatus check_open_path_traffic(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *other_routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition
+        = other_routes ? other_routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    double speed;
+    if (!traffic_speed_bound(obstacle, &speed))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot bound traffic vessel %s speed",
+            obstacle->id);
+    BoatModelSpec spec = waterfront_traffic_spec_routes(other_routes, other);
+    double other_radius = hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5);
+    uint64_t intervals = ticks / OPEN_PATH_SAMPLE_TICKS + (ticks % OPEN_PATH_SAMPLE_TICKS != 0);
+    unsigned tail = (unsigned)ceil(obstacle->period);
+    if (intervals + 1 + tail + 1 > OPEN_PATH_TRAFFIC_BUDGET - *work)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "traffic survey exceeds work budget");
+    *work += (unsigned)intervals + tail + 2;
+    double finish = (double)ticks * BOAT_TICK_SECONDS;
+    for (uint64_t i = 0; i <= intervals + tail + 1; ++i) {
+        bool after = i > intervals;
+        uint64_t tick = after ? ticks : i * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > ticks)
+            tick = ticks;
+        double offset = after ? fmin((double)(i - intervals - 1), obstacle->period) : 0;
+        double time = after ? finish + offset : (double)tick * BOAT_TICK_SECONDS;
+        BoatRoutePose pose;
+        if (!boat_route_path_evaluate(&scene->traffic.actors[actor].open_path, tick, &pose, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot evaluate open path");
+        WaterfrontVesselMotion m = waterfront_traffic_motion_routes(other_routes, other, time);
+        double margin = after ? .5 * speed : .05 * (path_speed + speed);
+        double distance = hypot(pose.x + m.position.x, pose.z - m.position.z);
+        // Legacy point/circuit periods can differ from their geometric loop by up to .02 s;
+        // at the 40 m/s speed cap a wrap can therefore jump up to .8 m.
+        if (!isfinite(distance) || distance <= path_radius + other_radius + margin + 1.1)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+                "open path crosses traffic vessel %s", obstacle->id);
+    }
+    return BOAT_PLUGIN_OK;
+}
 
 static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, const char *entry,
     const BoatMap *map, unsigned actor, BoatPluginDiagnostic *d)
@@ -813,14 +889,28 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
                 "swept hull is not open water of the compiled map");
         for (unsigned b = 0; b < scene->berth_count; ++b)
             if (hypot((double)centre.x - berth_centre[b].x, (double)centre.y - berth_centre[b].y)
-                < (double)hull_radius + berth_radius[b])
+                <= (double)hull_radius + berth_radius[b])
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.berths[%u]", b + 1);
         for (unsigned m = 0; m < scene->module_count; ++m)
             if (hypot((double)centre.x - module_centre[m].x, (double)centre.y - module_centre[m].y)
-                < (double)hull_radius + module_radius[m])
+                <= (double)hull_radius + module_radius[m])
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.modules[%u]", m + 1);
+    }
+    unsigned work = 0;
+    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
+        if (check_open_path_traffic(
+                scene, entry, actor, NULL, i, total_ticks, speed_bound, radius, &work, d)
+            != BOAT_PLUGIN_OK)
+            return d->status;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        if (i == actor || scene->traffic.actors[i].retain != 0xff)
+            continue;
+        if (check_open_path_traffic(scene, entry, actor, &scene->traffic, (int)i, total_ticks,
+                speed_bound, radius, &work, d)
+            != BOAT_PLUGIN_OK)
+            return d->status;
     }
     return BOAT_PLUGIN_OK;
 }
