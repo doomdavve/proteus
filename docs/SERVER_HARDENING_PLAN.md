@@ -147,3 +147,18 @@ third-party supplied. A cheaper first step then is one binary run twice (`--role
 
 Defers: H5 not yet soaked on Winterfell, the WebRTC syscalls under lockdown, and the longer H3 fuzz
 campaign stay the evidence that would change this decision.
+
+## H5 soak finding: remote candidate hostnames
+
+First `--lockdown log` soak on Winterfell (v0.0.28, 2026-11-14): the kernel logged seven would-be
+violations, all `openat` or `socket` from WebRTC threads. The `RTC resolver` thread is libdatachannel's
+asynchronous lookup of an ICE candidate whose address is a hostname, which `getaddrinfo` then resolves
+(resolver files, a DNS socket). Browsers send such names (mDNS `<uuid>.local`) and a hostile client
+can send any name, so an unauthenticated offer could make the server perform DNS lookups. The
+server now filters the SDP offer in `src/net/boat_net_sdp.c` and passes only candidates with a numeric
+IP address (`boat_net_sdp` test, `fuzz_net_sdp` harness). Same-LAN browsers that only offered an mDNS
+candidate use their server-reflexive or relay candidates instead. **Not yet verified on Winterfell:**
+the filter needs a release build and deployment; the `RTC poll` `openat` seen at start-up and the
+main-thread `socket` are still unexplained and may remain after the filter. Rerun the soak, then decide
+the allowlist, before `kill`. The change to `boat_net_rtc.c` is compiled only in WebRTC builds and was
+not compiled locally; CI and the release build are its first compile.

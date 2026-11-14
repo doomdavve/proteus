@@ -2,7 +2,7 @@
 # transports obey the core boundary. Native ENet, optional native WebRTC and the browser
 # bridge own platform networking separately.
 set(PROTEUS_BOAT_NET_SOURCES
-  boat_net_mux.c boat_net_mux.h
+  boat_net_mux.c boat_net_mux.h boat_net_sdp.c boat_net_sdp.h
   boat_net_client.c boat_net_client.h boat_net_memory.c boat_net_protocol.c
   boat_net_protocol.h boat_net_server.c boat_net_server.h boat_net_transport.h
   boat_net_private.c boat_net_private.h boat_local.c boat_local.h
