@@ -5,7 +5,7 @@
 # -DPROTEUS_FUZZ=ON and Clang, it links libFuzzer instead, for coverage-guided runs:
 #   ./build/fuzz_net_decode -max_total_time=600 corpus/net_decode
 # (`<name>_seeds --runs 0 --write-seeds DIR` writes the starting corpus).
-option(PROTEUS_FUZZ "Link the fuzz harnesses with libFuzzer (Clang)" OFF)
+# PROTEUS_FUZZ is defined in cmake/Sanitize.cmake, which also instruments the whole build.
 
 function(proteus_fuzz_harness name source runs)
   add_executable(${name} ${source})
@@ -13,7 +13,6 @@ function(proteus_fuzz_harness name source runs)
   target_compile_options(${name} PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(${name} PRIVATE ${ARGN})
   if(PROTEUS_FUZZ)
-    target_compile_options(${name} PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
     target_link_options(${name} PRIVATE -fsanitize=fuzzer,address,undefined)
     # libFuzzer starts from a corpus directory; this writes the harness's seeds into one:
     #   ./build/<name>_seeds --runs 0 --write-seeds DIR
