@@ -105,7 +105,7 @@ Added 2026-11-14: ENet `duplicatePeers` = 6 per source address, and a server-sid
 new connections (burst 8, 2 per second, on the caller's clock, `connect_limited` statistic,
 printed by `boat_server`). The values are conservative guesses, not measurements: 6 keeps a
 four-player household plus two retries; revisit them with real join traffic.
-Checks run on macOS, Debug, 2026-11-14: `ctest --preset full` passed (557 tests) including
+Checks run on macOS, Debug, 2026-11-14: `ctest --preset full` passed (558 tests) including
 `boat_net.connect_flood` (150 scripted connects in one virtual second: 10 admitted, 140
 refused) and `boat_net_enet.enet_source_cap` (7 loopback clients: 6 served). Not run: a
 `boat_bot` flood against a live server, per-source signalling limits (the process cannot see
