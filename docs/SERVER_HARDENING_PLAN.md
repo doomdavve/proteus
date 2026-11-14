@@ -2,10 +2,10 @@
 
 Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and **Winterfell runs `--lockdown kill` since v0.0.31**; H6 is decided (do not split); H7 is next.**
 Completed task: H1 credential unit and the H5 `kill` switch-over (v0.0.31), after two glibc first-use findings and a TURN quota finding. Evidence below.
-Open: a longer `kill` soak under real play (it is short so far); H4 operator work (nftables; the crash alert is done); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
+Open: a longer `kill` soak under real play (it is short so far); H4 nftables proof (the limits firing against a source outside the LAN and VPN; the crash alert is done); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: H4 nftables limits, then H7, the closing spec `docs/SERVER_SECURITY.md`.
+Next task: H4 nftables proof, then H7, the closing spec `docs/SERVER_SECURITY.md`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -41,7 +41,7 @@ that path becomes a fuzz target and a P1 for hardening.
 | H1 | Remove the TURN password from `ExecStart` (it shows in `ps` and `/proc/<pid>/cmdline`): the server reads it from a credential file or environment variable; `davve-srv` supplies it with `LoadCredential=`. Add `SECURITY.md` with the disclosure route. | Password absent from `ps`; room and browser join still work |
 | H2 | **Implemented 2026-11-14; passes Linux CI (Debug, no WebRTC); Release fortification and the WebRTC build are checked at the next release build.** Exploit-mitigation build flags for the server targets and their bundled dependencies: `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=3`, PIE, full RELRO and `-z now`, `-fstack-clash-protection`, `-fcf-protection`, `-ftrivial-auto-var-init=zero`. Check the built binary with `checksec`. | CI check on `boat_server`; no warning regressions; tests pass |
 | H3 | **Merged 2026-11-14 (PR #193); sanitizer CI and a first libFuzzer run recorded; a longer campaign is still owed.** Sanitizer and fuzz lane (absorbs the M5 "parser fuzzing" open loop). ASan/UBSan runs of the net and room tests and the `boat_bot` soak; libFuzzer/AFL++ harnesses for the packet codec, the ENet receive path, signalling messages, join/name/token handling and the session-record codec. Seed corpus from the recorded protocol tests. Tests keep the virtual clock. | Sanitizer lane green in CI budget; harnesses run N minutes locally without findings, or findings fixed privately |
-| H4 | **Code side implemented 2026-11-14 on `feat/h4-limits`; operator work remains.** Server-side limits and network hygiene: peer, packet-size and join-rate caps (in code, see [Connection limits](MULTIPLAYER_PROTOCOL.md#connection-limits)); per-source rate limit and port allowlist in nftables on Winterfell (`davve-srv`, not done); alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits (`davve-srv`, not done). | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
+| H4 | **Code side implemented 2026-11-14 on `feat/h4-limits`; operator work remains.** Server-side limits and network hygiene: peer, packet-size and join-rate caps (in code, see [Connection limits](MULTIPLAYER_PROTOCOL.md#connection-limits)); per-source UDP limits in nftables on Winterfell (`davve-srv`, deployed 2026-11-14; the port allowlist stays at the router forwards, not managed there); mail on abnormal room and relay exits (`davve-srv`, deployed and proven by a deliberate crash, see [H4 crash alert](#h4-crash-alert-operator-side)). | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
 | H5 | **Implemented 2026-11-14 on `feat/h5-lockdown`; operator work remains.** In-process lockdown, Linux only (`pledge` substitute), in `src/room/boat_lockdown.[ch]` behind `__linux__`; never in `proteus_boat_core` or `proteus_boat_net`. After assets, package, plugin load, socket binding and the recording file, `boat_server --lockdown MODE` applies `no_new_privs`, Landlock (all filesystem rights; TCP bind/connect and abstract-socket/signal scopes at ABI 4/6) and a seccomp allowlist; see [Lockdown](MULTIPLAYER_HOSTING.md#in-process-lockdown). It is **opt-in** and stays off until soaked on Winterfell. **Fail closed:** if Landlock is below `BOAT_LOCKDOWN_MIN_LANDLOCK_ABI` (6, what Linux 6.12 offers), or `no_new_privs` or the filter cannot be installed, the server prints the reason and exits 1 before serving. `log` mode is an explicit tuning option; `errno` is for tests. Excludes `--package-reload`. | Server runs a full soak; a test proves a denied `open`/`execve` fails; core boundary lint passes |
 | H6 | **Decided 2026-11-14: do not split.** Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Reasons and revisit triggers in [H6 decision](#h6-decision). | Decision and reasons recorded |
 | H7 | Closing step: move the contract and behaviour into `docs/SERVER_SECURITY.md` (new spec, present tense), update [hosting](MULTIPLAYER_HOSTING.md), turn leftovers into open items or drop them explicitly, then mark this plan done. | Docs match the deployed units and the code |
@@ -109,9 +109,13 @@ Checks run on macOS, Debug, 2026-11-14: `ctest --preset full` passed (558 tests)
 refused) and `boat_net_enet.enet_source_cap` (7 loopback clients: 6 served). Not run: a
 `boat_bot` flood against a live server, per-source signalling limits (the process cannot see
 the address; left to nftables), and any `davve-srv` change.
-Remaining operator work (private `davve-srv`): nftables per-source connection and rate limits
-and a port allowlist; an alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits, proven with a
-deliberate crash.
+Operator work (private `davve-srv`), 2026-11-14: nftables per-source limits deployed to Winterfell as their
+own `ip wake_velocity` table (limits only, no default drop; LAN and VPN exempt) on UDP 24680, 24682 and the
+relay range 49160-49200: 5 new flows/s (burst 20), 24 concurrent flows and 800 packets/s (burst 1600) per
+source. The values are guesses. Checked: `nft -c` on the host, playbook run without failures, services
+active, a LAN `boat_bot --hunt --predict` join (8 s, 0 decode errors, 0 dropped). **Not shown:** the limits
+dropping anything (the bot's source is exempt; all three counters read 0) and the host-wide port allowlist
+(left to the router, not inspected). Still owed: a flood from an outside source.
 
 ## H5 evidence
 
