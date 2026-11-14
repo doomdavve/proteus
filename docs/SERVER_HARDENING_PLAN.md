@@ -1,13 +1,12 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1, H2 are merged (PR #192); H3 is implemented locally; H4–H7 are planned.**
-Completed task: H0, both units sandboxed; `systemd-analyze security` 7.9 → 1.1 (evidence below).
-Open: the relay-from-outside-the-LAN join and a soak under the sandbox were not exercised.
+Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1, H2 (PR #192) and H3 (PR #193) are merged; H4 is in progress on `feat/h4-limits`; H4-H7 are next.**
+Completed task: H3, sanitizer option, three fuzz harnesses, sanitizer CI workflow and a first libFuzzer run (evidence below and in the H3 row).
+Open: the `davve-srv` credential unit for H1 and H2's Release/WebRTC check wait for the next release; the
+relay-from-outside-the-LAN join and a soak under the sandbox were not exercised; the longer H3 fuzz campaign is owed.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-H3 (sanitizer option, three fuzz harnesses, CI workflow) is on `feat/h3-fuzz-sanitizers`. The `davve-srv`
-credential unit for H1 waits for the next release, and so does H2's Release/WebRTC check.
-Next task: open the H3 PR and read its Linux sanitizer run, then **H4** (limits and firewall).
+Next task: finish **H4** (limits and firewall), then H5.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -42,7 +41,7 @@ that path becomes a fuzz target and a P1 for hardening.
 | H0 | Systemd sandbox for the room and relay units (`davve-srv`). **Done 2026-11-14.** | `systemd-analyze security` ≤ 2.0; native and browser join |
 | H1 | Remove the TURN password from `ExecStart` (it shows in `ps` and `/proc/<pid>/cmdline`): the server reads it from a credential file or environment variable; `davve-srv` supplies it with `LoadCredential=`. Add `SECURITY.md` with the disclosure route. | Password absent from `ps`; room and browser join still work |
 | H2 | **Implemented 2026-11-14; passes Linux CI (Debug, no WebRTC); Release fortification and the WebRTC build are checked at the next release build.** Exploit-mitigation build flags for the server targets and their bundled dependencies: `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=3`, PIE, full RELRO and `-z now`, `-fstack-clash-protection`, `-fcf-protection`, `-ftrivial-auto-var-init=zero`. Check the built binary with `checksec`. | CI check on `boat_server`; no warning regressions; tests pass |
-| H3 | **Implemented 2026-11-14 (PR #193); sanitizer CI and a first libFuzzer run pass.** Sanitizer and fuzz lane (absorbs the M5 "parser fuzzing" open loop). ASan/UBSan runs of the net and room tests and the `boat_bot` soak; libFuzzer/AFL++ harnesses for the packet codec, the ENet receive path, signalling messages, join/name/token handling and the session-record codec. Seed corpus from the recorded protocol tests. Tests keep the virtual clock. | Sanitizer lane green in CI budget; harnesses run N minutes locally without findings, or findings fixed privately |
+| H3 | **Merged 2026-11-14 (PR #193); sanitizer CI and a first libFuzzer run recorded; a longer campaign is still owed.** Sanitizer and fuzz lane (absorbs the M5 "parser fuzzing" open loop). ASan/UBSan runs of the net and room tests and the `boat_bot` soak; libFuzzer/AFL++ harnesses for the packet codec, the ENet receive path, signalling messages, join/name/token handling and the session-record codec. Seed corpus from the recorded protocol tests. Tests keep the virtual clock. | Sanitizer lane green in CI budget; harnesses run N minutes locally without findings, or findings fixed privately |
 | H4 | Server-side limits and network hygiene: peer, packet-size and join-rate caps; per-source rate limit and port allowlist in nftables on Winterfell; alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits. | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
 | H5 | In-process lockdown, Linux only (`pledge` substitute), in `src/room/` behind `__linux__`; never in `proteus_boat_core` or `proteus_boat_net`. After assets, package, plugin load and socket binding: Landlock (no filesystem, only the allowed bind ports) then a seccomp allowlist of the steady-state syscalls. | Server runs a full soak; a test proves a denied `open`/`execve` fails; core boundary lint passes |
 | H6 | Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Decide after H3–H5 whether the remaining risk justifies it. | Decision and reasons recorded |
