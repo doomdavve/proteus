@@ -856,7 +856,7 @@ than `"`, `\` and `` ` ``, without leading or trailing spaces. A tour has no `ex
 
 Recovery returns to the last stop passed, facing along the stop's heading. Objectives see the same
 `voyage.shelter_reached` and `voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
-worker's wire (`PSTA`) carries tours and captions.
+worker's wire (`PSTB`) carries tours and captions.
 
 ### Scene authoring not exposed yet
 

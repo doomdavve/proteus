@@ -486,6 +486,39 @@ static int open_leg_wire(void)
     actor->shape = WATERFRONT_ROUTE_OPEN_LEG;
     CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
     actor->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    actor->open_path = (BoatRoutePath) { .count = 2 };
+    actor->open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 2,
+        .start_z = 3,
+        .end_x = 4,
+        .end_z = 5,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 30 };
+    actor->open_path.pieces[0].dwell_ticks = 17;
+    actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    actor->open_path.pieces[1].shape.arc = (BoatRouteArc) { .centre_x = 7,
+        .centre_z = 8,
+        .radius = 9,
+        .start_angle = 1,
+        .sweep = -1,
+        .duration_ticks = 360,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 11,
+        .max_acceleration = 12 };
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    const BoatRoutePath *roundtrip = &back.voyage.scene.traffic.actors[0].open_path;
+    CHECK(roundtrip->count == 2 && roundtrip->pieces[0].kind == BOAT_ROUTE_PATH_LINE);
+    CHECK(roundtrip->pieces[0].dwell_ticks == 17
+        && roundtrip->pieces[0].shape.line.duration_ticks == 240
+        && roundtrip->pieces[0].shape.line.start_x == 2
+        && roundtrip->pieces[0].shape.line.end_z == 5);
+    CHECK(roundtrip->pieces[1].kind == BOAT_ROUTE_PATH_ARC
+        && roundtrip->pieces[1].shape.arc.duration_ticks == 360
+        && roundtrip->pieces[1].shape.arc.centre_x == 7
+        && roundtrip->pieces[1].shape.arc.sweep == -1);
+    actor->open_path.count = 0;
     CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
     *actor = saved;
 
