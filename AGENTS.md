@@ -92,8 +92,6 @@ Tests never wait for wall-clock time. Code that depends on time takes `now` as a
 test drives a virtual clock; wall-clock limits are only failure deadlines. The `test_time` test
 (`tests/lint/check_test_time.py`) enforces this.
 
-The routine suite disables retired physical wake-field experiments by default
-(`PROTEUS_WAKE_FIELD_TESTS=OFF`); re-enable them only when revisiting that work.
 Arcade-wake and gameplay checks remain active. Numerical validators retain assertions
 with optimization in Clang/GCC Debug builds; `PROTEUS_OPTIMIZE_TESTS=OFF` restores
 unoptimized validator debugging. See `docs/TESTING.md` for timings and opt-in commands.

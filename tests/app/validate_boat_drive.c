@@ -31,8 +31,8 @@ int main(void)
     BoatCpuView cpu_a = { 0 }, cpu_b = { 0 };
     Color pa[320 * 200], pb[320 * 200];
     for (int tick = 0; tick < 3840; ++tick) {
-        baseline_demo(&a, tick, NULL, NULL, &wa);
-        demo_step(&b, tick, NULL, NULL, &wb);
+        baseline_demo(&a, tick, NULL, &wa);
+        demo_step(&b, tick, NULL, &wb);
         CHECK(wake_velocity_state_hash(
                   WAKE_VELOCITY_HASH_SEED, &a.boat, boat_session_time(&a), &wa.wakes)
               == wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &b.boat, boat_session_time(&b),

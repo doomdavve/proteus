@@ -1,5 +1,7 @@
 # Wake performance and large-water follow-up
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 Historical physical-field follow-up, 2026-10-21. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md). The user likes the
 revision-3 basin results as a foundation, but requires much faster wakes that can apply
 to arbitrarily large water spaces. Performance and world scaling take priority over the

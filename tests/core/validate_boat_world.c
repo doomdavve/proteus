@@ -200,8 +200,8 @@ static int presentation_toggle(void)
     object_study_reset(&objects_on, &on, true, BOAT_OBJECT_LIFE_TICKS, 1.8f);
     object_study_reset(&objects_off, &off, true, BOAT_OBJECT_LIFE_TICKS, 1.8f);
     for (int tick = 0; tick < 3840; ++tick) {
-        demo_step(&on, tick, NULL, NULL, &objects_on);
-        demo_step(&off, tick, NULL, NULL, &objects_off);
+        demo_step(&on, tick, NULL, &objects_on);
+        demo_step(&off, tick, NULL, &objects_off);
         CHECK(wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &on.boat, boat_session_time(&on),
                   object_study_wakes(&objects_on))
             == wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &off.boat, boat_session_time(&off),

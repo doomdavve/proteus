@@ -412,8 +412,8 @@ in about 1 s. `ctest --preset full` ran all 220 enabled CPU tests in 18.7 s, dow
 for 98 tests earlier that day; with GPU tests on, all 246 passed in 60.7 s. Later that day the
 network tests moved to a virtual clock and tests may no longer wait on wall time: 227 CPU tests
 in 11.2 s, 140 quick ones in 0.75 s. Heavy validators are split into `<prefix>.<case>` tests. GPU
-tests run one at a time under a shared resource lock beside the CPU tests. Fifteen retired
-physical-field experiments stay disabled by default.
+tests run one at a time under a shared resource lock beside the CPU tests. The physical-field
+experiment and its disabled tests were removed on 2026-11-14.
 
 
 Wake continuity revision, 2026-10-22, macOS / M1 Max: Debug/optimized builds, all 97

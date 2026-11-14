@@ -19,7 +19,6 @@ if(PROTEUS_WEBRTC)
 endif()
 
 option(PROTEUS_GPU_TESTS "Enable GPU-context CTest cases" OFF)
-option(PROTEUS_WAKE_FIELD_TESTS "Enable retired physical wake-field and prototype experiments" OFF)
 option(PROTEUS_OPTIMIZE_TESTS "Optimize numerical validators in Debug, retaining assertions" ON)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN)
@@ -115,22 +114,6 @@ endif()
 find_package(Python3 COMPONENTS Interpreter)
 
 include(tests/tests.cmake)
-
-# Retired physical-field research is opt-in; arcade objects stay in the normal suite.
-set(PROTEUS_WAKE_FIELD_CASES
-  boat_wake_owned_field wake_field_refinement wake_runtime_cadence wake_packet_contracts
-  wake_candidate_backend_queries wake_candidate_moving_source wake_gpu_runtime
-  wake_candidate_boat wake_candidate_crossing wake_candidate_gpu
-  wake_candidate_course_rejected wake_candidate_map_rejected wake_candidate_current_rejected
-  wake_front_prototype wake_heightfield_prototype)
-foreach(test IN LISTS PROTEUS_WAKE_FIELD_CASES)
-  if(TEST ${test})
-    set_property(TEST ${test} APPEND PROPERTY LABELS wake_field)
-    if(NOT PROTEUS_WAKE_FIELD_TESTS)
-      set_property(TEST ${test} PROPERTY DISABLED TRUE)
-    endif()
-  endif()
-endforeach()
 
 # Lanes: quick tests take under about 100 ms on their own (ctest --preset quick); everything
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane

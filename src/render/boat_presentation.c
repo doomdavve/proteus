@@ -27,10 +27,7 @@ static void water_emit(
     BoatPresentation *presentation, const BoatWorld *world, double time, BoatWaterParticle particle)
 {
     if (!particle.spray)
-        particle.height
-            = boat_water_query_field(world->water, world->wake_field, particle.position, time)
-                  .height
-            + .015f;
+        particle.height = boat_water_query(world->water, particle.position, time).height + .015f;
     // Prefer expired slots. Foam may replace foam, but never shorten airborne spray.
     for (unsigned int offset = 0; offset < BOAT_WATER_PARTICLES; ++offset) {
         unsigned int slot = (presentation->next_particle + offset) % BOAT_WATER_PARTICLES;
@@ -66,8 +63,7 @@ static void water_step(
             p->lift -= 12 * BOAT_STEP;
             p->height += p->lift * BOAT_STEP;
         }
-        float surface
-            = boat_water_query_field(world->water, world->wake_field, p->position, time).height;
+        float surface = boat_water_query(world->water, p->position, time).height;
         if (!p->spray)
             p->height = surface + .015f;
         if (p->age >= p->lifetime || (p->spray && p->height < surface)
@@ -157,9 +153,9 @@ static void water_step(
                         .velocity = Vector2Add(Vector2Scale(boat->velocity, 0.25f),
                             Vector2Scale(out,
                                 1.5f + fabsf(slip) * (0.45f + variation * 0.4f) + boat->planing)),
-                        .height = fmaxf(boat_water_query_field(world->water, world->wake_field,
-                                            (Vector2) { -origin.x, origin.z }, time)
-                                            .height
+                        .height = fmaxf(
+                            boat_water_query(world->water, (Vector2) { -origin.x, origin.z }, time)
+                                    .height
                                 + .03f,
                             origin.y),
                         .lift = (2.0f + variation * 2 + fminf(fabsf(slip) * 0.25f, 1.5f)) * strength
@@ -206,9 +202,9 @@ static void landing_splash(
                     .velocity = Vector2Add(Vector2Scale(boat->velocity, .35f),
                         Vector2Add(Vector2Scale(out, (1.5f + 3.5f * strength) * (.7f + .6f * v)),
                             Vector2Scale(forward, (v - .5f) * 1.5f))),
-                    .height = fmaxf(boat_water_query_field(world->water, world->wake_field,
-                                        (Vector2) { -origin.x, origin.z }, time)
-                                        .height
+                    .height
+                    = fmaxf(boat_water_query(world->water, (Vector2) { -origin.x, origin.z }, time)
+                                .height
                             + .05f,
                         origin.y),
                     .lift = (2.5f + 5.5f * strength) * (.65f + .7f * v),

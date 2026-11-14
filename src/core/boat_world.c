@@ -46,7 +46,7 @@ void boat_world_restart(BoatWorld *world, BoatWater water)
 
 bool boat_world_displaced(const BoatWorld *world)
 {
-    return world->wake_field || boat_water_displaced(world->water);
+    return boat_water_displaced(world->water);
 }
 
 BoatWater boat_world_test_water(

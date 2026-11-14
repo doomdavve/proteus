@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     for (unsigned f = 0; f < warmup + frames; ++f) {
         double start = boat_profile_time(false);
         for (unsigned j = 0; j < 2; ++j)
-            demo_step(&session, (int)tick++, NULL, NULL, &objects);
+            demo_step(&session, (int)tick++, NULL, &objects);
         double elapsed = (boat_profile_time(false) - start) * 1000;
         /* Trace serialization is deliberately outside the measured simulation interval. */
         double now = boat_session_time(&session);

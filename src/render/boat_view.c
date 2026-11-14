@@ -170,8 +170,7 @@ static Transform3D water_particle_pose(
     Transform3D pose = { .position = { -water->position.x, water->height, water->position.y },
         .scale = { size, water->spray ? size : .015f, size } };
     if (!water->spray && boat_world_displaced(world)) {
-        Vector3 normal
-            = boat_water_query_field(world->water, world->wake_field, water->position, time).normal;
+        Vector3 normal = boat_water_query(world->water, water->position, time).normal;
         normal.x = -normal.x;
         pose.rotation = boat_pose_euler(
             QuaternionToMatrix(QuaternionFromVector3ToVector3((Vector3) { 0, 1, 0 }, normal)));
@@ -561,8 +560,7 @@ static void environment_visit(
                 p = Vector2Add(p, Vector2Scale(flow, phase));
                 if (world->definition->mapped && !boat_map_water(&world->resources->map, p, .2f))
                     continue;
-                float height
-                    = boat_water_query_field(world->water, world->wake_field, p, time).height;
+                float height = boat_water_query(world->water, p, time).height;
                 draw(context,
                     (Transform3D) { .position = { -p.x, height + .025f, p.y },
                         .rotation = { 0, atan2f(-flow.x, flow.y), 0 },
@@ -590,7 +588,7 @@ static void environment_visit(
                     (Vector3) { .1f, .8f, 1.6f }, hull);
     }
     if (boat_water_wake_source(world->water, time, &source)) {
-        float height = boat_water_query_field(world->water, world->wake_field, source, time).height;
+        float height = boat_water_query(world->water, source, time).height;
         draw(context,
             (Transform3D) {
                 .position = { -source.x, height + .25f, source.y }, .scale = { 4.2f, .5f, 1.5f } },
@@ -864,10 +862,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         }
     }
     if (boat_world_displaced(world)) {
-        const Mesh3D *surface = world->wake_field
-            ? boat_water_surface_field(&cpu->water_mesh, world->water, world->wake_field, time)
-            : boat_water_surface_visible(&cpu->water_mesh, world->definition->map, world->water,
-                  time, water_visible, renderer);
+        const Mesh3D *surface = boat_water_surface_visible(
+            &cpu->water_mesh, world->definition->map, world->water, time, water_visible, renderer);
         if (!surface)
             return false;
         renderer->emissive_tint = lighting.water;

@@ -31,10 +31,11 @@ expressed enthusiasm for crossing wakes. The [wake rewrite review and plan](WAKE
 owns that follow-up: W1 measurements/prototype complete on 2026-10-21; the strip
 prototype failed its physical gates; the isolated periodic heightfield fallback passes its
 free-propagation gates. W2.1 now completes the isolated owned C field, ledger, deep snapshots and matched-accuracy
-boundary/island proof. A native basin candidate now uses exact cosine evaluation, fixed-tick wetted stern forcing
-and common queries/rendering behind `--wake-field`. At that checkpoint D3 remained default; the provisional
-2 ms budget is not met. [Candidate evidence](WAKE_CANDIDATE_RESULTS.md) owns costs, limits
-and continued play review. The user likes the revision-3 basin results as a foundation;
+boundary/island proof. A native basin candidate used exact cosine evaluation, fixed-tick wetted
+stern forcing and common queries/rendering. At that checkpoint D3 remained default and the
+provisional 2 ms budget was not met. The physical-field experiment was retired on 2026-11-14.
+[Candidate evidence](WAKE_CANDIDATE_RESULTS.md) records costs and limits. The user liked the
+revision-3 basin results as a foundation;
 [performance and large-water scaling](WAKE_SCALING_RESULTS.md) led to an isolated compact
 quadrature rejection. The user then selected a third, arcade-oriented alternative:
 `--wake-objects` now provides bounded per-boat pieces, tick expiry, tall jump crests and
@@ -516,8 +517,8 @@ early disappearance and fragmented fronts. W1 measured gaps/expiry and rejected 
 strip prototype; its periodic heightfield fallback passes the isolated propagation gates.
 W2.1 completes the isolated owner and matched-accuracy domain/island proof. The subsequent
 [basin candidate](WAKE_CANDIDATE_RESULTS.md) integrates an exact cosine backend and shared
-queries/rendering behind `--wake-field`. It remains opt-in, misses the 2 ms target, and
-awaits human play review. The D3 runtime above remains the default.
+queries/rendering behind `--wake-field`. It missed the 2 ms target and was retired on
+2026-11-14. Arcade objects are now the default.
 Turn-banking work is recorded separately in the
 [turn-banking plan](BOAT_TURN_BANKING_PLAN.md).
 

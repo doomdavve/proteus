@@ -1,12 +1,14 @@
 # W2.1 owned-field and boundary prototype
 
+Historical record: the physical wake-field implementation and its review tools were retired on 2026-11-14. Commands describe the earlier revision.
+
 2026-10-21, macOS / Apple Silicon. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md).
 Historical baseline: commit `78ad300`, before the polynomial-tail/higher-order refinement.
 Current evidence and next task: [runtime feasibility checkpoint](WAKE_RUNTIME_RESULTS.md).
 The equations and measurements below describe that initial baseline; the commands show
 the workflow and reproduce those exact numbers only at that commit.
 
-Implementation: [boat_wake.h](../src/core/boat_wake.h), [boat_wake.c](../src/core/boat_wake.c),
+Implementation: boat_wake.h, boat_wake.c,
 [validation tool](../tests/core/validate_boat_wake.c).
 
 The isolated C owner, signed energy ledger, snapshots and boundary/island fixtures are

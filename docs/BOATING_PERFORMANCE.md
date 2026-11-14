@@ -153,7 +153,8 @@ Each CSV row has the tick range, route destination, pose and these durations, me
   uses eight query slots, read without waiting; a still-busy slot skips that frame. The
   report counts skipped samples and is `null` when timer queries are unavailable.
 
-The CSV also has per-frame wave-patch rebuilds and wake uploads, and, since
+The CSV also has per-frame wave-patch rebuilds and a retained `wake_uploads` column (always
+zero since the physical field was retired), and, since
 [A2.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25) (`schema_revision` 2),
 the scene's application work: `app_submissions` and `scene_triangles`, split by pass
 (`shadow_`, `reflection_`, `main_`) and by group (`map_`, `water_`, `object_`), each as

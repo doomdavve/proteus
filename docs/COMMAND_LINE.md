@@ -241,7 +241,6 @@ solo path rather than the local authority. `wake_velocity` rejects these options
 | `--wake-objects-crossing` | Basin rival sharing wake and hull contacts; free boating only |
 | `--no-player-wake` | Visual-only player trail |
 | `--player-wake` | Legacy D3 trail (research); free boating only |
-| `--wake-field` | Coherent CPU field, still-water basin free boating only (research) |
 
 ```sh
 ./build/wake_study --renderer cpu --player-wake --time 9 --screenshot build/player-wake.png

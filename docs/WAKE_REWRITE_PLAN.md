@@ -1,5 +1,17 @@
 # Coherent, crossable wakes
 
+Status, 2026-11-14: the physical wake-field experiment and its disabled tests are retired.
+The arcade objects and D3 remain available. Next: play the stability candidate and assess
+tight-turn readability. Done when play feedback resolves those open questions.
+
+Retirement verification, 2026-11-14, macOS arm64: Debug build passed. CPU and GPU basin
+and outer captures at 3 s were inspected; a 180-frame scripted GPU demo completed. These
+checks do not establish hands-on steering or user acceptance. With GPU tests enabled and
+desktop/socket access, `ctest --preset full` passed 584/584 tests in 100.63 s. The
+initial sandbox run could not bind local sockets. After preserving the benchmark CSV schema,
+the rebuilt GPU benchmark contract passed (27.02 s).
+
+
 Presentation, 2026-10-24: removed the blue `WAKE OBJECTS` live-count/height/lifetime
 label from the boating window at the user's request. Wake simulation and exit statistics
 are unchanged. The GPU+AA river demo completed and a live-window capture was inspected
@@ -24,7 +36,7 @@ report or establish network/platform acceptance.
 Status, 2026-10-22: **bounded arcade wake objects are now the free-boating default,
 with `--wake-objects` retained as an explicit selector.** The user redirected the work toward tall waves that are fun to jump,
 independent per-boat pieces, explicit tick lifetimes and signed overlap. D3 is available
-with `--player-wake`; `--wake-field` remains the separate native basin comparison.
+with `--player-wake`.
 
 Completed: caller-owned four-emitter world with thirty-two slots per boat; actual wetted
 stern-span emission; independent travelling crest/trough objects; smooth birth/expiry;
@@ -90,10 +102,7 @@ while reporting occasional stuck-looking waves.
 The earlier proposed W3.S localized physical-packet experiment is **superseded as the next
 work item by this user-authorized arcade direction**. Its old physical acceptance gates
 remain historical requirements of that alternative, not blockers for object-mode play.
-The user requested suspension of retired field tests until that track resumes.
-`PROTEUS_WAKE_FIELD_TESTS=OFF` is now the default; active arcade checks stay enabled.
-[Test workflow and timings](TESTING.md) own the selection, re-enable command and evidence:
-all 83 retained tests pass in 97.40 s, compared with 748.21 s for the original 98-case run.
+The physical field and its disabled tests were removed on 2026-11-14.
 Historical evidence: [basin candidate](WAKE_CANDIDATE_RESULTS.md), [scaling](WAKE_SCALING_RESULTS.md),
 [compact quadrature rejection](WAKE_PACKET_RESULTS.md), [W1](WAKE_W1_RESULTS.md),
 [field/domain proof](WAKE_W2_FIELD_RESULTS.md), and [original GPU checkpoint](WAKE_RUNTIME_RESULTS.md).
