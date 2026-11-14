@@ -24,7 +24,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Plugins by default | Human scene/GPU checks; round-boundary revisions were delivered as protocol v14 by [P5](PLUGIN_P5_PLAN.md) | 2026-11-07 | [default plan](PLUGIN_DEFAULT_PLAN.md#pd5-result-2026-10-31) |
 | Multiplayer | M4 acceptance checks, profile-F play and contact-gap measurement deferred by the user | 2026-10-24 | [multiplayer plan](MULTIPLAYER_PLAN.md) |
 | Multiplayer | M5 step 2 onward: impairment matrix, resource counters, long soaks (parser fuzzing moved to [H3](SERVER_HARDENING_PLAN.md)) | 2026-10-24 | [M5 status](MULTIPLAYER_PLAN.md#m5--four-playersession-and-impairment-hardening) |
-| Server security | H3 libFuzzer campaign; H1 deployment (next release); H4 operator work (nftables, crash alert); H5 operator work (enable `--lockdown`, `log`-mode soak); H6 privilege-separation decision; H7 spec | 2026-11-14 | [hardening plan](SERVER_HARDENING_PLAN.md) |
+| Server security | H3 libFuzzer campaign; H1 deployment (next release); H4 operator work (nftables, crash alert); H5 operator work (enable `--lockdown`, `log`-mode soak); H6 decided (no split, with revisit triggers); H7 spec | 2026-11-14 | [hardening plan](SERVER_HARDENING_PLAN.md) |
 | Multiplayer | M6, M7 and M8 acceptance: human play, platform/impairment/soak and browser qualification | 2026-10-26 | [M6](MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging), [browser](WEB_BUILD.md#webrtc-rooms) |
 | Deathmatch | Playtest steps not started (step 0 first); "cannot jump over a boat" re-reported | 2026-11-01 | [playtest plan](DEATHMATCH_PLAYTEST_PLAN.md) |
 | Race | List the improvements from the first human race; assess 63-71 s pacing | 2026-10-24 | [race plan](RACE_PLAN.md) |
