@@ -10,7 +10,7 @@ parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--four-players', action='store_true', help='Fill the room with two native and two browser clients, then reject a fifth.')
 parser.add_argument('--mode', choices=['free', 'deathmatch', 'race', 'hunt'], default='free',
                     help='hunt: a free room on outer running the bundled proteus.outer-hunt objective.')
-parser.add_argument('--old-url', help='URL of a served OLD Wasm bundle; after the main run it must be rejected with the protocol version message.')
+parser.add_argument('--old-url', help='URL of a served OLD Wasm bundle; after the main run it must be refused: the page fails to join and the room counts a version rejection.')
 parser.add_argument('--location', choices=['basin', 'outer'],
                     help='Room location override, e.g. outer for proteus.harbor-room.')
 parser.add_argument('--server-package', help='Bundled room ID or edited package directory for the local server.')
@@ -216,7 +216,9 @@ try:
             assert 'objective tick' in room_log.read_text(), room_log.read_text()
             page.screenshot(path=str(args.output / 'hunt-hud.png'))
         if args.old_url:
-            # An old bundle speaks an older protocol: the room must refuse it and the page must say so.
+            # An old bundle speaks an older protocol: the room must refuse it. The old client cannot
+            # decode the Reject, so the page only reports a failed join; the room's shutdown summary
+            # carries the reason as `rejected: version=N`.
             old = b.new_page(viewport={'width': 960, 'height': 600})
             old_logs = []
             old.on('console', lambda message: old_logs.append(message.text))
@@ -226,9 +228,12 @@ try:
             old.wait_for_timeout(500)
             join_room(old, old_logs, 'old-bundle.png')
             old.wait_for_timeout(2000)
-            assert any('protocol version mismatch' in line for line in old_logs), old_logs
+            assert any('Cannot join' in line for line in old_logs), old_logs
             assert not any('Joined as slot' in line for line in old_logs), old_logs
             old.close()
+            server.terminate()
+            server.wait(timeout=10)
+            assert 'rejected: version=1 ' in room_log.read_text(), room_log.read_text()
         b.close()
         print('web_multiplayer=ok', flush=True)
 finally:
