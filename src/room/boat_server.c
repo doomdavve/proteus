@@ -17,6 +17,7 @@
 #endif
 #include "net/boat_net_server.h"
 #include "platform/cli_usage.h"
+#include "room/boat_lockdown.h"
 #include "room/boat_room_objective.h"
 #include "room/boat_room_package.h"
 #include "room/boat_session_record.h"
@@ -62,6 +63,8 @@ static void usage(FILE *out)
     cli_usage_line(out, "--bind IPV4", "Listen address (default 127.0.0.1; use a LAN address)");
     cli_usage_line(out, "--port N", "UDP port (default 24680)");
     cli_usage_line(out, "--token TEXT", "Shared join token (default empty)");
+    cli_usage_line(out, "--lockdown MODE",
+        "Linux: after startup, drop filesystem access and syscalls (kill|log|errno)");
     cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
     cli_usage_line(out, "--location NAME", "basin|outer (default basin; race uses outer)");
     cli_usage_line(out, "--package ID|DIR", "Room package (default: the mode's bundled package)");
@@ -391,6 +394,9 @@ typedef struct {
     const char *record_path; // Opt-in authority recording; refuses an existing destination.
     const char *reload_directory; // --package-reload: the directory to watch; NULL when off.
     bool race, exit_with_stdin, until_empty;
+    bool lockdown; // H5: apply the in-process lockdown once the room is ready.
+    BoatLockdownMode lockdown_mode;
+    int lockdown_min_abi; // 0 means BOAT_LOCKDOWN_MIN_LANDLOCK_ABI (tests raise it).
     BoatLocationId location;
     const BoatWorldResources *world; // The location's resources, owned by main.
     BoatRoomDefinition room; // The loaded package definition.
@@ -621,6 +627,22 @@ static int room(const RoomOptions *options)
             result = 1;
         }
     }
+    if (!result && options->lockdown) {
+        // Fail closed before serving: no fallback to a weaker sandbox. fflush so a kill is
+        // never preceded by lost output.
+        BoatLockdownReport report;
+        char note[200];
+        int min_abi = options->lockdown_min_abi ? options->lockdown_min_abi
+                                                : BOAT_LOCKDOWN_MIN_LANDLOCK_ABI;
+        if (!boat_lockdown_apply(options->lockdown_mode, min_abi, &report, note, sizeof(note))) {
+            fprintf(stderr, "boat_server: --lockdown refused, not serving: %s\n", note);
+            result = 1;
+        } else {
+            boat_lockdown_describe(options->lockdown_mode, &report, note, sizeof(note));
+            printf("%s\n", note);
+            fflush(stdout);
+        }
+    }
     while (!result && !stop_requested
         && (!options->ticks || server.fleet.state.tick < options->ticks)) {
         if (options->exit_with_stdin && stdin_closed()) {
@@ -747,6 +769,7 @@ int boat_server_main(int argc, char **argv)
     unsigned long ticks = 0, boats = BOAT_FLEET_SLOTS, report = 0, seconds = 0, round = 0;
     bool deathmatch = false, race = false, location_given = false;
     bool scripted_mode = false, room_option = false, package_reload = false;
+    unsigned long min_abi = 0;
     static BoatWorldResources world;
     char ice_server_file[ICE_SERVER_FILE_MAX] = "";
     RoomOptions room_options = { .bind = "127.0.0.1",
@@ -865,6 +888,16 @@ int boat_server_main(int argc, char **argv)
             room_options.record_path = value;
             room_option = true;
             ++i;
+        } else if (strcmp(argv[i], "--lockdown") == 0 && value
+            && boat_lockdown_parse_mode(value, &room_options.lockdown_mode)) {
+            room_options.lockdown = true;
+            room_option = true;
+            ++i;
+        } else if (strcmp(argv[i], "--lockdown-min-abi") == 0 && value
+            && parse_count(value, 1, 99, &min_abi)) {
+            room_options.lockdown_min_abi = (int)min_abi; // Test hook: raise the required ABI.
+            room_option = true;
+            ++i;
         } else if (strcmp(argv[i], "--package-reload") == 0) {
             package_reload = true;
             room_option = true;
@@ -954,6 +987,16 @@ int boat_server_main(int argc, char **argv)
         return 2;
     }
     static char reload_path[256];
+    if (room_options.lockdown && package_reload) {
+        fprintf(stderr, "boat_server: --lockdown removes file access; it excludes "
+                        "--package-reload.\n");
+        return 2;
+    }
+    if (room_options.lockdown && !boat_lockdown_supported()) {
+        fprintf(stderr, "boat_server: --lockdown is only available on Linux "
+                        "(x86-64, aarch64).\n");
+        return 2;
+    }
     if (package_reload) {
         // A directory is watched as given; a bundled ID watches its plugins/ directory.
         const char *spec = room_options.package;
