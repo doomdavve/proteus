@@ -1,16 +1,15 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-14: **P5a–P5f are merged; P5g recording/reconstruction is locally implemented
-on `feat/plugin-p5g`, following Astra's contract review.** P5g verification is recorded below.
-Completed task: P5g's bounded recording codec, authority capture, headless playback/seek and
-optional diagnostic Lua re-execution; [contract](SESSION_RECORDING.md).
-Open: the user's P5f moved-mark check, P5h four-player/impairment/browser qualification, P5i closing.
-Play check 1 and the P5e live-reload check are accepted; no new human acceptance is inferred.
-Done when: two then four players hunt with authority-only Lua; join/reconnect HUD, safe revisions,
-recorded reconstruction, existing rooms and the closing specs all pass their gates.
-Next task: **P5h** (native four-crew HUD case, tick-cost measurement and the web hunt/old-bundle
-case are written locally on `feat/plugin-p5h`; the web case has not been run, and user play check 2
-and the P5f moved-mark check remain; steps in [TESTING.md](TESTING.md#manual-play-checks-p5)).
+Status, 2026-11-14: **done.** P5a–P5h are implemented and P5i has moved the contract into the
+specs: [PLUGIN_API](PLUGIN_API.md#marks-p5a) (marks, events, authority adapter, reload, revisions
+from reload, recording), [MULTIPLAYER_PROTOCOL](MULTIPLAYER_PROTOCOL.md) (v13 and v14),
+[SESSION_RECORDING](SESSION_RECORDING.md) and [TESTING](TESTING.md#authority-hunt-checks). This
+plan is now history for the design and the dated evidence below; leftovers are Open loops rows in
+the [index](README.md#open-loops). User acceptance recorded: play check 1 and the P5e live-reload
+check; on 2026-11-14 the user reported native-to-browser play check 2 worked and was content
+with the P5f moved-mark reload check. Nothing more is inferred.
+Not built: the `docs/MULTIPLAYER.md` overview spec (listed in AGENTS.md as a candidate; the
+protocol and API specs own the facts meanwhile).
 The shelter hunt replaces the earlier co-op working-harbour proposal ([decisions](#decisions)).
 
 This plan owns P5's design, steps and gates. The
@@ -434,11 +433,23 @@ Playwright or WebRTC build available in that session).
 
 ### P5i: closing step
 
-Move the contract into specs: the authority objective adapter, room events (`mark.reached`,
-`crew.*`) and limits into `docs/PLUGIN_API.md`; v13/v14 already in `docs/MULTIPLAYER_PROTOCOL.md`
-(remove plan wording); create `docs/MULTIPLAYER.md` (authority, prediction, rooms, revisions,
-recording, hosting). Turn leftovers into Open loops rows, retire the "v10" label, mark this plan
-done or move it to history, and update the index.
+Done 2026-11-14. The objective adapter, room events and limits already lived in
+`docs/PLUGIN_API.md` and v13/v14 in `docs/MULTIPLAYER_PROTOCOL.md`; the closing step rewrote the
+API's dated status into present tense, added the once-per-revision waiting line, retired the
+"v10" label in the live summaries, and recorded the leftovers as Open loops rows:
+
+- the browser hunt case and old-bundle rejection are written but were never run (needs
+  Emscripten and Playwright; the reported manual native-to-browser check is not that automation);
+- server tick cost is measured only in Debug on one Apple Silicon machine, with no Release or
+  WebRTC clients;
+- P5f/P5g qualification beyond the user's reports: P5g recording checks on Linux/Windows/browser,
+  disk cost and a human view of a reconstruction;
+- no `docs/MULTIPLAYER.md` overview was written.
+
+The following fix landed with the closing: the server's "revision N waits for an empty room" line
+printed on every one-second poll that offered a changed file; it now prints once per pending
+revision (`boat_room_objective.revision_waits_once`). The cause of 16 repeats in one user edit
+was not reproduced by hand; the test models repeated and alternating candidate files.
 
 ## Deferred
 
