@@ -28,7 +28,7 @@ branch when exploitable, and write only the fixed class of bug into public histo
 ## Trust boundary
 
 Untrusted: every byte from a network peer — ENet packets (`boat_net_codec`), the WebRTC
-signalling and data channels (libjuice, usrsctp/libdatachannel, `boat_net_*`), join
+signalling and data channels (libjuice, libdatachannel, `boat_net_*`), join
 tokens and names. Operator-controlled: room packages, Lua plugins, assets, command line. H3
 must confirm that no client-supplied bytes reach package, Lua or scenery parsing; if any do,
 that path becomes a fuzz target and a P1 for hardening.
