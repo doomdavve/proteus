@@ -42,7 +42,8 @@ MATH_SYMBOL = re.compile(
 RUNTIME_SYMBOL = re.compile(
     r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|memchr|strchr|bzero|strcmp|strncmp|"
     r"strlen|qsort|clock|_?_assert\w*|__\w*chk\w*|__stack_chk_\w+|__chkstk\w*|"
-    r"__sincosf?_stret|vDSP_\w+|abort")
+    r"__sincosf?_stret|vDSP_\w+|abort|"
+    r"_GLOBAL_OFFSET_TABLE_")  # Linker symbol that position-independent code (H2 flags) refers to.
 
 
 def strip_comments_and_strings(text):
@@ -174,7 +175,8 @@ def self_test():
         return False
     if not symbol_allowed("Vector3Add", set()) or symbol_allowed("DrawCube", set()) \
             or symbol_allowed("fopen", set()) or not symbol_allowed("atan2f", set()) \
-            or not symbol_allowed("memchr", set()) or not symbol_allowed("strchr", set()):
+            or not symbol_allowed("memchr", set()) or not symbol_allowed("strchr", set()) \
+            or not symbol_allowed("_GLOBAL_OFFSET_TABLE_", set()):
         print("self-test: symbol allowlist is wrong")
         return False
     # New and nested files are covered without changing a CMake source list.

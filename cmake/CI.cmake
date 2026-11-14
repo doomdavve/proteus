@@ -47,5 +47,13 @@ foreach(test test_time platform_bridges plugin_stage_backend plugin_data_boundar
   set_property(TEST ${test} APPEND PROPERTY LABELS ci)
 endforeach()
 
+# H2: the ELF checker's own logic everywhere, and on hardened Linux builds the real server
+# binary (which the ci target therefore builds).
+set_property(TEST binary_hardening_selftest APPEND PROPERTY LABELS ci)
+if(TEST boat_server_hardening)
+  add_dependencies(ci boat_server)
+  set_property(TEST boat_server_hardening APPEND PROPERTY LABELS ci)
+endif()
+
 # The case tables are discovered after linking, so the ci target validates their final
 # labels and test-count budget through check_ci_lane.py once all selected targets exist.

@@ -40,6 +40,8 @@ endif()
 # so its compiled raymath rounds like the inline copies in our validators.
 add_compile_options($<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-ffp-contract=off>)
 
+include(cmake/Hardening.cmake) # Linux exploit-mitigation flags; before the dependencies.
+
 include(FetchContent)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(

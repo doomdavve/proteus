@@ -90,3 +90,21 @@ add_test(NAME module_includes COMMAND ${Python3_EXECUTABLE}
 add_test(NAME module_includes_self_test COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_module_includes.py --self-test)
 set_tests_properties(module_includes module_includes_self_test PROPERTIES LABELS "cpu;quick")
+
+# H2: the checker's own logic runs everywhere on synthetic ELF files.
+add_test(NAME binary_hardening_selftest COMMAND ${Python3_EXECUTABLE} -I
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_binary_hardening.py --selftest)
+set_tests_properties(binary_hardening_selftest PROPERTIES LABELS "cpu;quick" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "selftest=ok")
+if(PROTEUS_HARDENED)
+  # The server binary built here must carry the flags; fortification needs optimization.
+  set(BOAT_HARDEN_FORTIFY)
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(BOAT_HARDEN_FORTIFY --fortify)
+  endif()
+  add_test(NAME boat_server_hardening COMMAND ${Python3_EXECUTABLE} -I
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_binary_hardening.py ${BOAT_HARDEN_FORTIFY}
+    $<TARGET_FILE:boat_server>)
+  set_tests_properties(boat_server_hardening PROPERTIES LABELS "cpu;quick" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "boat_server: hardened")
+endif()

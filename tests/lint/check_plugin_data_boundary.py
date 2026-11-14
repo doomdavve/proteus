@@ -65,6 +65,7 @@ LIBRARY_SYMBOLS = re.compile(
     r"(?:malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|memchr|"
     r"strchr|strrchr|strstr|strpbrk|strcmp|strncmp|strlen|strtod|strtol|strtoul|bzero|qsort|"
     r"snprintf|vsnprintf|__\w*chk\w*|__stack_chk_\w+|__chkstk\w*|_?_assert\w*|abort|"
+    r"_GLOBAL_OFFSET_TABLE_|"  # Linker symbol that position-independent code refers to.
     r"(?:sin|cos|tan|atan|atan2|sqrt|hypot|floor|ceil|round|trunc|fabs|fmin|fmax|fmod|exp|"
     r"log|pow|lround|lrint|copysign)[fl]?|__\w*isfinite\w*|__sincos[fl]?_stret)")
 RAYLIB_SYMBOLS = re.compile(r"(?:Vector[234]|Matrix|Quaternion)\w*")
@@ -386,7 +387,8 @@ def run_self_test(root):
             return 1
 
         problems = check(base, nm, [write_archive("elf.a", [
-            "U __stack_chk_fail", "U __memcpy_chk", "U __snprintf_chk", "U boat_core_thing"]), core])
+            "U __stack_chk_fail", "U __memcpy_chk", "U __snprintf_chk", "U _GLOBAL_OFFSET_TABLE_",
+            "U boat_core_thing"]), core])
         macho = write_archive("macho.a", ["U ___stack_chk_fail", "U _memcpy", "U _boat_core_thing"])
         mach_core = write_archive("mach_core.a", ["T _boat_core_thing"])
         MACHO_saved = globals()["MACHO"]

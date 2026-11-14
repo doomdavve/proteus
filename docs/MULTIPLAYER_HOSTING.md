@@ -174,7 +174,11 @@ No display, audio device or game assets are needed at runtime. The optional libj
 needs `-DCMAKE_C_FLAGS=-D_DEFAULT_SOURCE` with the release's strict C17 on Debian 13.
 
 The `wake-velocity` account builds and runs the authority; systemd makes its filesystem
-read-only at runtime. A separate `turnserver` account runs `wake-velocity-relay` with eight
+read-only at runtime and sandboxes both services (no capabilities, a syscall allowlist,
+hidden kernel, device and credential paths, memory and task caps; see
+[the sandbox notes](../../davve-srv/docs/wake-velocity.md#service-sandbox)). On 2026-11-14 the
+sandbox took `systemd-analyze security` from 7.9 to 1.1 on Winterfell; native and browser
+joins worked, while a join through the TURN relay from outside the LAN is unchecked. A separate `turnserver` account runs `wake-velocity-relay` with eight
 allocations at most. Both services start at boot and restart on failure. The package's unused
 default `coturn` service is disabled. Logs go to the system journal. The persistent private
 relay credential lives under `/etc/wake-velocity/`; it is not a player admission token.
