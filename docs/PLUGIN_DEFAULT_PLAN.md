@@ -784,7 +784,7 @@ the handshake digest.
 
 Read first: `src/core/boat_world.[ch]`, `src/core/boat_fleet.[ch]`, `src/net/boat_prediction.[ch]`,
 `src/core/boat_scene_definition.[ch]`, `src/core/waterfront_harbor.[ch]`, `src/core/waterfront_traffic.[ch]`,
-the [scene contract](PLUGIN_API.md#location-life-scene-contract-planned-l11) and
+the [scene contract](PLUGIN_API.md#location-life-scene-contract-l11l43) and
 [multiplayer prediction contract](PLUGIN_PLAN.md#multiplayer-prediction-and-recording).
 
 `BoatWorld.scene` is the seam: physics and presentation read that pointer, and rooms leave it NULL.
