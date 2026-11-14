@@ -158,7 +158,7 @@ typedef struct {
     uint64_t accepted, rejected[BOAT_NET_REJECT_LIMIT], left, timeouts;
     // Commands stored; repeats of stored ones; packets whose newest command came too late.
     uint64_t commands, duplicate_commands, late_commands, future_commands, stale_life_commands;
-    uint64_t stale_packets, rate_limited, malformed, forbidden, misbehaving;
+    uint64_t stale_packets, rate_limited, connect_limited, malformed, forbidden, misbehaving;
     uint64_t input_states[BOAT_NET_INPUT_STATES]; // Ticks integrated with each input source.
     uint64_t objective_states; // ObjectiveState messages queued, broadcasts and joins alike.
     // Definition revisions (v14): candidates staged, announced, refused at staging, committed;
@@ -204,6 +204,8 @@ typedef struct BoatNetServer {
     double origin, backlog_since;
     uint64_t origin_tick;
     uint64_t tick_limit; // Never tick past this (0: no limit), even when catching up.
+    double connect_tokens, connect_refill_at; // Connection-rate bucket (see BOAT_NET_CONNECT_*).
+    bool connect_started;
     double peer_timeout; // Seconds of silence before a peer times out (0: BOAT_NET_TIMEOUT).
     uint32_t next_checkpoint;
     BoatMatch match; // Deathmatch state; untouched in free play.

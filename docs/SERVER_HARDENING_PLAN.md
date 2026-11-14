@@ -1,12 +1,12 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1, H2 (PR #192) and H3 (PR #193) are merged; H4 is in progress on `feat/h4-limits`; H4-H7 are next.**
+Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1, H2 (PR #192) and H3 (PR #193) are merged; H4 code side is done on `feat/h4-limits` (operator work owed); H4-H7 are next.**
 Completed task: H3, sanitizer option, three fuzz harnesses, sanitizer CI workflow and a first libFuzzer run (evidence below and in the H3 row).
 Open: the `davve-srv` credential unit for H1 and H2's Release/WebRTC check wait for the next release; the
 relay-from-outside-the-LAN join and a soak under the sandbox were not exercised; the longer H3 fuzz campaign is owed.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: finish **H4** (limits and firewall), then H5.
+Next task: H4 operator work (nftables, crash alert) in `davve-srv`, then H5.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -42,7 +42,7 @@ that path becomes a fuzz target and a P1 for hardening.
 | H1 | Remove the TURN password from `ExecStart` (it shows in `ps` and `/proc/<pid>/cmdline`): the server reads it from a credential file or environment variable; `davve-srv` supplies it with `LoadCredential=`. Add `SECURITY.md` with the disclosure route. | Password absent from `ps`; room and browser join still work |
 | H2 | **Implemented 2026-11-14; passes Linux CI (Debug, no WebRTC); Release fortification and the WebRTC build are checked at the next release build.** Exploit-mitigation build flags for the server targets and their bundled dependencies: `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=3`, PIE, full RELRO and `-z now`, `-fstack-clash-protection`, `-fcf-protection`, `-ftrivial-auto-var-init=zero`. Check the built binary with `checksec`. | CI check on `boat_server`; no warning regressions; tests pass |
 | H3 | **Merged 2026-11-14 (PR #193); sanitizer CI and a first libFuzzer run recorded; a longer campaign is still owed.** Sanitizer and fuzz lane (absorbs the M5 "parser fuzzing" open loop). ASan/UBSan runs of the net and room tests and the `boat_bot` soak; libFuzzer/AFL++ harnesses for the packet codec, the ENet receive path, signalling messages, join/name/token handling and the session-record codec. Seed corpus from the recorded protocol tests. Tests keep the virtual clock. | Sanitizer lane green in CI budget; harnesses run N minutes locally without findings, or findings fixed privately |
-| H4 | Server-side limits and network hygiene: peer, packet-size and join-rate caps; per-source rate limit and port allowlist in nftables on Winterfell; alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits. | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
+| H4 | **Code side implemented 2026-11-14 on `feat/h4-limits`; operator work remains.** Server-side limits and network hygiene: peer, packet-size and join-rate caps (in code, see [Connection limits](MULTIPLAYER_PROTOCOL.md#connection-limits)); per-source rate limit and port allowlist in nftables on Winterfell (`davve-srv`, not done); alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits (`davve-srv`, not done). | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
 | H5 | In-process lockdown, Linux only (`pledge` substitute), in `src/room/` behind `__linux__`; never in `proteus_boat_core` or `proteus_boat_net`. After assets, package, plugin load and socket binding: Landlock (no filesystem, only the allowed bind ports) then a seccomp allowlist of the steady-state syscalls. | Server runs a full soak; a test proves a denied `open`/`execve` fails; core boundary lint passes |
 | H6 | Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Decide after H3–H5 whether the remaining risk justifies it. | Decision and reasons recorded |
 | H7 | Closing step: move the contract and behaviour into `docs/SERVER_SECURITY.md` (new spec, present tense), update [hosting](MULTIPLAYER_HOSTING.md), turn leftovers into open items or drop them explicitly, then mark this plan done. | Docs match the deployed units and the code |
@@ -95,3 +95,21 @@ libdatachannel), room package and Lua definition parsing (operator-supplied; H3'
 confirmation that no client bytes reach them is still owed), and the rest of the C code. `strcpy` in
 `apps/dance_study/choreography.c` and `sprintf` in `tools/wake_play_review.c` are outside the server
 and left alone.
+
+## H4 evidence
+
+Already present before H4: the 8-peer host cap, `maximumPacketSize` and per-message size and
+channel validation in `boat_net_enet.c`, per-peer input/spawn/resync rate limits, the 10 s
+handshake timeout, and WebRTC signalling bounds (8 pending sockets, 16 KiB messages, 15 s).
+Added 2026-11-14: ENet `duplicatePeers` = 6 per source address, and a server-side token bucket on
+new connections (burst 8, 2 per second, on the caller's clock, `connect_limited` statistic,
+printed by `boat_server`). The values are conservative guesses, not measurements: 6 keeps a
+four-player household plus two retries; revisit them with real join traffic.
+Checks run on macOS, Debug, 2026-11-14: `ctest --preset full` passed (557 tests) including
+`boat_net.connect_flood` (150 scripted connects in one virtual second: 10 admitted, 140
+refused) and `boat_net_enet.enet_source_cap` (7 loopback clients: 6 served). Not run: a
+`boat_bot` flood against a live server, per-source signalling limits (the process cannot see
+the address; left to nftables), and any `davve-srv` change.
+Remaining operator work (private `davve-srv`): nftables per-source connection and rate limits
+and a port allowlist; an alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits, proven with a
+deliberate crash.
