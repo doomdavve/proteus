@@ -55,5 +55,13 @@ if(TEST boat_server_hardening)
   set_property(TEST boat_server_hardening APPEND PROPERTY LABELS ci)
 endif()
 
+# H3: the fuzz harnesses as deterministic regressions (replay plus a fixed number of mutations).
+foreach(harness fuzz_net_decode fuzz_net_server fuzz_session_record)
+  if(TEST ${harness})
+    add_dependencies(ci ${harness})
+    set_property(TEST ${harness} APPEND PROPERTY LABELS ci)
+  endif()
+endforeach()
+
 # The case tables are discovered after linking, so the ci target validates their final
 # labels and test-count budget through check_ci_lane.py once all selected targets exist.

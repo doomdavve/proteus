@@ -66,6 +66,7 @@ LIBRARY_SYMBOLS = re.compile(
     r"strchr|strrchr|strstr|strpbrk|strcmp|strncmp|strlen|strtod|strtol|strtoul|bzero|qsort|"
     r"snprintf|vsnprintf|__\w*chk\w*|__stack_chk_\w+|__chkstk\w*|_?_assert\w*|abort|"
     r"_GLOBAL_OFFSET_TABLE_|"  # Linker symbol that position-independent code refers to.
+    r"__asan_\w+|__ubsan_\w+|__sanitizer_\w+|"  # Runtime calls the sanitizers insert (H3).
     r"(?:sin|cos|tan|atan|atan2|sqrt|hypot|floor|ceil|round|trunc|fabs|fmin|fmax|fmod|exp|"
     r"log|pow|lround|lrint|copysign)[fl]?|__\w*isfinite\w*|__sincos[fl]?_stret)")
 RAYLIB_SYMBOLS = re.compile(r"(?:Vector[234]|Matrix|Quaternion)\w*")

@@ -27,6 +27,11 @@ if(NOT EMSCRIPTEN)
     ${enet_SOURCE_DIR}/protocol.c ${enet_SOURCE_DIR}/unix.c ${enet_SOURCE_DIR}/win32.c)
   target_include_directories(proteus_enet SYSTEM PUBLIC ${enet_SOURCE_DIR}/include)
   set_target_properties(proteus_enet PROPERTIES C_STANDARD 99 C_EXTENSIONS ON)
+  if(PROTEUS_SANITIZED)
+    # ENet 1.3.18 shifts 1 into the sign bit when it marks an unsequenced group (protocol.c).
+    # It has no memory effect, and aborting on it would stop every sanitized network test.
+    target_compile_options(proteus_enet PRIVATE -fno-sanitize=shift-base)
+  endif()
   if(WIN32)
     target_link_libraries(proteus_enet PUBLIC ws2_32 winmm)
   else()

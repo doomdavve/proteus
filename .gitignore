@@ -15,3 +15,7 @@ __pycache__/
 
 # Emacs autosave files
 \#*#
+build-asan/
+build-fuzz/
+build-san/
+build-linux/

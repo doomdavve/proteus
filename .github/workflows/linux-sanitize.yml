@@ -1,0 +1,94 @@
+name: Linux sanitizers and fuzzing
+
+# H3 (docs/SERVER_HARDENING_PLAN.md): the network and room code under AddressSanitizer and
+# UndefinedBehaviorSanitizer, with the fuzz harnesses. Separate from the routine lane because an
+# instrumented build does not fit its three-minute cap. The libFuzzer job is manual only: this
+# repository is public, so a crash found by an unattended run would put a stack trace in a public
+# log before the bug is fixed. Run libFuzzer locally or by hand, and report findings privately.
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/net/**', 'src/room/**', 'src/core/**', 'tests/fuzz/**', 'tests/net/**', 'cmake/**', 'CMakeLists.txt', '.github/workflows/linux-sanitize.yml']
+  pull_request:
+    paths: ['src/net/**', 'src/room/**', 'src/core/**', 'tests/fuzz/**', 'tests/net/**', 'cmake/**', 'CMakeLists.txt', '.github/workflows/linux-sanitize.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DEPS: libcurl4-openssl-dev libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev wayland-protocols pkg-config
+
+jobs:
+  sanitize:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $DEPS
+      - name: Configure with ASan and UBSan
+        run: >-
+          cmake -S . -B build-san -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF
+          -DPROTEUS_SANITIZE=address,undefined -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
+      - name: Build the network, room and fuzz targets
+        run: >-
+          cmake --build build-san --parallel 2 --target fuzz_net_decode fuzz_net_server
+          fuzz_session_record validate_boat_net validate_boat_net_enet boat_server boat_bot
+      - name: Run the fuzz harnesses and the network validators
+        env:
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build-san -R '^(fuzz_|boat_net[.]|boat_net_enet[.])' --parallel 2 --timeout 300 --no-tests=error --output-on-failure
+      - name: Longer deterministic mutation runs
+        env:
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          for seed in 11 12 13; do
+            ./build-san/fuzz_net_decode --runs 300000 --seed $seed
+            ./build-san/fuzz_session_record --runs 200000 --seed $seed
+            ./build-san/fuzz_net_server --runs 10000 --seed $seed
+          done
+
+  libfuzzer:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $DEPS clang
+      - name: Configure with libFuzzer
+        env:
+          CC: clang
+        run: >-
+          cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF
+          -DPROTEUS_FUZZ=ON -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
+      - name: Build
+        run: >-
+          cmake --build build-fuzz --parallel 2 --target fuzz_net_decode fuzz_net_server
+          fuzz_session_record fuzz_net_decode_seeds fuzz_net_server_seeds fuzz_session_record_seeds
+      - name: Fuzz each harness for five minutes
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          for name in net_decode net_server session_record; do
+            mkdir -p corpus/$name
+            ./build-fuzz/fuzz_${name}_seeds --runs 0 --write-seeds corpus/$name
+            ./build-fuzz/fuzz_$name -max_total_time=300 -timeout=20 corpus/$name
+          done

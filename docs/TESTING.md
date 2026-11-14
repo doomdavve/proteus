@@ -1044,6 +1044,26 @@ floating-point results. `binary_hardening_selftest` exercises `tests/lint/check_
 on synthetic ELF files on every platform; on Linux `boat_server_hardening` runs it on the built
 `boat_server` (checking `_FORTIFY_SOURCE` calls outside Debug) and skips other file formats.
 
+### Sanitizers and fuzzing
+
+`-DPROTEUS_SANITIZE=address,undefined` (`cmake/Sanitize.cmake`) instruments the project and its
+fetched dependencies; a finding aborts the test. Linux CI runs it for changes under `src/net`,
+`src/room`, `src/core`, `tests/fuzz`, `tests/net` and `cmake` (`.github/workflows/linux-sanitize.yml`):
+the `fuzz_*` and `boat_net*` tests and longer fuzz runs. Detecting leaks is off because the validators
+exit without freeing their rooms. ENet's sign-bit shift (`-fno-sanitize=shift-base`, only for that
+target) is the one exemption.
+
+`tests/fuzz/` holds libFuzzer-style harnesses (`LLVMFuzzerTestOneInput`): `fuzz_net_decode` (message,
+checkpoint and LAN codecs, with a decode-encode-decode round trip), `fuzz_net_server` (a joined client
+sending arbitrary chunks to a room, on the virtual clock) and `fuzz_session_record` (one recording
+frame). Each links `fuzz_driver.c`, which replays its seeds and runs a fixed, seeded number of
+mutations, so the harnesses are ordinary deterministic tests (labelled `fuzz`, and in the routine CI
+lane). `fuzz_net_server` prints what it reached and fails if it stops reaching spawn and resync
+handling. For coverage-guided runs, build with Clang and `-DPROTEUS_FUZZ=ON`, write a corpus with
+`<name>_seeds --runs 0 --write-seeds DIR`, then run `./build/fuzz_net_decode -max_total_time=600 DIR`.
+The workflow's libFuzzer job is manual only, because this repository is public and a crash found by an
+unattended run would be visible in its log. Report findings privately ([SECURITY.md](../SECURITY.md)).
+
 `module_includes` recursively checks C sources and headers in `src`, `apps`, `tests` and
 `tools`. It rejects flat project includes, relative aliases and forbidden module dependencies.
 `tests/lint/check_module_includes.py` owns the allowed graph and closes it transitively.
