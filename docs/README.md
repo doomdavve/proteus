@@ -186,7 +186,7 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 ## Guides and evidence
 
 - [Boating performance](BOATING_PERFORMANCE.md): headless arcade benchmark contract, P2a verification, P3a baseline and C1 clock comparison.
-- [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v14 byte layout, channels, validation
+- [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v15 byte layout, channels, validation
   envelope, authority rules carried on the wire, version policy and fixtures.
 - [Architecture restructuring plan](ARCHITECTURE_PLAN.md): AR0 merged baseline/contracts and CPU
   verification complete (2026-11-09); the [AR1 authority/client design](ARCHITECTURE_AR1.md),

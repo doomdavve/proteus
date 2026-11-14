@@ -2,6 +2,7 @@
  * definition as data, and clients with no knowledge of the edited course or combat values
  * predict and mirror it bit for bit. The validator links the plugin host and catalog; the core
  * and net libraries remain free of them. */
+#include "core/boat_clock.h"
 #include "core/boat_world.h"
 #include "net/boat_net_client.h"
 #include "net/boat_net_server.h"
@@ -453,8 +454,20 @@ static int definition_size(void)
     d.scene.traffic.actors[0].shape = WATERFRONT_ROUTE_OPEN_LEG;
     static uint8_t rejected[BOAT_ROOM_BYTES_MAX];
     CHECK(boat_room_definition_encode(&d, rejected, sizeof(rejected)) == 0);
-    d.scene.traffic.actors[0].shape = WATERFRONT_ROUTE_OPEN_PATH;
-    CHECK(boat_room_definition_encode(&d, rejected, sizeof(rejected)) == 0);
+    WaterfrontRouteActor *open = &d.scene.traffic.actors[0];
+    open->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    open->point_count = open->stop_count = 0;
+    open->phase = 0;
+    open->period = 5;
+    open->open_path = (BoatRoutePath) { .count = 1 };
+    open->open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 0, .start_z = 0,
+        .end_x = 0, .end_z = -10, .duration_ticks = 600, .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20, .max_acceleration = 100 };
+    size_t open_size = boat_room_definition_encode(&d, rejected, sizeof(rejected));
+    CHECK(open_size > 0 && boat_room_definition_decode(rejected, open_size, &back, &rd));
+    CHECK(back.scene.traffic.actors[0].shape == WATERFRONT_ROUTE_OPEN_PATH
+        && back.scene.traffic.actors[0].open_path.pieces[0].shape.line.end_z == -10);
+    CHECK(!boat_room_definition_decode(rejected, open_size - 1, &back, &rd));
     d.scene.traffic.actors[0] = saved;
 
     printf("room_package definition: maximum %zu of %d bytes, %u pages\n", size,

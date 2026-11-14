@@ -323,12 +323,11 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 First groundwork, 2026-11-14: `boat_schedule_common_period` computes the exact least common
 multiple of positive tick periods, rejecting overflow and caller-budget overruns without changing
 the result. A separate straight-leg primitive evaluates explicit ticks using smoothstep, with
-analytic speed and acceleration bounds and exact terminal poses. These are not yet used by traffic
-validation or rendering. M3 remains incomplete: the existing
+analytic speed and acceleration bounds and exact terminal poses. M3 remains incomplete: the existing
 floating-point traffic schedules and fixed 4,160-second sampled horizon have not been converted
 to a proven bounded combined timetable. The next implementation must define tick conversion,
 the validation budget and conservative swept envelopes before connecting the helper. Open routes,
-docking, authoring, wire integration, Apply/Undo and visual qualification remain outstanding.
+docking, complete authoring integration, Apply/Undo and visual qualification remain outstanding.
 An unintegrated pairwise straight-leg clearance helper samples synchronized tick positions and
 inflates enclosing circles by a half-tick maximum relative travel bound. It may conservatively
 reject safe passages; the numerical rounding margins and its extension to turns, scenery and
@@ -338,10 +337,10 @@ passed. No motion or user acceptance is claimed.
 An unintegrated circular-arc primitive now evaluates tick-addressed left and right turns with
 bounded start phase, signed sweep and conservative tangential-plus-centripetal acceleration.
 Focused arc, leg, clearance and core-boundary tests passed on macOS/Apple Silicon Debug
-2026-11-14. Joining legs, continuous moving turns and their complete clearance proof remain open.
+2026-11-14. Continuous moving turns and their complete clearance proof remain open.
 An internal-only straight-leg actor now evaluates through the shared traffic motion owner; it is
-not authorable, and room and plugin wire codecs explicitly reject it. Its native route and wire
-rejection tests passed. New route serialization and scene clearance must be implemented together
+not authorable, and room and plugin wire codecs explicitly reject this single-leg shape. Its native
+route and wire rejection tests passed. Open-path serialization and scene clearance must be completed together
 before exposing it to packages. The existing traffic rendering and motion still require a visual
 demo when the authoring path is connected. On macOS/Apple Silicon Debug 2026-11-14, the build
 and full CTest preset passed 561 enabled tests (13 disabled). After a tick-rounding correction,
@@ -352,7 +351,7 @@ with the existing 1 MiB plugin-owner cap, and focused traffic and wire-rejection
 On the full preset 559 tests passed and two boundary checks initially rejected `nextafter`;
 after adding that standard math function to the boundary allowlist, both checks passed on rerun.
 A later arc-yaw correction passed the focused traffic and boundary checks. This path remains
-unavailable to packages; moving turns, broader capacity, wire integration and scene clearance
+unavailable to packages; moving turns, broader capacity and complete scene clearance
 are unfinished. Location staging explicitly rejects both internal shapes, including direct
 in-memory candidates; focused free/voyage regression tests passed on macOS Debug 2026-11-14.
 Before that rejection, internal paths now receive a bounded static survey: enclosing hull circles
@@ -366,9 +365,10 @@ circle and speed bounds with a 200,000-sample budget. On macOS Debug 2026-11-14,
 passed for a separated path, a compiled-traffic conflict, shore rejection and the path budget.
 It is still preliminary: multiple open paths, authoring and end-to-end qualification remain open.
 The Lua evaluator can now decode bounded `route = "open"` line/arc records and the isolated
-staging wire carries them as PSTB. Location staging and room wire still reject them; this is not
-a supported authoring contract yet. Focused decode, staging-wire, browser wire-version and
-existing traffic tests passed on macOS Debug 2026-11-14.
+staging wire carries them as PSTB. Room definition version 5 also carries open paths and protocol
+v15 rejects older peers; location staging still rejects them, so this is not yet a supported
+authoring contract. Focused decode, staging-wire, browser wire-version, room round-trip, protocol
+golden and codec tests passed on macOS Debug 2026-11-14.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

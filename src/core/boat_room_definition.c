@@ -199,6 +199,48 @@ static void combat_rules_wire(RoomWire *w, BoatCombatRules *r)
     r->grace_ticks = (uint32_t)integer(w, r->grace_ticks, 4);
 }
 
+static void open_path_wire(RoomWire *w, BoatRoutePath *path)
+{
+    path->count = (unsigned)integer(w, path->count, 1);
+    if (!path->count || path->count > BOAT_ROUTE_PATH_PIECES) {
+        w->ok = false;
+        return;
+    }
+    for (unsigned i = 0; i < path->count; ++i) {
+        BoatRoutePathPiece *p = &path->pieces[i];
+        p->kind = (BoatRoutePathKind)integer(w, p->kind, 1);
+        if (p->kind != BOAT_ROUTE_PATH_LINE && p->kind != BOAT_ROUTE_PATH_ARC) {
+            w->ok = false;
+            return;
+        }
+        p->dwell_ticks = integer(w, p->dwell_ticks, 8);
+        if (p->kind == BOAT_ROUTE_PATH_LINE) {
+            BoatRouteLeg *l = &p->shape.line;
+            l->duration_ticks = integer(w, l->duration_ticks, 8);
+            l->start_x = real64(w, l->start_x);
+            l->start_z = real64(w, l->start_z);
+            l->end_x = real64(w, l->end_x);
+            l->end_z = real64(w, l->end_z);
+            l->tick_seconds = real64(w, l->tick_seconds);
+            l->max_speed = real64(w, l->max_speed);
+            l->max_acceleration = real64(w, l->max_acceleration);
+        } else {
+            BoatRouteArc *a = &p->shape.arc;
+            a->duration_ticks = integer(w, a->duration_ticks, 8);
+            a->centre_x = real64(w, a->centre_x);
+            a->centre_z = real64(w, a->centre_z);
+            a->radius = real64(w, a->radius);
+            a->start_angle = real64(w, a->start_angle);
+            a->sweep = real64(w, a->sweep);
+            a->tick_seconds = real64(w, a->tick_seconds);
+            a->max_speed = real64(w, a->max_speed);
+            a->max_acceleration = real64(w, a->max_acceleration);
+        }
+        if (!w->ok)
+            return;
+    }
+}
+
 static void route_wire(RoomWire *w, WaterfrontRouteDefinition *routes)
 {
     routes->actor_count = (unsigned)integer(w, routes->actor_count, 1);
@@ -216,7 +258,7 @@ static void route_wire(RoomWire *w, WaterfrontRouteDefinition *routes)
         // OPEN_LEG is internal only and owns no wire bytes yet; decode and encode both reject it
         // so a round trip cannot silently drop the leg fields.
         if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->shape >= WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            || a->shape == WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
             w->ok = false;
         a->bridge = bridge != 0;
         a->speed = real32(w, a->speed);
@@ -246,6 +288,8 @@ static void route_wire(RoomWire *w, WaterfrontRouteDefinition *routes)
         a->short_radius = real32(w, a->short_radius);
         a->start_distance = real32(w, a->start_distance);
         a->turn_radius = real32(w, a->turn_radius);
+        if (a->shape == WATERFRONT_ROUTE_OPEN_PATH)
+            open_path_wire(w, &a->open_path);
     }
 }
 
