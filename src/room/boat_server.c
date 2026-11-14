@@ -396,20 +396,13 @@ typedef struct {
     const char *directory;
     BoatLocationId location;
     const BoatWorldResources *world;
-    BoatRoomObjectiveSource seen, candidate;
+    BoatRoomObjectiveSource candidate;
+    BoatRoomReloadWatch watch;
     BoatRoomDefinition scratch;
     char last_error[160];
     uint64_t reported; // BoatRoomObjective.reloads already printed.
-    uint64_t definition; // Digest of the definition the room runs or last staged.
     uint32_t revision; // The server revision already reported.
 } ObjectiveReload;
-
-static bool same_source(const BoatRoomObjectiveSource *a, const BoatRoomObjectiveSource *b)
-{
-    return a->present == b->present && a->state_version == b->state_version
-        && a->migrates == b->migrates && a->source_size == b->source_size
-        && !memcmp(a->source, b->source, a->source_size);
-}
 
 static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o, BoatNetServer *server)
 {
@@ -424,30 +417,7 @@ static void poll_reload(ObjectiveReload *r, BoatRoomObjective *o, BoatNetServer 
         return;
     }
     r->last_error[0] = 0;
-    uint64_t definition = boat_room_definition_digest(&r->scratch);
-    if (definition == r->definition && same_source(&r->candidate, &r->seen))
-        return;
-    memcpy(&r->seen, &r->candidate, sizeof(r->seen));
-    BoatPluginDiagnostic d;
-    if (definition != r->definition) {
-        if (!boat_room_objective_stage_revision(o, server, &r->scratch, &r->candidate, &d)) {
-            printf("objective reload rejected: %s\n", d.message);
-            fflush(stdout);
-            return;
-        }
-        r->definition = definition;
-        uint32_t next = server->stats.revision + 1;
-        if (boat_net_server_players(server))
-            printf("objective reload: marks changed; revision %u waits for an empty room\n", next);
-        else
-            printf("objective reload: marks changed; revision %u commits at once (the room is "
-                   "empty)\n",
-                next);
-        fflush(stdout);
-    } else if (!boat_room_objective_stage(o, &r->candidate, &d)) {
-        printf("objective reload rejected: %s\n", d.message);
-        fflush(stdout);
-    }
+    boat_room_reload_offer(&r->watch, o, server, &r->scratch, &r->candidate, stdout);
 }
 
 // Report each definition revision the server committed.
@@ -548,8 +518,7 @@ static int room(const RoomOptions *options)
         reload.directory = options->reload_directory;
         reload.location = options->location;
         reload.world = options->world;
-        reload.seen = *options->objective;
-        reload.definition = boat_room_definition_digest(&options->room);
+        boat_room_reload_watch_init(&reload.watch, &options->room, options->objective);
     }
     if (objective_on) {
         boat_room_objective_init(&objective, options->objective);

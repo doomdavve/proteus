@@ -1,14 +1,15 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-14: **P5a–P5f are merged; P5g recording/reconstruction is locally implemented
-on `feat/plugin-p5g`, following Astra's contract review.** P5g verification is recorded below.
-Completed task: P5g's bounded recording codec, authority capture, headless playback/seek and
-optional diagnostic Lua re-execution; [contract](SESSION_RECORDING.md).
-Open: the user's P5f moved-mark check, P5h four-player/impairment/browser qualification, P5i closing.
-Play check 1 and the P5e live-reload check are accepted; no new human acceptance is inferred.
-Done when: two then four players hunt with authority-only Lua; join/reconnect HUD, safe revisions,
-recorded reconstruction, existing rooms and the closing specs all pass their gates.
-Next task: **P5h**, retaining the outstanding P5f human check as a separate open item.
+Status, 2026-11-14: **done.** P5a–P5h are implemented and P5i has moved the contract into the
+specs: [PLUGIN_API](PLUGIN_API.md#marks-p5a) (marks, events, authority adapter, reload, revisions
+from reload, recording), [MULTIPLAYER_PROTOCOL](MULTIPLAYER_PROTOCOL.md) (v13 and v14),
+[SESSION_RECORDING](SESSION_RECORDING.md) and [TESTING](TESTING.md#authority-hunt-checks). This
+plan is now history for the design and the dated evidence below; leftovers are Open loops rows in
+the [index](README.md#open-loops). User acceptance recorded: play check 1 and the P5e live-reload
+check; on 2026-11-14 the user reported native-to-browser play check 2 worked and was content
+with the P5f moved-mark reload check. Nothing more is inferred.
+Not built: the `docs/MULTIPLAYER.md` overview spec (listed in AGENTS.md as a candidate; the
+protocol and API specs own the facts meanwhile).
 The shelter hunt replaces the earlier co-op working-harbour proposal ([decisions](#decisions)).
 
 This plan owns P5's design, steps and gates. The
@@ -123,10 +124,9 @@ anyone: clients only ever see the resulting HUD.
   duplicate and stale announcements are ignored by revision number; prediction history never
   crosses a commit.
 
-Naming correction: older documents call round-boundary revisions "protocol v10". The protocol is
-already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v14)),
-so this plan uses v13 and v14 and the closing step retires the "v10" label. Revisions landed in
-v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the protocol document).
+Older documents call round-boundary revisions "protocol v10"; v10 is the dimensioned marina
+contract, and revisions are v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the
+protocol document).
 
 ### Recording and reconstruction
 
@@ -419,13 +419,49 @@ rejected with the version message.
 Gate: measurements recorded; **user play check 2** — one native and one browser player on a
 locally built WebRTC room.
 
+#### P5h measurements
+
+Server tick cost, 2026-11-14, Apple M1 Max (arm64) macOS, Debug, `python3 tools/measure_room_tick.py
+--build-dir build --seconds 20 --repeats 3` (four `boat_bot` clients; the server's own
+`service_ms_per_tick`, real time, outside CTest). Three runs each, ms per 120 Hz tick (budget
+8.33): free `outer` 0.127 / 0.144 / 0.160; hunt (Lua objective every 12 ticks) 0.307 / 0.295 /
+0.286; deathmatch 0.292 / 0.317 / 0.292. The hunt costs about 0.15 ms per tick more than plain
+free play and the same as the deathmatch baseline (about 3.5% of the tick budget). That run was
+Debug only.
+
+Release, 2026-11-14, same machine and command, `build-release` (`-DCMAKE_BUILD_TYPE=Release
+-DPROTEUS_WEBRTC=ON`, ENet bots): free `outer` 0.201 / 0.359 / 0.414; hunt 0.524 / 0.610 / 0.481;
+deathmatch 0.946 / 0.972 / 0.875 ms per tick. All are at most about 12% of the 8.33 ms budget,
+hunt stays about 0.2 ms above free play and below deathmatch. These numbers are higher than the
+Debug ones, which a Release build should not produce; the likely cause is machine load or the
+WebRTC-enabled server (unconfirmed, not investigated). No other platform and no WebRTC clients
+measured.
+
+Browser hunt case and old-bundle rejection: run 2026-11-14, both pass; see
+[the browser guide](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h). The old client cannot
+decode the room's Reject, so the check asserts a failed join plus the room's `rejected: version=1`
+count instead of a "protocol version mismatch" console line.
+
 ### P5i: closing step
 
-Move the contract into specs: the authority objective adapter, room events (`mark.reached`,
-`crew.*`) and limits into `docs/PLUGIN_API.md`; v13/v14 already in `docs/MULTIPLAYER_PROTOCOL.md`
-(remove plan wording); create `docs/MULTIPLAYER.md` (authority, prediction, rooms, revisions,
-recording, hosting). Turn leftovers into Open loops rows, retire the "v10" label, mark this plan
-done or move it to history, and update the index.
+Done 2026-11-14. The objective adapter, room events and limits already lived in
+`docs/PLUGIN_API.md` and v13/v14 in `docs/MULTIPLAYER_PROTOCOL.md`; the closing step rewrote the
+API's dated status into present tense, added the once-per-revision waiting line, retired the
+"v10" label in the live summaries, and recorded the leftovers as Open loops rows:
+
+- the browser hunt case and old-bundle rejection were not run at closing; run afterwards on
+  2026-11-14 (see [P5h measurements](#p5h-measurements)) and no longer open;
+- server tick cost was measured only in Debug; Release was added the same day (ENet clients);
+  WebRTC clients and other platforms are still unmeasured and Release being slower than Debug is
+  unexplained;
+- P5f/P5g qualification beyond the user's reports: P5g recording checks on Linux/Windows/browser,
+  disk cost and a human view of a reconstruction;
+- no `docs/MULTIPLAYER.md` overview was written.
+
+The following fix landed with the closing: the server's "revision N waits for an empty room" line
+printed on every one-second poll that offered a changed file; it now prints once per pending
+revision (`boat_room_objective.revision_waits_once`). The cause of 16 repeats in one user edit
+was not reproduced by hand; the test models repeated and alternating candidate files.
 
 ## Deferred
 

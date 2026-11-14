@@ -14,6 +14,8 @@
 #include "plugins/boat_plugin_state.h"
 #include "room/boat_room_package.h"
 
+#include <stdio.h>
+
 #define BOAT_ROOM_OBJECTIVE_CADENCE 12
 
 typedef enum {
@@ -79,5 +81,20 @@ bool boat_room_objective_stage_revision(BoatRoomObjective *objective, BoatNetSer
 bool boat_room_objective_after_tick(BoatRoomObjective *objective, uint64_t tick);
 // The adapter for BoatNetServerConfig.rules.
 BoatNetRules boat_room_objective_rules(BoatRoomObjective *objective);
+
+// P5f/P5h: the server's reload watcher. OFFER judges a freshly loaded candidate package: a changed
+// room definition is staged as a definition revision, a changed source only as a live reload.
+// It reports on OUT (may be NULL). "waits for an empty room" is printed once per pending
+// revision, however many times the file is offered again, and again for the next revision.
+typedef struct {
+    BoatRoomObjectiveSource seen; // The last source looked at, accepted or refused.
+    uint64_t definition; // Digest of the definition the room runs or last staged.
+    uint32_t announced; // The revision whose waiting line was already printed.
+} BoatRoomReloadWatch;
+void boat_room_reload_watch_init(BoatRoomReloadWatch *watch, const BoatRoomDefinition *room,
+    const BoatRoomObjectiveSource *source);
+void boat_room_reload_offer(BoatRoomReloadWatch *watch, BoatRoomObjective *objective,
+    BoatNetServer *server, const BoatRoomDefinition *definition,
+    const BoatRoomObjectiveSource *candidate, FILE *out);
 
 #endif

@@ -1725,7 +1725,7 @@ three-engine browser qualification, including the cached INIT deadline regressio
 results remain historical evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
-**Next:** P5 (authority/prediction/recording, including v10 round-boundary revisions), scheduled by the user 2026-11-07 (previously held 2026-11-01).
+**Next:** P5 (authority/prediction/recording, including the revisions that became protocol v14), scheduled by the user 2026-11-07 (previously held 2026-11-01); it closed in P5i, see the [P5 plan](PLUGIN_P5_PLAN.md).
 Browser races, interactive preview controls, durable full-session saves, native asynchronous
 objective execution and an in-game agent are not implemented. Physical Safari/mobile devices,
 real background-tab policies and P3 human migration/Undo/recovery acceptance remain open.

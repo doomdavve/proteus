@@ -15,7 +15,7 @@ Harbor life is the title's `outer` default: the user accepted it after an iPhone
 failed to start from the title) and made the default in
 [#124](https://github.com/doomdavve/proteus/pull/124), both merged 2026-11-01. Standard stays
 selectable and `--location outer` keeps the catalog default `proteus.langedrag`. Round-boundary
-revisions (protocol v10) are part of plugin P5, scheduled by the user 2026-11-07 (previously held 2026-11-01). Open:
+revisions (since delivered as protocol v14 by plugin P5f) are part of plugin P5, scheduled by the user 2026-11-07 (previously held 2026-11-01). Open:
 the human checks listed in the [PD5 result](#pd5-result-2026-10-31); no implementation step
 remains. The user also chose the Eriksberg marina direction for Harbor life (implemented
 2026-11-01; see the [marina plan](MARINA_AUTHORING_PLAN.md)); an iPhone run and human scene/GPU
@@ -784,7 +784,7 @@ the handshake digest.
 
 Read first: `src/core/boat_world.[ch]`, `src/core/boat_fleet.[ch]`, `src/net/boat_prediction.[ch]`,
 `src/core/boat_scene_definition.[ch]`, `src/core/waterfront_harbor.[ch]`, `src/core/waterfront_traffic.[ch]`,
-the [scene contract](PLUGIN_API.md#location-life-scene-contract-planned-l11) and
+the [scene contract](PLUGIN_API.md#location-life-scene-contract-l11l43) and
 [multiplayer prediction contract](PLUGIN_PLAN.md#multiplayer-prediction-and-recording).
 
 `BoatWorld.scene` is the seam: physics and presentation read that pointer, and rooms leave it NULL.

@@ -64,8 +64,8 @@ void boat_room_objective_event(BoatRoomObjective *o, uint64_t tick, const BoatNe
         snprintf(event->id, sizeof(event->id), "%s", o->source->marks.items[e->mark].id);
 }
 
-bool boat_room_objective_stage(BoatRoomObjective *o, const BoatRoomObjectiveSource *candidate,
-    BoatPluginDiagnostic *d)
+bool boat_room_objective_stage(
+    BoatRoomObjective *o, const BoatRoomObjectiveSource *candidate, BoatPluginDiagnostic *d)
 {
     const char *error = NULL;
     if (!o->source || !o->source->present)
@@ -183,9 +183,8 @@ static void apply_source(
         count = 0;
         for (unsigned slot = 0; slot < BOAT_FLEET_SLOTS; ++slot)
             if (o->present[slot]) {
-                events[count] = (BoatPluginEvent) {
-                    .tick = at, .sequence = ++sequence, .crew = slot + 1
-                };
+                events[count]
+                    = (BoatPluginEvent) { .tick = at, .sequence = ++sequence, .crew = slot + 1 };
                 snprintf(events[count++].kind, sizeof(events[0].kind), "crew.joined");
             }
         for (unsigned i = skip; i < kept; ++i) {
@@ -303,4 +302,56 @@ BoatNetRules boat_room_objective_rules(BoatRoomObjective *o)
         .state = on_state,
         .definition = on_definition,
     };
+}
+
+static bool same_source(const BoatRoomObjectiveSource *a, const BoatRoomObjectiveSource *b)
+{
+    return a->present == b->present && a->state_version == b->state_version
+        && a->migrates == b->migrates && a->source_size == b->source_size
+        && !memcmp(a->source, b->source, a->source_size);
+}
+
+void boat_room_reload_watch_init(BoatRoomReloadWatch *watch, const BoatRoomDefinition *room,
+    const BoatRoomObjectiveSource *source)
+{
+    memset(watch, 0, sizeof(*watch));
+    watch->seen = *source;
+    watch->definition = boat_room_definition_digest(room);
+}
+
+void boat_room_reload_offer(BoatRoomReloadWatch *watch, BoatRoomObjective *o, BoatNetServer *server,
+    const BoatRoomDefinition *definition, const BoatRoomObjectiveSource *candidate, FILE *out)
+{
+    uint64_t digest = boat_room_definition_digest(definition);
+    if (digest == watch->definition && same_source(candidate, &watch->seen))
+        return;
+    memcpy(&watch->seen, candidate, sizeof(watch->seen));
+    BoatPluginDiagnostic d;
+    if (digest != watch->definition) {
+        if (!boat_room_objective_stage_revision(o, server, definition, candidate, &d)) {
+            watch->announced = 0;
+            if (out) {
+                fprintf(out, "objective reload rejected: %s\n", d.message);
+                fflush(out);
+            }
+            return;
+        }
+        watch->definition = digest;
+        uint32_t next = server->stats.revision + 1;
+        if (out) {
+            if (!boat_net_server_players(server))
+                fprintf(out,
+                    "objective reload: marks changed; revision %u commits at once (the room is "
+                    "empty)\n",
+                    next);
+            else if (watch->announced != next)
+                fprintf(out,
+                    "objective reload: marks changed; revision %u waits for an empty room\n", next);
+            fflush(out);
+        }
+        watch->announced = next;
+    } else if (!boat_room_objective_stage(o, candidate, &d) && out) {
+        fprintf(out, "objective reload rejected: %s\n", d.message);
+        fflush(out);
+    }
 }
