@@ -8,7 +8,9 @@ parser.add_argument('--url', default='http://127.0.0.1:8000/')
 parser.add_argument('--build-dir', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--four-players', action='store_true', help='Fill the room with two native and two browser clients, then reject a fifth.')
-parser.add_argument('--mode', choices=['free', 'deathmatch', 'race'], default='free')
+parser.add_argument('--mode', choices=['free', 'deathmatch', 'race', 'hunt'], default='free',
+                    help='hunt: a free room on outer running the bundled proteus.outer-hunt objective.')
+parser.add_argument('--old-url', help='URL of a served OLD Wasm bundle; after the main run it must be rejected with the protocol version message.')
 parser.add_argument('--location', choices=['basin', 'outer'],
                     help='Room location override, e.g. outer for proteus.harbor-room.')
 parser.add_argument('--server-package', help='Bundled room ID or edited package directory for the local server.')
@@ -26,7 +28,11 @@ def port(kind):
 udp, ws = (port(socket.SOCK_DGRAM), port(socket.SOCK_STREAM))
 room_log = args.output / 'server.log'
 bot_log = args.output / 'bot.log'
-server_args = [str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', args.mode, '--location', args.location or ('river' if args.mode == 'race' else 'basin'), '--seconds', '300']
+hunt = args.mode == 'hunt'
+server_mode = 'free' if hunt else args.mode
+server_args = [str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', server_mode, '--location', args.location or ('outer' if hunt else 'river' if args.mode == 'race' else 'basin'), '--seconds', '300']
+if hunt and not args.server_package:
+    args.server_package = 'proteus.outer-hunt'
 if args.server_package:
     server_args += ['--package', args.server_package]
 server = subprocess.Popen(server_args, stdout=room_log.open('w'), stderr=subprocess.STDOUT)
@@ -202,6 +208,27 @@ try:
         assert not errors, errors
         if args.mode != 'race':
             assert any('resets: 2 completed' in line for line in logs), logs
+        if hunt:
+            # The native bot mirrors the objective HUD; a second crew row proves the browser
+            # joined the same hunt, and the server must have run the objective for both.
+            bot_text = bot_log.read_text()
+            assert 'boat_bot objective:' in bot_text and 'CREW 2' in bot_text, bot_text
+            assert 'objective tick' in room_log.read_text(), room_log.read_text()
+            page.screenshot(path=str(args.output / 'hunt-hud.png'))
+        if args.old_url:
+            # An old bundle speaks an older protocol: the room must refuse it and the page must say so.
+            old = b.new_page(viewport={'width': 960, 'height': 600})
+            old_logs = []
+            old.on('console', lambda message: old_logs.append(message.text))
+            old.goto(args.old_url)
+            old.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
+            old.click('#play')
+            old.wait_for_timeout(500)
+            join_room(old, old_logs, 'old-bundle.png')
+            old.wait_for_timeout(2000)
+            assert any('protocol version mismatch' in line for line in old_logs), old_logs
+            assert not any('Joined as slot' in line for line in old_logs), old_logs
+            old.close()
         b.close()
         print('web_multiplayer=ok', flush=True)
 finally:

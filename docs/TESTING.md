@@ -1328,6 +1328,91 @@ leaver replaced in its slot with a zero score, and a completed hunt restarting f
 the links settle, every client's mirrored HUD equals the authority's. It does not cover server tick
 cost, the web build or WebRTC.
 
+### Browser hunt case and old-bundle rejection
+
+`python3 tests/web/check_web_multiplayer.py --mode hunt` (opt-in; Playwright, Chrome, a served Wasm
+build and a WebRTC-enabled native build) starts a free `outer` room running `proteus.outer-hunt`,
+one native `boat_bot` and one browser player, runs the usual drive/reset/leave/rejoin sequence and
+then requires the bot's mirrored HUD to show `CREW 2` and the server to have printed objective
+rows. `--old-url URL` additionally opens a bundle built from an older commit (serve it on another
+port) and requires the page to report `protocol version mismatch` without joining. Commands are in
+the [browser guide](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h).
+
+### Server tick cost (manual, real time)
+
+Tick cost is wall time, so it is measured outside CTest by `tools/measure_room_tick.py`, which
+runs four `boat_bot` clients against a plain free room, the hunt and a deathmatch room and prints
+the server's own `service_ms_per_tick` line:
+
+```sh
+python3 tools/measure_room_tick.py --build-dir build --seconds 20 --repeats 3
+```
+
+Results are recorded in the [P5 plan](PLUGIN_P5_PLAN.md#p5h-measurements).
+
+### Manual play checks (P5)
+
+Both need a Wasm build or two native games; no check here is accepted until the user reports it.
+
+**Play check 2: one native and one browser player on a local WebRTC room.** Build once (C++
+compiler and OpenSSL needed; first configure fetches libdatachannel; the Wasm build needs the
+pinned Emscripten, see [WEB_BUILD.md](WEB_BUILD.md#build-and-deployment)):
+
+```sh
+cd <worktree>
+cmake -S . -B build-rtc -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_WEBRTC=ON
+cmake --build build-rtc --parallel --target boat_server boat_bot wake_velocity
+source ../emsdk/emsdk_env.sh
+emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build-web --target web --parallel
+```
+
+Then, in three terminals from the worktree root:
+
+```sh
+# 1. the room (ENet 24680 for native, WebRTC signalling 24682 for the browser)
+./build-rtc/boat_server --bind 127.0.0.1 --port 24680 --rtc-port 24682 --no-lan --mode free --location outer --package proteus.outer-hunt
+# 2. the browser build
+python3 -m http.server 8000 --directory build-web/site
+# 3. the native player
+./build-rtc/wake_velocity --connect 127.0.0.1:24680 --name native
+```
+
+In Chrome open `http://127.0.0.1:8000/`, press PLAY, choose MULTIPLAYER, edit the URL to
+`ws://127.0.0.1:24682` and CONNECT (do not use the default hosted server). Pass when: (1) both
+players are in the room and each sees the other boat; (2) both HUD panels list `CREW 1` and
+`CREW 2` and the same `HUNT` value, and the minimap shows five marks; (3) driving each boat into
+a mark raises only that crew's count on both screens within about a second; (4) when both crews
+have all five marks the hunt restarts and both counts return to 0; (5) closing the browser tab
+removes `CREW 2` from the native HUD and the server prints a crew-left row; (6) the server
+terminal shows no `faults` or errors (Ctrl+C prints the summary). Report any stutter, missing
+mark ring or HUD disagreement.
+
+**P5f moved-mark check: a mark moved in a hosted hunt reaches game clients as a revision.** The
+revision commits only when the room is empty, then the hunt restarts:
+
+```sh
+cmake --build build --parallel --target boat_server wake_velocity
+rm -rf build/hunt-copy && cp -R plugins/outer-hunt build/hunt-copy
+./build/boat_server --bind 127.0.0.1 --location outer --package build/hunt-copy --package-reload
+# second terminal
+./build/wake_velocity --connect 127.0.0.1:24680 --name me
+```
+
+Note where the UPPER BEND mark (the second ring) sits on the minimap, then edit the copy while
+connected and save:
+
+```sh
+sed -i '' 's/x = -350, z = 0/x = -150, z = 200/' build/hunt-copy/main.lua
+```
+
+The server should print `objective reload: marks changed; revision 2 waits for an empty room`
+and you stay connected with the old mark. Leave the game (menu, leave) and wait: the server prints
+`definition revision 2 committed ... (5 marks)` and `objective reload: revision 2 accepted
+(restart)`. Join again with the same command. Pass when the rejoined game shows the second mark
+at the new place (minimap and in the world), the HUD restarted at `HUNT 1`, and the game did not
+crash or show a stale ring at the old place. (Linux: use `sed -i` without `''`.)
+
 ## Authority recording checks
 
 `boat_room_record_objective` checks the complete objective wrapper codec, pending migration

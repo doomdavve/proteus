@@ -8,8 +8,9 @@ Open: the user's P5f moved-mark check, P5h four-player/impairment/browser qualif
 Play check 1 and the P5e live-reload check are accepted; no new human acceptance is inferred.
 Done when: two then four players hunt with authority-only Lua; join/reconnect HUD, safe revisions,
 recorded reconstruction, existing rooms and the closing specs all pass their gates.
-Next task: **P5h** (native four-crew HUD case implemented locally on `feat/plugin-p5h`; tick-cost
-measurement, web hunt case, old-bundle rejection and play check 2 remain), retaining the outstanding P5f human check as a separate open item.
+Next task: **P5h** (native four-crew HUD case, tick-cost measurement and the web hunt/old-bundle
+case are written locally on `feat/plugin-p5h`; the web case has not been run, and user play check 2
+and the P5f moved-mark check remain; steps in [TESTING.md](TESTING.md#manual-play-checks-p5)).
 The shelter hunt replaces the earlier co-op working-harbour proposal ([decisions](#decisions)).
 
 This plan owns P5's design, steps and gates. The
@@ -419,6 +420,18 @@ measured against the deathmatch baseline; mixed clients finish a hunt; an old br
 rejected with the version message.
 Gate: measurements recorded; **user play check 2** — one native and one browser player on a
 locally built WebRTC room.
+
+#### P5h measurements
+
+Server tick cost, 2026-11-14, Apple M1 Max (arm64) macOS, Debug, `python3 tools/measure_room_tick.py
+--build-dir build --seconds 20 --repeats 3` (four `boat_bot` clients; the server's own
+`service_ms_per_tick`, real time, outside CTest). Three runs each, ms per 120 Hz tick (budget
+8.33): free `outer` 0.127 / 0.144 / 0.160; hunt (Lua objective every 12 ticks) 0.307 / 0.295 /
+0.286; deathmatch 0.292 / 0.317 / 0.292. The hunt costs about 0.15 ms per tick more than plain
+free play and the same as the deathmatch baseline (about 3.5% of the tick budget). Debug build only;
+no Release, other platform or WebRTC clients measured. Browser hunt case and old-bundle
+rejection: [written, not run](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h) (no Emscripten,
+Playwright or WebRTC build available in that session).
 
 ### P5i: closing step
 
