@@ -724,6 +724,60 @@ static int revision_refused(void)
     return 0;
 }
 
+// P5h: the waiting line is printed once per pending revision, not at every offer of the file.
+static unsigned lines_with(FILE *f, const char *text)
+{
+    char line[256];
+    unsigned n = 0;
+    rewind(f);
+    while (fgets(line, sizeof(line), f))
+        n += strstr(line, text) != NULL;
+    return n;
+}
+
+static int revision_waits_once(void)
+{
+    static BoatRoomObjective o;
+    static BoatRoomDefinition room;
+    static BoatRoomObjectiveSource candidate;
+    static BoatRoomReloadWatch watch;
+    CHECK(start_room(&o));
+    FILE *out = tmpfile();
+    CHECK(out);
+    boat_room_reload_watch_init(&watch, &hunt_room, &hunt);
+    // The same file re-offered changes nothing and prints nothing.
+    boat_room_reload_offer(&watch, &o, &server, &hunt_room, &hunt, out);
+    CHECK(!lines_with(out, "objective reload"));
+    // Edits while the room is occupied: one line for revision 2, however often they arrive.
+    const float shifts[] = { 100, 200, 100, 300, 100 };
+    for (unsigned i = 0; i < 5; ++i) {
+        moved(&room, &candidate, shifts[i]);
+        boat_room_reload_offer(&watch, &o, &server, &room, &candidate, out);
+        step(.2);
+    }
+    CHECK(boat_net_server_revision_pending(&server) && server.stats.revision == 1);
+    CHECK(lines_with(out, "revision 2 waits for an empty room") == 1);
+    CHECK(lines_with(out, "waits for an empty room") == 1);
+    // The commit moves on; the next pending revision announces itself once more.
+    boat_net_client_leave(&clients[0]);
+    boat_net_client_leave(&clients[1]);
+    step(.5);
+    CHECK(server.stats.revision == 2);
+    join(0, "three");
+    step(1);
+    CHECK(boat_net_server_players(&server) == 1);
+    for (unsigned i = 0; i < 3; ++i) {
+        moved(&room, &candidate, 400 + 10 * (float)i);
+        boat_room_reload_offer(&watch, &o, &server, &room, &candidate, out);
+        step(.2);
+    }
+    CHECK(lines_with(out, "revision 3 waits for an empty room") == 1);
+    CHECK(lines_with(out, "rejected") == 0);
+    fclose(out);
+    boat_net_memory_destroy(network);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(package),
     TEST_CASE(adapter),
@@ -736,6 +790,7 @@ static const TestCase cases[] = {
     TEST_CASE(reload_broken),
     TEST_CASE(reload_marks_changed),
     TEST_CASE(reload_reaches_clients),
+    TEST_CASE(revision_waits_once),
     TEST_CASE(revision_marks),
     TEST_CASE(revision_refused),
 };
