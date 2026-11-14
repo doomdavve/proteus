@@ -96,6 +96,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     src/room/boat_lockdown.c)
   target_include_directories(validate_boat_lockdown PRIVATE ${PROJECT_SOURCE_DIR}/src)
   target_compile_options(validate_boat_lockdown PRIVATE ${PROTEUS_WARNINGS})
+  target_link_libraries(validate_boat_lockdown PRIVATE Threads::Threads)
   add_test(NAME boat_lockdown COMMAND validate_boat_lockdown)
   set_tests_properties(boat_lockdown PROPERTIES LABELS "core;cpu"
     PASS_REGULAR_EXPRESSION "validate_boat_lockdown=ok" TIMEOUT 60)

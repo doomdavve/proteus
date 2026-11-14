@@ -285,6 +285,18 @@ be rejected; use the release checkout's bot instead. Browser testing must reach 
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
 
+## Status and verification — 2026-11-14 (v0.0.30, credential unit and second soak finding)
+
+**v0.0.30** (source `43666cb`, hosting pin `c9302eb`) is deployed with `--lockdown log`; protocol 14 /
+physics 9. The relay password was rotated and the room now reads its ICE server URL from
+`/etc/wake-velocity/ice-server` (root, 0600) through `LoadCredential=` and `--ice-server-file`, so it is
+absent from `ps` and `/proc/<pid>/cmdline` (H1; `davve-srv`). The soak was not clean: the first
+browser join after an empty room logged two `openat` calls, traced with `strace -k` to glibc sizing its
+malloc arena limit from the CPU count once WebRTC had started enough threads. The next release sets the
+limit before locking; a scratch build ran `--lockdown kill` through repeated hosted and Pages browser
+joins and a native join with no `SIGSYS` and no audit records. Not checked: a relay join from outside the
+LAN and long soaks. The live room stays in `log` mode until that release and a clean soak.
+
 ## Status and verification — 2026-11-14 (v0.0.29 and lockdown soak)
 
 **v0.0.29** (source `6ca3954`, hosting pin `a603dcd`) is deployed with `--lockdown log`: room and
