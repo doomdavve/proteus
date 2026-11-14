@@ -1,21 +1,15 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a-P5f implemented on `feat/plugin-p5`: the hunt's objective runs on
-`boat_server`'s authority, clients receive its marks and HUD over protocol v13, the game
-draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM),
-`boat_server --package-reload` reloads the objective source on a running room, and protocol v14
-carries definition revisions (marks, scene, course, rules) in every room mode, committing at
-round boundaries or in an empty free room. Play check 1 and the P5e reload check are accepted;
-the user's moved-mark check (P5f) is owed; next: P5g. P5a–P5f are in PR #175.** Scheduled by the user "as soon as possible"
-(2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
-room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
-possible ([decisions](#decisions)). Done when: two players (then four) play the
-`proteus.outer-hunt` package in a hosted room with Lua only on the authority, late joiners and
-reconnects see the same HUD, the authority can reload its source and commit definition revisions
-at safe boundaries, a session is recorded and reconstructed with its revision, existing
-free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: the user's live-reload check of [P5e](#p5e-authority-only-reload), then
-[P5g](#p5g-recording-and-reconstruction).
+Status, 2026-11-14: **P5a–P5f are merged; P5g recording/reconstruction is locally implemented
+on `feat/plugin-p5g`, following Astra's contract review.** P5g verification is recorded below.
+Completed task: P5g's bounded recording codec, authority capture, headless playback/seek and
+optional diagnostic Lua re-execution; [contract](SESSION_RECORDING.md).
+Open: the user's P5f moved-mark check, P5h four-player/impairment/browser qualification, P5i closing.
+Play check 1 and the P5e live-reload check are accepted; no new human acceptance is inferred.
+Done when: two then four players hunt with authority-only Lua; join/reconnect HUD, safe revisions,
+recorded reconstruction, existing rooms and the closing specs all pass their gates.
+Next task: **P5h**, retaining the outstanding P5f human check as a separate open item.
+The shelter hunt replaces the earlier co-op working-harbour proposal ([decisions](#decisions)).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -136,12 +130,14 @@ v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the protocol docume
 
 ### Recording and reconstruction
 
-`boat_server --record PATH` writes an authority-side session file: a header with the content
-identity (package id, source hash, revision, protocol, physics, tick rate), the room definition
-bytes, an initial keyframe (fleet checkpoint, objective checkpoint), then per tick the integrated
-slot inputs, joins/leaves and each committed objective batch, with a keyframe every 10 s and at
-every revision. Viewing replays the fleet natively and applies the recorded batches; no Lua runs
-by default, and a diagnostic mode re-runs the pinned source and compares.
+`boat_server --record PATH` captures selected integrated controls, ordered native mutations,
+objective callback checkpoints, source/definition revisions and mirrored HUD, with initial,
+ten-second and accepted-revision keyframes. Headless reconstruction runs fleet physics and
+checks every step hash before applying recorded native rule effects. Ordinary playback applies
+objective results without Lua; diagnostic mode re-executes the pinned callback preconditions.
+Seek reconstructs from a preceding keyframe. The implemented [recording contract](SESSION_RECORDING.md)
+owns format version 1, source provenance, error behavior and scope: playback rather than a
+resumable authority, visual viewer or room save.
 
 ### Hosting and browsers
 
@@ -375,12 +371,40 @@ modes); the browser build was not exercised. Next task: [P5g](#p5g-recording-and
 ### P5g: recording and reconstruction
 
 `--record PATH`, the session file and a reconstruction validator mode with seek.
-Files: new `src/boat_session_record.[ch]` (codec, no files), `src/room/boat_server.c`,
+Files: `src/room/boat_session_record.[ch]` and `boat_room_record_objective.[ch]` (codecs, no files),
+`src/room/boat_server.c`,
 `tools/validate_boat_session_record.c`.
 Tests: record a two-bot hunt with a reload and a reconnect; reconstruct every keyframe and compare
 fleet hash, objective digest and HUD; seek; a truncated file fails cleanly; no Lua by default;
 the diagnostic re-run matches.
 Gate: bit-identical reconstruction on the recording build.
+
+**P5g implementation, 2026-11-14 (`feat/plugin-p5g`).** Astra reviewed the next step and
+identified selected-input ordering, non-input fleet mutations, complete objective wrappers,
+independent revision counters and embedded source provenance as necessary additions. The
+implementation records those values in a versioned bounded stream. Every native fleet step's
+hash is checked before rule mutation checkpoints; sequential keyframes compare the preceding
+reconstruction rather than replacing a divergent step. Before/after objective and definition
+callbacks preserve pending migration/restart inputs; diagnostic mode compares committed results
+and commands without comparing operational callback costs. Initial, periodic and accepted
+source/definition revision keyframes support headless seek. Source bytes and effective metadata
+are embedded; the original manifest file is not required. `--record` refuses existing paths,
+and write/close errors fail the server; the reader rejects an incomplete stream.
+
+Verification, 2026-11-14, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
+`cmake --build build -j8` passed without project compiler warnings; `ctest --preset full`
+passed all 550 enabled tests in 43.44 s (13 retired experiments disabled). The 11 recording
+cases cover the hunt, all room modes, keyframe continuation, migration/revision/quarantine,
+malformed streams, sink failure and checksum-valid input tampering. The complete objective
+codec and real ENet recording/CLI process smoke also pass. An earlier full run hit the existing
+`wake_velocity_bridge` asynchronous `plugin.staging` assertion; its isolated rerun and final
+full run passed, with no bridge code changed. Local documentation file links and
+`git diff --check` passed. GPU tests, Windows/Linux/browser and cross-platform bit identity
+were not exercised. No visual behavior changed; no audiovisual or human multiplayer acceptance
+is claimed. Limits: same-build bit identity; headless playback
+only, no resumable authority/room save; seek validates and linearly scans the complete file;
+file I/O is synchronous and disk-cost qualification remains open. Next: P5h plus the separately
+owed P5f human moved-mark check.
 
 ### P5h: four players, impairment and browsers
 

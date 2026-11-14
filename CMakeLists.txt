@@ -148,6 +148,9 @@ set(PROTEUS_SLOW_TESTS
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_lighting_qualification_contract
+  boat_room_record_objective boat_session_record_process
+  boat_session_record.hunt boat_session_record.playback boat_session_record.diagnostic
+  boat_session_record.seek
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery ambient_river ambient_outer

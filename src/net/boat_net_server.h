@@ -80,6 +80,24 @@ typedef struct {
     bool (*completion)(void *context, BoatNetCommitResult *result);
 } BoatNetRules;
 
+// P5g: read-only authority observations, in simulation order. No files or Lua in net.
+struct BoatNetServer;
+typedef enum {
+    BOAT_NET_RECORD_INPUT, // Immediately before fleet_step; INPUTS are the integrated controls.
+    BOAT_NET_RECORD_RESULT, // Immediately after fleet_step, before native rules mutate it.
+    BOAT_NET_RECORD_BEFORE_OBJECTIVE,
+    BOAT_NET_RECORD_AFTER_OBJECTIVE,
+    BOAT_NET_RECORD_BEFORE_DEFINITION,
+    BOAT_NET_RECORD_AFTER_DEFINITION,
+    BOAT_NET_RECORD_BOUNDARY, // Native rules / definition commit completed, or between ticks.
+} BoatNetRecordPhase;
+typedef struct {
+    void *context;
+    void (*observe)(void *context, const struct BoatNetServer *server, BoatNetRecordPhase phase,
+        const BoatInput *inputs);
+    void (*event)(void *context, uint64_t tick, const BoatNetRuleEvent *event);
+} BoatNetRecord;
+
 typedef struct {
     const char *token; // Room token every Hello must match exactly; "" for none.
     bool waves; // Room water: gentle ambient waves or calm.
@@ -92,6 +110,7 @@ typedef struct {
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
     BoatNetRules rules; // Zero for none.
+    BoatNetRecord record; // Optional authority recorder; hosted rooms only.
     // AR6: a private session's world and spawn; its host advances it with boat_net_server_grant()
     // only. Disabled (zero) for every hosted room.
     BoatNetPrivateSession local;
@@ -156,7 +175,7 @@ typedef struct {
     unsigned max_backlog, max_messages_per_service;
 } BoatNetServerStats;
 
-typedef struct {
+typedef struct BoatNetServer {
     BoatNetTransport transport;
     BoatNetServerConfig config;
     char token[BOAT_NET_TOKEN_BYTES + 1];

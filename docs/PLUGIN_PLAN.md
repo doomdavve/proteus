@@ -31,8 +31,10 @@ Completed task: **P4.9 browser objective isolation**, following
 **M2 boat appearance is implemented; next marina task: [M3 authored routes and docking](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
-Authority callbacks, commands and session recordings remain P5 work after it; **P5 is the next plugin task, scheduled by the user 2026-11-07 (previously held 2026-11-01)**, owned by the
-[P5 plan](PLUGIN_P5_PLAN.md); the round-boundary revisions (now planned as protocol v14) are part of its scope. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
+The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
+objectives and revisions (P5a–P5f, merged), P5g headless session recording/reconstruction
+(locally implemented), and the next task, P5h four-player/impairment/browser qualification.
+Round-boundary revisions use protocol v14. Client objective commands remain deferred. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
 are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
@@ -444,6 +446,12 @@ allowlist protects engine capabilities but is not an OS security boundary agains
 interpreter/native memory bug.
 
 ## Multiplayer, prediction and recording
+
+The original proposal below is historical design direction. P5a–P5f implement authority
+objectives and definition revisions; P5g adds [headless session recordings](SESSION_RECORDING.md).
+The [P5 owner](PLUGIN_P5_PLAN.md) supersedes the matching-preinstalled-package proposal:
+clients receive validated data and never run room Lua. Remaining command/prediction extensions
+retain their separate gates.
 
 The proposed [room-content loading and distribution plan](ROOM_CONTENT_PLAN.md) owns the
 broader path from preinstalled packages to downloaded maps/scenarios. P5 supplies the shared
