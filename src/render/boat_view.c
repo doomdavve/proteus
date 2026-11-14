@@ -872,9 +872,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     }
     if (world->definition->mapped) {
         WaterfrontTrafficFrame traffic;
-        waterfront_traffic_evaluate_routes(
-            view->scene && view->scene->traffic_present ? &view->scene->traffic : NULL,
-            world->water, time, &traffic);
+        waterfront_traffic_evaluate_scene(view->scene, world->water, time, &traffic);
         // Wakes and gulls share the frame's unlit tint; navigation lamps keep their own colour.
         renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &traffic);

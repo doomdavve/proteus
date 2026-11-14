@@ -7,7 +7,7 @@ Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traf
 [protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
 Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
 Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
-Next task: M4 O2 harbor/traffic frames draw the vessel from its service (branch `feat/marina-m4`); O1a ownership core and O1b scene data/validation are done locally. Decisions are in the M4 section.
+Next task: M4 O3 Lua decoder, PSTB/room wire and protocol bump, and lifting the one-path survey cap (branch `feat/marina-m4`); O1a ownership, O1b scene data and O2 frames/contacts are done locally. Decisions are in the M4 section.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -37,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a/O1b local (core ownership, scene data); O2 next |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a/O1b/O2 local (ownership, scene data, frames and contacts); O3 next |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
@@ -743,7 +743,18 @@ ownership, berth-pose binding and reservations; `BoatSceneDefinition` gains empt
 4 vessels and 8 one-shot services, validated for missing IDs, static-hull berths, hull fit, pose
 binding, one service per route, resident exclusivity and berth/vessel window overlap.
 Tests `boat_service` and `boat_scene_service` pass; the full CTest run passed 561/561. The
-Lua decoder, wire, frames, route cap above one path and renderers are not yet connected.
+Lua decoder, wire and route cap above one path are not yet connected.
+
+O2 status, 2026-11-15 (macOS Debug, local): `src/core/waterfront_service.[ch]` is the single hull
+evaluation. The harbor frame gives each static (non-empty) berth hull a compact slot, then each
+vessel a slot that keeps its index while absent (`visible` false), with ropes only while moored.
+Traffic frames hide a serviced route actor (no mesh, lights or wake); contacts and camera
+exclusion use the same service hull, naming the route actor. Moored and travelling hulls both use
+`boat_water_pose`, so the handoff has no wave pop by construction (test: ≤5 cm across it). Test
+`waterfront_service` checks exact ticks around every handoff; the full run passed 571/571.
+Limits: a serviced vessel has no visual wake yet; no CPU/GPU frame has been rendered because
+no plugin can author a service until O3; the harbor-view model cache path is unchanged and
+untested with a service.
 
 Acceptance:
 

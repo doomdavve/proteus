@@ -1,5 +1,7 @@
 #include "core/waterfront_harbor.h"
+
 #include "core/waterfront_outer.h"
+#include "core/waterfront_service.h"
 
 #include "raylib.h"
 #include "raymath.h"
@@ -11,19 +13,19 @@
 // The central basin axis and the existing launch's X=12 route remain open.
 static const WaterfrontBerth berths[WATERFRONT_HARBOR_BOATS] = {
     { "skiff", BOAT_MODEL_SKIFF, BOAT_SCENE_BERTH_SKIFF, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 167 }, -PI / 2, { 0 } },
+        { -13, 0, 167 }, -PI / 2, { 0 }, false },
     { "runabout", BOAT_MODEL_RUNABOUT, BOAT_SCENE_BERTH_RUNABOUT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 173 }, -PI / 2, { 0 } },
+        { -13, 0, 173 }, -PI / 2, { 0 }, false },
     { "sailboat", BOAT_MODEL_SAILBOAT, BOAT_SCENE_BERTH_SAILBOAT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 179 }, -PI / 2, { 0 } },
+        { -13, 0, 179 }, -PI / 2, { 0 }, false },
     { "cruiser", BOAT_MODEL_CRUISER, BOAT_SCENE_BERTH_CRUISER, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 185 }, -PI / 2, { 0 } },
+        { -13, 0, 185 }, -PI / 2, { 0 }, false },
     { "speedboat", BOAT_MODEL_SPEEDBOAT, BOAT_SCENE_BERTH_SPEEDBOAT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 191 }, -PI / 2, { 0 } },
+        { -13, 0, 191 }, -PI / 2, { 0 }, false },
     { "sailboat_7m", BOAT_MODEL_SAILBOAT, BOAT_SCENE_BERTH_SAILBOAT_7M, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 197 }, -PI / 2, { 0 } },
+        { -13, 0, 197 }, -PI / 2, { 0 }, false },
     { "workboat", BOAT_MODEL_WORKBOAT, BOAT_SCENE_BERTH_WORKBOAT, BOAT_SCENE_MOORING_QUAY,
-        { 44, 0, 35 }, -.10f, { 0 } },
+        { 44, 0, 35 }, -.10f, { 0 }, false },
 };
 static const Vector3 dock_center = { -20, 0, 182 };
 // The user asked for a Stena Line ferry "docked right across the Eriksbergs crane" (A3.5e): an
@@ -60,7 +62,8 @@ WaterfrontBerth waterfront_harbor_berth_at(const BoatSceneDefinition *scene, uns
             .recipe = source->recipe,
             .mooring = source->mooring,
             .position = { -source->x, 0, source->z },
-            .heading = source->heading };
+            .heading = source->heading,
+            .empty = source->empty };
         out.appearance = source->appearance;
         memcpy(out.id, source->id, sizeof(out.id));
         return out;
@@ -422,6 +425,51 @@ static void evaluate_modules(const BoatSceneDefinition *scene, BoatWater water, 
     }
 }
 
+// Ropes from a hull's rail to the nearest authored (or compiled) pontoon/quay, for a hull at POSE.
+static void moor_hull(const BoatSceneDefinition *scene, bool authored, bool authored_modules,
+    unsigned compiled, float quay_lift, const WaterfrontBerth *berth, const BoatModelSpec *spec,
+    Transform3D pose, WaterfrontHarborFrame *frame)
+{
+    for (int end = -1; end <= 1; end += 2) {
+        Vector3 attachment = waterfront_harbor_attachment(pose,
+            (Vector3) { spec->beam * .39f, spec->freeboard + .10f, end * spec->length * .24f });
+        Vector3 anchor;
+        if (!authored_modules && !authored && compiled < 6) {
+            anchor = waterfront_harbor_attachment(frame->pontoon,
+                end > 0 ? (Vector3) { 1.05f, 1.04f, -18 + (int)compiled * 6 }
+                        : (Vector3) { 7.8f, 1.04f, -12 + ((int)compiled / 2) * 12 });
+        } else if (!authored_modules && !authored) {
+            float z = 35 + end * 5;
+            anchor = (Vector3) { 47.27f - .099f * (z - 30), 4.02f + quay_lift, z };
+        } else if (berth->mooring == BOAT_SCENE_MOORING_PONTOON) {
+            if (authored_modules) {
+                int pier = nearest_pontoon(scene, berth->position);
+                if (pier < 0)
+                    continue;
+                WaterfrontModuleSpec ps = (WaterfrontModuleSpec) { scene->modules[pier].length,
+                    scene->modules[pier].width, scene->modules[pier].deck_height };
+                Transform3D pose = frame->modules[pier].pose;
+                Vector3 local = Vector3Transform(Vector3Subtract(berth->position, pose.position),
+                    MatrixInvert(MatrixRotateXYZ(pose.rotation)));
+                float reach = fmaxf(0, ps.length * .5f - .2f);
+                float deck = pose.scale.y * .5f;
+                pose.scale = (Vector3) { 1, 1, 1 };
+                anchor = waterfront_harbor_attachment(pose,
+                    (Vector3) { local.x < 0 ? -ps.beam * .5f : ps.beam * .5f, deck,
+                        Clamp(local.z + end * 2, -reach, reach) });
+            } else {
+                float reach = 37 * .5f - 1;
+                float local = Clamp(berth->position.z - dock_center.z + end * 2, -reach, reach);
+                anchor = waterfront_harbor_attachment(
+                    frame->pontoon, (Vector3) { 1.05f, 1.04f, local });
+            }
+        } else {
+            continue;
+        }
+        mooring(frame, attachment, anchor);
+    }
+}
+
 void waterfront_harbor_evaluate_scene(const BoatSceneDefinition *scene, BoatWater water,
     double time, float (*ground)(float x, float z), WaterfrontHarborFrame *frame)
 {
@@ -457,53 +505,48 @@ void waterfront_harbor_evaluate_scene(const BoatSceneDefinition *scene, BoatWate
         }
     } else
         evaluate_modules(scene, water, time, ground, frame);
-    frame->berth_count = (int)count;
+    // Hull slots: static (non-empty) berths in order, then M4 vessels. A vessel keeps its slot
+    // while absent, so renderer models stay indexed consistently; VISIBLE says whether to draw.
+    int slot = 0;
     for (unsigned i = 0; i < count; ++i) {
         WaterfrontBerth berth = waterfront_harbor_berth_at(scene, i);
+        if (berth.empty)
+            continue;
         BoatModelSpec spec = waterfront_harbor_berth_spec(&berth);
-        frame->recipes[i] = berth.recipe;
-        frame->specs[i] = spec;
-        frame->boats[i]
+        frame->recipes[slot] = berth.recipe;
+        frame->specs[slot] = spec;
+        frame->visible[slot] = true;
+        frame->boats[slot]
             = boat_water_pose(water, time, berth.position, berth.heading, spec.length, spec.beam);
-        for (int end = -1; end <= 1; end += 2) {
-            Vector3 attachment = waterfront_harbor_attachment(frame->boats[i],
-                (Vector3) { spec.beam * .39f, spec.freeboard + .10f, end * spec.length * .24f });
-            Vector3 anchor;
-            if (!authored_modules && !authored && i < 6) {
-                anchor = waterfront_harbor_attachment(frame->pontoon,
-                    end > 0 ? (Vector3) { 1.05f, 1.04f, -18 + (int)i * 6 }
-                            : (Vector3) { 7.8f, 1.04f, -12 + ((int)i / 2) * 12 });
-            } else if (!authored_modules && !authored) {
-                float z = 35 + end * 5;
-                anchor = (Vector3) { 47.27f - .099f * (z - 30), 4.02f + quay_lift, z };
-            } else if (berth.mooring == BOAT_SCENE_MOORING_PONTOON) {
-                if (authored_modules) {
-                    int pier = nearest_pontoon(scene, berth.position);
-                    if (pier < 0)
-                        continue;
-                    WaterfrontModuleSpec ps = (WaterfrontModuleSpec) { scene->modules[pier].length,
-                        scene->modules[pier].width, scene->modules[pier].deck_height };
-                    Transform3D pose = frame->modules[pier].pose;
-                    Vector3 local = Vector3Transform(Vector3Subtract(berth.position, pose.position),
-                        MatrixInvert(MatrixRotateXYZ(pose.rotation)));
-                    float reach = fmaxf(0, ps.length * .5f - .2f);
-                    float deck = pose.scale.y * .5f;
-                    pose.scale = (Vector3) { 1, 1, 1 };
-                    anchor = waterfront_harbor_attachment(pose,
-                        (Vector3) { local.x < 0 ? -ps.beam * .5f : ps.beam * .5f, deck,
-                            Clamp(local.z + end * 2, -reach, reach) });
-                } else {
-                    float reach = 37 * .5f - 1;
-                    float local = Clamp(berth.position.z - dock_center.z + end * 2, -reach, reach);
-                    anchor = waterfront_harbor_attachment(
-                        frame->pontoon, (Vector3) { 1.05f, 1.04f, local });
-                }
-            } else {
-                continue;
-            }
-            mooring(frame, attachment, anchor);
+        moor_hull(scene, authored, authored_modules, i, quay_lift, &berth, &spec,
+            frame->boats[slot], frame);
+        ++slot;
+    }
+    for (unsigned v = 0;
+        scene && scene->services_present && v < scene->vessel_count && slot < BOAT_SCENE_BERTHS;
+        ++v, ++slot) {
+        const BoatSceneVessel *vessel = &scene->vessels[v];
+        frame->recipes[slot] = vessel->recipe;
+        frame->specs[slot] = boat_scene_vessel_resolve(vessel);
+        WaterfrontServiceHull hull;
+        if (!waterfront_service_hull(scene, v, time, &hull)) {
+            frame->boats[slot] = (Transform3D) { .scale = { 1, 1, 1 } };
+            continue;
+        }
+        frame->visible[slot] = true;
+        frame->boats[slot] = boat_water_pose(
+            water, time, hull.position, hull.heading, hull.spec.length, hull.spec.beam);
+        if (hull.owner == BOAT_OWNER_MOORED) {
+            const BoatSceneBerth *source
+                = boat_scene_find_berth(scene, scene->services[hull.service].berth);
+            WaterfrontBerth berth = { .mooring = source->mooring,
+                .position = { -source->x, 0, source->z },
+                .heading = source->heading };
+            moor_hull(scene, authored, authored_modules, BOAT_SCENE_BERTHS, quay_lift, &berth,
+                &hull.spec, frame->boats[slot], frame);
         }
     }
+    frame->berth_count = slot;
     // The ferry rides the water averaged over its length. Bow, stern and two spring lines run
     // from its quay-side deck edge to bollards on the quay, set on the ground there.
     frame->ferry
@@ -661,6 +704,8 @@ bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Ve
     unsigned count = waterfront_harbor_berth_count(scene);
     for (unsigned i = 0; i < count && !hit; ++i) {
         WaterfrontBerth berth = waterfront_harbor_berth_at(scene, i);
+        if (berth.empty)
+            continue;
         BoatModelSpec s = waterfront_harbor_berth_spec(&berth);
         hit = obstacle(p, (Vector2) { berth.position.x, berth.position.z },
             (Vector2) { s.beam * .5f + .45f, s.length * .5f + .9f }, berth.heading, clearance,
@@ -695,6 +740,8 @@ bool waterfront_harbor_camera_clear_scene(
     unsigned count = waterfront_harbor_berth_count(scene);
     for (unsigned i = 0; i < count; ++i) {
         WaterfrontBerth berth = waterfront_harbor_berth_at(scene, i);
+        if (berth.empty)
+            continue;
         BoatModelSpec s = waterfront_harbor_berth_spec(&berth);
         float top = fmaxf(s.mast_height, s.freeboard + s.cabin_height + .8f);
         if (p.y < top + clearance && p.y > -s.draft - clearance

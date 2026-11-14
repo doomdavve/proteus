@@ -183,6 +183,8 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
     }
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
     for (int i = 0; i < frame->vessel_count; ++i) {
+        if (frame->hidden[i])
+            continue;
         const WaterfrontVesselState *vessel = &frame->vessels[i];
         renderer3d_draw_mesh(r, waterfront_traffic_mesh_slot(frame->mesh[i]), vessel->pose);
         float size = i >= 3 ? .32f : .18f;
@@ -216,8 +218,9 @@ bool waterfront_draw_harbor(
     }
     renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
     for (int i = 0; i < frame->berth_count; ++i)
-        renderer3d_draw_mesh(
-            r, waterfront_harbor_models_mesh(models, (unsigned)i), frame->boats[i]);
+        if (frame->visible[i])
+            renderer3d_draw_mesh(
+                r, waterfront_harbor_models_mesh(models, (unsigned)i), frame->boats[i]);
     for (int i = 0; i < frame->line_count; ++i)
         renderer3d_draw_box(r, frame->lines[i], (Color) { 169, 153, 113, 255 });
     return true;

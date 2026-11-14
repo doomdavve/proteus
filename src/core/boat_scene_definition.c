@@ -196,6 +196,12 @@ static bool validate_services(const BoatSceneDefinition *scene, BoatSceneDiagnos
         if (!check_hull(&hull, base, d))
             return false;
     }
+    unsigned hulls = scene->vessel_count;
+    for (unsigned i = 0; i < scene->berth_count && i < BOAT_SCENE_BERTHS; ++i)
+        hulls += !scene->berths[i].empty;
+    if (hulls > BOAT_SCENE_BERTHS)
+        return fail(d, "scene.marina.vessels",
+            "plus static berth hulls exceed the 32-hull drawing capacity");
     uint64_t begin[BOAT_SCENE_SERVICES], end[BOAT_SCENE_SERVICES];
     int actor[BOAT_SCENE_SERVICES];
     for (unsigned i = 0; i < scene->service_count; ++i) {
