@@ -98,3 +98,9 @@ target_link_libraries(validate_traffic PRIVATE proteus_boat_session)
 target_compile_options(validate_traffic PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME harbor_traffic COMMAND validate_traffic)
+# Marina M4: vessel ownership (moored/travelling/absent) at exact ticks, berth pose checks.
+add_executable(validate_boat_service tests/core/validate_boat_service.c)
+target_link_libraries(validate_boat_service PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_service PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_service COMMAND validate_boat_service)
+set_tests_properties(boat_service PROPERTIES LABELS "core;cpu;quick")
