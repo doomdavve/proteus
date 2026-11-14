@@ -1048,7 +1048,7 @@ target) is the one exemption.
 
 `tests/fuzz/` holds libFuzzer-style harnesses (`LLVMFuzzerTestOneInput`): `fuzz_net_decode` (message,
 checkpoint and LAN codecs, with a decode-encode-decode round trip), `fuzz_net_server` (a joined client
-sending arbitrary chunks to a room, on the virtual clock) and `fuzz_session_record` (one recording
+sending arbitrary chunks to a room, on the virtual clock) and `fuzz_net_sdp` (the SDP offer filter) and `fuzz_session_record` (one recording
 frame). Each links `fuzz_driver.c`, which replays its seeds and runs a fixed, seeded number of
 mutations, so the harnesses are ordinary deterministic tests (labelled `fuzz`, and in the routine CI
 lane). `fuzz_net_server` prints what it reached and fails if it stops reaching spawn and resync
