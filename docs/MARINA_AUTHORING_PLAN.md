@@ -8,11 +8,10 @@ It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broa
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
 Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. M3 is
-underway: isolated common-period and straight-leg motion helpers are implemented but not connected
-to routes. Next task: define the bounded combined-timetable clearance proof and integrate motion
-with authored routes. Verification
-evidence and limitations are recorded
-below; agreeing to features is not visual or gameplay acceptance of an implementation.
+underway: one bounded authored open route can approach a platform, dwell and depart. Open work:
+looping waypoint authoring, broader capacity, Apply/Undo, visual and platform qualification.
+Done when M3's acceptance checks below pass and the resulting contract is recorded in the API.
+Next task: qualify the example and finish the remaining route and clearance gates.
 
 ## Agreed result
 
@@ -320,68 +319,27 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 
 ## M3: authored routes and docking motion
 
-First groundwork, 2026-11-14: `boat_schedule_common_period` computes the exact least common
-multiple of positive tick periods, rejecting overflow and caller-budget overruns without changing
-the result. A separate straight-leg primitive evaluates explicit ticks using smoothstep, with
-analytic speed and acceleration bounds and exact terminal poses. M3 remains incomplete: the existing
-floating-point traffic schedules and fixed 4,160-second sampled horizon have not been converted
-to a proven bounded combined timetable. The next implementation must define tick conversion,
-the validation budget and conservative swept envelopes before connecting the helper. Open routes,
-docking, complete authoring integration, Apply/Undo and visual qualification remain outstanding.
-An unintegrated pairwise straight-leg clearance helper samples synchronized tick positions and
-inflates enclosing circles by a half-tick maximum relative travel bound. It may conservatively
-reject safe passages; the numerical rounding margins and its extension to turns, scenery and
-periodic schedules remain to be justified before it can serve as a scene proof. On 2026-11-14,
-macOS/Apple Silicon Debug, the build and focused leg, clearance, schedule and core-boundary tests
-passed. No motion or user acceptance is claimed.
-An unintegrated circular-arc primitive now evaluates tick-addressed left and right turns with
-bounded start phase, signed sweep and conservative tangential-plus-centripetal acceleration.
-Focused arc, leg, clearance and core-boundary tests passed on macOS/Apple Silicon Debug
-2026-11-14. The path motion and clearance checks below build on those primitives.
-An internal-only straight-leg actor now evaluates through the shared traffic motion owner; it is
-not authorable, and room and plugin wire codecs explicitly reject this single-leg shape. Its native
-route and wire rejection tests passed. Open-path serialization and scene clearance must be completed together
-before exposing it to packages. The existing traffic rendering and motion still require a visual
-demo when the authoring path is connected. On macOS/Apple Silicon Debug 2026-11-14, the build
-and full CTest preset passed 561 enabled tests (13 disabled). After a tick-rounding correction,
-the focused traffic validator passed again.
-The internal traffic owner also supports a provisional four-piece open path of tangent line and
-arc pieces with tick-addressed stops. Zero-dwell joins now preserve speed through turns; a
-positive dwell stops the craft. Focused tick-by-tick speed, acceleration and join checks passed
-on macOS Debug 2026-11-14. The full build passed
-with the existing 1 MiB plugin-owner cap, and focused traffic and wire-rejection tests passed.
-On the full preset 559 tests passed and two boundary checks initially rejected `nextafter`;
-after adding that standard math function to the boundary allowlist, both checks passed on rerun.
-A later arc-yaw correction passed the focused traffic and boundary checks. This path remains
-unavailable to packages; broader capacity and complete scene clearance
-are unfinished. Location staging explicitly rejects both internal shapes, including direct
-in-memory candidates; focused free/voyage regression tests passed on macOS Debug 2026-11-14.
-Before that rejection, internal paths now receive a bounded static survey: enclosing hull circles
-are inflated by half an interval's maximum translation plus a numerical margin and checked against
-water, berth and module envelopes over at most three minutes. Focused free and voyage tests cover
-an open-water path, land and a budget overrun. Entrance semantics, route authoring and the full
-proof remain open; this preliminary survey alone does not authorize a package.
-The survey now also checks the finite path against each compiled and authored periodic actor,
-then checks the stationary terminal pose for one full period of each actor. It uses conservative
-circle and speed bounds with a 200,000-sample budget. On macOS Debug 2026-11-14, focused checks
-passed for a separated path, a compiled-traffic conflict, shore rejection and the path budget.
-It is still preliminary: multiple open paths, authoring and end-to-end qualification remain open.
-The Lua evaluator can now decode bounded `route = "open"` line/arc records and the isolated
-staging wire carries them as PSTB. Room definition version 5 also carries open paths and protocol
-v15 rejects older peers; location staging still rejects them, so this is not yet a supported
-authoring contract. Focused decode, staging-wire, browser wire-version, room round-trip, protocol
-golden and codec tests passed on macOS Debug 2026-11-14.
-The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
-checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
-the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest
-preset passed all 558 enabled tests with local sockets allowed; 13 retired wake-field tests were
-disabled. No visual or human motion check was performed for this validation-only change.
-On macOS/Apple Silicon Debug, the full build passed. The full CTest preset passed 542 tests
-inside the sandbox; the 14 socket-dependent failures passed on an unsandboxed rerun. Thirteen
-retired wake-field tests were disabled. No motion or user acceptance is claimed.
-After adding the straight-leg primitive on the same platform, the full build passed and the full
-CTest preset passed 556 tests; `boat_local.course_saved_ghost` failed in the parallel run and
-passed on an isolated rerun. Thirteen retired wake-field tests remained disabled.
+Implementation in progress, 2026-11-14: one authored open route has up to four tangent line
+and arc pieces, integer tick durations, optional dwell and bounded speed/acceleration. Zero-dwell
+joins preserve speed. A static site survey checks water, explicit and compiled contacts and the
+permanent ferry. A moving survey checks the route duration and one full period of each other
+periodic craft after arrival, with conservative bounds and capped work. A second open path is
+rejected. The staging wire is PSTB; room definition v5 and protocol v15 carry open paths.
+`plugins/marina-route-demo` approaches a platform, pauses and departs while retaining the upstream
+ferry and bridge service. [Plugin API](PLUGIN_API.md) describes the implemented subset.
+
+Focused macOS/Apple Silicon Debug tests passed for path motion and joins, Lua decoding, location
+survey, staging and room wire, protocol codec and golden bytes. The example validated via
+`plugin_author.py`; CPU screenshots at 0, 8, 12 and 18 seconds were rendered, but only the initial
+frame clearly showed the visitor. A 300-frame windowed demo was interrupted after macOS reported
+display-service connection errors; no motion review is claimed. The full CTest run passed 560
+tests; a v15 LAN golden byte and the test-time lint failed, then passed with `boat_plugin_author`
+after the fixture and test registration were corrected. Thirteen tests were disabled. No human
+motion review, Apply/Undo check, GPU or browser review is claimed. Legacy preset traffic retains
+its existing 4,160-second sampled check. Open-route
+circle bounds may conservatively reject safe passages; looping routes and multiple open paths
+are not implemented. Earlier incremental full runs passed all enabled tests after the documented
+socket or boundary reruns; final integrated verification is recorded below when performed.
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
 validation in `src/core/boat_scene_definition.[ch]`, `src/net/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.

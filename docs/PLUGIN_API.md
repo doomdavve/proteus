@@ -533,8 +533,8 @@ Status, 2026-11-01: **L1.1–L1.4 and L2–L4.3 complete; the first playable har
 implemented, with scene decoding, binding, staging wire, marina berths/modules, travelling-craft
 routes, named ferry stops and gull flocks/cues.** [`plugins/harbor-life`](../plugins/harbor-life/)
 now uses seven hulls along one long pontoon with three finger piers to approximate the real
-Eriksberg marina; authored route geometry still selects registered native presets. There is no freeform route
-editor. Human play acceptance is pending. The
+Eriksberg marina; traffic supports registered presets and bounded open line/arc paths. There is no
+interactive route editor. Human play acceptance is pending. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
@@ -545,11 +545,11 @@ clears the borrowed route and scene when the plugin closes. L2.2 added `scene.ma
 L3.2 adds `scene.traffic.vessels` with registered route/craft presets and explicit retained
 compiled actors. Both renderers, physics contact, combat and camera exclusion consume the same
 accepted lists. A missing subsystem keeps its compiled default; a present empty list disables it.
-`scene.define` does not enable a second package, a callback or a browser/room path.
+`scene.define` does not enable a second package or callback.
 
 Free-package marina and traffic scenes use the same location checks as voyage scenes, including
 map, berth, module and traffic checks. Voyage recovery-shelter checks apply only to voyages.
-The current traffic check samples a fixed horizon; it is not a proof for arbitrary schedules.
+Preset-route traffic checks sample a fixed horizon; they are not a proof for arbitrary schedules.
 
 ### Package composition
 
@@ -660,6 +660,9 @@ return {
 | `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
 | `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. |
 | `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
+| `vessels[i].route = "open"` | one per scene; 1–4 `pieces` | An independent finite path; omit `speed`, `phase`, `period` and `stops`. Each strict piece supplies integer `ticks` (1–21600), `dwell` (0–21600), `max_speed` (0–40 m/s, exclusive of zero) and positive `max_acceleration` in m/s². Total duration including dwell is at most 21600 ticks and at least 600 ticks. |
+| Open line piece | `kind = "line"`, `x0`, `z0`, `x1`, `z1` | Simulation-metre endpoints, each coordinate within ±20000 m. |
+| Open arc piece | `kind = "arc"`, `x`, `z`, `radius`, `start_angle`, `sweep` | Centre and radius in metres, angles in radians. The start angle is within ±2π; the nonzero signed sweep is at most π in magnitude. The entire circle must fit within ±20000 m. |
 | `gulls.flocks` | dense list of 0–4 records | A present list replaces every compiled gull group; empty disables gulls. No physical bird contact is implied. |
 | `flocks[i].id` | 1–23, same spelling; unique among flocks | Stable flock identity. |
 | `flocks[i].recipe` | `gull` | Registered bird recipe. Other species need native work. |
@@ -683,7 +686,16 @@ IDs, unknown recipes, a berth or pontoon ashore, overlapping solid modules, a bl
 non-finite values and capacity + 1 are rejected with their field paths. Authored craft are sampled
 over the 4,160 s combined river timetable and must clear compiled water, the declared entrance,
 berths, solid modules, other authored craft and compiled traffic; retained actors keep their
-compiled route. Ordinary traffic wakes stay visual. Every table is strict; lists are dense. There
+compiled route. An open path is evaluated on 120 Hz ticks, stops only at positive dwells and
+clamps at its final pose. Consecutive piece endpoints and headings must agree within 1 mm and
+0.001 radians; native bounds enforce the requested speed and acceleration. Its conservative
+survey checks a hull-enclosing circle against water, moored hulls and structures at up to
+12-tick intervals. It also checks other craft while the path runs and, after arrival, for one
+complete period of each periodic craft. The survey inflates intervals by speed and a safety margin,
+caps work at 200,000 samples, and may reject safe paths. A second open path or traffic whose
+speed cannot be bounded rejects. An entrance may be crossed. Open paths restart when applied;
+they do not bind to berth occupancy, and depth is unverified. Ordinary traffic wakes stay visual.
+Every table is strict; lists are dense. There
 is no silent clamp, index merge or partial installation. Depth is unavailable, so discovery and
 diagnostics report **depth unverified** instead of inventing a
 bathymetry check.

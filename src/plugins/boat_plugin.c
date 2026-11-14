@@ -568,6 +568,15 @@ static bool box_contains(Vector2 centre, Vector2 length, Vector2 beam, float hal
         && fabsf(delta.x * beam.x + delta.y * beam.y) < half_beam + margin;
 }
 
+static bool circle_box_overlap(Vector2 point, double radius, Vector2 centre, Vector2 length,
+    Vector2 beam, float half_length, float half_beam)
+{
+    double x = (double)point.x - centre.x, z = (double)point.y - centre.y;
+    double along = fmax(fabs(x * length.x + z * length.y) - half_length, 0);
+    double across = fmax(fabs(x * beam.x + z * beam.y) - half_beam, 0);
+    return hypot(along, across) <= radius;
+}
+
 static void module_box(const BoatSceneModule *m, Vector2 *length, Vector2 *beam, Vector2 *centre,
     float *half_length, float *half_beam)
 {
@@ -852,22 +861,38 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
     float hull_radius = (float)radius;
     if (!isfinite(radius) || !isfinite(hull_radius))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "open path sweep radius is not finite");
-    Vector2 berth_centre[BOAT_SCENE_BERTHS];
-    float berth_radius[BOAT_SCENE_BERTHS];
+    Vector2 berth_centre[BOAT_SCENE_BERTHS], berth_length[BOAT_SCENE_BERTHS],
+        berth_beam[BOAT_SCENE_BERTHS];
+    float berth_hl[BOAT_SCENE_BERTHS], berth_hb[BOAT_SCENE_BERTHS];
     for (unsigned b = 0; b < scene->berth_count; ++b) {
         BoatModelSpec bs = boat_scene_berth_resolve(&scene->berths[b]);
-        Vector2 bl, bb;
-        float bhl, bhb;
-        berth_box(&scene->berths[b], bs, &bl, &bb, &berth_centre[b], &bhl, &bhb);
-        berth_radius[b] = hypotf(bhl, bhb);
+        berth_box(&scene->berths[b], bs, &berth_length[b], &berth_beam[b], &berth_centre[b],
+            &berth_hl[b], &berth_hb[b]);
     }
-    Vector2 module_centre[BOAT_SCENE_MODULES];
-    float module_radius[BOAT_SCENE_MODULES];
+    Vector2 module_centre[BOAT_SCENE_MODULES], module_length[BOAT_SCENE_MODULES],
+        module_beam[BOAT_SCENE_MODULES];
+    float module_hl[BOAT_SCENE_MODULES], module_hb[BOAT_SCENE_MODULES];
     for (unsigned m = 0; m < scene->module_count; ++m) {
-        Vector2 ml, mb;
-        float mhl, mhb;
-        module_box(&scene->modules[m], &ml, &mb, &module_centre[m], &mhl, &mhb);
-        module_radius[m] = hypotf(mhl, mhb);
+        const BoatSceneModule *item = &scene->modules[m];
+        if (item->kind == BOAT_SCENE_MODULE_GANGWAY) {
+            const BoatSceneModule *target = boat_scene_find_module(scene, item->attaches);
+            if (!target)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway target is missing");
+            Vector2 landing = { target->x + target->width * .5f * cosf(target->heading),
+                target->z + target->width * .5f * sinf(target->heading) };
+            Vector2 delta = { item->anchor_x - landing.x, item->anchor_z - landing.y };
+            float span = hypotf(delta.x, delta.y);
+            if (!isfinite(span) || span < BOAT_SCENE_GANGWAY_MIN_LENGTH)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway span is invalid");
+            module_centre[m] = (Vector2) { (item->anchor_x + landing.x) * .5f,
+                (item->anchor_z + landing.y) * .5f };
+            module_length[m] = (Vector2) { delta.x / span, delta.y / span };
+            module_beam[m] = (Vector2) { -module_length[m].y, module_length[m].x };
+            module_hl[m] = span * .5f;
+            module_hb[m] = item->width * .5f;
+        } else
+            module_box(item, &module_length[m], &module_beam[m], &module_centre[m],
+                &module_hl[m], &module_hb[m]);
     }
     for (uint64_t sample = 0; sample <= intervals; ++sample) {
         uint64_t tick = sample * OPEN_PATH_SAMPLE_TICKS;
@@ -888,15 +913,21 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
             return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                 "swept hull is not open water of the compiled map");
         for (unsigned b = 0; b < scene->berth_count; ++b)
-            if (hypot((double)centre.x - berth_centre[b].x, (double)centre.y - berth_centre[b].y)
-                <= (double)hull_radius + berth_radius[b])
+            if (circle_box_overlap(centre, hull_radius, berth_centre[b], berth_length[b],
+                    berth_beam[b], berth_hl[b], berth_hb[b]))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.berths[%u]", b + 1);
         for (unsigned m = 0; m < scene->module_count; ++m)
-            if (hypot((double)centre.x - module_centre[m].x, (double)centre.y - module_centre[m].y)
-                <= (double)hull_radius + module_radius[m])
+            if (circle_box_overlap(centre, hull_radius, module_centre[m], module_length[m],
+                    module_beam[m], module_hl[m], module_hb[m]))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.modules[%u]", m + 1);
+        // Also cover compiled defaults and the permanent ferry when a scene does not replace
+        // them. This shared contact query uses conservative water-plane excursion envelopes.
+        if (waterfront_harbor_contact_height_scene(
+                scene, centre, hull_radius, -INFINITY, INFINITY, (BoatWater) { 0 }, 0, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "swept hull crosses a marina or ferry contact envelope");
     }
     unsigned work = 0;
     for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
@@ -922,18 +953,14 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
 {
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
-    // The open path gets the bounded static survey first, so a package author sees shore or
-    // structure failures before the final unsupported-shape diagnostic. Open legs have no such
-    // survey yet.
+    // Open paths use their own bounded static and moving-traffic surveys.
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
         if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH
             && check_scene_open_path(scene, entry, map, i, d) != BOAT_PLUGIN_OK)
             return d->status;
-    // Complete moving-traffic proof and package authoring/wire support are still absent, so all
-    // internal simulation shapes remain unconditionally unsupported for packages.
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         unsigned char shape = scene->traffic.actors[i].shape;
-        if (shape == WATERFRONT_ROUTE_OPEN_LEG || shape == WATERFRONT_ROUTE_OPEN_PATH) {
+        if (shape == WATERFRONT_ROUTE_OPEN_LEG) {
             char path[48];
             snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", i + 1);
             return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
@@ -947,7 +974,7 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
         const WaterfrontRouteActor *a = &scene->traffic.actors[i];
         // Retained actors keep their compiled schedule; authored craft are sampled against them
         // below, so a retained actor never needs its own full sweep.
-        if (a->retain != 0xff)
+        if (a->retain != 0xff || a->shape == WATERFRONT_ROUTE_OPEN_PATH)
             continue;
         BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
         char path[48];
@@ -997,7 +1024,8 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
             }
             for (unsigned j = i + 1; j < scene->traffic.actor_count; ++j) {
                 // Two retained compiled actors keep their existing relative schedules.
-                if (scene->traffic.actors[j].retain != 0xff)
+                if (scene->traffic.actors[j].retain != 0xff
+                    || scene->traffic.actors[j].shape == WATERFRONT_ROUTE_OPEN_PATH)
                     continue;
                 BoatModelSpec os = waterfront_traffic_spec_routes(&scene->traffic, (int)j);
                 WaterfrontVesselMotion om

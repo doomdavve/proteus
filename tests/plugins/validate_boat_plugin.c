@@ -419,9 +419,9 @@ static int open_path_decode(void)
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
     const char *old = "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540";
     const char *good = "route = \"open\", pieces = {"
-                       "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240,dwell=120,"
+                       "{kind=\"line\",x0=0,z0=-100,x1=0,z1=-110,ticks=240,dwell=120,"
                        "max_speed=20,max_acceleration=100},"
-                       "{kind=\"line\",x0=0,z0=-10,x1=0,z1=-20,ticks=240,dwell=0,"
+                       "{kind=\"line\",x0=0,z0=-110,x1=0,z1=-120,ticks=240,dwell=0,"
                        "max_speed=20,max_acceleration=100}}";
     const char *source = harbor_variant(old, good);
     CHECK(source);
@@ -433,6 +433,12 @@ static int open_path_decode(void)
     CHECK(voyage.scene.traffic.actors[0].shape == WATERFRONT_ROUTE_OPEN_PATH);
     CHECK(voyage.scene.traffic.actors[0].open_path.count == 2);
     CHECK(voyage.scene.traffic.actors[0].period == 5);
+    BoatWorldResources world;
+    CHECK(boat_world_resources_init(&world, boat_location_find("outer")));
+    CHECK(boat_plugin_check_location(&voyage, world.definition, &world.map, &d) == BOAT_PLUGIN_OK);
+    WaterfrontVesselMotion motion = waterfront_route_motion(&voyage.scene.traffic, 0, 5);
+    CHECK(fabsf(motion.position.z + 120) < .001f);
+    boat_world_resources_destroy(&world);
     const char *bad = "route = \"open\", pieces = {"
                       "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240,dwell=0,"
                       "max_speed=20,max_acceleration=100,extra=1}}";
@@ -616,14 +622,41 @@ static int free_scene_location(void)
     CHECK(waterfront_route_validate(&internal_path, &route));
     internal_free.scene.traffic = internal_path;
     internal_voyage.scene.traffic = internal_path;
-    // A surveyed path that avoids traffic still reaches the final unsupported-shape guard.
+    // A surveyed path that avoids traffic can be installed in free and voyage packages.
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+
+    WaterfrontRouteDefinition berth_path = internal_path;
+    berth_path.actors[0].open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 13,
+        .start_z = 130, .end_x = 13, .end_z = 140, .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 20, .max_acceleration = 100 };
+    berth_path.actors[0].open_path.pieces[1].shape.line = (BoatRouteLeg) { .start_x = 13,
+        .start_z = 140, .end_x = 13, .end_z = 150, .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 20, .max_acceleration = 100 };
+    internal_free.scene.traffic = berth_path;
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
-    show("free internal open path", &d);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
-    CHECK(
-        boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+    CHECK(strstr(d.message, "berths[") || strstr(d.message, "modules["));
+
+    // Omitted berth/module lists retain compiled contacts; they must not vanish from the survey.
+    BoatPluginFree defaults = internal_free;
+    defaults.scene.berths_present = false;
+    defaults.scene.berth_count = 0;
+    defaults.scene.modules_present = false;
+    defaults.scene.module_count = 0;
+    defaults.scene.entrance_present = false;
+    defaults.scene.traffic = internal_path;
+    defaults.scene.traffic.actors[0].open_path.pieces[0].shape.line
+        = (BoatRouteLeg) { .start_x = 13, .start_z = 150, .end_x = 13, .end_z = 160,
+              .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
+              .max_speed = 20, .max_acceleration = 100 };
+    defaults.scene.traffic.actors[0].open_path.pieces[1].shape.line
+        = (BoatRouteLeg) { .start_x = 13, .start_z = 160, .end_x = 13, .end_z = 170,
+              .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
+              .max_speed = 20, .max_acceleration = 100 };
+    CHECK(boat_plugin_free_check_location(&defaults, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "contact envelope"));
 
     // Open water alone is insufficient: this path ends inside the compiled runabout's circuit.
     WaterfrontRouteDefinition conflict_path = internal_path;

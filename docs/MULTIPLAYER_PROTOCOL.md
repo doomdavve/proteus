@@ -8,8 +8,8 @@ and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
 
 v15 uses room definition version 5 and adds the bounded open traffic-path encoding below.
-Older peers reject the version at Hello. Package location staging still rejects these paths
-until their full validation and authoring integration are complete.
+Older peers reject the version at Hello. The authority validates open paths against their map,
+marina and other traffic before accepting them.
 
 v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
 position validation to cover the mapped world, and fingerprints the complete compiled map
