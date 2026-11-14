@@ -243,9 +243,10 @@ static void build_allowlist(Filter *f)
     };
     for (size_t i = 0; i < sizeof(plain) / sizeof(plain[0]); ++i)
         A(plain[i]);
-    // Only IP sockets (ICE and signalling threads create them); no AF_UNIX/NETLINK/PACKET.
-    static const uint32_t domains[] = { AF_INET, AF_INET6 };
-    allow_if_arg_in(f, SYS_socket, 0, domains, 2);
+    // IP sockets (ICE and signalling threads) and netlink (interface discovery, as in the systemd
+    // address-family allowlist); no AF_UNIX or AF_PACKET.
+    static const uint32_t domains[] = { AF_INET, AF_INET6, AF_NETLINK };
+    allow_if_arg_in(f, SYS_socket, 0, domains, 3);
     static const uint32_t ioctls[] = { 0x5421 /* FIONBIO */, 0x541B /* FIONREAD */ };
     allow_if_arg_in(f, SYS_ioctl, 1, ioctls, 2);
     static const uint32_t fcntls[] = { 1 /* GETFD */, 2 /* SETFD */, 3 /* GETFL */, 4 /* SETFL */ };

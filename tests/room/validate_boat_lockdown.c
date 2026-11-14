@@ -61,7 +61,7 @@ static int denied(void)
     char *const argv[] = { "/bin/true", NULL };
     bad += expect_errno(execve("/bin/true", argv, NULL), EPERM);
     bad += expect_errno(socket(AF_UNIX, SOCK_STREAM, 0), EPERM);
-    bad += expect_errno(socket(AF_NETLINK, SOCK_RAW, 0), EPERM);
+    bad += expect_errno(socket(AF_PACKET, SOCK_RAW, 0), EPERM);
     bad += before < 0 || close(before) != 0;
     return bad;
 }
