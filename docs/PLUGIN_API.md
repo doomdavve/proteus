@@ -1515,7 +1515,7 @@ Payload is a subset of the reservation, so adding the two would double count it.
 Native inspection and the benchmark report the complete `WakePlugin` reservation (all ten
 revision slots, files, state/pending output, events, diagnostics and trace) plus the single
 allowed Lua heap as `owned_ceiling`. A compile-time assertion keeps the native owner within
-1 MiB; Lua adds at most 2 MiB. This is owned storage, excluding allocator metadata, C stack,
+1.25 MiB (raised from 1 MiB by Marina M4's vessel and service data); Lua adds at most 2 MiB. This is owned storage, excluding allocator metadata, C stack,
 borrowed directory/map/world/view resources and process RSS. Stack scratch includes candidate
 revisions, transaction copies and recursive state decoding; the validators also run under a
 1 MiB stack limit. Preview checkpoints own another full plugin/session/wake copy; their

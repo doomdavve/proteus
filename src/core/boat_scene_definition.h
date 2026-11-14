@@ -6,6 +6,7 @@
 // values. It never points at Lua, files or a plugin host. Simulation x/z coordinates and renderer
 // headings follow the voyage API; a renderer converts x once at its boundary.
 #include "core/boat_model.h"
+#include "core/boat_service.h"
 #include "core/waterfront_flock.h"
 #include "core/waterfront_route.h"
 
@@ -21,6 +22,8 @@
 #define BOAT_SCENE_ENTRANCE_MAX_WIDTH 40.0f
 #define BOAT_SCENE_GANGWAY_MIN_LENGTH 2.0f
 #define BOAT_SCENE_GANGWAY_MAX_LENGTH 20.0f
+#define BOAT_SCENE_VESSELS 4
+#define BOAT_SCENE_SERVICES 8
 #define BOAT_SCENE_WORK_SITES 4
 #define BOAT_SCENE_NOTICE_TEXT 64 // One notice template, including the terminator.
 
@@ -65,7 +68,30 @@ typedef struct {
     float x, z; // Simulation metres.
     float heading; // Renderer radians; forward is (sin, -cos).
     BoatSceneAppearance appearance;
+    // M4: an empty berth is a slot with no static hull. Recipe and appearance give the largest
+    // hull it fits (resolved length and beam); a service's vessel occupies it. Its name may be
+    // empty.
+    bool empty;
 } BoatSceneBerth;
+
+// M4: one vessel's identity and appearance, separate from any berth. It is drawn only where a
+// service says it is (moored at a berth or travelling its route), never as a static berth hull.
+typedef struct {
+    char id[BOAT_SCENE_TEXT];
+    unsigned char recipe; // BoatSceneBerthRecipe
+    BoatSceneAppearance appearance;
+} BoatSceneVessel;
+
+// M4: a vessel's one-shot use of an empty berth along an authored open path (one traffic route).
+typedef struct {
+    char id[BOAT_SCENE_TEXT];
+    char vessel[BOAT_SCENE_TEXT];
+    char berth[BOAT_SCENE_TEXT];
+    char route[BOAT_SCENE_TEXT]; // Traffic actor ID: an independent open path, used by one service.
+    unsigned char kind; // BoatServiceKind
+    unsigned dock_piece; // Visitor: the path piece whose dwell is the stay.
+    uint32_t start_tick; // Simulation tick at which path tick zero occurs.
+} BoatSceneService;
 
 typedef struct {
     char id[BOAT_SCENE_TEXT];
@@ -124,6 +150,11 @@ typedef struct BoatSceneDefinition {
     // L4.2: a present flock list replaces the compiled gull groups. Count zero disables them.
     bool gulls_present;
     WaterfrontFlockDefinition gulls;
+    // M4: vessels and their services. Present services replace nothing compiled.
+    bool services_present;
+    unsigned vessel_count, service_count;
+    BoatSceneVessel vessels[BOAT_SCENE_VESSELS];
+    BoatSceneService services[BOAT_SCENE_SERVICES];
     // S1a: cargo work sites. Only free packages may author them; nothing is compiled by default.
     bool work_present;
     unsigned work_count;
@@ -171,6 +202,11 @@ BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe);
 float boat_scene_module_distance(const BoatSceneModule *module, float x, float z);
 
 const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, const char *id);
+const BoatSceneVessel *boat_scene_find_vessel(const BoatSceneDefinition *scene, const char *id);
+// The resolved spec of a vessel, the same as a berth hull with its recipe and appearance.
+BoatModelSpec boat_scene_vessel_resolve(const BoatSceneVessel *vessel);
+// Index of the traffic actor with ID, or -1.
+int boat_scene_find_route(const BoatSceneDefinition *scene, const char *id);
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);
 const char *boat_scene_work_preset_name(BoatSceneWorkPreset preset);
 bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *preset);

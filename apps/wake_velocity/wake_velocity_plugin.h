@@ -70,7 +70,9 @@ typedef struct {
 
 // Persistent native owner (all revision slots, file buffers, state/pending output, events,
 // diagnostics and traces) plus one 2 MiB Lua heap. C stack and native world/view are separate.
-_Static_assert(sizeof(WakePlugin) <= (1u << 20), "plugin native owner exceeds 1 MiB");
+// Marina M4 raised the cap from 1 MiB to 1.25 MiB: vessels and services add ~1.2 KB to each of
+// the ten revision-slot scene copies.
+_Static_assert(sizeof(WakePlugin) <= (5u << 18), "plugin native owner exceeds 1.25 MiB");
 
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
 const BoatWorldDefinition *wake_plugin_location(const char *directory);

@@ -7,7 +7,7 @@ Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traf
 [protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
 Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
 Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
-Next task: M4 O1 native ownership core (branch `feat/marina-m4`); decisions recorded in the M4 section.
+Next task: M4 O2 harbor/traffic frames draw the vessel from its service (branch `feat/marina-m4`); O1a ownership core and O1b scene data/validation are done locally. Decisions are in the M4 section.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -37,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; decisions made 2026-11-14, O1 next |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a/O1b local (core ownership, scene data); O2 next |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
@@ -735,6 +735,15 @@ approach without exempting unrelated boats from collision.
   the path's berth endpoint is derived or checked against it, never authored independently.
 - Services are one-shot (no repeat) in M4; repeat is deferred explicitly.
 - Ownership is one pure function of (vessel, tick): moored, travelling or absent.
+- Native owner budget raised 1 MiB → 1.25 MiB (user-approved 2026-11-15): vessel/service data adds
+  about 1.2 KB to each of ten revision-slot scene copies, which exceeded the old 500 B headroom.
+
+O1a/O1b status, 2026-11-15 (macOS Debug, local): `src/core/boat_service.[ch]` owns exact-tick
+ownership, berth-pose binding and reservations; `BoatSceneDefinition` gains empty berths, up to
+4 vessels and 8 one-shot services, validated for missing IDs, static-hull berths, hull fit, pose
+binding, one service per route, resident exclusivity and berth/vessel window overlap.
+Tests `boat_service` and `boat_scene_service` pass; the full CTest run passed 561/561. The
+Lua decoder, wire, frames, route cap above one path and renderers are not yet connected.
 
 Acceptance:
 
