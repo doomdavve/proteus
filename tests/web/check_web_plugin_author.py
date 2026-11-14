@@ -103,6 +103,35 @@ def main():
             if chromium:
                 cdp = context.new_cdp_session(page)
             original = {'manifest': page.input_value('#plugin-manifest'), 'source': page.input_value('#plugin-source')}
+            # M3: exercise the authored path through the real worker wire and game owner,
+            # including the restart required by a timetable edit and its atomic Undo.
+            route = root / 'plugins' / 'marina-route-demo'
+            route_source = (route / 'main.lua').read_text()
+            page.fill('#plugin-manifest', (route / 'plugin.json').read_text())
+            page.fill('#plugin-source', route_source)
+            assert 'Voyage staged' in stage()
+            page.click('#plugin-play')
+            route_owner = owner(1)
+            page.wait_for_function('Module.boatScenery.state("outer") === 2', timeout=60000)
+            page.locator('#plugin-tools').evaluate('(e) => e.open = true')
+            assert route_source.count('dwell=240') == 1
+            page.fill('#plugin-source', route_source.replace('dwell=240', 'dwell=360'))
+            stage()
+            page.wait_for_function("!document.getElementById('plugin-apply').disabled")
+            assert page.evaluate('Module.boatPluginOwner') == route_owner
+            page.click('#plugin-apply')
+            edited_route_owner = owner(2)
+            page.click('#plugin-undo')
+            page.wait_for_function("document.getElementById('plugin-status').textContent.includes('(UNDO)')")
+            page.click('#plugin-apply')
+            restored_route_owner = owner(1)
+            evidence['marina_route_owners'] = [route_owner, edited_route_owner, restored_route_owner]
+            checks.append('M3 authored route worker launch and held timetable Apply/Undo')
+            drained('after M3 route Apply/Undo')
+            page.reload()
+            ready()
+            page.fill('#plugin-manifest', original['manifest'])
+            page.fill('#plugin-source', original['source'])
             assert 'Voyage staged' in stage()
             cold = page.evaluate('stageTimes[0]')
             with page.expect_download() as download:

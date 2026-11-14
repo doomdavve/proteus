@@ -1,0 +1,88 @@
+{
+  "errors": [],
+  "checks": [
+    "M3 authored route worker launch and held timetable Apply/Undo",
+    "bundle export/import",
+    "capability rejection",
+    "scene import accepted above the old response cap",
+    "20 repeated worker validations retired",
+    "worker launch",
+    "live rename",
+    "syntax rejection",
+    "held water Apply/Undo",
+    "stale epoch rejection",
+    "cancellation/late completion",
+    "tab freeze/resume during validation; deadline across a freeze",
+    "navigation during validation; 3 restored sessions revalidated",
+    "free and course imports launch",
+    "M2 marina name/dimensions Apply/Undo/export and full-source worker reply",
+    "isolated objective init/update/timers, gated ticks, migration/Undo/restart, quarantine, timeout and session cleanup",
+    "storage denial"
+  ],
+  "evidence": {
+    "browser": {
+      "engine": "chromium",
+      "version": "156.0.8078.4"
+    },
+    "marina_route_owners": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        0
+      ],
+      [
+        1,
+        2,
+        0
+      ]
+    ],
+    "validation_ms": {
+      "cold": 54.4,
+      "cycles": 20,
+      "median": 53.5,
+      "max": 59.5
+    },
+    "main_heap_bytes": {
+      "before_cycles": 3099216,
+      "after_cycles": 3156400
+    },
+    "freeze_resume": {
+      "frozen_s": 1.5,
+      "status": "R4 ACTIVE, renamed",
+      "owner": [
+        4,
+        5,
+        0
+      ]
+    },
+    "objectives": {
+      "normal_callbacks": {
+        "count": 20,
+        "mean_ms": 76.26500005722046,
+        "max_ms": 225.90000009536743,
+        "initial_delivery_ms": 601.3000001907349,
+        "evaluator_mean_ms": 0.2399999976158142,
+        "evaluator_max_ms": 0.40000009536743164
+      },
+      "initial": {
+        "alarms": 19,
+        "draw": 519671626,
+        "events": 0,
+        "migrated": 0,
+        "updates": 19
+      },
+      "worker_wasm_bytes": 16777216,
+      "restart_initialized": true,
+      "deadline_across_freeze": true,
+      "timeout_retained_state": true,
+      "completed_including_fault_checks": 31,
+      "sessions_cleaned": 4,
+      "cached_init_deadline": true
+    }
+  }
+}

@@ -1324,8 +1324,12 @@ strings, with `plugin_stage.wasm` as the positive control. The opt-in
 capability rejection, scene/free/course staging and launch, repeated worker validations, launch,
 live rename and syntax failure, held water Apply/Undo, stale output, cancellation, navigation
 mid-validation, repeated source restore/revalidation and storage denial. On Chromium it also
-freezes the tab mid-validation. The title check now covers the bundled Harbor life catalog session,
-the desktop console query/export/live-edit path and the absence of a worker in a normal session.
+freezes the tab mid-validation.
+The authoring check also launches `marina-route-demo` through the real worker/staging wire,
+holds a dwell-time edit for Apply, and restores the prior route revision with Undo/Apply.
+It awaits the asynchronously loaded outer scenery before editing the route.
+The title check covers the bundled Harbor life catalog session, the desktop console
+query/export/live-edit path and the absence of a worker in a normal session.
 It awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
 The browser PR workflow runs the Node contracts and packages the Wasm build. Full three-engine
 qualification is manual-only; dispatch it for browser/plugin lifecycle changes and before a
