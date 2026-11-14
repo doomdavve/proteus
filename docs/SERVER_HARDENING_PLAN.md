@@ -1,12 +1,11 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and runs in `log` mode (a `kill` switch-over waits for one more fix and a clean soak); H6 is decided (do not split); H7 is next.**
-Completed task: H1 credential unit and the H5 soak findings (glibc warm-ups, malloc arena limit). Evidence below.
-Open: a release containing the arena-limit fix, a clean `log` soak across several joins and restarts, then the `kill` switch-over in `davve-srv`; H4 operator work (nftables, crash alert);
-the longer H3 fuzz campaign; relay join from outside the LAN.
+Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and **Winterfell runs `--lockdown kill` since v0.0.31**; H6 is decided (do not split); H7 is next.**
+Completed task: H1 credential unit and the H5 `kill` switch-over (v0.0.31), after two glibc first-use findings and a TURN quota finding. Evidence below.
+Open: a longer `kill` soak under real play (it is short so far); H4 operator work (nftables, a crash alert so a `SIGSYS` exit is noticed); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: release the arena-limit fix (v0.0.31), confirm a clean `log` soak, switch the unit to `kill`; then H7 and the H4 operator work in `davve-srv`.
+Next task: H4 operator work (crash alert first), then H7, the closing spec `docs/SERVER_SECURITY.md`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -192,3 +191,27 @@ that starts 24 threads after a `kill` lockdown; it fails with `SIGSYS` without t
 and Pages, twice each) and a native join with the server alive and no audit records. One earlier scratch
 run died to `SIGSYS` before the fix; that is the evidence above. Not changed: the allowlist; a first guess
 that libdatachannel's thread-pool sizing was the source was wrong and is not in the code.
+
+### H5 switch-over to `kill` (v0.0.31)
+
+Winterfell, 2026-11-14. v0.0.31 (source `f8c3fbf`, hosting pin `1869475`) contains the arena-limit fix.
+Under `--lockdown log` the release checks, a repeat of the join sequence that had triggered the second
+finding (hosted then Pages browser check, twice, room empty in between, plus a native join) and the
+operator's own browser and native joins gave **0 seccomp records** across 18 player-count changes. The unit
+was then switched to `--lockdown kill`. After the switch the same sequence passed again with the room still
+up, 0 restarts and 0 records. **Limits:** the soak was about 25 minutes of mostly scripted joins, not a long
+run, so a rare syscall under real play would end the room (systemd restarts it). The allowlist was not
+widened at any point.
+
+### TURN allocation quota (operator side)
+
+After the switch-over a browser join stalled for the operator ("no answer within 10 s"). The room was healthy;
+the private relay was full: `user-quota` and `total-quota` were 8 and the relay held 8 allocation sockets, so
+the room's TURN allocate for new peers was refused (error 486) and a browser had no relay candidate.
+libjuice requests a 10 minute allocation per peer and does not send a lifetime-0 refresh when the peer
+closes, so every join, successful or not, holds a slot for up to 10 minutes. Test joins used the slots up.
+Restarting the relay released them and the join worked. The quotas in `davve-srv` are now 24 (the relay
+port range holds 41), which makes this much harder to hit but does not remove the leak; the fix that does
+is a lifetime-0 refresh on close, which means patching or upgrading the vendored libdatachannel. That is an
+open item, not done. The relay only accepts allocations from the room over loopback, so the higher quota
+does not open anything to the public.
