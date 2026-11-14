@@ -11,18 +11,6 @@ file(GLOB WEB_SHADERS CONFIGURE_DEPENDS
 foreach(shader IN LISTS WEB_SHADERS)
   get_filename_component(name "${shader}" NAME)
   file(READ "${shader}" source)
-  # The native review field is explicitly unavailable in the browser. Keep its
-  # wide sampler out of WebGL programs, including drivers that compile dead branches.
-  string(FIND "${source}" "// BEGIN NATIVE WAKE FIELD" wake_begin)
-  if(NOT wake_begin EQUAL -1)
-    string(FIND "${source}" "// END NATIVE WAKE FIELD" wake_end)
-    if(wake_end LESS wake_begin)
-      message(FATAL_ERROR "Missing native wake shader end marker: ${name}")
-    endif()
-    string(SUBSTRING "${source}" 0 ${wake_begin} prefix)
-    string(SUBSTRING "${source}" ${wake_end} -1 suffix)
-    set(source "${prefix}const int wakeFieldEnabled = 0;\nvec3 wakeFieldSample(vec2 p) { return vec3(0.0); }\nfloat wakeVertexHeight(vec2 p) { return 0.0; }\n${suffix}")
-  endif()
   # These fragments use raylib's default vertex shader (mediump varyings).
   if(name STREQUAL "gpu_downsample.fs" OR name STREQUAL "gpu_post.fs")
     set(precision mediump)

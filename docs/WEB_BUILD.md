@@ -523,12 +523,7 @@ A local raylib checkout can be reused with CMake's `FETCHCONTENT_SOURCE_DIR_RAYL
 The web build requires GNU extensions only in raylib for its `EM_ASM` macros; application
 sources remain C17. Its POSIX clock calls are enabled through `_POSIX_C_SOURCE=200809L`.
 
-The native `--wake-field` review candidate is explicitly unavailable in Web builds.
-[Web.cmake](../cmake/Web.cmake) removes its wide field sampler from generated WebGL shaders;
-The native field sampler stays unavailable; the current arcade object default and D3
-selector share the existing browser launcher. The portable cosine backend is
-numerically tested on the development Mac, but no browser candidate performance or query
-latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
+The arcade object default and D3 selector share the existing browser launcher.
 
 ## Runtime decisions
 

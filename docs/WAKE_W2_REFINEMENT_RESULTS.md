@@ -1,13 +1,15 @@
 # W2.1b: operator accuracy and bounded-domain refinement
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-21, macOS / Apple Silicon. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md).
 Historical baseline: commit `801970a`, after [initial W2.1 at 78ad300](WAKE_W2_RESULTS.md).
 Current status and next task: [runtime feasibility checkpoint](WAKE_RUNTIME_RESULTS.md).
 The intervening [matched-accuracy proof](WAKE_W2_FIELD_RESULTS.md) completed W2.1's numerical gates.
 The decisions/measurements below describe this earlier checkpoint; exact baseline reproduction
 requires that commit.
-Implementation: [boat_wake.c](../src/core/boat_wake.c),
-[review tool](../tools/wake_field_review.c).
+Implementation: boat_wake.c,
+review tool.
 
 The owned candidate now has a positive polynomial-tail correction and optional fourth/eighth
 order water-only spatial operators. The new tests cover manufactured modes, irregular land,

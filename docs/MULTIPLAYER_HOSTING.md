@@ -189,6 +189,27 @@ nginx therefore proxies signaling to `10.0.21.3:24682` on the same machine.
 The systemd address-family allowlist includes `AF_NETLINK` for Linux interface discovery;
 without it, WebRTC fails to gather host candidates. Room and relay restart independently.
 
+### In-process lockdown
+
+`boat_server --lockdown kill` (Linux, opt-in) restricts the process after startup, on top of the
+systemd sandbox. It applies `PR_SET_NO_NEW_PRIVS`; Landlock with no rules (every filesystem right,
+plus TCP bind/connect and the abstract-socket and signal scopes, denied; open descriptors and
+already-bound sockets keep working); and a hand-written seccomp-bpf allowlist for x86-64 and
+aarch64 (audit architecture checked). Landlock does not cover UDP, so the ENet socket is
+limited by the seccomp list and the nftables rules, not by Landlock. The allowlist covers
+console and open-descriptor I/O, time, memory, futex and thread creation (`clone` needs
+`CLONE_THREAD`; `clone3` answers `ENOSYS` so glibc falls back), polling, IP and netlink sockets,
+and `ioctl`/`fcntl`/`prctl` with a few permitted requests. `open`, `execve` and other socket
+families are not allowed. The lockdown is fail-closed (see
+[COMMAND_LINE](COMMAND_LINE.md)); the achieved Landlock ABI is printed at start-up. To tune the
+list under a soak, run `--lockdown log` and read the kernel's `SECCOMP` audit records
+(`journalctl -k` or `ausearch -m SECCOMP`), then extend `build_allowlist` in
+`src/room/boat_lockdown.c`. The WebRTC threads (libdatachannel, libjuice) were exercised under `kill` on
+Winterfell with native and browser joins (2026-11-14); the lockdown warms up glibc's lazy file
+reads and address probing first (`warm_libc`), so later lookups and log timestamps do not need
+files. The recording file is opened before the lockdown, and
+`--package-reload` is refused because it needs files.
+
 The playbook adds `/etc/nginx/conf.d/wake-velocity.conf`, validates nginx, then reloads it.
 Its dedicated TLS listener serves only the game assets and `/room`, using Winterfell's
 existing Let's Encrypt certificate. The baseline's infrastructure HTTPS site is unchanged;
@@ -263,6 +284,43 @@ Use `10.0.21.3:24680` for the LAN check. A development build with newer handling
 be rejected; use the release checkout's bot instead. Browser testing must reach the room,
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-11-14 (v0.0.30, credential unit and second soak finding)
+
+**v0.0.30** (source `43666cb`, hosting pin `c9302eb`) is deployed with `--lockdown log`; protocol 14 /
+physics 9. The relay password was rotated and the room now reads its ICE server URL from
+`/etc/wake-velocity/ice-server` (root, 0600) through `LoadCredential=` and `--ice-server-file`, so it is
+absent from `ps` and `/proc/<pid>/cmdline` (H1; `davve-srv`). The soak was not clean: the first
+browser join after an empty room logged two `openat` calls, traced with `strace -k` to glibc sizing its
+malloc arena limit from the CPU count once WebRTC had started enough threads. The next release sets the
+limit before locking; a scratch build ran `--lockdown kill` through repeated hosted and Pages browser
+joins and a native join with no `SIGSYS` and no audit records. Not checked: a relay join from outside the
+LAN and long soaks. The live room stays in `log` mode until that release and a clean soak.
+
+## Status and verification — 2026-11-14 (v0.0.29 and lockdown soak)
+
+**v0.0.29** (source `6ca3954`, hosting pin `a603dcd`) is deployed with `--lockdown log`: room and
+relay are active, protocol **14 / physics 9**, and native and hosted-browser joins passed. After the
+SDP offer filter, the kernel logged no name-lookup calls from the WebRTC threads. The remaining
+would-be violations were traced with `strace` on Winterfell (v0.0.29 binary, scratch run on the real
+ports, native and browser joins) to glibc's lazy first use, not to the game: the timezone file for log
+timestamps, `gai.conf` when a lookup returns several addresses, and a probe of the `nscd` socket.
+`boat_lockdown_apply` now performs those once before locking (`warm_libc`); a scratch build of that
+change ran `--lockdown kill` on Winterfell through a native join and a browser join with no
+`SIGSYS` and no audit records. **That change is not in v0.0.29**: the live room still runs `log`, and
+`kill` waits for a release containing it. Not checked: a relay join from outside the LAN, long soaks,
+and joins from several browsers at once.
+
+## Status and verification — 2026-11-14
+
+The release command deployed **v0.0.28** at source `a0ba228cdf85316e0b8b6c4a112d4be9961cb87e` through
+hosting pin `e8b5ebe`, pushed to the private baseline. Room and relay are active on the tagged commit
+(`Wake Velocity v0.0.28 outer room`). Directory compatibility is protocol **14 / physics 9**. The
+hosted and Pages browser directory checks passed in Chrome, and the matching native bot joined
+`wake.davve.net:24680` with zero decode errors. This build includes the H1-H5 hardening code; the
+unit does not enable `--lockdown`, so [lockdown](#in-process-lockdown) is not yet in effect on
+Winterfell. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/`. Not run: human
+input, a Release-build `--fortify` check of the deployed binary, and a relay join from outside the LAN.
 
 ## Status and verification — 2026-11-04
 

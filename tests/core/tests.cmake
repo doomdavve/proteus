@@ -1,13 +1,5 @@
 # tests/core: registered from tests/tests.cmake in the project root's directory scope.
 
-add_executable(validate_boat_wake tests/core/validate_boat_wake.c)
-target_link_libraries(validate_boat_wake PRIVATE proteus_boat_core)
-target_compile_options(validate_boat_wake PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-if(NOT MSVC)
-  target_link_libraries(validate_boat_wake PRIVATE m)
-endif()
-add_test(NAME boat_wake_owned_field COMMAND validate_boat_wake)
 add_executable(validate_boat_cargo tests/core/validate_boat_cargo.c)
 target_link_libraries(validate_boat_cargo PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_cargo PRIVATE ${PROTEUS_WARNINGS})

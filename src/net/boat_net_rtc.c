@@ -1,5 +1,6 @@
 #include "net/boat_net_rtc.h"
 #include "net/boat_net_enet.h" // Monotonic scheduling, shared with the native authority.
+#include "net/boat_net_sdp.h"
 #include <rtc/rtc.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -99,7 +100,11 @@ static bool start_peer(BoatNetRtc *rtc, Peer *peer, const char *offer)
         if (peer->channels[i] < 0)
             return false;
     }
-    return rtcSetRemoteDescription(peer->pc, offer, "offer") >= 0
+    // Name-based candidates would make the library resolve hostnames; keep numeric ones only.
+    char numeric[SIGNAL_BYTES];
+    if (boat_net_sdp_filter_offer(offer, numeric, sizeof(numeric), NULL) == SIZE_MAX)
+        return false;
+    return rtcSetRemoteDescription(peer->pc, numeric, "offer") >= 0
         && rtcSetLocalDescription(peer->pc, "answer") >= 0;
 }
 static bool service_peer(BoatNetRtc *rtc, Peer *peer)

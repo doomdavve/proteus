@@ -1,5 +1,7 @@
 # Native basin wake candidate
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-21, macOS / Apple M1 Max / Apple clang. Owner:
 [wake rewrite plan](WAKE_REWRITE_PLAN.md). **Opt-in review candidate, not an accepted
 replacement. D3 remains the default. The 2 ms per rendered 60 Hz frame target fails.**

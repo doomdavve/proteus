@@ -47,7 +47,6 @@ typedef struct {
     size_t surface_sources; // Water triangles displaced by the last surface call.
     size_t patch_sources[2]; // Water triangles clipped by each patch's last rebuild.
     bool full_scan; // Review only: visit every water triangle, as before the index existed.
-    BoatWaterMeshSurface field; // Basin grid for the retired physical wake field.
     BoatWaterMeshSurface patches[2]; // GPU rest patches: ordinary and arcade (fine) grid.
     Vector2 patch_centers[2];
 } BoatWaterMeshCache;
@@ -65,8 +64,6 @@ const Mesh3D *boat_water_surface(
 typedef bool (*BoatWaterMeshVisible)(void *context, Vector3 min, Vector3 max);
 const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMapDescription *map,
     BoatWater water, double time, BoatWaterMeshVisible visible, void *context);
-const Mesh3D *boat_water_surface_field(
-    BoatWaterMeshCache *cache, BoatWater water, const BoatWake *field, double time);
 // GPU-only rest topology, clipped to MAP's water. World X/Z, not simulation X.
 // Cached on a fixed 1.5 m grid; shifts by 12 m outside the visible displacement radius.
 #define BOAT_WATER_PATCH_FULL 48.0f

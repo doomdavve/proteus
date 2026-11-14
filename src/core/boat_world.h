@@ -23,13 +23,12 @@ void boat_world_resources_destroy(BoatWorldResources *resources);
 bool boat_world_resources_ready(const BoatWorldResources *resources);
 
 // One physical environment. Assignment clones it: the water history is held by value and the
-// resources, arcade wake objects and wake field are borrowed, never owned or freed here.
+// resources, arcade wake objects are borrowed, never owned or freed here.
 typedef struct {
     const BoatWorldDefinition *definition; // Always resources->definition.
     const BoatWorldResources *resources; // Shoreline queries use resources->map.
     const struct BoatCombat *combat; // Optional presentation view; simulation uses fleet state.
     BoatWater water; // Settings plus the legacy D3 trail history that boats publish into.
-    const BoatWake *wake_field; // Optional legacy CPU field endpoint (basin review only).
     // L1.3: the accepted authored scene, borrowed until the session rebinds or exits. NULL keeps
     // every compiled marina default. Physics and presentation read this same pointer.
     const BoatSceneDefinition *scene;
@@ -37,9 +36,9 @@ typedef struct {
 
 // RESOURCES must be ready.
 void boat_world_init(BoatWorld *world, const BoatWorldResources *resources, BoatWater water);
-// Start over with WATER, keeping the borrowed resources; drops any wake field.
+// Start over with WATER, keeping the borrowed resources.
 void boat_world_restart(BoatWorld *world, BoatWater water);
-// True when the surface moves: ambient/scripted/D3/object sources or a borrowed wake field.
+// True when the surface moves: ambient/scripted/D3/object sources.
 bool boat_world_displaced(const BoatWorld *world);
 // Study water with the definition's current and crossing-source placement.
 BoatWater boat_world_test_water(

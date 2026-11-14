@@ -87,7 +87,7 @@ static int calm_independence(void)
     }
     for (int tick = 0; tick < 14640; ++tick)
         for (int i = 0; i < 3; ++i) {
-            demo_step(&sessions[i], tick, NULL, NULL, &studies[i]);
+            demo_step(&sessions[i], tick, NULL, &studies[i]);
             CHECK(sessions[i].tick == starts[i] + (uint64_t)tick + 1);
             CHECK(boat_session_view(&sessions[i]).time == boat_tick_seconds(sessions[i].tick));
             if (i)
@@ -108,7 +108,7 @@ static int calm_independence(void)
     float divergence = 0;
     for (int tick = 0; tick < 2400; ++tick)
         for (int i = 0; i < 3; ++i) {
-            demo_step(&sessions[i], tick, NULL, NULL, NULL);
+            demo_step(&sessions[i], tick, NULL, NULL);
             if (i) {
                 divergence = fmaxf(divergence,
                     Vector2Distance(sessions[i].boat.position, sessions[0].boat.position)
@@ -262,7 +262,7 @@ static int soak(double seconds, const char *directory, bool waves)
                 .throttle_rate
                 = Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
                     1) },
-            NULL, NULL, &study);
+            NULL, &study);
         // Recover pose only after a capsize or a shoreline stall: the world clock, water
         // settings and wake history continue.
         bool stalled = throttle > 0 && Vector2Length(boat->velocity) < .5f;

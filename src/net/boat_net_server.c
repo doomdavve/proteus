@@ -770,6 +770,28 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
     }
 }
 
+// A token bucket on new connections, on the caller's clock: a flood of connects cannot make the
+// server do handshake work faster than the refill rate.
+static bool connect_allowed(BoatNetServer *s, double now)
+{
+    if (!s->connect_started) {
+        s->connect_started = true;
+        s->connect_tokens = BOAT_NET_CONNECT_BURST;
+        s->connect_refill_at = now;
+    }
+    double elapsed = now - s->connect_refill_at;
+    s->connect_refill_at = now;
+    if (elapsed > 0) {
+        s->connect_tokens += elapsed * BOAT_NET_CONNECT_PER_SECOND;
+        if (s->connect_tokens > BOAT_NET_CONNECT_BURST)
+            s->connect_tokens = BOAT_NET_CONNECT_BURST;
+    }
+    if (s->connect_tokens < 1)
+        return false;
+    s->connect_tokens -= 1;
+    return true;
+}
+
 static void handle_events(BoatNetServer *s, double now)
 {
     BoatNetEvent event;
@@ -782,6 +804,11 @@ static void handle_events(BoatNetServer *s, double now)
         switch (event.kind) {
         case BOAT_NET_EVENT_CONNECT:
             drop_peer(s, event.peer, false);
+            if (!connect_allowed(s, now)) {
+                ++s->stats.connect_limited;
+                s->transport.disconnect(s->transport.context, event.peer);
+                break;
+            }
             *p = (BoatNetServerPeer) { .phase = BOAT_NET_PEER_HANDSHAKE,
                 .connected_at = now,
                 .heard_at = now,

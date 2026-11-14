@@ -217,9 +217,68 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.30 — 2026-11-14
+
+Current release: **[v0.0.30](https://github.com/doomdavve/proteus/releases/tag/v0.0.30)** is
+published at `43666cb4637c3c730849321f5f6a575ec3d28394` (the merge of PR #199). It adds the glibc
+warm-up before the lockdown (`warm_libc`: timezone, address-sort configuration, name-service probe).
+Compatibility remains protocol 14 / physics 9. The Winterfell room runs it with `--lockdown log` and a
+credential-file ICE server (hosting pin `c9302eb`).
+
+On Apple Silicon/macOS, **560 CPU CTests** passed through `tools/cut_release.py`. The hosted and
+GitHub Pages browser checks passed in Chrome and the matching native bot joined with zero decode errors;
+room and relay report active on the tagged commit. The `log`-mode soak was **not clean**: the second
+browser join after an empty room logged two `openat` calls from glibc's malloc arena sizing, fixed after
+this release (see the
+[hardening plan](SERVER_HARDENING_PLAN.md#second-soak-finding-the-malloc-arena-limit)). Not performed:
+human input/audio, Windows execution, physical devices, the Release-build `--fortify` check, a relay join
+from outside the LAN. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.30/`.
+
+### v0.0.29 — 2026-11-14
+
+Earlier release: **[v0.0.29](https://github.com/doomdavve/proteus/releases/tag/v0.0.29)** is
+published at `6ca3954ff327e986a8a183a1157177932e7d2f95` (the merge of PR #198). It adds the SDP
+offer filter: the server passes only numeric IP candidates from a client's offer to the WebRTC
+library, so a client can no longer cause name lookups. Compatibility remains protocol 14 / physics 9.
+The Winterfell room runs it with `--lockdown log`.
+
+On Apple Silicon/macOS, Debug configure/build and **560 CPU CTests** passed through
+`tools/cut_release.py` (`ctest --preset full`, GPU tests off). Both native archives passed SHA-256
+(macOS `affe2ff6...`, Windows `4bedcc00...`), ZIP and version/commit checks. The first deployment
+attempt succeeded. The hosted and GitHub Pages browser checks passed in Chrome and the matching
+native bot joined with zero decode errors. Room and relay report active on the tagged commit;
+hosting pin `a603dcd` is on the private baseline. Not performed: human input/audio, Windows
+execution, physical devices, the Release-build `--fortify` check of the deployed binary. Evidence:
+`/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.29/` (the worktree was reused for the
+second release).
+
+### v0.0.28 — 2026-11-14
+
+Earlier release: **[v0.0.28](https://github.com/doomdavve/proteus/releases/tag/v0.0.28)** is
+published at `a0ba228cdf85316e0b8b6c4a112d4be9961cb87e` (the merge of PR #196). It collects the
+server hardening work (H1-H5: connection limits, mitigation build flags, fuzz and sanitizer lanes,
+and the opt-in `--lockdown` mode) and the wake-field retirement since v0.0.27. Compatibility
+remains protocol 14 / physics 9. **`--lockdown` ships off**; the Winterfell unit does not pass it.
+
+On Apple Silicon/macOS, Debug configure/build and **558 CPU CTests** passed (`ctest --preset full`,
+GPU tests off) through `tools/cut_release.py`. Both native archives were downloaded and passed
+SHA-256 (macOS `591a5613...`, Windows `5144bb7e...`), ZIP and version/commit checks. Release
+deployment ran on the first attempt (no retries). The hosted and GitHub Pages
+browser checks (`check_web_server_directory.py`, Chrome) passed, and the matching native
+`boat_bot --predict` joined `wake.davve.net:24680` for five seconds with zero decode errors.
+Hosting pin `e8b5ebe` is pushed to the private baseline; room and relay report active on the tagged
+commit.
+
+Not performed: human input/audio, local Windows execution, physical-device acceptance, Firefox/Safari,
+and the Release-build `check_binary_hardening.py --fortify` check on the Winterfell binary
+(still owed from H2). Whether the WebRTC build links under the new flags is shown only by the
+deployment succeeding, not by a dedicated check. Evidence:
+`/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/` (`verification.json`, stage logs).
+The v0.0.26 and v0.0.27 sections are on `release/v0.0.27-evidence` and are not yet on `main`.
+
 ### v0.0.25 — 2026-11-04
 
-Current release: **[v0.0.25](https://github.com/doomdavve/proteus/releases/tag/v0.0.25)**
+Earlier release: **[v0.0.25](https://github.com/doomdavve/proteus/releases/tag/v0.0.25)**
 is published at `f6152ba3eb655772dc2fcea1de177bb8c79b86be`. The
 [native release](https://github.com/doomdavve/proteus/actions/runs/41867615283) and
 [Pages](https://github.com/doomdavve/proteus/actions/runs/41867615336) workflows passed after

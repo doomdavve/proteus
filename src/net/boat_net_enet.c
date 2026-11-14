@@ -84,6 +84,7 @@ static BoatNetEnet *create(const ENetAddress *address, size_t peers, char *error
         return NULL;
     }
     e->host->mtu = BOAT_NET_ENET_MTU;
+    e->host->duplicatePeers = BOAT_NET_MAX_PEERS_PER_SOURCE; // Per source address (clients: 1).
     e->host->maximumPacketSize = BOAT_NET_MAX_MESSAGE;
     e->host->maximumWaitingData = BOAT_NET_ENET_WAITING_BYTES;
     e->host->intercept = intercept;

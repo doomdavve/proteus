@@ -480,21 +480,3 @@ Vector3 boat_water_resistance(
     force = fmaxf(force, -support / water.normal.y);
     return Vector3Scale(water.normal, force);
 }
-
-BoatWaterSample boat_water_query_field(
-    BoatWater water, const BoatWake *field, Vector2 position, double time)
-{
-    BoatWaterSample s = query(&water, position, time);
-    if (!field)
-        return s;
-    BoatWakeSample q;
-    if (!boat_wake_query(field, position.x, position.y, &q))
-        return s;
-    float gx = -s.normal.x / s.normal.y + (float)q.gradient_x;
-    float gz = -s.normal.z / s.normal.y + (float)q.gradient_z;
-    s.height += (float)q.height;
-    s.normal = Vector3Normalize((Vector3) { -gx, 1, -gz });
-    s.velocity = Vector3Add(s.velocity,
-        (Vector3) { (float)q.velocity_x, (float)q.vertical_velocity, (float)q.velocity_z });
-    return s;
-}

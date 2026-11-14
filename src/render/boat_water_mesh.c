@@ -63,7 +63,6 @@ void boat_water_mesh_cache_destroy(BoatWaterMeshCache *cache)
     free(cache->rest_first);
     free(cache->rest_end);
     index_destroy(&cache->index);
-    surface_destroy(&cache->field);
     for (int i = 0; i < 2; ++i)
         surface_destroy(&cache->patches[i]);
     *cache = (BoatWaterMeshCache) { 0 };
@@ -575,44 +574,6 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
         s->triangles[i].color = (Color) { (unsigned char)Lerp(base.r * light, 166, crest),
             (unsigned char)Lerp(base.g * light, 199, crest),
             (unsigned char)Lerp(base.b * light, 204, crest), 255 };
-    }
-    s->mesh = (Mesh3D) { s->vertices, s->triangles, s->count };
-    return &s->mesh;
-}
-
-const Mesh3D *boat_water_surface_field(
-    BoatWaterMeshCache *cache, BoatWater water, const BoatWake *field, double time)
-{
-    Surface *s = &cache->field;
-    if (!s->count) {
-        for (int z = 0; z < 215; ++z)
-            for (int x = 0; x < 321; ++x) {
-                float left = x == 0 ? -120 : -119.625f + (x - 1) * .75f;
-                float right = x == 320 ? 120 : -119.625f + x * .75f;
-                float bottom = z == 0 ? -80 : -79.875f + (z - 1) * .75f;
-                float top = z == 214 ? 80 : -79.875f + z * .75f;
-                Vector3 a = { left, 0, bottom }, b = { left, 0, top }, c = { right, 0, top },
-                        d = { right, 0, bottom };
-                if (!surface_triangle(s, a, b, c) || !surface_triangle(s, a, c, d)) {
-                    s->count = 0; // Retry the complete basin after an allocation failure.
-                    return NULL;
-                }
-            }
-    }
-    for (size_t i = 0; i < s->count; ++i) {
-        Vector3 centre = { 0 };
-        for (int j = 0; j < 3; ++j) {
-            Vector3 *v = &s->vertices[3 * i + j];
-            v->y = boat_water_query_field(water, field, (Vector2) { -v->x, v->z }, time).height;
-            centre = Vector3Add(centre, Vector3Scale(*v, 1.0f / 3));
-        }
-        BoatWaterSample q
-            = boat_water_query_field(water, field, (Vector2) { -centre.x, centre.z }, time);
-        float light = Clamp(.95f + .55f * (-q.normal.x + q.normal.z), .85f, 1.05f);
-        float crest = .65f * Clamp(q.height / .38f, 0, 1);
-        s->triangles[i].color = (Color) { (unsigned char)Lerp(36 * light, 166, crest),
-            (unsigned char)Lerp(107 * light, 199, crest),
-            (unsigned char)Lerp(125 * light, 204, crest), 255 };
     }
     s->mesh = (Mesh3D) { s->vertices, s->triangles, s->count };
     return &s->mesh;

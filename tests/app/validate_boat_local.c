@@ -221,14 +221,14 @@ static void direct_frame(Frame f)
         if (direct_plugin)
             wake_plugin_before_tick(direct_plugin);
         if (scripted)
-            demo_step(s, (int)s->tick, NULL, NULL, &direct.objects);
+            demo_step(s, (int)s->tick, NULL, &direct.objects);
         else if (autopilot)
-            timed_boat_step(s, pilot_input(&pilots[0], &s->boat), NULL, NULL, &direct.objects);
+            timed_boat_step(s, pilot_input(&pilots[0], &s->boat), NULL, &direct.objects);
         else
             timed_boat_step(s,
                 boat_helm_input(&s->boat, (BoatInput) { .steering_rate = f.steering_rate },
                     f.thrust_target, f.steering_target),
-                NULL, NULL, &direct.objects);
+                NULL, &direct.objects);
         if (objective_revision)
             reference_after_tick();
         if (direct_plugin)
@@ -635,7 +635,7 @@ static int scripted_capture(void)
             return 1;
         const uint64_t ticks = 1501;
         for (uint64_t tick = 0; tick < ticks; ++tick)
-            demo_step(&direct.session, (int)tick, NULL, NULL, &direct.objects);
+            demo_step(&direct.session, (int)tick, NULL, &direct.objects);
         game.traced = NULL;
         CHECK(wake_local_scripted_drive(&game, &play.session, &play.objects, ticks));
         game.traced = traced;

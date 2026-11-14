@@ -704,7 +704,7 @@ These are tunable gameplay models, not calibrated hydrodynamics.
 - **Crossable wakes (arcade default, implemented and enjoyed):** the
   [wake plan](WAKE_REWRITE_PLAN.md) owns bounded per-boat pieces, signed overlap, flight,
   landing and capsize. Free boating uses arcade objects; `--player-wake` selects legacy D3,
-  `--no-player-wake` opts out, and `--wake-field` remains a separate native basin experiment.
+  and `--no-player-wake` opts out.
   The dynamic basin rival shares wakes and mutual impacts; ordinary harbor/traffic trails
   remain visual. Multiplayer sharing/authority is planned separately in
   [the multiplayer owner](MULTIPLAYER_PLAN.md), preserving the accepted arcade feel.

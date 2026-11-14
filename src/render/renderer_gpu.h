@@ -122,8 +122,6 @@ typedef struct {
     Mesh water;
     Mesh near_water; // Borrowed boat wave patch; owned by BoatGpu, never unloaded here.
     Mesh near_water_extra; // Optional second indexed candidate strip, same lifetime.
-    Texture2D wake_field; // Borrowed, immutable for the complete draw; owned by BoatGpu.
-    float wake_spacing;
     Texture2D object_wakes; // Owned compact object records; not a sampled water height field.
     // Records of the frame being drawn: player and traffic pieces, and, in a third row, the
     // indices of the pieces the stamped field cannot shade.

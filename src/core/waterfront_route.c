@@ -175,6 +175,17 @@ bool waterfront_route_recipe_from_name(const char *name, WaterfrontCraftRecipe *
     return false;
 }
 
+
+// A bounded copy of a constant id into its fixed buffer.
+static void set_id(char *destination, size_t size, const char *source)
+{
+    size_t length = strlen(source);
+    if (length >= size)
+        length = size - 1;
+    memcpy(destination, source, length);
+    destination[length] = '\0';
+}
+
 static void copy_actor(WaterfrontRouteActor *out, const CompiledActor *in)
 {
     *out = (WaterfrontRouteActor) { .shape = in->shape,
@@ -208,7 +219,7 @@ const WaterfrontRouteDefinition *waterfront_route_defaults(void)
                   "alvsnabben_b", "frihamnen", "schooner" };
         for (unsigned i = 0; i < WATERFRONT_ROUTE_ACTORS; ++i) {
             copy_actor(&defaults.actors[i], &compiled[i]);
-            strcpy(defaults.actors[i].id, ids[i]);
+            set_id(defaults.actors[i].id, sizeof(defaults.actors[i].id), ids[i]);
         }
         defaults_ready = true;
     }
@@ -441,7 +452,7 @@ bool waterfront_route_preset(const char *id, WaterfrontRouteActor *actor)
             .period = 1,
             .point_count = 4,
             .points = { { -20, 184, 5 }, { 20, 184, 5 }, { 20, 198, 5 }, { -20, 198, 5 } } };
-        strcpy(actor->id, "marina_pass");
+        set_id(actor->id, sizeof(actor->id), "marina_pass");
         Route route;
         if (!build(&route, actor, NULL))
             return false;
@@ -458,7 +469,7 @@ bool waterfront_route_preset(const char *id, WaterfrontRouteActor *actor)
     // Friendly compiled aliases used by discovery and package examples.
     if (!strcmp(id, "alvsnabben")) {
         *actor = def->actors[4];
-        strcpy(actor->id, "alvsnabben");
+        set_id(actor->id, sizeof(actor->id), "alvsnabben");
         return true;
     }
     return false;

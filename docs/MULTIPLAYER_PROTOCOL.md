@@ -793,6 +793,20 @@ within 0..1, and engine angle within ±π. Wake amplitude and emitter strength m
 0–3.5, direction components within ±1.001, and length and inverse speed within 0–10⁴. Counts
 must not exceed their capacities, and expired ≤ emitted.
 
+## Connection limits
+
+These bound server work and change no byte on the wire, so they do not increment the protocol
+version. The host holds at most `BOAT_NET_MAX_PEERS` (8) peers, of which at most
+`BOAT_NET_MAX_PEERS_PER_SOURCE` (6) may share one source address (ENet `duplicatePeers`; a
+four-player household plus two retries). ENet drops datagrams that would reassemble past
+`BOAT_NET_MAX_MESSAGE` (1100 bytes) and the server drops any other oversize or empty message.
+The authority admits new connections through a token bucket on its own clock: a burst of
+`BOAT_NET_CONNECT_BURST` (8), refilled at `BOAT_NET_CONNECT_PER_SECOND` (2); the rest are
+disconnected and counted as `connect_limited`. A peer that has not installed a world within
+`BOAT_NET_HANDSHAKE_TIMEOUT` (10 s) is dropped. WebRTC signalling accepts at most eight pending
+sockets, 16 KiB per signalling message and a 15 s window to connect. There is no per-source
+rate limit in the process; the firewall owns that (hardening plan H4).
+
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the

@@ -2,7 +2,7 @@
 # transports obey the core boundary. Native ENet, optional native WebRTC and the browser
 # bridge own platform networking separately.
 set(PROTEUS_BOAT_NET_SOURCES
-  boat_net_mux.c boat_net_mux.h
+  boat_net_mux.c boat_net_mux.h boat_net_sdp.c boat_net_sdp.h
   boat_net_client.c boat_net_client.h boat_net_memory.c boat_net_protocol.c
   boat_net_protocol.h boat_net_server.c boat_net_server.h boat_net_transport.h
   boat_net_private.c boat_net_private.h boat_local.c boat_local.h
@@ -27,6 +27,11 @@ if(NOT EMSCRIPTEN)
     ${enet_SOURCE_DIR}/protocol.c ${enet_SOURCE_DIR}/unix.c ${enet_SOURCE_DIR}/win32.c)
   target_include_directories(proteus_enet SYSTEM PUBLIC ${enet_SOURCE_DIR}/include)
   set_target_properties(proteus_enet PROPERTIES C_STANDARD 99 C_EXTENSIONS ON)
+  if(PROTEUS_SANITIZED)
+    # ENet 1.3.18 shifts 1 into the sign bit when it marks an unsequenced group (protocol.c).
+    # It has no memory effect, and aborting on it would stop every sanitized network test.
+    target_compile_options(proteus_enet PRIVATE -fno-sanitize=shift-base)
+  endif()
   if(WIN32)
     target_link_libraries(proteus_enet PUBLIC ws2_32 winmm)
   else()

@@ -89,3 +89,21 @@ add_test(NAME boat_session_record_process COMMAND ${Python3_EXECUTABLE}
   --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>
   --validator $<TARGET_FILE:validate_boat_session_record>)
 set_tests_properties(boat_session_record_process PROPERTIES LABELS "cpu" TIMEOUT 60)
+
+# H5: in-process lockdown (Landlock, no_new_privs, seccomp), Linux only; compiled out elsewhere.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(validate_boat_lockdown tests/room/validate_boat_lockdown.c
+    src/room/boat_lockdown.c)
+  target_include_directories(validate_boat_lockdown PRIVATE ${PROJECT_SOURCE_DIR}/src)
+  target_compile_options(validate_boat_lockdown PRIVATE ${PROTEUS_WARNINGS})
+  target_link_libraries(validate_boat_lockdown PRIVATE Threads::Threads)
+  add_test(NAME boat_lockdown COMMAND validate_boat_lockdown)
+  set_tests_properties(boat_lockdown PROPERTIES LABELS "core;cpu"
+    PASS_REGULAR_EXPRESSION "validate_boat_lockdown=ok" TIMEOUT 60)
+  # A locked-down server serves bots and a LAN search, and refuses an unreachable ABI.
+  add_test(NAME boat_lockdown_process COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/room/boat_lockdown_process.py
+    --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
+  set_tests_properties(boat_lockdown_process PROPERTIES LABELS "core;cpu"
+    PASS_REGULAR_EXPRESSION "boat_lockdown_process=ok" TIMEOUT 60)
+endif()

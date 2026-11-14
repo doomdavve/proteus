@@ -484,6 +484,12 @@ visual capture was needed for this slice. Interactive browser, GPU/motion review
 Windows/Linux remain unverified; C2–C4 remain open. Existing uncommitted M3 changes were
 preserved; no push or PR was made. No additional capacity expansion or M4/M5 work is included.
 
+Integration verification, 2026-11-14: merged `origin/main` at `f8c3fbf` into the M3
+branch for PR #201. The sole conflict was the `marina_pass` initializer; retained main's
+bounded `set_id` helper and the M3 route data. Native Debug build passed without warnings;
+full CTest with local socket access passed **568/568 tests** in 54.10 s. GPU tests remain OFF;
+no new Wasm or audiovisual run was performed for this merge. `git diff --check` passed.
+
 Effort assessment (inference from source/history, not session usage telemetry): 15 commits
 built timetable, leg, arc, clearance, traffic, plugin, staging and room layers before the
 integrated demo. The continuous-clearance requirement and repeated cross-layer integration

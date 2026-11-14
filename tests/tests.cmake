@@ -1,6 +1,7 @@
 # Test registration, near each owner. Included (not added as a subdirectory) so every test
 # stays in the project root's directory scope: lanes, labels, CI selection and working
 # directories apply to all of them at once.
+set(BOAT_REPLAY_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/replay-tests")
 include(${CMAKE_CURRENT_LIST_DIR}/core/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/scenery/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/render/tests.cmake)
@@ -10,6 +11,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/net/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/plugins/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/session/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/room/tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/fuzz/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/app/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/web/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/lint/tests.cmake)

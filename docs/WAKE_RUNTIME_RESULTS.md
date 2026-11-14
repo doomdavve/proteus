@@ -1,5 +1,7 @@
 # Wake runtime feasibility checkpoint (historical at 6deaba2)
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-21, macOS / Apple M1 Max, native Apple clang. Owner:
 [wake rewrite plan](WAKE_REWRITE_PLAN.md). Previous numerical baseline:
 [W2.1 field/domain proof](WAKE_W2_FIELD_RESULTS.md).
@@ -23,7 +25,7 @@ cadence/default change. The D3 player, water queries, rendering and audio are un
 
 ## Source work and bounded ownership
 
-[boat_wake.c](../src/core/boat_wake.c) now uses symmetry of the same positive operator A:
+boat_wake.c now uses symmetry of the same positive operator A:
 
 `delta H = rho dx^2 (psi + delta_psi/2)^T A delta_psi`.
 
@@ -53,7 +55,7 @@ invalid impulses, and a constant-potential gauge plus a small modal kick.
 
 ## Temporal convergence
 
-[CPU diagnostic](../tools/wake_runtime_review.c), `--check`: actual C fields on a
+CPU diagnostic, `--check`: actual C fields on a
 24x16 grid at .75 m, spatial order 8, polynomial order 256; 16 seconds of smooth
 prescribed moving/turning/stopping forcing projected onto five zero-mean Neumann modes
 (wavelengths include 3–12 m). The reference independently integrates the modal forced
@@ -103,7 +105,7 @@ runs. No browser/Windows or worst-case guarantee is claimed.
 
 ## Direct GPU experiment
 
-[GPU diagnostic](../tools/wake_gpu_runtime_review.c): isolated desktop OpenGL 3.3,
+GPU diagnostic: isolated desktop OpenGL 3.3,
 RGBA32F textures, the same mirrored water-only neighbors and order-256 factored
 Clenshaw recurrence. No compute shaders or graphics-backend change. The shader port is
 not wired into the demo or web packaging.

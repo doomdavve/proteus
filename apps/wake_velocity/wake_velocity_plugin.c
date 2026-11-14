@@ -1099,7 +1099,7 @@ static bool preview_session(const BoatSession *s)
         for (unsigned i = 1; i < BOAT_OBJECT_BOATS; ++i)
             if (s->world.water.objects->emitters[i].initialized)
                 return false; // A crossing/fleet fixture needs its other boats checkpointed too.
-    return !s->record_runs && !s->course.enabled && !s->world.combat && !s->world.wake_field
+    return !s->record_runs && !s->course.enabled && !s->world.combat
         && !s->world.water.radial && !r->playing && !r->export_path && !r->recording.samples
         && !r->last.samples && !r->best.samples && !r->opponent.samples && !r->reference.samples
         && !r->save_best && !r->export_last && !r->report_finish;

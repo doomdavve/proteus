@@ -152,8 +152,8 @@ Artifacts under `build/wake-smoothing/`: `before.log`, `after.log`, `cost-before
 2026-10-22: the user reports the continuity revision is very fun, notes waves sometimes
 appear stuck, and requests wake objects as the new default. Free boating now selects
 objects in basin, Eriksberg and river, including bundled app startup. `--wake-objects`
-remains an explicit selector; `--player-wake` selects legacy D3, `--wake-field` selects
-the native basin field, and `--no-player-wake` selects the visual-only trail. Existing
+remains an explicit selector; `--player-wake` selects legacy D3 and
+`--no-player-wake` selects the visual-only trail. Existing
 course/replay/ghost water stays unchanged. Tuning flags now work with the implicit default.
 Explicit incompatible mode combinations still fail as before.
 

@@ -2,7 +2,6 @@
 #define PROTEUS_BOAT_WATER_H
 
 #include "core/boat_vessel_wake.h"
-#include "core/boat_wake.h"
 #include "core/boat_wake_objects.h"
 #include "core/geometry3d.h"
 
@@ -107,8 +106,6 @@ bool boat_water_wake_source(BoatWater water, double time, Vector2 *position);
 BoatWaterSample boat_water_query(BoatWater water, Vector2 position, double time);
 // The same query reading WATER in place, for per-vertex loops over one settings value.
 BoatWaterSample boat_water_query_borrowed(const BoatWater *water, Vector2 position, double time);
-BoatWaterSample boat_water_query_field(
-    BoatWater water, const BoatWake *field, Vector2 position, double time);
 // Dissipative normal resistance in simulation coordinates. Positive support is the local upward
 // spring force; it caps exit damping so the combined support never pulls the hull underwater.
 Vector3 boat_water_resistance(

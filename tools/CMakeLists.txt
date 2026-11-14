@@ -37,50 +37,8 @@ target_compile_options(gpu_fixture PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 add_dependencies(gpu_fixture proteus_assets)
-add_executable(wake_field_review wake_field_review.c)
-target_link_libraries(wake_field_review PRIVATE proteus_boat_core)
-target_compile_options(wake_field_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-if(NOT MSVC)
-  target_link_libraries(wake_field_review PRIVATE m)
-endif()
-add_executable(wake_runtime_review wake_runtime_review.c)
-target_link_libraries(wake_runtime_review PRIVATE proteus_boat_core)
-target_compile_options(wake_runtime_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-if(NOT MSVC)
-  target_link_libraries(wake_runtime_review PRIVATE m)
-endif()
-
-# Compact representation diagnostic only; no player or renderer dependency.
-add_executable(wake_packet_review wake_packet_review.c)
-target_link_libraries(wake_packet_review PRIVATE proteus_boat_core)
-target_compile_options(wake_packet_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-if(NOT MSVC)
-  target_link_libraries(wake_packet_review PRIVATE m)
-endif()
-
-add_executable(wake_candidate_review wake_candidate_review.c)
-target_link_libraries(wake_candidate_review PRIVATE proteus_boat_core)
-target_compile_options(wake_candidate_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-if(NOT MSVC)
-  target_link_libraries(wake_candidate_review PRIVATE m)
-endif()
-# Isolated desktop GL 3.3 experiment. It is deliberately not linked into wake_velocity.
-add_executable(wake_gpu_runtime_review wake_gpu_runtime_review.c)
-target_link_libraries(wake_gpu_runtime_review PRIVATE proteus_boat_core)
-target_compile_options(wake_gpu_runtime_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_dependencies(title_backdrop proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
-add_executable(wake_play_review wake_play_review.c)
-target_include_directories(wake_play_review PRIVATE ${raylib_SOURCE_DIR}/src)
-target_link_libraries(wake_play_review PRIVATE proteus_boat_session proteus_gpu)
-target_compile_options(wake_play_review PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-add_dependencies(wake_play_review proteus_assets)
 execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   OUTPUT_VARIABLE BOAT_BENCH_REV OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(NOT BOAT_BENCH_REV)
@@ -98,7 +56,6 @@ target_compile_definitions(boat_benchmark PRIVATE
   BOAT_BENCH_PLATFORM="${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
 target_compile_options(boat_benchmark PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
-add_executable(wake_baseline wake_baseline.c)
 add_executable(boat_water_review boat_water_review.c)
 add_dependencies(boat_water_review proteus_assets)
 target_compile_definitions(boat_water_review PRIVATE
@@ -115,7 +72,6 @@ add_executable(boat_flag_review boat_flag_review.c)
 add_dependencies(boat_flag_review proteus_assets)
 add_executable(boat_fleet_review boat_fleet_review.c)
 add_dependencies(boat_fleet_review proteus_assets)
-target_link_libraries(wake_baseline PRIVATE proteus_boat_core)
 foreach(target boat_banking_review boat_flag_review boat_fleet_review)
   target_link_libraries(${target} PRIVATE proteus_boat_session proteus_gpu)
 endforeach()
