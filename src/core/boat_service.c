@@ -61,8 +61,9 @@ bool boat_service_state(const BoatServiceDefinition *service, const BoatRoutePat
         out.path_tick = total;
     } else {
         out.path_tick = tick - service->start_tick;
-        out.owner = visitor && out.path_tick >= begin && out.path_tick < end ? BOAT_OWNER_MOORED
-                                                                          : BOAT_OWNER_TRAVELLING;
+        out.owner = visitor && out.path_tick >= begin && out.path_tick < end
+            ? BOAT_OWNER_MOORED
+            : BOAT_OWNER_TRAVELLING;
     }
     *state = out;
     return true;
@@ -109,8 +110,8 @@ BoatServiceFault boat_service_validate(const BoatServiceDefinition *service,
     return fault;
 }
 
-bool boat_service_reservation(const BoatServiceDefinition *service, const BoatRoutePath *path,
-    uint64_t *begin, uint64_t *end)
+bool boat_service_reservation(
+    const BoatServiceDefinition *service, const BoatRoutePath *path, uint64_t *begin, uint64_t *end)
 {
     uint64_t total;
     if (!begin || !end || !usable(service, path, &total))

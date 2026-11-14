@@ -42,7 +42,8 @@ typedef struct {
 
 #define BOAT_SERVICE_POSE_TOLERANCE 0.001 // Metres and radians, as path joins.
 
-// Half-open path-tick interval [BEGIN, END) of PIECE's dwell. False for a missing piece or no dwell.
+// Half-open path-tick interval [BEGIN, END) of PIECE's dwell. False for a missing piece or no
+// dwell.
 bool boat_service_dock_interval(
     const BoatRoutePath *path, unsigned piece, uint64_t *begin, uint64_t *end);
 // Ownership at TICK. False for an invalid path or definition, leaving STATE unchanged.

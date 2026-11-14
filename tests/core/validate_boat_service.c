@@ -13,16 +13,16 @@
         }                                                                                          \
     } while (0)
 
-static BoatRoutePathPiece line(double x0, double z0, double x1, double z1, uint64_t ticks,
-    uint64_t dwell)
+static BoatRoutePathPiece line(
+    double x0, double z0, double x1, double z1, uint64_t ticks, uint64_t dwell)
 {
     BoatRoutePathPiece p = { .kind = BOAT_ROUTE_PATH_LINE, .dwell_ticks = dwell };
     p.shape.line = (BoatRouteLeg) { x0, z0, x1, z1, ticks, BOAT_TICK_SECONDS, 5, 7 };
     return p;
 }
 
-static BoatRoutePathPiece arc(double cx, double cz, double r, double start, double sweep,
-    uint64_t ticks)
+static BoatRoutePathPiece arc(
+    double cx, double cz, double r, double start, double sweep, uint64_t ticks)
 {
     BoatRoutePathPiece p = { .kind = BOAT_ROUTE_PATH_ARC };
     p.shape.arc = (BoatRouteArc) { cx, cz, r, start, sweep, ticks, BOAT_TICK_SECONDS, 5, 7 };
@@ -69,7 +69,7 @@ int main(void)
 
     // Berth pose: the dock piece end, (12, 195) heading pi/2.
     BoatServiceBerthPose berth = { 12, 195, M_PI / 2 };
-        CHECK(boat_service_validate(&visitor, &path, berth, NULL) == BOAT_SERVICE_OK);
+    CHECK(boat_service_validate(&visitor, &path, berth, NULL) == BOAT_SERVICE_OK);
     BoatServiceBerthPose off = { 12.01, 195, M_PI / 2 };
     BoatRoutePose got;
     CHECK(boat_service_validate(&visitor, &path, off, &got) == BOAT_SERVICE_FAULT_DOCK);
@@ -123,8 +123,8 @@ int main(void)
     CHECK(boat_route_path_validate(&loop4, &total));
     CHECK(boat_service_validate(&resident, &loop4, start, NULL) == BOAT_SERVICE_OK);
     CHECK(boat_service_pose(&resident, &loop4, 0, &pose, NULL) && pose.z == 0);
-    CHECK(boat_service_pose(&resident, &loop4, 500 + total + 99, &pose, NULL)
-        && fabs(pose.x) < 1e-9 && fabs(pose.z) < 1e-9);
+    CHECK(boat_service_pose(&resident, &loop4, 500 + total + 99, &pose, NULL) && fabs(pose.x) < 1e-9
+        && fabs(pose.z) < 1e-9);
 
     // Reservations: a resident reserves forever; visitors reserve their window; boundaries are
     // half-open so back-to-back windows do not conflict.
