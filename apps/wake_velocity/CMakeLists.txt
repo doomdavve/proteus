@@ -102,7 +102,8 @@ if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE wake_velocity_net.c wake_velocity_net.h
     wake_velocity_host.c wake_velocity_host.h ${PROJECT_SOURCE_DIR}/src/room/boat_server.c ${PROJECT_SOURCE_DIR}/src/room/boat_server.h
     ${PROJECT_SOURCE_DIR}/src/room/boat_room_package.c ${PROJECT_SOURCE_DIR}/src/room/boat_room_package.h
-    ${PROJECT_SOURCE_DIR}/src/room/boat_room_objective.c ${PROJECT_SOURCE_DIR}/src/room/boat_room_objective.h)
+    ${PROJECT_SOURCE_DIR}/src/room/boat_room_objective.c ${PROJECT_SOURCE_DIR}/src/room/boat_room_objective.h
+    ${PROJECT_SOURCE_DIR}/src/room/boat_lockdown.c ${PROJECT_SOURCE_DIR}/src/room/boat_lockdown.h)
 endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.

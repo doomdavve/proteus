@@ -189,6 +189,25 @@ nginx therefore proxies signaling to `10.0.21.3:24682` on the same machine.
 The systemd address-family allowlist includes `AF_NETLINK` for Linux interface discovery;
 without it, WebRTC fails to gather host candidates. Room and relay restart independently.
 
+### In-process lockdown
+
+`boat_server --lockdown kill` (Linux, opt-in) restricts the process after startup, on top of the
+systemd sandbox. It applies `PR_SET_NO_NEW_PRIVS`; Landlock with no rules (every filesystem right,
+plus TCP bind/connect and the abstract-socket and signal scopes, denied; open descriptors and
+already-bound sockets keep working); and a hand-written seccomp-bpf allowlist for x86-64 and
+aarch64 (audit architecture checked). Landlock does not cover UDP, so the ENet socket is
+limited by the seccomp list and the nftables rules, not by Landlock. The allowlist covers
+console and open-descriptor I/O, time, memory, futex and thread creation (`clone` needs
+`CLONE_THREAD`; `clone3` answers `ENOSYS` so glibc falls back), polling, IP and netlink sockets,
+and `ioctl`/`fcntl`/`prctl` with a few permitted requests. `open`, `execve` and other socket
+families are not allowed. The lockdown is fail-closed (see
+[COMMAND_LINE](COMMAND_LINE.md)); the achieved Landlock ABI is printed at start-up. To tune the
+list under a soak, run `--lockdown log` and read the kernel's `SECCOMP` audit records
+(`journalctl -k` or `ausearch -m SECCOMP`), then extend `build_allowlist` in
+`src/room/boat_lockdown.c`. The WebRTC threads (libdatachannel, libjuice) may need more than
+the ENet path; that is unverified. The recording file is opened before the lockdown, and
+`--package-reload` is refused because it needs files.
+
 The playbook adds `/etc/nginx/conf.d/wake-velocity.conf`, validates nginx, then reloads it.
 Its dedicated TLS listener serves only the game assets and `/room`, using Winterfell's
 existing Let's Encrypt certificate. The baseline's infrastructure HTTPS site is unchanged;
