@@ -1036,6 +1036,14 @@ own module (`"core/boat.h"`, `"wake_velocity/wake_velocity_local.h"`,
 private to their consumers. Each module defines its targets in its own `CMakeLists.txt`;
 `tests/<module>/tests.cmake` owns test registration.
 
+Linux builds compile and link with exploit-mitigation flags (`cmake/Hardening.cmake`, option
+`PROTEUS_HARDEN`, on by default): stack protector, stack-clash protection, `-fcf-protection` and
+zero-initialised locals where the compiler accepts them, `_FORTIFY_SOURCE=3` outside Debug, PIE,
+full RELRO and a non-executable stack, applied to fetched dependencies too. They do not change
+floating-point results. `binary_hardening_selftest` exercises `tests/lint/check_binary_hardening.py`
+on synthetic ELF files on every platform; on Linux `boat_server_hardening` runs it on the built
+`boat_server` (checking `_FORTIFY_SOURCE` calls outside Debug) and skips other file formats.
+
 `module_includes` recursively checks C sources and headers in `src`, `apps`, `tests` and
 `tools`. It rejects flat project includes, relative aliases and forbidden module dependencies.
 `tests/lint/check_module_includes.py` owns the allowed graph and closes it transitively.
