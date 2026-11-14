@@ -211,10 +211,11 @@ static void objective_poll(BoatNetServer *s)
 
 static void rule_event(BoatNetServer *s, BoatNetRuleKind kind, unsigned slot, unsigned mark)
 {
-    if (!s->config.rules.event)
-        return;
     BoatNetRuleEvent e = { .kind = (uint8_t)kind, .slot = (uint8_t)slot, .mark = (uint8_t)mark };
-    s->config.rules.event(s->config.rules.context, s->fleet.state.tick, &e);
+    if (s->config.record.event)
+        s->config.record.event(s->config.record.context, s->fleet.state.tick, &e);
+    if (s->config.rules.event)
+        s->config.rules.event(s->config.rules.context, s->fleet.state.tick, &e);
 }
 
 // Free PEER's slot between ticks; its live wakes stay and expire naturally.
@@ -982,6 +983,13 @@ static void revision_announce(BoatNetServer *s, uint64_t commit_tick)
     ++s->stats.revisions_announced;
 }
 
+// Notify the optional read-only recorder without adding an I/O dependency to net.
+static void record_observe(BoatNetServer *s, BoatNetRecordPhase phase, const BoatInput *inputs)
+{
+    if (s->config.record.observe)
+        s->config.record.observe(s->config.record.context, s, phase, inputs);
+}
+
 // Install ROOM (encoded as BYTES) as the running definition after the tick just simulated.
 static void revision_install(
     BoatNetServer *s, const BoatRoomDefinition *room, const uint8_t *bytes, uint32_t size)
@@ -1013,8 +1021,10 @@ static void revision_install(
     }
     boat_marks_tracker_reset(&s->marks);
     ++s->stats.revisions_committed;
+    record_observe(s, BOAT_NET_RECORD_BEFORE_DEFINITION, NULL);
     if (s->config.rules.definition)
         s->config.rules.definition(s->config.rules.context, s->fleet.state.tick, s->room);
+    record_observe(s, BOAT_NET_RECORD_AFTER_DEFINITION, NULL);
 }
 
 // At the commit tick: drop whoever is not ready, switch, then serve the Hellos held meanwhile.
@@ -1123,7 +1133,9 @@ static void tick(BoatNetServer *s)
     BoatInput inputs[BOAT_FLEET_SLOTS];
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         inputs[i] = select_input(s, i, next);
+    record_observe(s, BOAT_NET_RECORD_INPUT, inputs);
     boat_fleet_step(&s->fleet, inputs);
+    record_observe(s, BOAT_NET_RECORD_RESULT, NULL);
     s->stats.emission_failures += s->fleet.stats.emission_failures;
     if (s->deathmatch) {
         BoatMatchOutput out;
@@ -1147,10 +1159,13 @@ static void tick(BoatNetServer *s)
     if (s->config.local.enabled && s->config.rules.weather
         && s->config.rules.weather(s->config.rules.context, &storm))
         s->fleet.world.water.storm = storm;
+    record_observe(s, BOAT_NET_RECORD_BEFORE_OBJECTIVE, NULL);
     if (s->config.rules.after_tick)
         s->config.rules.after_tick(s->config.rules.context, next);
+    record_observe(s, BOAT_NET_RECORD_AFTER_OBJECTIVE, NULL);
     objective_poll(s);
     revision_tick(s);
+    record_observe(s, BOAT_NET_RECORD_BOUNDARY, NULL);
     ++s->stats.ticks;
     // Births first, so a lossless link delivers them before the snapshot that counts them.
     if (next % BOAT_NET_BIRTH_TICKS == 0)
@@ -1180,6 +1195,7 @@ bool boat_net_server_service(BoatNetServer *s, double now)
             leave(s, peer, BOAT_NET_LEAVE_TIMEOUT);
         }
     }
+    record_observe(s, BOAT_NET_RECORD_BOUNDARY, NULL);
     uint64_t due = s->origin_tick + (uint64_t)floor((now - s->origin) * BOAT_TICK_HZ);
     if (s->tick_limit && due > s->tick_limit)
         due = s->tick_limit;

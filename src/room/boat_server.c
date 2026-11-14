@@ -19,6 +19,7 @@
 #include "platform/cli_usage.h"
 #include "room/boat_room_objective.h"
 #include "room/boat_room_package.h"
+#include "room/boat_session_record.h"
 
 #include <inttypes.h>
 #include <signal.h>
@@ -64,6 +65,7 @@ static void usage(FILE *out)
     cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
     cli_usage_line(out, "--location NAME", "basin|outer (default basin; race uses outer)");
     cli_usage_line(out, "--package ID|DIR", "Room package (default: the mode's bundled package)");
+    cli_usage_line(out, "--record PATH", "Record a headless reconstructable authority session.");
     cli_usage_line(out, "--package-reload", "Reload the package's room objective when its files");
     cli_usage_line(out, "", "change (needs --package DIR or a bundled ID with a room objective)");
     cli_usage_line(out, "--waves", "Gentle crossing waves");
@@ -356,6 +358,7 @@ typedef struct {
     unsigned long players, ticks, report;
     unsigned long peer_timeout; // Seconds; 0 keeps BOAT_NET_TIMEOUT.
     const char *package; // --package ID or directory; NULL uses the mode's default.
+    const char *record_path; // Opt-in authority recording; refuses an existing destination.
     const char *reload_directory; // --package-reload: the directory to watch; NULL when off.
     bool race, exit_with_stdin, until_empty;
     BoatLocationId location;
@@ -490,6 +493,12 @@ static bool open_world(BoatWorldResources *world, BoatLocationId location)
     return false;
 }
 
+static bool record_write(void *context, const uint8_t *bytes, size_t size)
+{
+    FILE *file = context;
+    return fwrite(bytes, 1, size, file) == size;
+}
+
 static int room(const RoomOptions *options)
 {
     char error[160];
@@ -546,6 +555,9 @@ static int room(const RoomOptions *options)
         boat_room_objective_init(&objective, options->objective);
         config.rules = boat_room_objective_rules(&objective);
     }
+    static BoatSessionRecorder recorder;
+    config.record
+        = options->record_path ? boat_session_record_adapter(&recorder) : (BoatNetRecord) { 0 };
     static BoatNetServer server;
     if (!boat_net_server_init(&server, transport, &config)) {
         fprintf(stderr, "boat_server: invalid room configuration.\n");
@@ -600,7 +612,18 @@ static int room(const RoomOptions *options)
     uint64_t events = 0, race_events = 0;
     double busy = 0, started = boat_net_clock();
     int result = 0;
-    while (!stop_requested && (!options->ticks || server.fleet.state.tick < options->ticks)) {
+    FILE *record_file = NULL;
+    if (options->record_path) {
+        record_file = fopen(options->record_path, "wbx");
+        if (!record_file
+            || !boat_session_record_begin(
+                &recorder, &server, objective_on ? &objective : NULL, record_write, record_file)) {
+            fprintf(stderr, "boat_server: cannot create recording '%s'.\n", options->record_path);
+            result = 1;
+        }
+    }
+    while (!result && !stop_requested
+        && (!options->ticks || server.fleet.state.tick < options->ticks)) {
         if (options->exit_with_stdin && stdin_closed()) {
             printf("boat_server: standard input closed; closing the room.\n");
             break;
@@ -616,6 +639,11 @@ static int room(const RoomOptions *options)
             fprintf(stderr,
                 "boat_server: overloaded (more than 500 ms behind for a second); "
                 "closing the room.\n");
+            result = 1;
+            break;
+        }
+        if (options->record_path && recorder.failed) {
+            fprintf(stderr, "boat_server: recording write failed; closing the room.\n");
             result = 1;
             break;
         }
@@ -658,6 +686,16 @@ static int room(const RoomOptions *options)
                 server.fleet.state.wakes.live, players);
         boat_net_enet_wait(enet, boat_net_server_next_tick(&server) - boat_net_clock());
     }
+    // Finish before shutdown removes the remaining crews.
+    if (record_file) {
+        bool recorded = recorder.begun && boat_session_record_end(&recorder, &server);
+        bool closed = fclose(record_file) == 0;
+        if (!recorded || !closed) {
+            fprintf(stderr, "boat_server: recording incomplete: %s\n", options->record_path);
+            result = 1;
+        }
+    }
+    server.config.record = (BoatNetRecord) { 0 };
     boat_net_server_shutdown(&server);
     boat_net_enet_flush(enet);
     BoatNetTransportStats net = transport.stats(transport.context);
@@ -806,6 +844,10 @@ int boat_server_main(int argc, char **argv)
             room_options.package = value;
             room_option = true;
             ++i;
+        } else if (strcmp(argv[i], "--record") == 0 && value && value[0]) {
+            room_options.record_path = value;
+            room_option = true;
+            ++i;
         } else if (strcmp(argv[i], "--package-reload") == 0) {
             package_reload = true;
             room_option = true;
@@ -870,8 +912,8 @@ int boat_server_main(int argc, char **argv)
         if (deathmatch) {
             BoatRoomDefinition definition;
             char error[220];
-            if (!boat_room_package_load("proteus.deathmatch", true, false,
-                    room_options.location, &world, &definition, error, sizeof(error))) {
+            if (!boat_room_package_load("proteus.deathmatch", true, false, room_options.location,
+                    &world, &definition, error, sizeof(error))) {
                 fprintf(stderr, "boat_server: %s\n", error);
                 boat_world_resources_destroy(&world);
                 return 1;

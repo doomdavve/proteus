@@ -49,3 +49,38 @@ add_test(NAME boat_net_process COMMAND ${Python3_EXECUTABLE}
 set_tests_properties(boat_net_process PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_process=ok"
   TIMEOUT 60)
 add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)
+
+add_executable(validate_boat_room_record_objective
+  tests/room/validate_boat_room_record_objective.c src/room/boat_room_objective.c)
+target_link_libraries(validate_boat_room_record_objective PRIVATE
+  proteus_room_record_objective proteus_plugins)
+target_compile_options(validate_boat_room_record_objective PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_room_record_objective COMMAND validate_boat_room_record_objective)
+set_tests_properties(boat_room_record_objective PROPERTIES LABELS "core;cpu")
+
+add_executable(validate_boat_session_record_contract tests/room/validate_boat_session_record.c
+  src/room/boat_room_objective.c src/room/boat_room_package.c)
+target_link_libraries(validate_boat_session_record_contract PRIVATE proteus_session_record
+  proteus_plugins proteus_plugin_catalog)
+target_compile_options(validate_boat_session_record_contract PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_session_record validate_boat_session_record_contract LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set(BOAT_SESSION_RECORD_FIXTURE "${CMAKE_CURRENT_BINARY_DIR}/session-record-hunt.p5gr")
+add_test(NAME boat_session_record.hunt COMMAND validate_boat_session_record_contract
+  --write "${BOAT_SESSION_RECORD_FIXTURE}")
+set_tests_properties(boat_session_record.hunt PROPERTIES FIXTURES_SETUP session_record_hunt
+  LABELS "core;cpu;slow" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME boat_session_record.playback COMMAND validate_boat_session_record
+  "${BOAT_SESSION_RECORD_FIXTURE}")
+add_test(NAME boat_session_record.diagnostic COMMAND validate_boat_session_record
+  "${BOAT_SESSION_RECORD_FIXTURE}" --diagnostic)
+add_test(NAME boat_session_record.seek COMMAND validate_boat_session_record
+  "${BOAT_SESSION_RECORD_FIXTURE}" --seek 700)
+set_tests_properties(boat_session_record.playback boat_session_record.diagnostic
+  boat_session_record.seek PROPERTIES FIXTURES_REQUIRED session_record_hunt LABELS "core;cpu;slow"
+  PASS_REGULAR_EXPRESSION "boat_session_record=ok")
+add_test(NAME boat_session_record_process COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/room/check_session_record_process.py
+  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>
+  --validator $<TARGET_FILE:validate_boat_session_record>)
+set_tests_properties(boat_session_record_process PROPERTIES LABELS "cpu" TIMEOUT 60)

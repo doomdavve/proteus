@@ -1319,3 +1319,19 @@ The browser PR workflow runs the Node contracts and packages the Wasm build. Ful
 qualification is manual-only; dispatch it for browser/plugin lifecycle changes and before a
 release, using `gh workflow run web-plugin.yml --ref BRANCH`. It is not run on ordinary pushes
 to `main`. Superseded PR builds are canceled. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
+
+## Authority recording checks
+
+`boat_room_record_objective` checks the complete objective wrapper codec, pending migration
+continuation, bounded fields and truncation rejection. `boat_session_record.*` drives a virtual
+clock through a two-client hunt, selected inputs, reset, leave/reconnect, source migration,
+empty-room moved-mark revision, periodic keyframes and quarantine. It compares live keyframe
+oracles with sequential reconstruction and continuation from each sought keyframe. The fixture
+also exercises the headless CLI with ordinary playback, diagnostic Lua re-execution and seek.
+Malformed frames, compatibility failures, missing end markers and a failed sink are checked.
+`boat_session_record_process` exercises `--record` over local ENet, the CLI, damaged files and
+refusal to overwrite an existing recording. Its process timeouts are failure deadlines.
+
+The [session recording contract](SESSION_RECORDING.md) describes what is reconstructed. These
+checks establish headless behavior; they do not qualify cross-platform bit identity, visual
+playback, a room save or human multiplayer acceptance.

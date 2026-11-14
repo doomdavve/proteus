@@ -415,6 +415,12 @@ new marks; players who join afterwards receive them. `wake_velocity --serve` sha
 [room objective reload](PLUGIN_API.md#room-objective-reload-p5e) and
 [its revisions](PLUGIN_API.md#definition-revisions-from-reload-p5f).
 
+`--record PATH` creates a new authority session recording (existing paths are refused).
+Reconstruct it with `./build/validate_boat_session_record PATH`, seek to a simulation tick with
+`--seek TICK`, or re-evaluate embedded objective callbacks with `--diagnostic`. Ordinary playback
+runs no Lua. Finish the server normally to write the required end marker. This is a headless
+playback artifact; [session recordings](SESSION_RECORDING.md) owns the format and limits.
+
 The standalone authority defaults to loopback, basin and UDP port 24680. `--bind` selects
 an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--seconds` /
 `--ticks` limit. `--players 1-4` caps room size, `--waves` enables ambient waves,

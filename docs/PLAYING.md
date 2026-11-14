@@ -287,3 +287,7 @@ and MENU are also in the game. Use MENU to recover or return to the title. Tilt 
 and permission; recenter after rotating. On iPhone, Safari's Share → Add to Home Screen → Open as Web App
 provides more screen space. Mobile weapons, replay controls and text editing remain
 limited; see [mobile controls and qualification](WEB_BUILD.md#mobile-controls-and-iphone-presentation-2026-10-28).
+
+Authority developers can capture a hosted session with `boat_server --record PATH` and inspect
+it with the headless reconstruction tool; see [session recordings](SESSION_RECORDING.md).
+These files use separate commands from solo course replays.

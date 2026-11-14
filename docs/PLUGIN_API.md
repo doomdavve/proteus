@@ -380,6 +380,15 @@ Race and deathmatch rooms revise at their round boundaries through the same serv
 (`boat_net_server_stage_revision`); no command-line trigger exists for them yet, so those paths are
 covered by the validator only.
 
+#### Authority session recording
+
+`boat_server --record PATH` embeds the effective objective source and complete room-objective
+checkpoints, including pending events, accepted commands and reload candidates. Default headless
+reconstruction applies recorded results without evaluating Lua; `--diagnostic` re-executes
+recorded callbacks and compares committed results. Source, definition and mirrored HUD revisions
+remain independent. See [session recordings](SESSION_RECORDING.md) for capture order, seek,
+compatibility and error behavior. This does not provide a room save or authority resume.
+
 ## Match schema
 
 A `match` package defines a deathmatch room's rules and combat values. It selects no map of its
