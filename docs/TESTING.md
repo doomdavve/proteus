@@ -1403,7 +1403,7 @@ Note where the UPPER BEND mark (the second ring) sits on the minimap, then edit 
 connected and save:
 
 ```sh
-sed -i '' 's/x = -350, z = 0/x = -150, z = 200/' build/hunt-copy/main.lua
+sed -i '' 's/x = -350, z = 0/x = -300, z = 100/' build/hunt-copy/main.lua
 ```
 
 The server should print `objective reload: marks changed; revision 2 waits for an empty room`
@@ -1411,7 +1411,9 @@ and you stay connected with the old mark. Leave the game (menu, leave) and wait:
 `definition revision 2 committed ... (5 marks)` and `objective reload: revision 2 accepted
 (restart)`. Join again with the same command. Pass when the rejoined game shows the second mark
 at the new place (minimap and in the world), the HUD restarted at `HUNT 1`, and the game did not
-crash or show a stale ring at the old place. (Linux: use `sed -i` without `''`.)
+crash or show a stale ring at the old place. If the server instead prints `objective reload
+rejected: ...` (for example a mark centre that is not open water), the validator is working and
+the old revision keeps running; fix the coordinates and save again. (Linux: use `sed -i` without `''`.)
 
 ## Authority recording checks
 
