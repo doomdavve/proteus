@@ -31,10 +31,12 @@ endfunction()
 if(NOT EMSCRIPTEN)
   proteus_fuzz_harness(fuzz_net_decode tests/fuzz/fuzz_net_decode.c 20000 proteus_boat_net)
   proteus_fuzz_harness(fuzz_net_server tests/fuzz/fuzz_net_server.c 300 proteus_boat_net)
-  # The server harness must reach past the handshake, or it tests nothing. Its summary prints
-  # only on a normal exit, so matching it also fails the test on a crash.
-  set_tests_properties(fuzz_net_server PROPERTIES PASS_REGULAR_EXPRESSION
-    "spawns=[1-9][0-9]* resyncs=[1-9][0-9]*")
+  if(NOT PROTEUS_FUZZ)
+    # The server harness must reach past the handshake, or it tests nothing. Its summary prints
+    # only on a normal exit, so matching it also fails the test on a crash.
+    set_tests_properties(fuzz_net_server PROPERTIES PASS_REGULAR_EXPRESSION
+      "spawns=[1-9][0-9]* resyncs=[1-9][0-9]*")
+  endif()
   proteus_fuzz_harness(fuzz_session_record tests/fuzz/fuzz_session_record.c 5000
     proteus_session_record)
 endif()
