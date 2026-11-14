@@ -266,12 +266,13 @@ guide to the same site. The sandbox checks the whole batch before applying any o
 
 ## Marks (P5a)
 
-Status, 2026-11-08: **P5a-P5c: the objective runs on `boat_server`'s authority; clients receive
-its marks (room definition v4) and HUD (ObjectiveState) over protocol v13 and `boat_bot` prints
-them; the game draws them from P5d.** A free package may author up to 16 named circles on
-the water for an objective that runs on a multiplayer room's authority
-([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it. The marks
-stay fixed for the room's life; the script can be [reloaded](#room-objective-reload-p5e).
+A free package may author up to 16 named circles on the water for an objective that runs on a
+multiplayer room's authority ([P5 plan](PLUGIN_P5_PLAN.md)). Clients receive the marks in the room
+definition (v4) and the HUD as ObjectiveState over [protocol v13 and later](MULTIPLAYER_PROTOCOL.md#objectivestate-free-rooms-with-an-objective);
+the game draws them, and `boat_bot` prints them. `--plugin`, Single Player and `cargo_sandbox`
+refuse a package with marks. The marks stay fixed for a room definition revision; the script can be
+[reloaded](#room-objective-reload-p5e) and the marks changed through a
+[definition revision](#definition-revisions-from-reload-p5f).
 
 `boat_server` (and the game's HOST A ROOM child) loads the objective with
 `boat_room_package_load_objective` and runs it in `src/room/boat_room_objective.c` behind
@@ -364,8 +365,9 @@ means changed marks, is a **definition revision**
   validates the definition like the room's own and keeps its mode and location. A refusal prints
   `objective reload rejected: MESSAGE` and changes nothing.
 - A **free room commits a revision only while empty**. With players connected the server prints
-  `objective reload: marks changed; revision N waits for an empty room`; with none, `... revision N
-  commits at once (the room is empty)`. When it commits it prints `definition revision N committed
+  `objective reload: marks changed; revision N waits for an empty room`, once per pending revision
+  however many edits arrive meanwhile (the next pending revision prints it again); with none,
+  `... revision N commits at once (the room is empty)`. When it commits it prints `definition revision N committed
   at tick T (M marks)`.
 - On commit the server tells the rules adapter (`BoatNetRules.definition`), and the objective
   **restarts** on the staged source and marks: `init` at generation + 1 with no state, a replay of

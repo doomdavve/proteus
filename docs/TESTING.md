@@ -1326,7 +1326,9 @@ to `main`. Superseded PR builds are canceled. The [browser guide](WEB_BUILD.md#p
 crews on lossy, duplicating, reordering links: two joiners during play, a fifth refused as full, a
 leaver replaced in its slot with a zero score, and a completed hunt restarting for everyone. After
 the links settle, every client's mirrored HUD equals the authority's. It does not cover server tick
-cost, the web build or WebRTC.
+cost, the web build or WebRTC. `boat_room_objective.revision_waits_once` offers a changing
+candidate file to an occupied room on the virtual clock and requires one "waits for an empty
+room" line per pending revision.
 
 ### Browser hunt case and old-bundle rejection
 

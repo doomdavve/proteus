@@ -15,7 +15,7 @@ Harbor life is the title's `outer` default: the user accepted it after an iPhone
 failed to start from the title) and made the default in
 [#124](https://github.com/doomdavve/proteus/pull/124), both merged 2026-11-01. Standard stays
 selectable and `--location outer` keeps the catalog default `proteus.langedrag`. Round-boundary
-revisions (protocol v10) are part of plugin P5, scheduled by the user 2026-11-07 (previously held 2026-11-01). Open:
+revisions (since delivered as protocol v14 by plugin P5f) are part of plugin P5, scheduled by the user 2026-11-07 (previously held 2026-11-01). Open:
 the human checks listed in the [PD5 result](#pd5-result-2026-10-31); no implementation step
 remains. The user also chose the Eriksberg marina direction for Harbor life (implemented
 2026-11-01; see the [marina plan](MARINA_AUTHORING_PLAN.md)); an iPhone run and human scene/GPU

@@ -125,10 +125,9 @@ anyone: clients only ever see the resulting HUD.
   duplicate and stale announcements are ignored by revision number; prediction history never
   crosses a commit.
 
-Naming correction: older documents call round-boundary revisions "protocol v10". The protocol is
-already v12 ([v10 was the dimensioned marina](MULTIPLAYER_PROTOCOL.md#multiplayer-protocol-v14)),
-so this plan uses v13 and v14 and the closing step retires the "v10" label. Revisions landed in
-v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the protocol document).
+Older documents call round-boundary revisions "protocol v10"; v10 is the dimensioned marina
+contract, and revisions are v14 ([P5f](#p5f-definition-revisions-protocol-v14); bytes in the
+protocol document).
 
 ### Recording and reconstruction
 
