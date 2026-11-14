@@ -421,13 +421,12 @@ static void print_objective(BoatRoomObjective *o, uint64_t tick, bool *reported)
     }
 }
 
-// P5e: every 120 ticks (one second) re-read the package directory; a changed objective is staged
+// P5e: every wall-clock second re-read the package directory; a changed objective is staged
 // and applies at the next objective boundary. A candidate is judged once: SEEN is the last source
 // looked at, whether it was accepted or refused.
 // P5f: a candidate whose room definition differs from the one the room runs (or last staged) is a
 // definition revision, staged through the server; it commits at a boundary, in a free room when
 // it is empty, and the objective restarts on its source and marks then.
-#define RELOAD_POLL_TICKS 120
 typedef struct {
     const char *directory;
     BoatLocationId location;
@@ -573,6 +572,7 @@ static int room(const RoomOptions *options)
         boat_net_enet_cleanup();
         return 1;
     }
+    server.config.empty_pause_seconds = options->ticks || options->record_path ? 0 : 10;
     reload.revision = server.stats.revision;
     server.tick_limit = options->ticks; // --ticks/--seconds run exactly that many ticks.
     server.peer_timeout = (double)options->peer_timeout;
@@ -643,6 +643,7 @@ static int room(const RoomOptions *options)
             fflush(stdout);
         }
     }
+    double reload_at = boat_net_clock() + 1;
     while (!result && !stop_requested
         && (!options->ticks || server.fleet.state.tick < options->ticks)) {
         if (options->exit_with_stdin && stdin_closed()) {
@@ -695,8 +696,10 @@ static int room(const RoomOptions *options)
         if (objective_on)
             print_objective(&objective, server.fleet.state.tick, &suspension_reported);
         if (reload.directory) {
-            if (server.fleet.state.tick / RELOAD_POLL_TICKS != before / RELOAD_POLL_TICKS)
+            if (now >= reload_at) {
                 poll_reload(&reload, &objective, &server);
+                reload_at = now + 1;
+            }
             print_revision(&reload, &server);
             print_reload(&reload, &objective);
         }

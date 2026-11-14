@@ -1275,10 +1275,39 @@ static int lan_discovery(void)
     return 0;
 }
 
+static int empty_pause(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 3, (BoatNetServerConfig) { .empty_pause_seconds = 10 }));
+    room_run(&room, 5);
+    CHECK(!room.server.paused && room.server.fleet.state.tick > 0);
+    room_run(&room, 6);
+    CHECK(room.server.paused);
+    uint64_t frozen = room.server.fleet.state.tick;
+    uint64_t hash = boat_fleet_hash(&room.server.fleet.state);
+    room_step(&room, 3600);
+    CHECK(room.server.paused && room.server.fleet.state.tick == frozen);
+    CHECK(boat_fleet_hash(&room.server.fleet.state) == hash);
+    CHECK(fabs(boat_net_server_next_tick(&room.server) - room.now - .05) < 1e-6);
+    unsigned a = room_join(&room, "wake", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[a].phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(!room.server.paused && !room.server.overloaded);
+    CHECK(room.server.fleet.state.tick > frozen);
+    CHECK(room.server.fleet.state.tick < frozen + 2 * BOAT_TICK_HZ);
+    boat_net_client_leave(&room.clients[a]);
+    room_run(&room, 1);
+    CHECK(!room.server.paused);
+    room_run(&room, 11);
+    CHECK(room.server.paused);
+    room_close(&room);
+    return 0;
+}
+
 static int tick_limit(void)
 {
     static Room room;
-    CHECK(room_open(&room, 3, (BoatNetServerConfig) { 0 }));
+    CHECK(room_open(&room, 3, (BoatNetServerConfig) { .empty_pause_seconds = .01 }));
     room.server.tick_limit = 10;
     CHECK(boat_net_server_service(&room.server, 0));
     CHECK(boat_net_server_service(&room.server, 8.0 / BOAT_TICK_HZ));
@@ -2877,6 +2906,8 @@ static int enet_source_cap(void)
 
 // Room cases without simulated impairment run unchanged over real UDP.
 static const TestCase cases[] = {
+    TEST_CASE(empty_pause),
+    TEST_CASE(tick_limit),
     TEST_CASE(enet_loopback),
     TEST_CASE(enet_source_cap),
     TEST_CASE(enet_lan),
@@ -3697,6 +3728,7 @@ static const TestCase cases[] = {
     TEST_CASE(prediction_owners),
     SLOW_CASE(race_room),
     TEST_CASE(lan_discovery),
+    TEST_CASE(empty_pause),
     TEST_CASE(tick_limit),
     TEST_CASE(rejections),
     TEST_CASE(authority_rules),

@@ -1208,6 +1208,11 @@ bool boat_net_server_service(BoatNetServer *s, double now)
         s->origin = now;
         s->origin_tick = s->fleet.state.tick;
     }
+    // Rebase before handling a waking connection: its checkpoint uses the frozen tick.
+    if (s->paused) {
+        s->origin = now;
+        s->origin_tick = s->fleet.state.tick;
+    }
     handle_events(s, now);
     for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer) {
         BoatNetServerPeer *p = &s->peers[peer];
@@ -1221,6 +1226,21 @@ bool boat_net_server_service(BoatNetServer *s, double now)
             ++s->stats.timeouts;
             leave(s, peer, BOAT_NET_LEAVE_TIMEOUT);
         }
+    }
+    bool empty = true;
+    for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
+        empty &= s->peers[peer].phase == BOAT_NET_PEER_FREE;
+    if (empty && !s->empty)
+        s->empty_since = now;
+    s->empty = empty;
+    s->paused = s->config.empty_pause_seconds > 0 && !s->tick_limit && !s->config.record.observe
+        && empty && !boat_net_server_revision_pending(s)
+        && now - s->empty_since >= s->config.empty_pause_seconds;
+    if (s->paused) {
+        s->origin = now;
+        s->origin_tick = s->fleet.state.tick;
+        s->backlog_since = -1;
+        return !s->overloaded;
     }
     record_observe(s, BOAT_NET_RECORD_BOUNDARY, NULL);
     uint64_t due = s->origin_tick + (uint64_t)floor((now - s->origin) * BOAT_TICK_HZ);
@@ -1304,6 +1324,8 @@ bool boat_net_server_grant(BoatNetServer *s, double now, unsigned ticks)
 
 double boat_net_server_next_tick(const BoatNetServer *s)
 {
+    if (s->paused)
+        return s->origin + 0.05;
     return s->origin + (double)(s->fleet.state.tick + 1 - s->origin_tick) / BOAT_TICK_HZ;
 }
 

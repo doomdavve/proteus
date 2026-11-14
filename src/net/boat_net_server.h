@@ -100,6 +100,7 @@ typedef struct {
 
 typedef struct {
     const char *token; // Room token every Hello must match exactly; "" for none.
+    double empty_pause_seconds; // Pause with no transport peers after this grace (0: disabled).
     bool waves; // Room water: gentle ambient waves or calm.
     uint32_t epoch; // Non-zero session epoch.
     uint32_t first_sequence; // First outgoing sequence on every channel (wrap tests).
@@ -201,6 +202,8 @@ typedef struct BoatNetServer {
     int slot_peer[BOAT_FLEET_SLOTS]; // Peer owning each slot, or -1.
     BoatNetServerPeer peers[BOAT_NET_MAX_PEERS];
     bool started, overloaded;
+    bool empty, paused;
+    double empty_since;
     double origin, backlog_since;
     uint64_t origin_tick;
     uint64_t tick_limit; // Never tick past this (0: no limit), even when catching up.
@@ -230,7 +233,9 @@ bool boat_net_server_init(
     BoatNetServer *server, BoatNetTransport transport, const BoatNetServerConfig *config);
 // Handle waiting messages, then run the ticks due at monotonic time NOW (seconds; the first
 // call starts the clock): at most BOAT_NET_CATCH_UP_TICKS, sending snapshots and births on
-// their cadence, stopping at tick_limit when set. False once the room is overloaded (500 ms
+// their cadence, stopping at tick_limit when set. With empty_pause_seconds enabled, freeze
+// after the grace with no peers or pending revision; rebase on resume. Tick limits and
+// recording disable suspension. False once the room is overloaded (500 ms
 // behind for a second).
 bool boat_net_server_service(BoatNetServer *server, double now);
 // AR6: a private session's service. Handle waiting messages (at most
@@ -253,7 +258,7 @@ bool boat_net_server_stage_revision(
     BoatNetServer *server, const uint8_t *bytes, size_t size, BoatRoomDiagnostic *diagnostic);
 // True while a staged candidate has not committed (waiting for a boundary or announced).
 bool boat_net_server_revision_pending(const BoatNetServer *server);
-// Monotonic time of the next tick, for the caller's wait.
+// Monotonic next service deadline: next tick, or a 50 ms maintenance wake while paused.
 double boat_net_server_next_tick(const BoatNetServer *server);
 unsigned boat_net_server_players(const BoatNetServer *server);
 // Tell every peer the room is closing and disconnect it.
