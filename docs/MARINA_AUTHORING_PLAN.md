@@ -337,7 +337,7 @@ passed. No motion or user acceptance is claimed.
 An unintegrated circular-arc primitive now evaluates tick-addressed left and right turns with
 bounded start phase, signed sweep and conservative tangential-plus-centripetal acceleration.
 Focused arc, leg, clearance and core-boundary tests passed on macOS/Apple Silicon Debug
-2026-11-14. Continuous moving turns and their complete clearance proof remain open.
+2026-11-14. The path motion and clearance checks below build on those primitives.
 An internal-only straight-leg actor now evaluates through the shared traffic motion owner; it is
 not authorable, and room and plugin wire codecs explicitly reject this single-leg shape. Its native
 route and wire rejection tests passed. Open-path serialization and scene clearance must be completed together
@@ -346,12 +346,14 @@ demo when the authoring path is connected. On macOS/Apple Silicon Debug 2026-11-
 and full CTest preset passed 561 enabled tests (13 disabled). After a tick-rounding correction,
 the focused traffic validator passed again.
 The internal traffic owner also supports a provisional four-piece open path of tangent line and
-arc pieces with tick-addressed stops; each piece comes to rest at its end. The full build passed
+arc pieces with tick-addressed stops. Zero-dwell joins now preserve speed through turns; a
+positive dwell stops the craft. Focused tick-by-tick speed, acceleration and join checks passed
+on macOS Debug 2026-11-14. The full build passed
 with the existing 1 MiB plugin-owner cap, and focused traffic and wire-rejection tests passed.
 On the full preset 559 tests passed and two boundary checks initially rejected `nextafter`;
 after adding that standard math function to the boundary allowlist, both checks passed on rerun.
 A later arc-yaw correction passed the focused traffic and boundary checks. This path remains
-unavailable to packages; moving turns, broader capacity and complete scene clearance
+unavailable to packages; broader capacity and complete scene clearance
 are unfinished. Location staging explicitly rejects both internal shapes, including direct
 in-memory candidates; focused free/voyage regression tests passed on macOS Debug 2026-11-14.
 Before that rejection, internal paths now receive a bounded static survey: enclosing hull circles

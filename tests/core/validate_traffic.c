@@ -750,8 +750,19 @@ static int check_open_path(void)
             .max_speed = 20, .max_acceleration = 100 } };
     a->period = 6;
     CHECK(waterfront_route_validate(&def, &d));
+    WaterfrontVesselMotion before_join = waterfront_route_motion(&def, 0, boat_tick_seconds(239));
+    WaterfrontVesselMotion after_join = waterfront_route_motion(&def, 0, boat_tick_seconds(240));
+    CHECK(Vector3Length(before_join.velocity) > 1 && Vector3Length(after_join.velocity) > 1);
+    CHECK(Vector3Distance(before_join.velocity, after_join.velocity) < .2f);
     WaterfrontVesselMotion turning = waterfront_route_motion(&def, 0, 3);
     CHECK(turning.yaw_rate > 0 && Vector3Length(turning.velocity) > 0);
+    WaterfrontVesselMotion previous = waterfront_route_motion(&def, 0, 0);
+    for (unsigned tick = 1; tick <= 720; ++tick) {
+        WaterfrontVesselMotion current = waterfront_route_motion(&def, 0, boat_tick_seconds(tick));
+        CHECK(Vector3Length(current.velocity) <= 20.01f);
+        CHECK(Vector3Distance(current.velocity, previous.velocity) / BOAT_TICK_SECONDS < 100.5f);
+        previous = current;
+    }
     WaterfrontVesselMotion turn = waterfront_route_motion(&def, 0, 4);
     CHECK(fabsf(turn.position.x + 10) < 1e-4f && fabsf(turn.position.z + 20) < 1e-4f);
     a->open_path.pieces[1].dwell_ticks = UINT64_MAX;
