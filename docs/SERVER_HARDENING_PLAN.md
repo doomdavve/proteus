@@ -1,12 +1,12 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged; H4 code side is merged (operator work owed); H5 is implemented on `feat/h5-lockdown`; H6-H7 are next.**
+Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged; H4 code side is merged (operator work owed); H5 is implemented on `feat/h5-lockdown`; H6 is decided (do not split); H7 is next.**
 Completed task: H5, `boat_server --lockdown kill|log|errno` (Landlock ABI 6, `no_new_privs`, hand-written seccomp allowlist); it fails closed. Evidence below.
 Open: `davve-srv`: enable `--lockdown` in the unit and soak with `--lockdown log` to tune the allowlist; H4 operator work (nftables, crash alert); H1 credential unit; the WebRTC syscalls under lockdown are unverified;
 the longer H3 fuzz campaign; relay join from outside the LAN.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: H6 decision (privilege separation), with the H5 operator work in `davve-srv`.
+Next task: H7 closing step, with the H4/H5 operator work in `davve-srv`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -44,7 +44,7 @@ that path becomes a fuzz target and a P1 for hardening.
 | H3 | **Merged 2026-11-14 (PR #193); sanitizer CI and a first libFuzzer run recorded; a longer campaign is still owed.** Sanitizer and fuzz lane (absorbs the M5 "parser fuzzing" open loop). ASan/UBSan runs of the net and room tests and the `boat_bot` soak; libFuzzer/AFL++ harnesses for the packet codec, the ENet receive path, signalling messages, join/name/token handling and the session-record codec. Seed corpus from the recorded protocol tests. Tests keep the virtual clock. | Sanitizer lane green in CI budget; harnesses run N minutes locally without findings, or findings fixed privately |
 | H4 | **Code side implemented 2026-11-14 on `feat/h4-limits`; operator work remains.** Server-side limits and network hygiene: peer, packet-size and join-rate caps (in code, see [Connection limits](MULTIPLAYER_PROTOCOL.md#connection-limits)); per-source rate limit and port allowlist in nftables on Winterfell (`davve-srv`, not done); alert on `SIGSEGV`/`SIGSYS`/`EPERM` service exits (`davve-srv`, not done). | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
 | H5 | **Implemented 2026-11-14 on `feat/h5-lockdown`; operator work remains.** In-process lockdown, Linux only (`pledge` substitute), in `src/room/boat_lockdown.[ch]` behind `__linux__`; never in `proteus_boat_core` or `proteus_boat_net`. After assets, package, plugin load, socket binding and the recording file, `boat_server --lockdown MODE` applies `no_new_privs`, Landlock (all filesystem rights; TCP bind/connect and abstract-socket/signal scopes at ABI 4/6) and a seccomp allowlist; see [Lockdown](MULTIPLAYER_HOSTING.md#in-process-lockdown). It is **opt-in** and stays off until soaked on Winterfell. **Fail closed:** if Landlock is below `BOAT_LOCKDOWN_MIN_LANDLOCK_ABI` (6, what Linux 6.12 offers), or `no_new_privs` or the filter cannot be installed, the server prints the reason and exits 1 before serving. `log` mode is an explicit tuning option; `errno` is for tests. Excludes `--package-reload`. | Server runs a full soak; a test proves a denied `open`/`execve` fails; core boundary lint passes |
-| H6 | Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Decide after H3–H5 whether the remaining risk justifies it. | Decision and reasons recorded |
+| H6 | **Decided 2026-11-14: do not split.** Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Reasons and revisit triggers in [H6 decision](#h6-decision). | Decision and reasons recorded |
 | H7 | Closing step: move the contract and behaviour into `docs/SERVER_SECURITY.md` (new spec, present tense), update [hosting](MULTIPLAYER_HOSTING.md), turn leftovers into open items or drop them explicitly, then mark this plan done. | Docs match the deployed units and the code |
 
 Order: H1 and H2 are small and independent; H3 is the main investment and can run beside them;
@@ -119,3 +119,31 @@ deliberate crash.
 - 2026-11-14, Winterfell scratch copy (Debian 13, Linux 6.12.116, x86-64, GCC, Debug, no WebRTC, Landlock ABI 6 reached): `validate_boat_lockdown` (denied `open`/`execve`/AF_UNIX/AF_PACKET socket fail with `EPERM`, `execve` and `open` kill with `SIGSYS`, loopback UDP exchange works, refusal installs nothing, Landlock denies files and TCP bind) and `boat_lockdown_process` (`--lockdown kill` and `log` servers with two bots and a LAN search, clean exit) passed; the scratch copy and processes were removed. The live room was not touched.
 - macOS (Debug): full CTest passed with the Linux code compiled out; `--lockdown` exits 2 there.
 - Not verified: WebRTC threads under lockdown (libdatachannel/libjuice may need more syscalls), a soak of the real unit on Winterfell, `log`-mode trace contents (kernel audit log was not readable from the scratch account), aarch64.
+
+## H6 decision
+
+2026-11-14: **do not split `boat_server` into a network front and an authority process.** This is a
+design judgement, not a measurement; no split was prototyped.
+
+Benefit of a split: a compromised front could only send well-formed fixed-size messages, so it could not
+read or alter room state, spoof players or cheat. The authority could run with no network at all, the
+exposed code (ENet, libjuice, libdatachannel, signalling) would shrink to a small auditable front, and a
+front crash would not lose the room. It would also add a second barrier if the H5 allowlist had a hole.
+
+Cost: a second binary, an IPC protocol with its own spec, tests and fuzzing, a second unit, lifecycle
+and version-skew failure modes, an extra hop per packet, a clean split of join, token and name
+handling, and a rework of how WebRTC sessions map to peers (the riskiest path). Releases and
+`tools/cut_release.py` would ship two components.
+
+Why not now: after H0, H2 and H5 an RCE in the network code lands in a process with no filesystem, no
+`execve`, no new privileges and a short syscall list. What a split would still add is mostly the
+integrity of game state and denial-of-service containment, which do not justify the added code and
+operating surface for a playground. The front would stay exposed to denial of service either way.
+
+**Revisit if:** the server holds persistent data, accounts or credentials worth stealing; a fuzz
+campaign or advisory shows real memory bugs in the network parsers; or rooms and Lua plugins become
+third-party supplied. A cheaper first step then is one binary run twice (`--role front` and
+`--role authority`) over a socketpair.
+
+Defers: H5 not yet soaked on Winterfell, the WebRTC syscalls under lockdown, and the longer H3 fuzz
+campaign stay the evidence that would change this decision.
