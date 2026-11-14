@@ -10,6 +10,7 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -802,6 +803,216 @@ static int check_open_path(void)
     return 0;
 }
 
+// Composed paths must depend on the requested tick, including when calls skip across
+// pieces, dwell intervals and loop wraps. Compare fields, never C structure padding.
+static bool same_path_motion(WaterfrontVesselMotion a, WaterfrontVesselMotion b)
+{
+    return a.position.x == b.position.x && a.position.y == b.position.y
+        && a.position.z == b.position.z && a.velocity.x == b.velocity.x
+        && a.velocity.y == b.velocity.y && a.velocity.z == b.velocity.z && a.heading == b.heading
+        && a.yaw_rate == b.yaw_rate;
+}
+
+static int check_path_seek_order(const WaterfrontRouteDefinition *def, unsigned last_tick)
+{
+    static WaterfrontVesselMotion reference[5000];
+    static BoatRoutePose poses[5000];
+    static double yaw_rates[5000];
+    CHECK(last_tick < sizeof(reference) / sizeof(reference[0]));
+    const BoatRoutePath *path = &def->actors[0].open_path;
+    for (unsigned tick = 0; tick <= last_tick; ++tick) {
+        CHECK(boat_route_path_evaluate(path, tick, &poses[tick], &yaw_rates[tick]));
+        reference[tick] = waterfront_route_motion(def, 0, boat_tick_seconds(tick));
+        CHECK(reference[tick].position.x == (float)-poses[tick].x);
+        CHECK(reference[tick].position.z == (float)poses[tick].z);
+        CHECK(reference[tick].heading == (float)poses[tick].heading);
+        CHECK(reference[tick].yaw_rate == (float)yaw_rates[tick]);
+        CHECK(same_path_motion(
+            reference[tick], waterfront_route_motion(def, 0, (double)tick * BOAT_TICK_SECONDS)));
+    }
+    const unsigned strides[] = { 1, 7, 31 };
+    for (unsigned cadence = 0; cadence < sizeof(strides) / sizeof(strides[0]); ++cadence) {
+        unsigned stride = strides[cadence];
+        for (unsigned tick = 0;; tick = last_tick - tick < stride ? last_tick : tick + stride) {
+            WaterfrontVesselMotion motion
+                = waterfront_route_motion(def, 0, boat_tick_seconds(tick));
+            CHECK(same_path_motion(reference[tick], motion));
+            if (tick == last_tick)
+                break;
+        }
+    }
+    WaterfrontRouteDefinition translated = *def;
+    for (unsigned i = 0; i < translated.actors[0].open_path.count; ++i) {
+        BoatRoutePathPiece *piece = &translated.actors[0].open_path.pieces[i];
+        if (piece->kind == BOAT_ROUTE_PATH_LINE) {
+            piece->shape.line.start_x += 37;
+            piece->shape.line.end_x += 37;
+            piece->shape.line.start_z -= 19;
+            piece->shape.line.end_z -= 19;
+        } else {
+            piece->shape.arc.centre_x += 37;
+            piece->shape.arc.centre_z -= 19;
+        }
+    }
+    // Reverse and alternating far/near seeks cross every boundary in both directions.
+    for (unsigned sample = 0; sample <= last_tick; ++sample) {
+        unsigned ticks[] = { last_tick - sample, sample % 2 ? last_tick - sample / 2 : sample / 2 };
+        for (unsigned i = 0; i < sizeof(ticks) / sizeof(ticks[0]); ++i) {
+            unsigned tick = ticks[i];
+            WaterfrontVesselMotion other
+                = waterfront_route_motion(&translated, 0, boat_tick_seconds(tick));
+            CHECK(fabsf(other.position.x - reference[tick].position.x + 37) < 1e-5f);
+            CHECK(fabsf(other.position.z - reference[tick].position.z + 19) < 1e-5f);
+            BoatRoutePose pose;
+            double yaw_rate;
+            CHECK(boat_route_path_evaluate(path, tick, &pose, &yaw_rate));
+            CHECK(pose.x == poses[tick].x && pose.z == poses[tick].z
+                && pose.heading == poses[tick].heading && pose.speed == poses[tick].speed
+                && yaw_rate == yaw_rates[tick]);
+            CHECK(same_path_motion(
+                reference[tick], waterfront_route_motion(def, 0, boat_tick_seconds(tick))));
+        }
+    }
+    return 0;
+}
+
+static int check_composed_path_seeks(void)
+{
+    WaterfrontRouteDefinition def = { .actor_count = 1 };
+    WaterfrontRouteActor *actor = &def.actors[0];
+    strcpy(actor->id, "seek_path");
+    actor->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    actor->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    actor->retain = 0xff;
+    actor->period = 7;
+    actor->open_path = (BoatRoutePath) { .count = 3,
+        .pieces = { { .kind = BOAT_ROUTE_PATH_LINE,
+                        .shape.line = { .start_x = 0,
+                            .start_z = 0,
+                            .end_x = 0,
+                            .end_z = -10,
+                            .duration_ticks = 240,
+                            .tick_seconds = BOAT_TICK_SECONDS,
+                            .max_speed = 20,
+                            .max_acceleration = 100 } },
+            { .kind = BOAT_ROUTE_PATH_ARC,
+                .dwell_ticks = 120,
+                .shape.arc = { .centre_x = 10,
+                    .centre_z = -10,
+                    .radius = 10,
+                    .start_angle = BOAT_TWO_PI / 2,
+                    .sweep = BOAT_TWO_PI / 4,
+                    .duration_ticks = 240,
+                    .tick_seconds = BOAT_TICK_SECONDS,
+                    .max_speed = 20,
+                    .max_acceleration = 100 } },
+            { .kind = BOAT_ROUTE_PATH_LINE,
+                .shape.line = { .start_x = 10,
+                    .start_z = -20,
+                    .end_x = 20,
+                    .end_z = -20,
+                    .duration_ticks = 240,
+                    .tick_seconds = BOAT_TICK_SECONDS,
+                    .max_speed = 20,
+                    .max_acceleration = 100 } } } };
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(waterfront_route_validate(&def, &diagnostic));
+    CHECK(check_path_seek_order(&def, 960) == 0);
+    // The line/arc join flows, the arc endpoint dwells for [480,600), and the
+    // finite terminal pose clamps at tick 840. These expected states anchor the replay check.
+    BoatRoutePose pose;
+    double yaw_rate;
+    CHECK(boat_route_path_evaluate(&actor->open_path, 240, &pose, &yaw_rate));
+    CHECK(fabs(pose.x) < 1e-10 && fabs(pose.z + 10) < 1e-10 && pose.speed > 1);
+    CHECK(yaw_rate > 0);
+    for (unsigned tick = 480; tick <= 600; ++tick) {
+        CHECK(boat_route_path_evaluate(&actor->open_path, tick, &pose, &yaw_rate));
+        CHECK(fabs(pose.x - 10) < 1e-10 && fabs(pose.z + 20) < 1e-10);
+        CHECK(pose.speed == 0 && yaw_rate == 0);
+    }
+    CHECK(boat_route_path_evaluate(&actor->open_path, 479, &pose, &yaw_rate));
+    CHECK(pose.speed > 0 && yaw_rate > 0);
+    CHECK(boat_route_path_evaluate(&actor->open_path, 601, &pose, &yaw_rate));
+    CHECK(pose.x > 10 && pose.speed > 0 && yaw_rate == 0);
+    WaterfrontVesselMotion start = waterfront_route_motion(&def, 0, 0);
+    CHECK(same_path_motion(start, waterfront_route_motion(&def, 0, -1)));
+    CHECK(start.position.x == 0 && start.position.z == 0 && Vector3Length(start.velocity) == 0
+        && start.yaw_rate == 0);
+    CHECK(boat_route_path_evaluate(&actor->open_path, 1, &pose, &yaw_rate));
+    CHECK(pose.z < 0 && pose.speed > 0 && yaw_rate == 0);
+    CHECK(boat_route_path_evaluate(&actor->open_path, 839, &pose, &yaw_rate));
+    CHECK(pose.x < 20 && pose.speed > 0 && yaw_rate == 0);
+    CHECK(boat_route_path_evaluate(&actor->open_path, 840, &pose, &yaw_rate));
+    CHECK(pose.x == 20 && pose.z == -20 && pose.speed == 0 && yaw_rate == 0);
+    CHECK(
+        same_path_motion(waterfront_route_motion(&def, 0, 7), waterfront_route_motion(&def, 0, 8)));
+
+    // Two tangent semicircles with stops at both endpoints exercise an internal dwell
+    // and a dwell spanning the end of each loop. Total: 600+120+600+120 ticks.
+    actor->period = 12;
+    actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    for (unsigned i = 0; i < 2; ++i) {
+        actor->open_path.pieces[i] = (BoatRoutePathPiece) { .kind = BOAT_ROUTE_PATH_ARC,
+            .dwell_ticks = 120,
+            .shape.arc = { .centre_x = 0,
+                .centre_z = 0,
+                .radius = 10,
+                .start_angle = i * BOAT_TWO_PI / 2,
+                .sweep = BOAT_TWO_PI / 2,
+                .duration_ticks = 600,
+                .tick_seconds = BOAT_TICK_SECONDS,
+                .max_speed = 10,
+                .max_acceleration = 20 } };
+    }
+    CHECK(waterfront_route_validate(&def, &diagnostic));
+    CHECK(check_path_seek_order(&def, 4321) == 0);
+    // Between ticks, hold the preceding pose even across the wrap. Large finite
+    // times stay bounded without an out-of-range integer conversion.
+    for (unsigned tick = 1439; tick <= 1441; ++tick) {
+        WaterfrontVesselMotion expected = waterfront_route_motion(&def, 0, boat_tick_seconds(tick));
+        CHECK(same_path_motion(
+            expected, waterfront_route_motion(&def, 0, ((double)tick + .25) / BOAT_TICK_HZ)));
+        CHECK(same_path_motion(
+            expected, waterfront_route_motion(&def, 0, ((double)tick + .75) / BOAT_TICK_HZ)));
+    }
+    const double huge_times[] = { DBL_MAX, -DBL_MAX, 0x1p52, -0x1p52 };
+    for (unsigned i = 0; i < sizeof(huge_times) / sizeof(huge_times[0]); ++i) {
+        WaterfrontVesselMotion motion = waterfront_route_motion(&def, 0, huge_times[i]);
+        CHECK(isfinite(motion.position.x) && isfinite(motion.position.z) && isfinite(motion.heading)
+            && isfinite(motion.yaw_rate));
+        CHECK(fabsf(motion.position.x) <= 10 && fabsf(motion.position.z) <= 10);
+        CHECK(Vector3Length(motion.velocity) <= 10);
+    }
+    CHECK(same_path_motion(waterfront_route_motion(&def, 0, -boat_tick_seconds(1)),
+        waterfront_route_motion(&def, 0, boat_tick_seconds(1439))));
+    for (unsigned cycle = 0; cycle < 3; ++cycle) {
+        unsigned offset = cycle * 1440;
+        const unsigned boundaries[] = { 600, 720, 1320, 1440 };
+        for (unsigned b = 0; b < sizeof(boundaries) / sizeof(boundaries[0]); ++b)
+            for (int delta = -1; delta <= 1; ++delta) {
+                unsigned tick = boundaries[b] + delta;
+                CHECK(same_path_motion(waterfront_route_motion(&def, 0, boat_tick_seconds(tick)),
+                    waterfront_route_motion(&def, 0, boat_tick_seconds(offset + tick))));
+            }
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 599, &pose, &yaw_rate));
+        CHECK(pose.speed > 0 && yaw_rate > 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 600, &pose, &yaw_rate));
+        CHECK(fabs(pose.x + 10) < 1e-10 && fabs(pose.z) < 1e-10 && pose.speed == 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 719, &pose, &yaw_rate));
+        CHECK(pose.speed == 0 && yaw_rate == 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 721, &pose, &yaw_rate));
+        CHECK(pose.speed > 0 && yaw_rate > 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 1439, &pose, &yaw_rate));
+        CHECK(fabs(pose.x - 10) < 1e-10 && fabs(pose.z) < 1e-10 && pose.speed == 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 1440, &pose, &yaw_rate));
+        CHECK(pose.x == 10 && pose.z == 0 && pose.speed == 0 && yaw_rate == 0);
+        CHECK(boat_route_path_evaluate(&actor->open_path, offset + 1441, &pose, &yaw_rate));
+        CHECK(pose.speed > 0 && yaw_rate > 0);
+    }
+    puts("composed_path_seeks=ok cadences=1,7,31 finite_dwell=ok loop_cycles=3 reverse=ok");
+    return 0;
+}
+
 static int check_scene_traffic(void)
 {
     BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
@@ -976,6 +1187,7 @@ int main(void)
     CHECK(check_route_definition() == 0);
     CHECK(check_open_leg() == 0);
     CHECK(check_open_path() == 0);
+    CHECK(check_composed_path_seeks() == 0);
     CHECK(check_scene_traffic() == 0);
     CHECK(check_ferry_schedule() == 0);
     CHECK(check_bridge_safety() == 0);

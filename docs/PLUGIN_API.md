@@ -687,7 +687,9 @@ non-finite values and capacity + 1 are rejected with their field paths. Authored
 over the 4,160 s combined river timetable and must clear compiled water, the declared entrance,
 berths, solid modules, other authored craft and compiled traffic; retained actors keep their
 compiled route. An open path is evaluated on 120 Hz ticks, stops only at positive dwells and
-clamps at its final pose. Consecutive piece endpoints and headings must agree within 1 mm and
+clamps at its final pose. Looping paths wrap the absolute simulation tick by their total
+travel/dwell tick count; direct and reverse seeks to the same tick select the same pose.
+Consecutive piece endpoints and headings must agree within 1 mm and
 0.001 radians, including the last-to-first join for loops; native bounds enforce the requested speed and acceleration. Its conservative
 survey checks a hull-enclosing circle against water, moored hulls and structures at up to
 12-tick intervals. It also checks other craft while the path runs and, after arrival, for one

@@ -320,6 +320,12 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 Screenshots use a deterministic scripted drive, not interactive elapsed time. `--time`
 selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to its finish.
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
+Add `--demo-idle` to a solo free/voyage `--demo` or `--screenshot` to send neutral helm
+input while world time, traffic and waves continue. Its initial camera faces the placed
+hull immediately, including tick zero. On calm water this supports a stationary scene review;
+current, waves or contacts can still move the boat. It rejects work, courses, replays/ghosts,
+rooms and the crossing-boat study. See the [marina route example](../plugins/marina-route-demo/README.md)
+for a full approach/pause/departure review and deterministic boundary captures.
 
 Plain free boating (a free package without a voyage, objective or live authoring, on the native
 game) and the time trial (`--course`, `--ghost` or a course package) run as a private local

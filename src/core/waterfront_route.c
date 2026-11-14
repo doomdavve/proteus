@@ -957,17 +957,24 @@ WaterfrontVesselMotion waterfront_route_motion(
                 return out;
         } else
             duration = leg->duration_ticks;
-        // Clamp in seconds before converting, so a huge finite time cannot overflow the tick
-        // product and a negative time resolves to the start tick.
         uint64_t tick = 0;
         bool loop = actor->shape == WATERFRONT_ROUTE_OPEN_PATH && actor->open_path.loop;
-        if (loop || time > 0) {
-            double sample_time = loop ? wrapped(time, actor->period) : time;
-            double scaled = sample_time * (double)BOAT_TICK_HZ;
+        if (loop) {
+            // Recover the absolute simulation tick before wrapping. Reducing seconds first
+            // loses low bits near a wrap (for example tick 1441 in a 1440-tick loop).
+            double scaled = time * (double)BOAT_TICK_HZ;
+            if (!isfinite(scaled))
+                scaled = wrapped(time, actor->period) * (double)BOAT_TICK_HZ;
+            // Below 2^52, tick/120 can round one ULP below its integer on multiplication.
+            // Above that range doubles already have integer spacing; do not advance them.
+            double whole = floor(fabs(scaled) < 0x1p52 ? nextafter(scaled, INFINITY) : scaled);
+            tick = (uint64_t)wrapped(whole, (double)duration);
+        } else if (time > 0) {
+            // Clamp before converting so a huge finite time cannot overflow the integer.
+            double scaled = time * (double)BOAT_TICK_HZ;
             if (!isfinite(scaled) || scaled >= (double)duration)
                 tick = duration;
             else
-                // Converting tick / 120 back to ticks can round one ULP below the integer.
                 tick = (uint64_t)floor(nextafter(scaled, INFINITY));
         }
         BoatRoutePose pose;

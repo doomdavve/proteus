@@ -698,6 +698,13 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 Select a group with `-L`, for example `ctest --test-dir build -L core`; CTest adds fixture
 setup tests that a selected test requires, whatever their label.
 
+`harbor_traffic` checks composed authored paths through the native path evaluator and traffic
+adapter. Finite line/arc/line motion with an interior dwell and a looping two-arc path with
+interior/final dwells cover forward, reverse and alternating seeks, multiple loop wraps and
+1/7/31-tick evaluation cadences. Motion fields compare exactly at identical ticks; independent
+geometry and stopped/moving assertions cover joins, dwell boundaries and terminal clamping.
+This numerical check does not qualify docking visibility or windowed motion.
+
 The former demo's `cube_render_checksum` (an exact opening-frame CPU baseline) was removed
 with the demo on 2026-10-25; no test now pins a rendered image hash.
 

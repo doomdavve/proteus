@@ -1,0 +1,56 @@
+{
+  "platform": "macOS 26.6.2 arm64",
+  "source_base": "f05f74e",
+  "render_size": [
+    320,
+    200
+  ],
+  "camera": {
+    "start": "-5,185,90",
+    "distance": 16,
+    "height": 30,
+    "fixed_fov": true
+  },
+  "neutral_helm": true,
+  "capture_ticks": [
+    0,
+    599,
+    600,
+    601,
+    900,
+    1199,
+    1200,
+    1201,
+    1439,
+    1440,
+    1441,
+    1560,
+    1679,
+    1680,
+    1681,
+    1980,
+    2279,
+    2280,
+    2281
+  ],
+  "window": {
+    "renderer": "gpu",
+    "vsync": false,
+    "frames": 1800,
+    "simulation_ticks": 3611,
+    "restarts": 0,
+    "recording_seconds": 24,
+    "inspection_fps": 4
+  },
+  "sha256": {
+    "cpu-sequence.png": "c157274c2f2fe4c8531c96d1c277d2a7869ec2dea91dead1e2fc49eee3147469",
+    "gpu-sequence.png": "a2e65722ec1c7b372c61a189b2cec41f9c84f0c700a3af00c3811c026e43a6e8",
+    "window-gpu-full.mp4": "6063bd1a4e8c363d686fc2e0ff22e03bc92d1698855fe95c621ae42e93ec2c7c",
+    "window-final.png": "0498eff1ff3d98b48d140934343d5818b8b9d74a4a43ff491c75e6e3967651f8",
+    "validate.json": "9b98657244a4c4d17398140fcf2aab7b6ed8cebc10f79dca3afd403c14479268",
+    "motion-sheet-0.png": "b8eb412490be6b8da654135d58d064c56b8e51bc04e17f83524420274b54d5bb",
+    "motion-sheet-1.png": "3332144b221584a2b7acdd16e42b4cd0a65139dc3ba97c657544a0e3c6b9f9c6",
+    "motion-sheet-2.png": "cd269ab58dc3276e7d8d746201b69310a2c48dbd2d28ec13a943e9e1eaf7b5d2",
+    "motion-sheet-3.png": "f5b32b6f079bce7346fc29debf30b2538fe05757006d20fa7d35c694b55a31eb"
+  }
+}
