@@ -346,6 +346,14 @@ before exposing it to packages. The existing traffic rendering and motion still 
 demo when the authoring path is connected. On macOS/Apple Silicon Debug 2026-11-14, the build
 and full CTest preset passed 561 enabled tests (13 disabled). After a tick-rounding correction,
 the focused traffic validator passed again.
+The internal traffic owner also supports a provisional four-piece open path of tangent line and
+arc pieces with tick-addressed stops; each piece comes to rest at its end. The full build passed
+with the existing 1 MiB plugin-owner cap, and focused traffic and wire-rejection tests passed.
+On the full preset 559 tests passed and two boundary checks initially rejected `nextafter`;
+after adding that standard math function to the boundary allowlist, both checks passed on rerun.
+A later arc-yaw correction passed the focused traffic and boundary checks. This path remains
+unavailable to packages; moving turns, broader capacity, wire integration and scene clearance
+are unfinished.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

@@ -151,7 +151,7 @@ static BoatModel recipe_models[WATERFRONT_CRAFT_RECIPES];
 static bool recipe_models_ready;
 
 static const char *const shape_names[WATERFRONT_ROUTE_SHAPES]
-    = { "dock_circuit", "ellipse", "points", "open_leg" };
+    = { "dock_circuit", "ellipse", "points", "open_leg", "open_path" };
 static const char *const recipe_names[WATERFRONT_CRAFT_RECIPES] = { "runabout", "cruiser",
     "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner", "workboat" };
 
@@ -526,6 +526,14 @@ static uint64_t fold_double(uint64_t hash, double value)
     return fold(hash, bytes, sizeof(bytes));
 }
 
+static uint64_t fold_u64(uint64_t hash, uint64_t value)
+{
+    unsigned char bytes[8];
+    for (unsigned i = 0; i < 8; ++i)
+        bytes[i] = (unsigned char)(value >> (i * 8));
+    return fold(hash, bytes, sizeof(bytes));
+}
+
 uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
 {
     uint64_t hash = 14695981039346656037ull;
@@ -574,6 +582,36 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
             hash = fold_double(hash, a->open_leg.tick_seconds);
             hash = fold_double(hash, a->open_leg.max_speed);
             hash = fold_double(hash, a->open_leg.max_acceleration);
+        }
+        if (a->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            hash = fold_u64(hash, a->open_path.count);
+            for (unsigned p = 0; p < a->open_path.count && p < BOAT_ROUTE_PATH_PIECES; ++p) {
+                const BoatRoutePathPiece *part = &a->open_path.pieces[p];
+                hash = fold_u64(hash, part->kind);
+                hash = fold_u64(hash, part->dwell_ticks);
+                if (part->kind == BOAT_ROUTE_PATH_LINE) {
+                    const BoatRouteLeg *l = &part->shape.line;
+                    hash = fold_double(hash, l->start_x);
+                    hash = fold_double(hash, l->start_z);
+                    hash = fold_double(hash, l->end_x);
+                    hash = fold_double(hash, l->end_z);
+                    hash = fold_u64(hash, l->duration_ticks);
+                    hash = fold_double(hash, l->tick_seconds);
+                    hash = fold_double(hash, l->max_speed);
+                    hash = fold_double(hash, l->max_acceleration);
+                } else if (part->kind == BOAT_ROUTE_PATH_ARC) {
+                    const BoatRouteArc *r = &part->shape.arc;
+                    hash = fold_double(hash, r->centre_x);
+                    hash = fold_double(hash, r->centre_z);
+                    hash = fold_double(hash, r->radius);
+                    hash = fold_double(hash, r->start_angle);
+                    hash = fold_double(hash, r->sweep);
+                    hash = fold_u64(hash, r->duration_ticks);
+                    hash = fold_double(hash, r->tick_seconds);
+                    hash = fold_double(hash, r->max_speed);
+                    hash = fold_double(hash, r->max_acceleration);
+                }
+            }
         }
     }
     return hash;
@@ -878,28 +916,38 @@ WaterfrontVesselMotion waterfront_route_motion(
             Vector2Add(Vector2Scale(along, local.x), Vector2Scale(across, local.y)));
         v = Vector2Add(Vector2Scale(along, first.x), Vector2Scale(across, first.y));
         a = Vector2Add(Vector2Scale(along, second.x), Vector2Scale(across, second.y));
-    } else if (actor->shape == WATERFRONT_ROUTE_OPEN_LEG) {
+    } else if (actor->shape == WATERFRONT_ROUTE_OPEN_LEG
+        || actor->shape == WATERFRONT_ROUTE_OPEN_PATH) {
         const BoatRouteLeg *leg = &actor->open_leg;
+        uint64_t duration;
+        if (actor->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            if (!boat_route_path_validate(&actor->open_path, &duration))
+                return out;
+        } else
+            duration = leg->duration_ticks;
         // Clamp in seconds before converting, so a huge finite time cannot overflow the tick
         // product and a negative time resolves to the start tick.
         uint64_t tick = 0;
         if (time > 0) {
             double scaled = time * (double)BOAT_TICK_HZ;
-            if (!isfinite(scaled) || scaled >= (double)leg->duration_ticks)
-                tick = leg->duration_ticks;
+            if (!isfinite(scaled) || scaled >= (double)duration)
+                tick = duration;
             else
                 // Converting tick / 120 back to ticks can round one ULP below the integer.
                 tick = (uint64_t)floor(nextafter(scaled, INFINITY));
         }
         BoatRoutePose pose;
-        if (!boat_route_leg_evaluate(leg, tick, &pose))
+        double yaw_rate = 0;
+        if (!(actor->shape == WATERFRONT_ROUTE_OPEN_PATH
+                    ? boat_route_path_evaluate(&actor->open_path, tick, &pose, &yaw_rate)
+                    : boat_route_leg_evaluate(leg, tick, &pose)))
             return out;
         float heading = (float)pose.heading;
         float speed = (float)pose.speed;
         out.position = (Vector3) { (float)-pose.x, 0, (float)pose.z };
         out.velocity = (Vector3) { -sinf(heading) * speed, 0, -cosf(heading) * speed };
         out.heading = heading;
-        out.yaw_rate = 0;
+        out.yaw_rate = (float)yaw_rate;
         return out;
     } else {
         prepare(routes);
@@ -1230,6 +1278,14 @@ bool waterfront_route_validate(
             if (a->retain != 0xff || a->bridge || a->stop_count || !boat_route_leg_validate(leg)
                 || leg->tick_seconds != BOAT_TICK_SECONDS || a->phase != 0 || !period_matches) {
                 fail(diagnostic, "scene.traffic.vessels", "has an invalid open leg");
+                return false;
+            }
+        } else if (a->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            uint64_t ticks;
+            if (a->retain != 0xff || a->bridge || a->stop_count || a->phase != 0
+                || !boat_route_path_validate(&a->open_path, &ticks)
+                || fabs(a->period - (double)ticks * BOAT_TICK_SECONDS) > 1e-6 * a->period) {
+                fail(diagnostic, "scene.traffic.vessels", "has an invalid open path");
                 return false;
             }
         }

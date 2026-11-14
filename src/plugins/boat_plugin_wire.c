@@ -98,7 +98,7 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
         // OPEN_LEG is internal only and owns no wire bytes yet; decode and encode both reject it
         // so a round trip cannot silently drop the leg fields.
         if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->shape == WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            || a->shape >= WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
             w->ok = false;
         a->bridge = bridge != 0;
         a->speed = (float)number(w, a->speed);

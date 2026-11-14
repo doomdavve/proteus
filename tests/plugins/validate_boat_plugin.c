@@ -441,6 +441,8 @@ static int open_leg_wire(void)
     WaterfrontRouteActor saved = *actor;
     actor->shape = WATERFRONT_ROUTE_OPEN_LEG;
     CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    actor->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
     *actor = saved;
 
     // A unique ID keeps the probe out of the embedded Lua source, so the shape byte is the next

@@ -37,7 +37,7 @@ FORBIDDEN_CALLS = {
 FORBIDDEN_IDENTIFIERS = {"stdin", "stdout", "stderr", "FILE"}
 MATH_SYMBOL = re.compile(
     r"(a?(sin|cos|tan)h?|sincos|atan2|exp|exp2|expm1|log|log2|log10|log1p|pow|sqrt|cbrt|hypot|"
-    r"fmod|remainder|floor|ceil|round|trunc|l?lround|l?lrint|rint|nearbyint|fabs|fmin|fmax|copysign|fma|"
+    r"fmod|remainder|floor|ceil|round|trunc|l?lround|l?lrint|rint|nearbyint|nextafter|fabs|fmin|fmax|copysign|fma|"
     r"ldexp|frexp|modf)[fl]?")
 RUNTIME_SYMBOL = re.compile(
     r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|memchr|strchr|bzero|strcmp|strncmp|"

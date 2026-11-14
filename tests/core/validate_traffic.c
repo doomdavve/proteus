@@ -707,6 +707,58 @@ static int check_open_leg(void)
 
 // L3.2: one authored craft flows through the shared scene frame, contact and camera queries.
 // Reordering preserves each actor's identity; removing the collection removes every consumer.
+static int check_open_path(void)
+{
+    WaterfrontRouteDefinition def = { 0 };
+    def.actor_count = 1;
+    WaterfrontRouteActor *a = &def.actors[0];
+    strcpy(a->id, "path");
+    a->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    a->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    a->retain = 0xff;
+    a->period = 5;
+    a->open_path.count = 2;
+    BoatRouteLeg line = { .start_x = 0, .start_z = 0, .end_x = 0, .end_z = -10,
+        .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20, .max_acceleration = 100 };
+    a->open_path.pieces[0].shape.line = line;
+    a->open_path.pieces[0].dwell_ticks = 120;
+    line.start_z = -10;
+    line.end_z = -20;
+    a->open_path.pieces[1].shape.line = line;
+    WaterfrontRouteDiagnostic d;
+    CHECK(waterfront_route_validate(&def, &d));
+    WaterfrontVesselMotion stop = waterfront_route_motion(&def, 0, 2.5);
+    CHECK(fabsf(stop.position.z + 10) < 1e-5f && Vector3Length(stop.velocity) == 0);
+    WaterfrontVesselMotion end = waterfront_route_motion(&def, 0, 5);
+    CHECK(fabsf(end.position.z + 20) < 1e-5f && Vector3Length(end.velocity) == 0);
+    uint64_t hash = waterfront_route_digest(&def);
+    a->open_path.pieces[1].shape.line.end_z = -21;
+    CHECK(waterfront_route_digest(&def) != hash);
+    a->open_path.pieces[1].shape.line.start_z = -11;
+    CHECK(!waterfront_route_validate(&def, &d));
+    // A tangent line, left turn and line preserve the same pose across both joins.
+    a->open_path.count = 3;
+    a->open_path.pieces[0].dwell_ticks = 0;
+    a->open_path.pieces[1] = (BoatRoutePathPiece) { .kind = BOAT_ROUTE_PATH_ARC,
+        .shape.arc = { .centre_x = 10, .centre_z = -10, .radius = 10,
+            .start_angle = PI, .sweep = PI / 2, .duration_ticks = 240,
+            .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 20, .max_acceleration = 100 } };
+    a->open_path.pieces[2] = (BoatRoutePathPiece) { .kind = BOAT_ROUTE_PATH_LINE,
+        .shape.line = { .start_x = 10, .start_z = -20, .end_x = 20, .end_z = -20,
+            .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
+            .max_speed = 20, .max_acceleration = 100 } };
+    a->period = 6;
+    CHECK(waterfront_route_validate(&def, &d));
+    WaterfrontVesselMotion turning = waterfront_route_motion(&def, 0, 3);
+    CHECK(turning.yaw_rate > 0 && Vector3Length(turning.velocity) > 0);
+    WaterfrontVesselMotion turn = waterfront_route_motion(&def, 0, 4);
+    CHECK(fabsf(turn.position.x + 10) < 1e-4f && fabsf(turn.position.z + 20) < 1e-4f);
+    a->open_path.pieces[1].dwell_ticks = UINT64_MAX;
+    CHECK(!waterfront_route_validate(&def, &d));
+    return 0;
+}
+
 static int check_scene_traffic(void)
 {
     BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
@@ -880,6 +932,7 @@ int main(void)
     CHECK(check_vertical_contacts() == 0);
     CHECK(check_route_definition() == 0);
     CHECK(check_open_leg() == 0);
+    CHECK(check_open_path() == 0);
     CHECK(check_scene_traffic() == 0);
     CHECK(check_ferry_schedule() == 0);
     CHECK(check_bridge_safety() == 0);

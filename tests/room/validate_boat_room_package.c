@@ -453,6 +453,8 @@ static int definition_size(void)
     d.scene.traffic.actors[0].shape = WATERFRONT_ROUTE_OPEN_LEG;
     static uint8_t rejected[BOAT_ROOM_BYTES_MAX];
     CHECK(boat_room_definition_encode(&d, rejected, sizeof(rejected)) == 0);
+    d.scene.traffic.actors[0].shape = WATERFRONT_ROUTE_OPEN_PATH;
+    CHECK(boat_room_definition_encode(&d, rejected, sizeof(rejected)) == 0);
     d.scene.traffic.actors[0] = saved;
 
     printf("room_package definition: maximum %zu of %d bytes, %u pages\n", size,
