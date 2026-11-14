@@ -1,11 +1,11 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and **Winterfell runs `--lockdown kill` since v0.0.31**; H6 is decided (do not split); H7 is next.**
-Completed task: H1 credential unit and the H5 `kill` switch-over (v0.0.31), after two glibc first-use findings and a TURN quota finding. Evidence below.
-Open: a longer `kill` soak under real play (it is short so far); H4 nftables proof (the limits firing against a source outside the LAN and VPN; the crash alert is done); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
+Status, 2026-11-14: **Done.** H0-H5 are merged and deployed on Winterfell (lockdown `kill` since v0.0.31, nftables limits and the crash alert deployed), H6 is decided (do not split) and H7 moved the contract into [SERVER_SECURITY](SERVER_SECURITY.md), which now owns the system description. This plan is history.
+Completed task: H7, the closing spec; the leftovers are open items, not gates.
+Open (see [Known limits](SERVER_SECURITY.md#known-limits) and the [Open loops](README.md#open-loops) board): the nftables limits shown to drop from an outside source; the libjuice allocation leak; a Release `--fortify` check; relay join from outside the LAN. Longer fuzz and `kill` soaks are welcome, not gates (accepted in the spec).
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
-the remaining risk is written down as a decision, not an omission.
-Next task: H4 nftables proof, then H7, the closing spec `docs/SERVER_SECURITY.md`.
+the remaining risk is written down as a decision, not an omission. Met 2026-11-14.
+Next task: none.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -44,7 +44,7 @@ that path becomes a fuzz target and a P1 for hardening.
 | H4 | **Code side implemented 2026-11-14 on `feat/h4-limits`; operator work remains.** Server-side limits and network hygiene: peer, packet-size and join-rate caps (in code, see [Connection limits](MULTIPLAYER_PROTOCOL.md#connection-limits)); per-source UDP limits in nftables on Winterfell (`davve-srv`, deployed 2026-11-14; the port allowlist stays at the router forwards, not managed there); mail on abnormal room and relay exits (`davve-srv`, deployed and proven by a deliberate crash, see [H4 crash alert](#h4-crash-alert-operator-side)). | Bot flood test stays within caps; firewall rules in `davve-srv`; alert fires on a deliberate crash |
 | H5 | **Implemented 2026-11-14 on `feat/h5-lockdown`; operator work remains.** In-process lockdown, Linux only (`pledge` substitute), in `src/room/boat_lockdown.[ch]` behind `__linux__`; never in `proteus_boat_core` or `proteus_boat_net`. After assets, package, plugin load, socket binding and the recording file, `boat_server --lockdown MODE` applies `no_new_privs`, Landlock (all filesystem rights; TCP bind/connect and abstract-socket/signal scopes at ABI 4/6) and a seccomp allowlist; see [Lockdown](MULTIPLAYER_HOSTING.md#in-process-lockdown). It is **opt-in** and stays off until soaked on Winterfell. **Fail closed:** if Landlock is below `BOAT_LOCKDOWN_MIN_LANDLOCK_ABI` (6, what Linux 6.12 offers), or `no_new_privs` or the filter cannot be installed, the server prints the reason and exits 1 before serving. `log` mode is an explicit tuning option; `errno` is for tests. Excludes `--package-reload`. | Server runs a full soak; a test proves a denied `open`/`execve` fails; core boundary lint passes |
 | H6 | **Decided 2026-11-14: do not split.** Decision only: privilege separation — a small network front that validates and forwards fixed-size messages to the authority process. Reasons and revisit triggers in [H6 decision](#h6-decision). | Decision and reasons recorded |
-| H7 | Closing step: move the contract and behaviour into `docs/SERVER_SECURITY.md` (new spec, present tense), update [hosting](MULTIPLAYER_HOSTING.md), turn leftovers into open items or drop them explicitly, then mark this plan done. | Docs match the deployed units and the code |
+| H7 | **Done 2026-11-14.** Closing step: move the contract and behaviour into `docs/SERVER_SECURITY.md` (new spec, present tense), update [hosting](MULTIPLAYER_HOSTING.md), turn leftovers into open items or drop them explicitly, then mark this plan done. | Docs match the deployed units and the code |
 
 Order: H1 and H2 are small and independent; H3 is the main investment and can run beside them;
 H4 follows H3's measured limits; H5 follows H3 so the syscall allowlist is built from a
