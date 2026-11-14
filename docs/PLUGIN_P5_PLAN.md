@@ -426,10 +426,21 @@ Server tick cost, 2026-11-14, Apple M1 Max (arm64) macOS, Debug, `python3 tools/
 `service_ms_per_tick`, real time, outside CTest). Three runs each, ms per 120 Hz tick (budget
 8.33): free `outer` 0.127 / 0.144 / 0.160; hunt (Lua objective every 12 ticks) 0.307 / 0.295 /
 0.286; deathmatch 0.292 / 0.317 / 0.292. The hunt costs about 0.15 ms per tick more than plain
-free play and the same as the deathmatch baseline (about 3.5% of the tick budget). Debug build only;
-no Release, other platform or WebRTC clients measured. Browser hunt case and old-bundle
-rejection: [written, not run](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h) (no Emscripten,
-Playwright or WebRTC build available in that session).
+free play and the same as the deathmatch baseline (about 3.5% of the tick budget). That run was
+Debug only.
+
+Release, 2026-11-14, same machine and command, `build-release` (`-DCMAKE_BUILD_TYPE=Release
+-DPROTEUS_WEBRTC=ON`, ENet bots): free `outer` 0.201 / 0.359 / 0.414; hunt 0.524 / 0.610 / 0.481;
+deathmatch 0.946 / 0.972 / 0.875 ms per tick. All are at most about 12% of the 8.33 ms budget,
+hunt stays about 0.2 ms above free play and below deathmatch. These numbers are higher than the
+Debug ones, which a Release build should not produce; the likely cause is machine load or the
+WebRTC-enabled server (unconfirmed, not investigated). No other platform and no WebRTC clients
+measured.
+
+Browser hunt case and old-bundle rejection: run 2026-11-14, both pass; see
+[the browser guide](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h). The old client cannot
+decode the room's Reject, so the check asserts a failed join plus the room's `rejected: version=1`
+count instead of a "protocol version mismatch" console line.
 
 ### P5i: closing step
 
@@ -438,10 +449,11 @@ Done 2026-11-14. The objective adapter, room events and limits already lived in
 API's dated status into present tense, added the once-per-revision waiting line, retired the
 "v10" label in the live summaries, and recorded the leftovers as Open loops rows:
 
-- the browser hunt case and old-bundle rejection are written but were never run (needs
-  Emscripten and Playwright; the reported manual native-to-browser check is not that automation);
-- server tick cost is measured only in Debug on one Apple Silicon machine, with no Release or
-  WebRTC clients;
+- the browser hunt case and old-bundle rejection were not run at closing; run afterwards on
+  2026-11-14 (see [P5h measurements](#p5h-measurements)) and no longer open;
+- server tick cost was measured only in Debug; Release was added the same day (ENet clients);
+  WebRTC clients and other platforms are still unmeasured and Release being slower than Debug is
+  unexplained;
 - P5f/P5g qualification beyond the user's reports: P5g recording checks on Linux/Windows/browser,
   disk cost and a human view of a reconstruction;
 - no `docs/MULTIPLAYER.md` overview was written.

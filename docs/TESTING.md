@@ -1337,7 +1337,9 @@ build and a WebRTC-enabled native build) starts a free `outer` room running `pro
 one native `boat_bot` and one browser player, runs the usual drive/reset/leave/rejoin sequence and
 then requires the bot's mirrored HUD to show `CREW 2` and the server to have printed objective
 rows. `--old-url URL` additionally opens a bundle built from an older commit (serve it on another
-port) and requires the page to report `protocol version mismatch` without joining. Commands are in
+port) and requires the page to report `Cannot join` without joining and the room to count a
+`rejected: version=1` (the old client cannot decode the Reject). Passed on 2026-11-14 (Chrome,
+Apple M1 Max, Emscripten 6.0.12, old bundle `v0.0.25`); only that platform has been run. Commands are in
 the [browser guide](WEB_BUILD.md#hunt-case-and-old-bundle-rejection-p5h).
 
 ### Server tick cost (manual, real time)
@@ -1350,7 +1352,8 @@ the server's own `service_ms_per_tick` line:
 python3 tools/measure_room_tick.py --build-dir build --seconds 20 --repeats 3
 ```
 
-Results are recorded in the [P5 plan](PLUGIN_P5_PLAN.md#p5h-measurements).
+Use a Release build for numbers you quote; ENet clients only (the tool does not drive WebRTC
+clients). Results are recorded in the [P5 plan](PLUGIN_P5_PLAN.md#p5h-measurements).
 
 ### Manual play checks (P5)
 

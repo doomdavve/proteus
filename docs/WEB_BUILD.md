@@ -768,15 +768,20 @@ python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-
 bot and one browser player; it requires the bot's mirrored HUD to list `CREW 2` and the server to
 print objective rows, and saves `hunt-hud.png`. `--old-url` takes a Wasm bundle built from an
 older commit (build it in another worktree and serve it on a second port) and requires the page
-to log `protocol version mismatch` and never join:
+to log `Cannot join` without ever joining, and the room's shutdown summary to count
+`rejected: version=1` (an old client cannot decode the Reject, so the page cannot say "protocol
+version mismatch"). Install Playwright in a venv, not globally:
 
 ```sh
 python3 -m http.server 8001 --directory <old-worktree>/build-web/site &
 python3 tests/web/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode hunt --old-url http://127.0.0.1:8001/ --output build-web/net-hunt
 ```
 
-The case was written on 2026-11-14 without being run: the machine had no Emscripten, Playwright or
-WebRTC build to hand. The manual [play check 2](TESTING.md#manual-play-checks-p5) lists the
+Run 2026-11-14 on Apple M1 Max, macOS, Chrome with ANGLE Metal, Emscripten 6.0.12 (`build-web`,
+`MinSizeRel`), a `PROTEUS_WEBRTC=ON` Debug `build-rtc`, Playwright in a venv under `build/`: the
+hunt case passed (`web_multiplayer=ok`; the bot's HUD showed `CREW 2` and the room printed
+objective rows), and with the `v0.0.25` bundle (protocol 12) as `--old-url` the page failed to
+join and the room counted `rejected: version=1`. Other browsers and platforms are not covered. The manual [play check 2](TESTING.md#manual-play-checks-p5) lists the
 equivalent human steps.
 
 `boat_rtc_echo [PORT]` is the standalone 120-second protocol-byte echo gate;
