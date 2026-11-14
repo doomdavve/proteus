@@ -397,6 +397,17 @@ bundled package by ID or evaluates a package directory once at start-up. The aut
 resulting definition to clients as data, and refuses to start with a diagnostic if it is
 invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.
 
+`--lockdown MODE` (Linux x86-64/aarch64 only; off by default) locks the room down once it is ready to
+serve: `no_new_privs`, Landlock (no filesystem access, no TCP bind or connect) and a seccomp
+allowlist of steady-state syscalls. `MODE` is `kill` (production: any other syscall kills the
+process with `SIGSYS`), `log` (tuning: the kernel logs would-be violations and allows them) or
+`errno` (tests: they fail with `EPERM`). It is fail-closed: if Landlock ABI 6 (Linux 6.12) is not
+available, or `no_new_privs` or the filter cannot be installed, the server prints the reason and exits
+with status 1 before serving; elsewhere, or together with `--package-reload`, it exits with
+status 2. The achieved levels print at start-up (`lockdown: landlock abi 6 ...; seccomp kill (N syscalls)`).
+`--lockdown-min-abi N` raises the required Landlock ABI (a test hook for the refusal path).
+See [in-process lockdown](MULTIPLAYER_HOSTING.md#in-process-lockdown).
+
 `--package-reload` re-reads that package while the room runs. It needs `--package` naming a
 directory, or a bundled ID such as `proteus.outer-hunt` (which resolves to `plugins/outer-hunt`
 when run from the repository root), whose package has a room objective; otherwise the server is
