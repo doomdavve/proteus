@@ -1,0 +1,36 @@
+{
+  "source": "bb4d589",
+  "platform": "macOS 26.6.2 arm64",
+  "native": {
+    "configuration": "Debug",
+    "ctest_full": {
+      "passed": 568,
+      "failed": 0,
+      "seconds": 73.73
+    },
+    "gpu_ctests": false,
+    "warning": "raylib external/stb_vorbis.c:1404 pointer comparison"
+  },
+  "wasm": {
+    "emscripten": "6.0.12",
+    "configuration": "MinSizeRel",
+    "targets": [
+      "web",
+      "validate_boat_plugin"
+    ],
+    "plugin_cases": [
+      "free_scene_location",
+      "open_path_decode",
+      "scene_traffic"
+    ],
+    "lua_isolation": "passed",
+    "artifacts": {
+      "build-web/wake_velocity.wasm": "f6fb2be1608216e197918770687aed6b7293c6244afd3f12f6ab45fd041c80c8",
+      "build-web/plugin_stage.wasm": "1f4d936bcc8cdfda1497c7616c18d810de33f7852552c0dabcf8ca8d98fe772b"
+    }
+  },
+  "node_contracts": [
+    "web_plugin_author",
+    "web_plugin_wire PSTB"
+  ]
+}

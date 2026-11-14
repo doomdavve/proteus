@@ -1,0 +1,74 @@
+{
+  "errors": [],
+  "checks": [
+    "M3 authored route worker launch and held timetable Apply/Undo",
+    "bundle export/import",
+    "capability rejection",
+    "scene import accepted above the old response cap",
+    "20 repeated worker validations retired",
+    "worker launch",
+    "live rename",
+    "syntax rejection",
+    "held water Apply/Undo",
+    "stale epoch rejection",
+    "cancellation/late completion",
+    "navigation during validation; 3 restored sessions revalidated",
+    "free and course imports launch",
+    "M2 marina name/dimensions Apply/Undo/export and full-source worker reply",
+    "isolated objective init/update/timers, gated ticks, migration/Undo/restart, quarantine, timeout and session cleanup",
+    "storage denial"
+  ],
+  "evidence": {
+    "browser": {
+      "engine": "firefox",
+      "version": "157.0"
+    },
+    "marina_route_owners": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        0
+      ],
+      [
+        1,
+        2,
+        0
+      ]
+    ],
+    "validation_ms": {
+      "cold": 45,
+      "cycles": 20,
+      "median": 48.0,
+      "max": 53
+    },
+    "freeze_resume": "not exercised: Page lifecycle control is Chromium-only",
+    "objectives": {
+      "normal_callbacks": {
+        "count": 20,
+        "mean_ms": 3.1,
+        "max_ms": 5,
+        "initial_delivery_ms": 656,
+        "evaluator_mean_ms": 0.25,
+        "evaluator_max_ms": 1
+      },
+      "initial": {
+        "alarms": 19,
+        "draw": 519671626,
+        "events": 0,
+        "migrated": 0,
+        "updates": 19
+      },
+      "worker_wasm_bytes": 16777216,
+      "restart_initialized": true,
+      "timeout_retained_state": true,
+      "completed_including_fault_checks": 30,
+      "sessions_cleaned": 4,
+      "cached_init_deadline": true
+    }
+  }
+}

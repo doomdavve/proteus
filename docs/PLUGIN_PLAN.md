@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**M3 routes and bounded clearance are merged in #201; next marina task: [M3 integrated qualification and closure](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**Marina M3 routes, bounded clearance and C1–C4 qualification/closure are complete; next marina task: [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
@@ -48,7 +48,7 @@ scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
 twelve-berth/two-row package, M2 boat appearance and M3 routes/clearance (#201); M3 agent visual
-evidence is recorded, with integrated qualification and closure remaining. The
+evidence, native/browser/Wasm qualification and closure are complete; M4 occupancy is next. The
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
 sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are
@@ -1818,8 +1818,9 @@ implemented and awaits human review.** `scene.define` installs and stages the se
 harbor-life layout, its long finger pontoon, gangway and shore equipment, one authored passing
 craft, a retained ferry with an edited dwell, the retained schooner/lift dependency and one
 authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
-owns the current counts and its explicit native gaps.
-M1 structures and M2 boat appearance are implemented; the selected next work is [marina M3 routes](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
+records the historical seven-berth counts and gaps; the marina plan and current API supersede
+its structures/appearance/routes limits.
+M1 structures, M2 boat appearance and M3 routes are complete; the next marina work is [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 
@@ -2495,6 +2496,9 @@ bird/building/berth clipping in motion. No human acceptance is inferred from tes
 
 #### Eriksberg marina layout, 2026-11-01
 
+Historical baseline: M1–M3 supersede the counts and structures/appearance/routes gaps below;
+the current package guide and API describe supported authoring.
+
 **Request:** use a real Eriksberg shipyard-dock photograph as the target for harbor life and flag
 what the plugin/scene API cannot express.
 
@@ -2531,7 +2535,9 @@ The package README now separates the authored recipe from the missing native cap
 boat, does the crane/building composition resemble the reference, and does the entrance remain
 clear in motion? No acceptance is inferred from the captures.
 
-**Next in this track: [marina M3 routes](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion)** (M1 structures and M2 appearance implemented), selected after reviewing these gaps on 2026-11-01. The new plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
+Historical selection, 2026-11-01: marina M3 routes followed M1 structures and M2 appearance.
+M1–M3 are now complete; [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors)
+is next. The marina plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
 
 #### L2 — a small marina before a marina editor
 
@@ -2673,8 +2679,13 @@ through the isolated worker and headless live-bridge mailbox, and inspected CPU 
 Refined the authored marina to the seven-berth Eriksberg layout, 2026-11-01, with the
 [result above](#eriksberg-marina-layout-2026-11-01); this is an example/layout change, not a new
 capability milestone.
-Next task for this track: **[marina M3 routes](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion)**, following implemented M1 structures and M2 appearance. The requested L1.1–L4.3 sequence is complete; the new five-step marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
-Known limits: authored route geometry is selected from registered presets; no freeform route
+Next task for this track: **[marina M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors)**,
+following completed M1 structures, M2 appearance and M3 routes. The requested L1.1–L4.3 sequence
+is complete; the marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
+
+Historical L4.3 limits (2026-10-30), superseded for structures/appearance/routes by M1–M3
+and for their visual/platform evidence by the marina plan; remaining API limits live in the
+[Plugin API](PLUGIN_API.md#scene-authoring-not-exposed-yet): authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no floating quay/platform,
 crane/building restyling or per-berth hull colours/dimensions/names; no berth occupancy schedule;
 no boarding/passenger simulation; no tram closure interlock; depth is unverified; GPU/windowed
@@ -2725,7 +2736,8 @@ marina or traffic scene (only S1a work sites are surveyed there). Free scenes re
 through rooms, whose package loader checks spawn/grid contacts and open water around each
 berth, but did not use the voyage path's module shore/support checks or authored-traffic sweep.
 The M3 prerequisite now shares those checks with free packages. The existing fixed-horizon
-traffic sampling remains subject to M3's stronger combined-timetable proof.
+traffic sampling remains for registered presets; completed M3 open/loop paths use the
+bounded conservative schedule proof specified in the [API](PLUGIN_API.md#location-life-scene-contract-l11l43).
 
 Rules carried over from P3 and the location-life track:
 

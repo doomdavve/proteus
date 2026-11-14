@@ -1,14 +1,14 @@
 # Marina authoring expansion
 
-Status, 2026-11-14: M1 structures and M2 appearance are merged; M3 authored routes and
-C1 bounded schedule clearance are merged in [PR #201](https://github.com/doomdavve/proteus/pull/201).
-M3 supports one open or looping route with up to four tangent line/arc pieces; it remains open.
-Completed: C2a composed-path regression/tick correction and C2b CPU/GPU/windowed visual evidence.
-Open: C3 integrated native/browser/Wasm qualification and C4 closure; human acceptance is separate.
-Done when M3's acceptance checks below pass and its contract is recorded in the API.
-Next task: C3 final integration qualification, then C4 documentation closure.
-The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap; the [API](PLUGIN_API.md) owns
-implemented capabilities. M4 occupancy and M5 modules remain deferred.
+Status, 2026-11-14: M1 structures, M2 appearance and M3 authored routes are complete.
+M3: C1 clearance merged in #201; C2 evidence merged in #203; C3 qualification and C4 closure local.
+Supported: one open/loop route, up to four tangent line/arc pieces, bounded schedule clearance.
+Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traffic](HARBOR_TRAFFIC.md),
+[protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
+Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
+Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
+Next task: prepare M4 berth/vessel ownership and schedules; no M4 implementation is included.
+The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
 
@@ -36,7 +36,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 merged in #201; C2 evidence complete; C3–C4 open |
+| M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -316,7 +316,7 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 
 ## M3: authored routes and docking motion
 
-Implementation in progress, 2026-11-14: one authored open or looping route has up to four tangent line
+Implemented and qualified, 2026-11-14: one authored open or looping route has up to four tangent line
 and arc pieces, integer tick durations, optional dwell and bounded speed/acceleration. Zero-dwell
 joins preserve speed. A static site survey checks water, explicit and compiled contacts and the
 permanent ferry. A moving survey checks the route duration and one full period of each other
@@ -327,6 +327,10 @@ path is rejected. The staging wire is PSTB;
 room definition v5 and protocol v15 carry paths.
 `plugins/marina-route-demo` approaches a platform, pauses and departs while retaining the upstream
 ferry and bridge service. [Plugin API](PLUGIN_API.md) describes the implemented subset.
+
+### Initial implementation evidence — historical
+
+This baseline predates C1–C3; the closure result below supersedes its open verification gaps.
 
 Focused macOS/Apple Silicon Debug tests passed for path motion and joins, Lua decoding, location
 survey, staging and room wire, protocol codec and golden bytes. The example validated via
@@ -342,6 +346,8 @@ its existing 4,160-second sampled check. Route bounds may conservatively reject 
 exact-tick repeats within the work cap. Multiple authored paths are not supported. Earlier
 incremental full runs passed all enabled tests after the documented
 socket or boundary reruns; final integrated verification is recorded below when performed.
+
+### Implementation and acceptance contract — completed
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
 validation in `src/core/boat_scene_definition.[ch]`, `src/net/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
@@ -367,7 +373,54 @@ Acceptance:
 - Direct seeks, reverse seeks, different frame steps and loop boundaries produce identical
   poses. Route edits Apply/Undo atomically under documented restart rules.
 
+### M3 closure (C4) — 2026-11-14
+
+**M3 is complete for the bounded one-route contract.** C1–C3 satisfy the implementation and
+agent qualification gate; this does not imply human acceptance or close M4/M5.
+
+| Gate | Completed evidence |
+| --- | --- |
+| C1 clearance and legal separated passages | [Settled contract and regressions](#c1-decision--2026-11-14): simultaneous bounded schedules accept separated crossings and reject conflicts, unsupported repeats and exhausted work; retained services stay unchanged. |
+| C2a deterministic composition | [Composed-path result](#c2a-execution-contract--2026-11-14): turns, dwell, terminal hold, loop wrap, independent owners and seek/cadence equality. |
+| C2b visible approach/pause/departure | [CPU/GPU captures and windowed recording](evidence/marina-c2b/2026-11-14/README.md): full visitor/platform visibility across the complete sequence. |
+| C3 final integration | [Native/browser/Wasm qualification](#c3-integrated-qualification--2026-11-14): native full CTest, Wasm validation/packaging, real browser staging and timetable Apply/Undo. |
+| C4 contract and handoff | API, traffic/protocol specs, schema/discovery claims, package guides, plugin roadmap and index reconciled; closing verification recorded below. |
+
+The current contract lives in the [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43),
+[traffic guide](HARBOR_TRAFFIC.md#plugin-authored-paths) and
+[protocol](MULTIPLAYER_PROTOCOL.md#room-definition).
+The [route package guide](../plugins/marina-route-demo/README.md) owns launch/capture commands.
+The schema/discovery already expose `route = "open"`, line/arc pieces and the one-route cap;
+C4 changes documentation only, with no schema or wire-version change.
+
+Remaining limits are explicit: conservative enclosing hulls can reject safe passages;
+overlapped loop corridors require supported exact-tick repeats within the 200,000-evaluation
+budget; legacy preset checks retain their sampled timetable. Depth, multiple authored paths,
+reactive avoidance and physical traffic wakes are outside M3. M4 owns named berths,
+reservations, snug docking/contact exceptions and a single vessel owner across moored/traffic
+handoffs; M5 owns local source modules and the combined example. Human acceptance, Windows/Linux,
+physical Safari/mobile and a new mixed WebRTC route-demo play session remain unverified.
+C2b's platform stand-off is the qualified approach example, not an occupancy handoff.
+
+C3 is recorded in local commit `edc6a08`; C4 is a separate focused local commit on the same
+`feat/marina-m3-c3` branch. No push or PR is authorized by this closure. The broader marina
+plan remains open for M4/M5. Next: prepare M4 using the open-loop board and the ownership
+contract below; unrelated tracks retain their owners.
+
+Closing verification, 2026-11-14, Apple Silicon/macOS 26.6.2: `cmake --build build -j 8`
+passed; `ctest --preset full` with localhost socket access passed **568/568 tests in 44.19 s**,
+GPU CTests OFF. `plugin_author.py schema` and `capabilities` succeeded; schema inspection
+confirmed the open-route line/arc alternatives, four-piece limit and discovery constraints.
+`plugin_author.py validate plugins/marina-route-demo` returned `status: ok` with seven traffic
+actors and the platform. All 480 local links/anchors across the eight changed guides resolved;
+`git diff --check` passed. This documentation-only step needs no new audiovisual review.
+C3's browser/Wasm results and C2b's native motion evidence remain dated evidence; they were
+not rerun for C4. No new platform or human acceptance is claimed.
+
 ### M3 bounded closure audit — 2026-11-14
+
+Historical pre-C1/C2/C3 findings: the closure result above supersedes the open assessments
+and work queue below. Dated execution/result sections retain their original evidence.
 
 Audited local `feat/marina-m3-routes` at `1462e60` plus its existing uncommitted
 implementation changes. This is an evidence audit, not acceptance or a scope reduction.
@@ -514,6 +567,45 @@ C2b is complete as agent evidence for the documented platform approach/pause/dep
 C3 still owns fresh browser/Wasm staging/room qualification and platform limits; C4 owns
 milestone closure. No new browser build, interactive browser, Windows/Linux, depth, snug
 mooring, named berth ownership or human acceptance is claimed. The branch remains local.
+
+#### C3 integrated qualification — 2026-11-14
+
+Qualified merged #203 (`bb4d589`) in the separate local `feat/marina-m3-c3` worktree,
+Apple Silicon/macOS 26.6.2. No production behavior changed. The real-browser authoring
+check now imports `marina-route-demo`, launches its checked route into the game, stages
+240 → 360 dwell ticks without changing the active owner, applies the held revision and
+restores the original revision with Undo/Apply. It waits for asynchronous outer scenery
+loading; an initial immediate assertion raced on Firefox/WebKit and was corrected.
+
+Fresh native Debug configure/build passed. One warning came from raylib's bundled
+`stb_vorbis.c` pointer comparison; no project-source warning was emitted. With local socket
+access, `ctest --preset full` passed **568/568 tests in 73.73 s**; GPU CTests were OFF.
+This includes composed-path regressions, staging roundtrips, native Apply/Undo, the browser
+staging backend model, room-definition finite/loop path roundtrips and protocol golden bytes.
+
+Emscripten **6.0.12**, MinSizeRel: `web` and `validate_boat_plugin` targets built and the
+content-hashed site packaged. The first sandboxed link could not lock the SDK cache; rebuilding
+with cache access passed. Packaging confirmed Lua parser/VM isolation from the game Wasm,
+with the isolated evaluator as positive control. Node/Wasm `free_scene_location`,
+`open_path_decode` and `scene_traffic` cases passed; Node authoring contracts and the PSTB
+browser/native wire-version check also passed.
+
+The complete authoring suite passed on Chromium 156.0.8078.4 (SwiftShader), Firefox 157.0
+and WebKit 27.2, each with 20 fresh worker validations and three restored sessions. Chromium
+also passed freeze/resume and deadline-across-freeze checks. An additional installed Chrome
+157.0.8103.52 run passed the same suite. No page errors were recorded.
+Browser results and exact commands are retained in the
+[C3 evidence](evidence/marina-c3/2026-11-14/README.md). Route activation, held dwell edit and
+Undo restored owner tuples `[1,0,0]` → `[2,1,0]` → `[1,2,0]`.
+These checks qualify staging and owner lifecycle, not frame-by-frame browser route motion.
+Native CPU/GPU/motion evidence remains the C2b result above. Browser room contract coverage
+here is serialization and native authority/transport tests, not a new mixed WebRTC route-demo
+play session. Windows/Linux, physical Safari/mobile devices, audio listening and human
+acceptance remain unverified. WebKit automation is not physical Safari acceptance.
+
+C3 is complete; C4 owns reconciling the remaining historical/live status and closing M3.
+M4 occupancy/named berths and M5 modules remain deferred. Changes stay local pending explicit
+PR approval.
 
 #### C1 decision — 2026-11-14
 

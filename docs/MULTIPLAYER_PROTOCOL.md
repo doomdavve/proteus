@@ -7,7 +7,8 @@ and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`src/net/boat_net_protocol.[ch]`](../src/net/boat_net_protocol.h) and its fixtures are in
 [`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
 
-v15 uses room definition version 5 and adds the bounded open traffic-path encoding below.
+v15 uses room definition version 5 and carries finite and looping authored traffic paths
+with the bounded open-path encoding below; the loop flag selects repeat behavior.
 Older peers reject the version at Hello. The authority validates open paths against their map,
 marina and other traffic before accepting them.
 
