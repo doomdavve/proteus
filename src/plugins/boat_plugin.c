@@ -1,6 +1,8 @@
 #include "plugins/boat_plugin.h"
 
 #include "core/boat_cargo.h"
+#include "core/boat_clock.h"
+#include "core/boat_route_path.h"
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_outer.h"
 #include "plugins/boat_plugin_decode.h"
@@ -726,6 +728,103 @@ static BoatPluginStatus check_scene_modules(const BoatSceneDefinition *scene, co
     return BOAT_PLUGIN_OK;
 }
 
+// Marina M3: bounded static survey of an internal open path. This is deliberately only a
+// conservative static proof: it samples the finite open duration at <= 12-tick intervals and
+// checks compiled water plus moored hulls and modules. It does NOT yet check the declared marina
+// entrance (which must remain passable for an arrival) or moving traffic, and packages cannot
+// author this shape, so the unconditional rejection in check_scene_traffic below still stands.
+#define OPEN_PATH_SAMPLE_TICKS 12
+#define OPEN_PATH_SAMPLE_BUDGET 1800 // ceil(ticks / 12): three minutes at 120 Hz.
+
+static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, const char *entry,
+    const BoatMap *map, unsigned actor, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteActor *a = &scene->traffic.actors[actor];
+    char path[48];
+    snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", actor + 1);
+    uint64_t total_ticks = 0;
+    if (!boat_route_path_validate(&a->open_path, &total_ticks))
+        return diagnose(
+            d, BOAT_PLUGIN_SCHEMA, entry, path, "has an invalid or non-finite open path");
+    uint64_t intervals
+        = total_ticks / OPEN_PATH_SAMPLE_TICKS + (total_ticks % OPEN_PATH_SAMPLE_TICKS != 0);
+    if (intervals > OPEN_PATH_SAMPLE_BUDGET)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+            "open path spans %llu ticks and needs %llu samples at %d-tick intervals, beyond the "
+            "%d-sample three-minute survey budget",
+            (unsigned long long)total_ticks, (unsigned long long)(intervals + 1),
+            OPEN_PATH_SAMPLE_TICKS, OPEN_PATH_SAMPLE_BUDGET);
+    // Each validated piece's max_speed bounds its translation speed; the path-wide bound also
+    // covers every intermediate sample and any dwell at an endpoint.
+    double speed_bound = 0;
+    for (unsigned p = 0; p < a->open_path.count; ++p) {
+        const BoatRoutePathPiece *piece = &a->open_path.pieces[p];
+        double max_speed = piece->kind == BOAT_ROUTE_PATH_LINE ? piece->shape.line.max_speed
+                                                               : piece->shape.arc.max_speed;
+        if (!isfinite(max_speed) || max_speed <= 0 || max_speed > 40)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path piece %u needs a speed bound in (0, 40] m/s", p + 1);
+        speed_bound = fmax(speed_bound, max_speed);
+    }
+    BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)actor);
+    // Enclose the travelling hull, then inflate by half a sample interval of travel and a small
+    // numerical margin. Double arithmetic plus the finite check keeps the cast to the map query's
+    // float radius well defined.
+    double interval_seconds = (double)OPEN_PATH_SAMPLE_TICKS * BOAT_TICK_SECONDS;
+    double radius = hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .5 * interval_seconds * speed_bound + .1;
+    float hull_radius = (float)radius;
+    if (!isfinite(radius) || !isfinite(hull_radius))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "open path sweep radius is not finite");
+    Vector2 berth_centre[BOAT_SCENE_BERTHS];
+    float berth_radius[BOAT_SCENE_BERTHS];
+    for (unsigned b = 0; b < scene->berth_count; ++b) {
+        BoatModelSpec bs = boat_scene_berth_resolve(&scene->berths[b]);
+        Vector2 bl, bb;
+        float bhl, bhb;
+        berth_box(&scene->berths[b], bs, &bl, &bb, &berth_centre[b], &bhl, &bhb);
+        berth_radius[b] = hypotf(bhl, bhb);
+    }
+    Vector2 module_centre[BOAT_SCENE_MODULES];
+    float module_radius[BOAT_SCENE_MODULES];
+    for (unsigned m = 0; m < scene->module_count; ++m) {
+        Vector2 ml, mb;
+        float mhl, mhb;
+        module_box(&scene->modules[m], &ml, &mb, &module_centre[m], &mhl, &mhb);
+        module_radius[m] = hypotf(mhl, mhb);
+    }
+    for (uint64_t sample = 0; sample <= intervals; ++sample) {
+        uint64_t tick = sample * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > total_ticks)
+            tick = total_ticks;
+        BoatRoutePose pose;
+        double yaw_rate = 0;
+        if (!boat_route_path_evaluate(&a->open_path, tick, &pose, &yaw_rate) || !isfinite(pose.x)
+            || !isfinite(pose.z))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path cannot be evaluated at tick %llu", (unsigned long long)tick);
+        // Open-path poses are already in simulation X/Z; the map query takes that space directly.
+        Vector2 centre = { (float)pose.x, (float)pose.z };
+        if (!isfinite(centre.x) || !isfinite(centre.y))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path pose at tick %llu is not finite", (unsigned long long)tick);
+        if (!boat_map_water(map, centre, hull_radius))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "swept hull is not open water of the compiled map");
+        for (unsigned b = 0; b < scene->berth_count; ++b)
+            if (hypot((double)centre.x - berth_centre[b].x, (double)centre.y - berth_centre[b].y)
+                < (double)hull_radius + berth_radius[b])
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                    "swept hull crosses scene.marina.berths[%u]", b + 1);
+        for (unsigned m = 0; m < scene->module_count; ++m)
+            if (hypot((double)centre.x - module_centre[m].x, (double)centre.y - module_centre[m].y)
+                < (double)hull_radius + module_radius[m])
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                    "swept hull crosses scene.marina.modules[%u]", m + 1);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 // L3.2: sample every authored craft over the combined river timetable. The hull envelope is
 // inflated by half a sample step of travel, so a thin diagonal cannot slip between samples.
 static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, const char *entry,
@@ -733,8 +832,15 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
 {
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
-    // The open leg and open path are internal simulation shapes with no package-wire proof or
-    // authored-scene validation yet. Reject them before sampling any actor's timetable.
+    // The open path gets the bounded static survey first, so a package author sees shore or
+    // structure failures before the final unsupported-shape diagnostic. Open legs have no such
+    // survey yet.
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+        if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH
+            && check_scene_open_path(scene, entry, map, i, d) != BOAT_PLUGIN_OK)
+            return d->status;
+    // Complete moving-traffic proof and package authoring/wire support are still absent, so all
+    // internal simulation shapes remain unconditionally unsupported for packages.
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         unsigned char shape = scene->traffic.actors[i].shape;
         if (shape == WATERFRONT_ROUTE_OPEN_LEG || shape == WATERFRONT_ROUTE_OPEN_PATH) {

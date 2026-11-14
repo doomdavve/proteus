@@ -355,6 +355,11 @@ A later arc-yaw correction passed the focused traffic and boundary checks. This 
 unavailable to packages; moving turns, broader capacity, wire integration and scene clearance
 are unfinished. Location staging explicitly rejects both internal shapes, including direct
 in-memory candidates; focused free/voyage regression tests passed on macOS Debug 2026-11-14.
+Before that rejection, internal paths now receive a bounded static survey: enclosing hull circles
+are inflated by half an interval's maximum translation plus a numerical margin and checked against
+water, berth and module envelopes over at most three minutes. Focused free and voyage tests cover
+an open-water path, land and a budget overrun. Moving traffic, entrance semantics, route authoring
+and the full proof remain open; this preliminary survey alone does not authorize a package.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

@@ -482,8 +482,9 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
     // The internal-only open shapes are valid core schedules, but a package location has no
-    // route-scene proof for them and rejects each one before sampling any actor. Both the voyage
-    // and free checks share that rejection and its indexed diagnostic.
+    // complete moving-traffic proof or package authoring for them. An open path first passes the
+    // bounded static water/structure survey and then takes the unsupported-shape diagnostic; an
+    // open leg goes straight to that diagnostic. Both voyage and free checks share the messages.
     WaterfrontRouteDefinition internal = { .actor_count = 1 };
     WaterfrontRouteActor *leg = &internal.actors[0];
     strcpy(leg->id, "internal_open_leg");
@@ -510,8 +511,8 @@ static int free_scene_location(void)
         == BOAT_PLUGIN_SCHEMA);
     show("free internal open leg", &d);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
-    CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d)
-        == BOAT_PLUGIN_SCHEMA);
+    CHECK(
+        boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
 
     WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
@@ -538,13 +539,61 @@ static int free_scene_location(void)
     CHECK(waterfront_route_validate(&internal_path, &route));
     internal_free.scene.traffic = internal_path;
     internal_voyage.scene.traffic = internal_path;
+    // A safe, finite path clears the static survey, then still reports the missing package proof.
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
     show("free internal open path", &d);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
-    CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d)
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal")
+        && !strstr(d.message, "open water"));
+    CHECK(
+        boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal")
+        && !strstr(d.message, "open water"));
+
+    // A path clearly ashore fails the static survey itself, before the unsupported-shape
+    // diagnostic. The same indexed actor path names the fault for both package kinds.
+    WaterfrontRouteDefinition ashore = internal_path;
+    WaterfrontRouteActor *ashore_path = &ashore.actors[0];
+    ashore_path->open_path.pieces[0].shape.line.start_x = 500;
+    ashore_path->open_path.pieces[0].shape.line.start_z = 500;
+    ashore_path->open_path.pieces[0].shape.line.end_x = 500;
+    ashore_path->open_path.pieces[0].shape.line.end_z = 510;
+    ashore_path->open_path.pieces[1].shape.line.start_x = 500;
+    ashore_path->open_path.pieces[1].shape.line.start_z = 510;
+    ashore_path->open_path.pieces[1].shape.line.end_x = 500;
+    ashore_path->open_path.pieces[1].shape.line.end_z = 520;
+    CHECK(waterfront_route_validate(&ashore, &route));
+    internal_free.scene.traffic = ashore;
+    internal_voyage.scene.traffic = ashore;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
-    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+    show("free internal open path ashore", &d);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "open water")
+        && !strstr(d.message, "internal"));
+    CHECK(
+        boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "open water")
+        && !strstr(d.message, "internal"));
+
+    // Exceeding the 1800-sample budget fails before any map query (the geography stays safe).
+    WaterfrontRouteDefinition budget = internal_path;
+    WaterfrontRouteActor *budget_path = &budget.actors[0];
+    budget_path->open_path.pieces[0].shape.line.duration_ticks = 10801;
+    budget_path->open_path.pieces[0].dwell_ticks = 0;
+    budget_path->open_path.pieces[1].shape.line.duration_ticks = 10801;
+    budget_path->period = 21602 * BOAT_TICK_SECONDS;
+    CHECK(waterfront_route_validate(&budget, &route));
+    internal_free.scene.traffic = budget;
+    internal_voyage.scene.traffic = budget;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    show("free internal open path budget", &d);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "three-minute")
+        && !strstr(d.message, "internal"));
+    CHECK(
+        boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "three-minute")
+        && !strstr(d.message, "internal"));
 
     // A free scene without marina or traffic keeps the old path, even on the unmapped basin.
     const BoatWorldDefinition *basin = boat_location_find("basin");
