@@ -24,6 +24,7 @@
 #include <unistd.h>
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -244,7 +245,8 @@ void boat_net_enet_wait(BoatNetEnet *enet, double seconds)
 {
     if (enet->stashed)
         return;
-    enet_uint32 ms = seconds <= 0 ? 0 : seconds > 1 ? 1000 : (enet_uint32)(seconds * 1000);
+    // Round up: truncation busy-polls for the final fractional millisecond of every tick.
+    enet_uint32 ms = seconds <= 0 ? 0 : seconds > 1 ? 1000 : (enet_uint32)ceil(seconds * 1000);
     stash_service(enet, ms);
 }
 
