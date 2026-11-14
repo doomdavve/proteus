@@ -8,7 +8,8 @@ Open: the user's P5f moved-mark check, P5h four-player/impairment/browser qualif
 Play check 1 and the P5e live-reload check are accepted; no new human acceptance is inferred.
 Done when: two then four players hunt with authority-only Lua; join/reconnect HUD, safe revisions,
 recorded reconstruction, existing rooms and the closing specs all pass their gates.
-Next task: **P5h**, retaining the outstanding P5f human check as a separate open item.
+Next task: **P5h** (native four-crew HUD case implemented locally on `feat/plugin-p5h`; tick-cost
+measurement, web hunt case, old-bundle rejection and play check 2 remain), retaining the outstanding P5f human check as a separate open item.
 The shelter hunt replaces the earlier co-op working-harbour proposal ([decisions](#decisions)).
 
 This plan owns P5's design, steps and gates. The

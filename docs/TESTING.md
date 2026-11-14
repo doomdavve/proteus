@@ -1320,6 +1320,14 @@ qualification is manual-only; dispatch it for browser/plugin lifecycle changes a
 release, using `gh workflow run web-plugin.yml --ref BRANCH`. It is not run on ordinary pushes
 to `main`. Superseded PR builds are canceled. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
 
+## Authority hunt checks
+
+`boat_room_objective.four_crews` drives the bundled hunt over the memory transport with four
+crews on lossy, duplicating, reordering links: two joiners during play, a fifth refused as full, a
+leaver replaced in its slot with a zero score, and a completed hunt restarting for everyone. After
+the links settle, every client's mirrored HUD equals the authority's. It does not cover server tick
+cost, the web build or WebRTC.
+
 ## Authority recording checks
 
 `boat_room_record_objective` checks the complete objective wrapper codec, pending migration

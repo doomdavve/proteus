@@ -279,6 +279,122 @@ static int room(void)
     return 0;
 }
 
+// P5h: four crews on lossy, reordering links. Every client mirrors the HUD, a late joiner and a
+// replacement for a leaver included, and a hunt finishes and restarts for everyone.
+#define CREWS 4
+static BoatNetClient crew[CREWS + 1];
+static unsigned crew_link[CREWS + 1];
+static bool crew_used[CREWS + 1];
+
+static void crews_step(double seconds)
+{
+    for (double end = now + seconds; now < end;) {
+        now += 1.0 / 240;
+        boat_net_memory_set_time(network, now);
+        boat_net_server_service(&server, now);
+        for (unsigned i = 0; i <= CREWS; ++i)
+            if (crew_used[i] && crew[i].phase < BOAT_NET_CLIENT_REJECTED)
+                boat_net_client_service(&crew[i], now, (BoatInput) { 0 }, false);
+    }
+}
+
+static void crews_join(unsigned i, const char *name)
+{
+    BoatNetTransport transport;
+    boat_net_memory_client(network, &crew_link[i], &transport);
+    BoatNetClientConfig c
+        = { .name = name, .token = "", .build = "validate", .resources = test_worlds };
+    boat_net_client_init(&crew[i], transport, &c, now);
+    crew_used[i] = true;
+}
+
+static void crews_visit(unsigned slot, const BoatMark *mark)
+{
+    Boat *boat = &server.fleet.state.slots[slot].boat;
+    boat->position = (Vector2) { mark->x, mark->z };
+    boat->velocity = (Vector2) { 0 };
+    crews_step(.15);
+}
+
+static bool crews_agree(const BoatNetClient *c)
+{
+    return c->objective_valid && c->objective.revision == server.objective.revision
+        && boat_net_objective_state_equal(&c->objective, &server.objective);
+}
+
+static int four_crews(void)
+{
+    static BoatRoomObjective o;
+    CHECK(load_hunt() && boat_room_objective_init(&o, &hunt));
+    now = 0;
+    memset(crew, 0, sizeof(crew));
+    memset(crew_used, 0, sizeof(crew_used));
+    network = boat_net_memory_create(9);
+    CHECK(network);
+    BoatNetServerConfig config = { .token = "",
+        .epoch = 0x5eed,
+        .max_players = CREWS,
+        .room = &hunt_room,
+        .resources = test_world(BOAT_LOCATION_OUTER),
+        .rules = boat_room_objective_rules(&o) };
+    CHECK(boat_net_server_init(&server, boat_net_memory_server(network), &config));
+    const char *names[CREWS + 1] = { "one", "two", "three", "four", "five" };
+    BoatNetImpairment f = { .04, .01, .01, .002, .01, .02 };
+    for (unsigned i = 0; i < 3; ++i) {
+        crews_join(i, names[i]);
+        boat_net_memory_impair(network, crew_link[i], f, f);
+    }
+    crews_step(2);
+    CHECK(boat_net_server_players(&server) == 3);
+    // Crews 1 and 3 each find marks; crew 2 stays at sea.
+    for (unsigned m = 0; m < hunt.marks.count - 1; ++m)
+        crews_visit(0, &hunt.marks.items[m]);
+    crews_visit(2, &hunt.marks.items[1]);
+    // A fourth crew joins late and a fifth is refused as full.
+    crews_join(3, names[3]);
+    boat_net_memory_impair(network, crew_link[3], f, f);
+    crews_step(2);
+    CHECK(boat_net_server_players(&server) == CREWS && crew[3].phase == BOAT_NET_CLIENT_PLAYING);
+    crews_join(4, names[4]);
+    crews_step(2);
+    CHECK(crew[4].phase == BOAT_NET_CLIENT_REJECTED);
+    CHECK(value(&o, "c1") == 4 && value(&o, "c3") == 1 && value(&o, "c4") == 0);
+    // A crew leaves mid-hunt; its replacement starts at zero in the freed slot.
+    unsigned left = crew[1].slot;
+    boat_net_client_leave(&crew[1]);
+    crews_step(1);
+    CHECK(boat_net_server_players(&server) == CREWS - 1);
+    crews_join(1, "replacement");
+    boat_net_memory_impair(network, crew_link[1], f, f);
+    crews_step(2);
+    CHECK(crew[1].phase == BOAT_NET_CLIENT_PLAYING && crew[1].slot == left);
+    CHECK(value(&o, "c2") == 0);
+    // Crew 1 finishes the hunt: it restarts for all four.
+    for (unsigned m = 0; m < hunt.marks.count; ++m)
+        crews_visit(0, &hunt.marks.items[m]);
+    for (unsigned m = 0; m < hunt.marks.count; ++m)
+        crews_visit(1, &hunt.marks.items[m]);
+    crews_visit(2, &hunt.marks.items[0]);
+    crews_visit(3, &hunt.marks.items[0]);
+    for (unsigned m = 1; m < hunt.marks.count; ++m) {
+        crews_visit(2, &hunt.marks.items[m]);
+        crews_visit(3, &hunt.marks.items[m]);
+    }
+    crews_step(1);
+    CHECK(value(&o, "hunt") == 2 && value(&o, "c1") == 0 && value(&o, "c4") == 0);
+    // Let the lossy links settle, then every client mirrors the authority's HUD.
+    for (unsigned i = 0; i < CREWS; ++i)
+        boat_net_memory_impair(
+            network, crew_link[i], (BoatNetImpairment) { 0 }, (BoatNetImpairment) { 0 });
+    crews_step(1);
+    for (unsigned i = 0; i < CREWS; ++i)
+        CHECK(crews_agree(&crew[i]) && crew[i].stats.decode_errors == 0);
+    CHECK(!o.objective.quarantined && server.stats.malformed == 0);
+    printf("four_crews: ticks=%" PRIu64 " revision=%u hunt=%" PRId64 "\n", server.fleet.state.tick,
+        server.objective.revision, value(&o, "hunt"));
+    boat_net_memory_destroy(network);
+    return 0;
+}
 
 // P5e: reloading the hunt's source on a live objective.
 static BoatRoomObjectiveSource edited; // The hunt with one textual change.
@@ -412,7 +528,8 @@ static int reload_broken(void)
     CHECK(edit(MIGRATE, "migrate = function(c, s) error('nope') end,"));
     CHECK(boat_room_objective_stage(&o, &edited, &d));
     rules.after_tick(rules.context, 36);
-    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_REJECTED && strstr(o.reload.diagnostic.message, "nope"));
+    CHECK(
+        o.reload.kind == BOAT_ROOM_RELOAD_REJECTED && strstr(o.reload.diagnostic.message, "nope"));
     CHECK(o.revision == 1 && o.objective.generation == 1 && value(&o, "c3") == 3 && o.reloads == 2);
     // A newer stage replaces an older pending one.
     CHECK(edit("\"CREW \"", "\"ONE \""));
@@ -612,6 +729,7 @@ static const TestCase cases[] = {
     TEST_CASE(adapter),
     TEST_CASE(quarantine),
     TEST_CASE(room),
+    TEST_CASE(four_crews),
     TEST_CASE(reload_keeps_counts),
     TEST_CASE(reload_migrates),
     TEST_CASE(reload_restart),
