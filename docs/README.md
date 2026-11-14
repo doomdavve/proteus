@@ -19,7 +19,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | --- | --- | --- | --- |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
 | Plugins | P5 follow-ups: hunt tick cost has Debug and Release numbers (M1 Max, ENet bots) but no WebRTC clients or other platform, and Release reading slower than Debug is unexplained (the browser hunt case and old-bundle rejection passed on Chrome/macOS 2026-11-14); P5g recording not qualified beyond macOS Debug, with disk cost and a human view of a reconstruction open; R2 loaded maps not scheduled | 2026-11-14 | [P5 plan](PLUGIN_P5_PLAN.md#p5i-closing-step) |
-| Plugins | Marina M3 authored routes and docking motion underway; timetable helper only | 2026-11-14 | [marina plan](MARINA_AUTHORING_PLAN.md) |
+| Plugins | Marina M3 authored routes and docking motion underway; unintegrated native primitives | 2026-11-14 | [marina plan](MARINA_AUTHORING_PLAN.md) |
 | Plugins | A free package's marina/traffic scene gets no map checks (found in S1a) | 2026-11-07 | [plugin plan](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07) |
 | Plugins by default | Human scene/GPU checks; round-boundary revisions were delivered as protocol v14 by [P5](PLUGIN_P5_PLAN.md) | 2026-11-07 | [default plan](PLUGIN_DEFAULT_PLAN.md#pd5-result-2026-10-31) |
 | Multiplayer | M4 acceptance checks, profile-F play and contact-gap measurement deferred by the user | 2026-10-24 | [multiplayer plan](MULTIPLAYER_PLAN.md) |
@@ -96,7 +96,7 @@ outer. Human play remains open.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns dimensioned fixed/floating structures,
 32-berth/64-module limits and the twelve-berth, two-row `harbor-life`/`harbor-room` marina.
 M2 adds per-berth boat dimensions, colors, mast height and painted hull names on that layout.
-M3 authored routes have started with an unintegrated timetable helper. Verification and remaining
+M3 authored routes have started with unintegrated timetable and motion primitives. Verification and remaining
 review limits are recorded in that plan.
 
 ## Earlier Eriksberg harbor-life layout — 2026-11-01

@@ -8,8 +8,9 @@ It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broa
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
 Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. M3 is
-underway: an isolated common-period helper is implemented, but is not connected to route validation.
-Next task: implement a bounded combined-timetable clearance proof using integer ticks. Verification
+underway: isolated common-period and straight-leg motion helpers are implemented but not connected
+to routes. Next task: define the bounded combined-timetable clearance proof and integrate motion
+with authored routes. Verification
 evidence and limitations are recorded
 below; agreeing to features is not visual or gameplay acceptance of an implementation.
 
@@ -39,7 +40,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; timetable helper only |
+| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; unintegrated timetable and straight-leg primitives |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -321,7 +322,9 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 
 First groundwork, 2026-11-14: `boat_schedule_common_period` computes the exact least common
 multiple of positive tick periods, rejecting overflow and caller-budget overruns without changing
-the result. It is not yet used by traffic validation. M3 remains incomplete: the existing
+the result. A separate straight-leg primitive evaluates explicit ticks using smoothstep, with
+analytic speed and acceleration bounds and exact terminal poses. These are not yet used by traffic
+validation or rendering. M3 remains incomplete: the existing
 floating-point traffic schedules and fixed 4,160-second sampled horizon have not been converted
 to a proven bounded combined timetable. The next implementation must define tick conversion,
 the validation budget and conservative swept envelopes before connecting the helper. Open routes,
@@ -329,6 +332,9 @@ docking, authoring, wire integration, Apply/Undo and visual qualification remain
 On macOS/Apple Silicon Debug, the full build passed. The full CTest preset passed 542 tests
 inside the sandbox; the 14 socket-dependent failures passed on an unsandboxed rerun. Thirteen
 retired wake-field tests were disabled. No motion or user acceptance is claimed.
+After adding the straight-leg primitive on the same platform, the full build passed and the full
+CTest preset passed 556 tests; `boat_local.course_saved_ghost` failed in the parallel run and
+passed on an isolated rerun. Thirteen retired wake-field tests remained disabled.
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
 validation in `src/core/boat_scene_definition.[ch]`, `src/net/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.

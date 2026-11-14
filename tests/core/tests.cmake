@@ -19,6 +19,12 @@ target_link_libraries(validate_boat_schedule PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_schedule PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_schedule COMMAND validate_boat_schedule)
 set_tests_properties(boat_schedule PROPERTIES LABELS "core;cpu;quick")
+# Marina M3 groundwork: one straight open leg evaluated directly at explicit simulation ticks.
+add_executable(validate_boat_route_leg tests/core/validate_boat_route_leg.c)
+target_link_libraries(validate_boat_route_leg PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_route_leg PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_route_leg COMMAND validate_boat_route_leg)
+set_tests_properties(boat_route_leg PROPERTIES LABELS "core;cpu;quick")
 add_executable(validate_boat_clock tests/core/validate_boat_clock.c)
 target_link_libraries(validate_boat_clock PRIVATE proteus_boat_drive)
 target_compile_options(validate_boat_clock PRIVATE
