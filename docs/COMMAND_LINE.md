@@ -417,7 +417,7 @@ See [in-process lockdown](MULTIPLAYER_HOSTING.md#in-process-lockdown).
 `--package-reload` re-reads that package while the room runs. It needs `--package` naming a
 directory, or a bundled ID such as `proteus.outer-hunt` (which resolves to `plugins/outer-hunt`
 when run from the repository root), whose package has a room objective; otherwise the server is
-refused with exit status 2. Every 120 server ticks (one second) the package is read again; when
+refused with exit status 2. Every wall-clock second the package is read again; when
 `main.lua` or the state version changed, the new objective is staged and applies at the next
 12-tick objective boundary. With a `migrate` callback the state is kept; without one the
 objective restarts and re-announces present crews. The server prints
@@ -443,6 +443,13 @@ an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--sec
 `--token TEXT` requires the same client token, and `--round-seconds S` sets deathmatch
 round length (default 300). LAN discovery uses UDP 24681; change it with `--lan-port N`
 or disable it with `--no-lan`. A loopback room answers only local discovery.
+
+An ordinary standalone room pauses simulation after ten seconds with no connected peers
+(including handshakes). Networking, discovery and package reload checks remain active, with
+maintenance wakes scheduled every 50 ms. A connection resumes from the frozen tick without
+catch-up for the empty interval. Weather, traffic and game timers share that pause. Pending
+definition revisions keep simulation running until resolved. `--seconds`, `--ticks`,
+`--record` and scripted runs keep advancing when empty.
 
 For joining and firewall guidance see [multiplayer](PLAYING.md#multiplayer). For internet
 and browser endpoint operation see [hosting](MULTIPLAYER_HOSTING.md) and
