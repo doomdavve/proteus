@@ -217,9 +217,25 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.31 — 2026-11-14
+
+Current release: **[v0.0.31](https://github.com/doomdavve/proteus/releases/tag/v0.0.31)** is
+published at `f8c3fbf9a34864cfa1f76014e1b7a49157964073` (the merge of PR #200). It sets glibc's malloc
+arena limit before the lockdown (`mallopt(M_ARENA_MAX, 8)`), so a later browser join no longer makes glibc
+read the CPU count after the seccomp filter is installed. Compatibility remains protocol 14 / physics 9.
+The Winterfell room runs it with `--lockdown kill` (hosting pin `1869475`).
+
+On Apple Silicon/macOS, **560 CPU CTests** passed through `tools/cut_release.py`. The hosted and
+GitHub Pages browser checks passed in Chrome and the matching native bot joined with zero decode errors;
+room and relay report active on the tagged commit. Under `log` the deploy produced no seccomp records, and
+`kill` was switched on afterwards (see the
+[hardening plan](SERVER_HARDENING_PLAN.md#h5-switch-over-to-kill-v0031)). Not performed: human
+input/audio, Windows execution, physical devices, the Release-build `--fortify` check, a relay join from
+outside the LAN, a long soak. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.31/`.
+
 ### v0.0.30 — 2026-11-14
 
-Current release: **[v0.0.30](https://github.com/doomdavve/proteus/releases/tag/v0.0.30)** is
+Earlier release: **[v0.0.30](https://github.com/doomdavve/proteus/releases/tag/v0.0.30)** is
 published at `43666cb4637c3c730849321f5f6a575ec3d28394` (the merge of PR #199). It adds the glibc
 warm-up before the lockdown (`warm_libc`: timezone, address-sort configuration, name-service probe).
 Compatibility remains protocol 14 / physics 9. The Winterfell room runs it with `--lockdown log` and a

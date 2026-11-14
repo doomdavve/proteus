@@ -207,7 +207,9 @@ list under a soak, run `--lockdown log` and read the kernel's `SECCOMP` audit re
 `src/room/boat_lockdown.c`. The WebRTC threads (libdatachannel, libjuice) were exercised under `kill` on
 Winterfell with native and browser joins (2026-11-14); the lockdown warms up glibc's lazy file
 reads and address probing first (`warm_libc`), so later lookups and log timestamps do not need
-files. The recording file is opened before the lockdown, and
+files, and fixes glibc's malloc arena limit (`M_ARENA_MAX`, 8) so it never reads the CPU count
+after the filter is installed. Winterfell runs `--lockdown kill` (`wake_velocity_lockdown` in
+the host vars). The recording file is opened before the lockdown, and
 `--package-reload` is refused because it needs files.
 
 The playbook adds `/etc/nginx/conf.d/wake-velocity.conf`, validates nginx, then reloads it.
@@ -284,6 +286,19 @@ Use `10.0.21.3:24680` for the LAN check. A development build with newer handling
 be rejected; use the release checkout's bot instead. Browser testing must reach the room,
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-11-14 (v0.0.31, lockdown kill and relay quota)
+
+**v0.0.31** (source `f8c3fbf`, hosting pin `1869475`) is deployed and the unit now sets
+`wake_velocity_lockdown: kill`: the running process shows `--lockdown kill` and `seccomp kill (70 syscalls)`.
+Release checks, repeated hosted and Pages browser joins with the room empty in between, and a native join
+passed before and after the switch, with 0 restarts and 0 seccomp records. The soak is short (about 25
+minutes), so a rare syscall under real play would end the room and systemd would restart it. A browser join
+then stalled because the private relay's allocation quota (8) was full of slots held by peers that had
+already left (libjuice never releases a TURN allocation when a peer closes; they expire after 10 minutes).
+Restarting the relay freed them, and the quotas are now 24
+([plan](SERVER_HARDENING_PLAN.md#turn-allocation-quota-operator-side)). The leak itself remains. Not
+checked: a relay join from outside the LAN and long soaks.
 
 ## Status and verification — 2026-11-14 (v0.0.30, credential unit and second soak finding)
 
