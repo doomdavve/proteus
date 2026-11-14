@@ -63,5 +63,12 @@ foreach(harness fuzz_net_decode fuzz_net_server fuzz_session_record)
   endif()
 endforeach()
 
+# H5 (Linux only): the lockdown child-process cases and a locked-down server soak, both well
+# under a second of work.
+if(TEST boat_lockdown)
+  add_dependencies(ci validate_boat_lockdown boat_server boat_bot)
+  set_property(TEST boat_lockdown boat_lockdown_process APPEND PROPERTY LABELS ci)
+endif()
+
 # The case tables are discovered after linking, so the ci target validates their final
 # labels and test-count budget through check_ci_lane.py once all selected targets exist.
