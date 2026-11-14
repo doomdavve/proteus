@@ -643,6 +643,16 @@ return {
 | `appearance.mast_height` | finite `freeboard + 2` through 12 m above calm water | Only `sailboat` and `sailboat_7m`; zero, removal and fields on mastless recipes reject. |
 | `appearance.hull`, `appearance.deck`, `appearance.trim` | dense triples of Lua integers 0–255 | Opaque RGB; alpha, extra/missing channels, fractions and coercion reject. |
 | `appearance.name` | optional 1–16 ASCII characters: A–Z, 0–9, space, period, hyphen, apostrophe; include a letter/digit | Painted on both hull sides. Empty, unsupported or overlong text rejects without truncation. No lowercase/accented glyphs. |
+| `berths[i].empty` | optional boolean, default false | M4: a slot with no static hull. Its recipe/appearance give the largest hull it fits (length and beam). It has no static contact or camera exclusion; a vessel service occupies it. |
+| `marina.vessels` | dense list of 0–4 records | M4: vessel identity and appearance, separate from any berth. A vessel is drawn only where a service places it. |
+| `vessels[i].id`, `.recipe`, `.appearance` | as a berth's | IDs are unique across berths, modules and vessels. `appearance` is validated like a berth's and is the hull every renderer, contact and camera check uses. |
+| `marina.services` | dense list of 0–8 records | M4: one-shot services (no repeat). A resident is moored at its berth outside its path window; a visitor is absent outside it and moored during the dock dwell. |
+| `services[i].id` | 1–23, same spelling; unique among services | Stable service identity. |
+| `services[i].vessel`, `.berth` | a vessel ID; an **empty** berth ID | The vessel must fit the berth's resolved length and beam. A berth holds one service over its reserved window; a resident reserves it forever. |
+| `services[i].route` | a `traffic.vessels` entry with `route = "open"` and no `loop` | Its path is the vessel's motion; that actor is not drawn, lit or given a wake. Each route belongs to one service. |
+| `services[i].kind` | `resident` or `visitor` | Resident: the path starts and ends at the berth pose. Visitor: the path's `dock_piece` ends at the berth pose and its dwell is the stay. |
+| `services[i].dock_piece` | whole number 1–4 (visitor only) | The 1-based path piece whose dwell is the stay. A resident rejects the field. |
+| `services[i].start_tick` | whole number 0–4294967295 | 120 Hz simulation tick at which the path's tick zero occurs. Windows are half-open: the first tick travels, the tick after the last is moored (resident) or absent (visitor). |
 | `marina.modules` | dense list of 0–64 records | A present list replaces the entire compiled dock furniture. Empty disables it. The ferry and bridge stay independent. |
 | `modules[i].id` | 1–23, same spelling; unique across the scene including berths | Stable attachment identity. |
 | `modules[i].kind` | `walkway`, `finger_pier`, `platform`, `gangway`, `quay_deck` | Native dimensioned pieces; removed recipe names reject. |
@@ -885,7 +895,7 @@ than `"`, `\` and `` ` ``, without leading or trailing spaces. A tour has no `ex
 
 Recovery returns to the last stop passed, facing along the stop's heading. Objectives see the same
 `voyage.shelter_reached` and `voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
-worker's wire (`PSTB`) carries tours and captions.
+worker's wire (`PSTC`) carries tours, captions and, from M4, empty berths, vessels and services.
 
 ### Scene authoring not exposed yet
 

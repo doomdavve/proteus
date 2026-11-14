@@ -7,7 +7,7 @@ Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traf
 [protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
 Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
 Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
-Next task: M4 O3 Lua decoder, PSTB/room wire and protocol bump, and lifting the one-path survey cap (branch `feat/marina-m4`); O1a ownership, O1b scene data and O2 frames/contacts are done locally. Decisions are in the M4 section.
+Next task: M4 O4 example plugin, evidence and renderer/browser checks (branch `feat/marina-m4`); O1a ownership, O1b scene data, O2 frames/contacts and O3 Lua/wire/survey are done locally. Decisions are in the M4 section.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -37,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a/O1b/O2 local (ownership, scene data, frames and contacts); O3 next |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a–O3 local (ownership, scene data, frames/contacts, Lua/wire/survey); O4 example and evidence next |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
@@ -752,6 +752,14 @@ Traffic frames hide a serviced route actor (no mesh, lights or wake); contacts a
 exclusion use the same service hull, naming the route actor. Moored and travelling hulls both use
 `boat_water_pose`, so the handoff has no wave pop by construction (test: ≤5 cm across it). Test
 `waterfront_service` checks exact ticks around every handoff; the full run passed 571/571.
+O3 status, 2026-11-15 (macOS Debug, local): Lua `empty` berths, `marina.vessels` and
+`marina.services` decode with field paths; the staging wire is PSTC and the room definition v6
+inside protocol v16 (golden bytes and digest updated), and old content is refused by version.
+The survey lifts M3's one-path cap: authored paths are checked pairwise over their shared window,
+a service vessel uses its own hull, may touch only its berth's pier during docking pieces, and
+empty berths are open water. Cases `marina_service_decode` and `marina_service_survey`; the full
+run passed 573/573. The JSON schema tool lists the new fields. Not yet done: the example package,
+CPU/GPU frames, browser/Wasm and room end-to-end runs, and a loop-path service.
 Limits: a serviced vessel has no visual wake yet; no CPU/GPU frame has been rendered because
 no plugin can author a service until O3; the harbor-view model cache path is unchanged and
 untested with a service.

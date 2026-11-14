@@ -234,15 +234,69 @@ static void flock_wire(Wire *w, WaterfrontFlockDefinition *flocks)
     }
 }
 
+static void appearance_wire(Wire *w, BoatSceneAppearance *a)
+{
+    a->length = (float)number(w, a->length);
+    a->beam = (float)number(w, a->beam);
+    a->mast_height = (float)number(w, a->mast_height);
+    Color *colors[] = { &a->hull, &a->deck, &a->trim };
+    for (unsigned c = 0; c < 3; ++c) {
+        colors[c]->r = (unsigned char)integer(w, colors[c]->r, 1);
+        colors[c]->g = (unsigned char)integer(w, colors[c]->g, 1);
+        colors[c]->b = (unsigned char)integer(w, colors[c]->b, 1);
+        colors[c]->a = (unsigned char)integer(w, colors[c]->a, 1);
+    }
+    string(w, a->name, sizeof(a->name));
+}
+
+static void service_wire(Wire *w, BoatSceneDefinition *s);
+
+// M4: vessels and services, after the marina lists and before traffic (which holds their routes).
+static void service_wire(Wire *w, BoatSceneDefinition *s)
+{
+    s->vessel_count = (unsigned)integer(w, s->vessel_count, 1);
+    s->service_count = (unsigned)integer(w, s->service_count, 1);
+    if (s->vessel_count > BOAT_SCENE_VESSELS || s->service_count > BOAT_SCENE_SERVICES) {
+        w->ok = false;
+        return;
+    }
+    for (unsigned i = 0; i < s->vessel_count; ++i) {
+        BoatSceneVessel *v = &s->vessels[i];
+        string(w, v->id, sizeof(v->id));
+        v->recipe = (unsigned char)integer(w, v->recipe, 1);
+        if (v->recipe >= BOAT_SCENE_BERTH_RECIPES)
+            w->ok = false;
+        appearance_wire(w, &v->appearance);
+        if (w->reading) {
+            BoatSceneBerth hull = { .recipe = v->recipe, .appearance = v->appearance };
+            boat_scene_berth_canonicalize(&hull);
+            v->appearance = hull.appearance;
+        }
+    }
+    for (unsigned i = 0; i < s->service_count; ++i) {
+        BoatSceneService *v = &s->services[i];
+        string(w, v->id, sizeof(v->id));
+        string(w, v->vessel, sizeof(v->vessel));
+        string(w, v->berth, sizeof(v->berth));
+        string(w, v->route, sizeof(v->route));
+        v->kind = (unsigned char)integer(w, v->kind, 1);
+        if (v->kind >= BOAT_SERVICE_KINDS)
+            w->ok = false;
+        v->dock_piece = (unsigned)integer(w, v->dock_piece, 1);
+        v->start_tick = (uint32_t)integer(w, v->start_tick, 4);
+    }
+}
+
 static void scene_wire(Wire *w, BoatSceneDefinition *s)
 {
     s->version = (unsigned)integer(w, s->version, 4);
     unsigned flags = (unsigned)integer(w,
         (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
             | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u)
-            | (s->gulls_present ? 16u : 0u) | (s->work_present ? 32u : 0u),
+            | (s->gulls_present ? 16u : 0u) | (s->work_present ? 32u : 0u)
+            | (s->services_present ? 64u : 0u),
         1);
-    if (flags > 63 || s->version > BOAT_SCENE_VERSION) {
+    if (flags > 127 || s->version > BOAT_SCENE_VERSION) {
         w->ok = false;
         return;
     }
@@ -252,6 +306,7 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     s->traffic_present = flags & 8u;
     s->gulls_present = flags & 16u;
     s->work_present = flags & 32u;
+    s->services_present = flags & 64u;
     if (s->entrance_present) {
         s->entrance_x = (float)number(w, s->entrance_x);
         s->entrance_z = (float)number(w, s->entrance_z);
@@ -268,23 +323,13 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         string(w, b->id, sizeof(b->id));
         b->recipe = (unsigned char)integer(w, b->recipe, 1);
         b->mooring = (unsigned char)integer(w, b->mooring, 1);
+        b->empty = integer(w, b->empty, 1) != 0;
         if (b->recipe >= BOAT_SCENE_BERTH_RECIPES || b->mooring > BOAT_SCENE_MOORING_PONTOON)
             w->ok = false;
         b->x = (float)number(w, b->x);
         b->z = (float)number(w, b->z);
         b->heading = (float)number(w, b->heading);
-        BoatSceneAppearance *a = &b->appearance;
-        a->length = (float)number(w, a->length);
-        a->beam = (float)number(w, a->beam);
-        a->mast_height = (float)number(w, a->mast_height);
-        Color *colors[] = { &a->hull, &a->deck, &a->trim };
-        for (unsigned c = 0; c < 3; ++c) {
-            colors[c]->r = (unsigned char)integer(w, colors[c]->r, 1);
-            colors[c]->g = (unsigned char)integer(w, colors[c]->g, 1);
-            colors[c]->b = (unsigned char)integer(w, colors[c]->b, 1);
-            colors[c]->a = (unsigned char)integer(w, colors[c]->a, 1);
-        }
-        string(w, a->name, sizeof(a->name));
+        appearance_wire(w, &b->appearance);
         if (w->reading)
             boat_scene_berth_canonicalize(b);
     }
@@ -304,6 +349,8 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         m->anchor_z = (float)number(w, m->anchor_z);
         string(w, m->attaches, sizeof(m->attaches));
     }
+    if (s->services_present)
+        service_wire(w, s);
     if (s->traffic_present)
         traffic_wire(w, &s->traffic);
     if (s->gulls_present)

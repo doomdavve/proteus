@@ -57,16 +57,16 @@ their existing visual trails.
 ## Plugin-authored paths
 
 The [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43) owns the strict route schema
-and clearance contract. One `route = "open"` actor per scene has one to four tangent line/arc
+and clearance contract. Each `route = "open"` actor has one to four tangent line/arc
 pieces at 120 Hz, optional dwell and bounded speed/acceleration; `loop = true` repeats the
 complete travel/dwell schedule. Finite paths hold their terminal pose. The eight-actor scene
 budget includes retained services. There is no interactive route editor.
 
 Native evaluation supplies the same pose for hull rendering, contacts, camera and visual wakes.
 Zero-dwell joins preserve speed; a positive dwell holds the endpoint and tangent heading.
-Restart Apply/Undo installs the complete scene revision atomically. Room definition v5 and
-[protocol v15](MULTIPLAYER_PROTOCOL.md#room-definition) carry finite/loop paths; browser staging
-uses PSTB checked data.
+Restart Apply/Undo installs the complete scene revision atomically. Room definition v6 and
+[protocol v16](MULTIPLAYER_PROTOCOL.md#room-definition) carry finite/loop paths and M4 vessel
+services; browser staging uses PSTC checked data.
 
 The conservative survey checks water, static hulls/structures and scheduled craft between
 samples. Finite routes include terminal occupancy over a full period of each periodic obstacle.
@@ -74,6 +74,22 @@ Loops first try spatial separation, then simultaneous poses over a bounded exact
 schedule for supported POINTS obstacles. Unsupported repeat semantics, overflow and exhausted
 200,000-actor-evaluation work reject explicitly. Legacy preset pairs keep the 4,160-second
 sampled check; it is separate from this authored-path proof. Safe paths can reject conservatively.
+
+Several authored paths are checked pairwise over the ticks in which both can be present (service
+windows included), at 12-tick samples within the 1,800-sample budget, using oriented hull boxes
+and a travel margin; after the last moving tick both are static and the final sample covers them.
+A service vessel travels with its own customized hull, may touch only the pier or quay nearest its
+berth and only during its docking pieces, and treats empty berths as open water.
+
+## Marina vessel services (M4)
+
+A `marina.services` entry binds a vessel, an empty berth and one open-path route. The native
+owner (`waterfront_service_hull`) answers moored, travelling or absent at a simulation tick, so the
+harbor frame, traffic frame, contacts and camera exclusion agree and a vessel is never drawn or
+collided twice. Moored and travelling hulls both use the shared wave pose at the berth pose, so
+there is no step at the handoff. A serviced route actor is not drawn, lit or given a wake, and
+serviced vessels have no visual wake yet. Services are one-shot: windows are half-open and nothing
+repeats.
 
 The [route demo](../plugins/marina-route-demo/README.md) provides a platform approach, two turns,
 a pause and departure with retained ferry/bridge services. It maintains stand-off clearance;
