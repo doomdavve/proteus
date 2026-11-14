@@ -719,9 +719,10 @@ static int room(const RoomOptions *options)
         s->snapshots, s->birth_batches, s->births_sent, s->bootstraps, s->bootstrap_bytes,
         s->resyncs);
     printf("commands: stored=%" PRIu64 " duplicate=%" PRIu64 " late=%" PRIu64 " future=%" PRIu64
-           " stale_life=%" PRIu64 " stale_packets=%" PRIu64 " rate_limited=%" PRIu64 "\n",
+           " stale_life=%" PRIu64 " stale_packets=%" PRIu64 " rate_limited=%" PRIu64
+           " connect_limited=%" PRIu64 "\n",
         s->commands, s->duplicate_commands, s->late_commands, s->future_commands,
-        s->stale_life_commands, s->stale_packets, s->rate_limited);
+        s->stale_life_commands, s->stale_packets, s->rate_limited, s->connect_limited);
     printf("inputs: received=%" PRIu64 " repeated=%" PRIu64 " zero=%" PRIu64 " neutral=%" PRIu64
            "\n",
         s->input_states[BOAT_NET_INPUT_RECEIVED], s->input_states[BOAT_NET_INPUT_REPEATED],

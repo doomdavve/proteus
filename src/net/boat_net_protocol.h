@@ -21,6 +21,9 @@
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
 #define BOAT_NET_PORT 24680
 #define BOAT_NET_MAX_PEERS 8 // Four players plus four handshakes.
+#define BOAT_NET_MAX_PEERS_PER_SOURCE 6 // One address: a four-player household plus two retries.
+#define BOAT_NET_CONNECT_BURST 8 // New connections accepted at once, then
+#define BOAT_NET_CONNECT_PER_SECOND 2 // this many per second; the rest are disconnected.
 #define BOAT_NET_SNAPSHOT_TICKS 4 // 30 Hz snapshots.
 #define BOAT_NET_BIRTH_TICKS 12 // 10 Hz recent-birth batches.
 #define BOAT_NET_BIRTH_WINDOW_TICKS 180 // Each batch repeats 1.5 s of births.

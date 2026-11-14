@@ -1837,6 +1837,69 @@ static int wrap_and_flood(void)
     return 0;
 }
 
+// A stub transport that raises scripted connections and counts the refusals.
+typedef struct {
+    unsigned pending, next, disconnected;
+} ConnectFlood;
+
+static bool flood_poll(void *context, BoatNetEvent *event)
+{
+    ConnectFlood *f = context;
+    if (!f->pending)
+        return false;
+    --f->pending;
+    *event
+        = (BoatNetEvent) { .kind = BOAT_NET_EVENT_CONNECT, .peer = f->next++ % BOAT_NET_MAX_PEERS };
+    return true;
+}
+
+static bool flood_send(
+    void *context, unsigned peer, BoatNetChannel channel, const void *data, size_t size)
+{
+    (void)context, (void)peer, (void)channel, (void)data, (void)size;
+    return true;
+}
+
+static void flood_disconnect(void *context, unsigned peer)
+{
+    (void)peer;
+    ++((ConnectFlood *)context)->disconnected;
+}
+
+static BoatNetTransportStats flood_stats(void *context)
+{
+    (void)context;
+    return (BoatNetTransportStats) { 0 };
+}
+
+// New connections are rate limited on the server's clock: a burst, then a steady refill.
+static int connect_flood(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    ConnectFlood flood = { .pending = 100 };
+    room.server.transport = (BoatNetTransport) { .context = &flood,
+        .poll = flood_poll,
+        .send = flood_send,
+        .disconnect = flood_disconnect,
+        .stats = flood_stats };
+    CHECK(boat_net_server_service(&room.server, 0));
+    while (flood.pending)
+        CHECK(boat_net_server_service(&room.server, 0));
+    CHECK(room.server.stats.connect_limited == 100 - BOAT_NET_CONNECT_BURST);
+    CHECK(flood.disconnected == 100 - BOAT_NET_CONNECT_BURST);
+    // One virtual second refills BOAT_NET_CONNECT_PER_SECOND tokens, no more.
+    flood.pending = 50;
+    while (flood.pending)
+        CHECK(boat_net_server_service(&room.server, 1));
+    CHECK(room.server.stats.connect_limited
+        == 150 - BOAT_NET_CONNECT_BURST - BOAT_NET_CONNECT_PER_SECOND);
+    printf("connect_flood: 150 connects in 1 s admitted %d, refused %" PRIu64 "\n",
+        BOAT_NET_CONNECT_BURST + BOAT_NET_CONNECT_PER_SECOND, room.server.stats.connect_limited);
+    room_close(&room);
+    return 0;
+}
+
 static int impaired(void)
 {
     static Room room;
@@ -2794,9 +2857,28 @@ static int enet_lifecycle(void)
     return 0;
 }
 
+// One source address cannot hold every peer slot: the host refuses connections past the cap.
+static int enet_source_cap(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    for (unsigned k = 0; k < BOAT_NET_MAX_PEERS_PER_SOURCE + 1; ++k)
+        room_join(&room, "same-source", NULL, 0);
+    room_run(&room, 2);
+    unsigned answered = 0;
+    for (unsigned k = 0; k < room.count; ++k)
+        answered += room.clients[k].phase >= BOAT_NET_CLIENT_BOOTSTRAP;
+    CHECK(answered == BOAT_NET_MAX_PEERS_PER_SOURCE);
+    CHECK(room.clients[BOAT_NET_MAX_PEERS_PER_SOURCE].phase == BOAT_NET_CLIENT_CONNECTING);
+    printf("enet_source_cap: %u of %u loopback connections served\n", answered, room.count);
+    room_close(&room);
+    return 0;
+}
+
 // Room cases without simulated impairment run unchanged over real UDP.
 static const TestCase cases[] = {
     TEST_CASE(enet_loopback),
+    TEST_CASE(enet_source_cap),
     TEST_CASE(enet_lan),
     TEST_CASE(deferred_ready),
     TEST_CASE(snapshot_resync),
@@ -3619,6 +3701,7 @@ static const TestCase cases[] = {
     TEST_CASE(rejections),
     TEST_CASE(authority_rules),
     TEST_CASE(wrap_and_flood),
+    TEST_CASE(connect_flood),
     SLOW_CASE(impaired),
     SLOW_CASE(mapped_rooms),
     SLOW_CASE(four_player_lifecycle),
