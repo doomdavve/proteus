@@ -3,6 +3,7 @@
 #include "core/boat_cargo.h"
 #include "core/boat_clock.h"
 #include "core/boat_route_path.h"
+#include "core/boat_schedule.h"
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_outer.h"
 #include "plugins/boat_plugin_decode.h"
@@ -10,6 +11,7 @@
 #include "raymath.h"
 #include "json/boat_json.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -737,17 +739,128 @@ static BoatPluginStatus check_scene_modules(const BoatSceneDefinition *scene, co
     return BOAT_PLUGIN_OK;
 }
 
-// Marina M3: bounded static survey of an internal open path. This is deliberately only a
-// conservative static proof: it samples the finite open duration at <= 12-tick intervals and
-// checks compiled water plus moored hulls and modules. It does NOT yet check the declared marina
-// entrance (which must remain passable for an arrival) or moving traffic, and packages cannot
-// author this shape, so the unconditional rejection in check_scene_traffic below still stands.
 #define OPEN_PATH_SAMPLE_TICKS 12
 #define OPEN_PATH_SAMPLE_BUDGET 1800 // ceil(ticks / 12): three minutes at 120 Hz.
 #define OPEN_PATH_TRAFFIC_BUDGET 200000
 
+static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed);
+
+// A POINTS route has <=64 geometric pieces and <=8 stops. Reserve gamma_128
+// for positive length/duration accumulation, quotient and float dwell conversion:
+// gamma_n = n*epsilon/(1-n*epsilon). Convert the relative timing allowance to
+// distance with the speed bound, in addition to the validator's .02 s mismatch.
+// The 1.1 m minimum and .1 m absolute reserve cover bounded local coordinate,
+// join and libm rounding on the supported float builds; no bitwise repeat is claimed.
+static double traffic_wrap_margin(const WaterfrontRouteActor *actor, double speed)
+{
+    double relative = 128 * FLT_EPSILON / (1 - 128 * FLT_EPSILON);
+    return fmax(1.1, (.02 + relative * actor->period) * speed + .1);
+}
+
+// Only POINTS wraps time itself by the declared period. The older ellipse/circuit
+// evaluators wrap an angle/distance product; rounding their period would invent a repeat
+// contract. Require an exact tick representation, never a nearest-tick approximation.
+static bool traffic_repeat_ticks(const WaterfrontRouteActor *actor, uint64_t *ticks)
+{
+    double scaled = actor->period * BOAT_TICK_HZ;
+    if (actor->shape != WATERFRONT_ROUTE_POINTS || !isfinite(scaled) || scaled < 1
+        || scaled > WATERFRONT_ROUTE_MAX_PERIOD * BOAT_TICK_HZ || floor(scaled) != scaled)
+        return false;
+    *ticks = (uint64_t)scaled;
+    return actor->period == (double)*ticks * BOAT_TICK_SECONDS;
+}
+
+static BoatPluginStatus check_loop_schedule(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, double speed, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition = routes ? routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    uint64_t periods[2] = { ticks, 0 }, common;
+    if (scene->traffic.actors[actor].period != (double)ticks * BOAT_TICK_SECONDS
+        || !traffic_repeat_ticks(obstacle, &periods[1]))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+            "unsupported exact-tick schedule for traffic vessel %s", obstacle->id);
+    // Each sample evaluates both actors, including the closing boundary sample.
+    uint64_t samples = (OPEN_PATH_TRAFFIC_BUDGET - *work) / 2;
+    uint64_t limit = samples > 1 ? (samples - 1) * OPEN_PATH_SAMPLE_TICKS : 0;
+    if (!boat_schedule_common_period(periods, 2, limit, &common))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+            "common traffic schedule exceeds work budget or overflows");
+    BoatModelSpec spec = waterfront_traffic_spec_routes(routes, other);
+    // A native path is held between integer ticks. Add one full tick of path travel
+    // as well as the nearest-sample bound. POINTS permits at most .02 s of geometric
+    // wrap mismatch (<= .8 m at the validated 40 m/s cap); the separate seam
+    // allowance includes float arithmetic without treating a jump as continuous motion.
+    double radius = path_radius + hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .05 * (path_speed + speed) + path_speed * BOAT_TICK_SECONDS
+        + traffic_wrap_margin(obstacle, speed);
+    uint64_t intervals = common / OPEN_PATH_SAMPLE_TICKS + (common % OPEN_PATH_SAMPLE_TICKS != 0);
+    for (uint64_t i = 0; i <= intervals; ++i) {
+        uint64_t tick = i * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > common)
+            tick = common;
+        *work += 2;
+        double time = (double)tick * BOAT_TICK_SECONDS;
+        WaterfrontVesselMotion a
+            = waterfront_traffic_motion_routes(&scene->traffic, (int)actor, time);
+        WaterfrontVesselMotion b = waterfront_traffic_motion_routes(routes, other, time);
+        double distance
+            = hypot((double)a.position.x - b.position.x, (double)a.position.z - b.position.z);
+        if (!isfinite(distance) || distance <= radius)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+                "loop timetable crosses traffic vessel %s", obstacle->id);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
+// Spatial separation is sufficient even for incompatible periods. Overlap requests
+// a simultaneous bounded schedule proof instead of being treated as a collision.
+static BoatPluginStatus check_loop_path_traffic(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition = routes ? routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    double speed;
+    if (!traffic_speed_bound(obstacle, &speed))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot bound traffic vessel %s speed",
+            obstacle->id);
+    uint64_t count = ticks / 60 + (ticks % 60 != 0) + 1;
+    unsigned samples = (unsigned)ceil(obstacle->period / 2) + 1;
+    if (count > (OPEN_PATH_TRAFFIC_BUDGET - *work) / (samples + 1))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "loop survey exceeds work budget");
+    BoatModelSpec spec = waterfront_traffic_spec_routes(routes, other);
+    double radius = path_radius + hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .25 * path_speed + speed + traffic_wrap_margin(obstacle, speed);
+    for (uint64_t i = 0; i < count; ++i) {
+        uint64_t tick = i * 60;
+        if (tick > ticks)
+            tick = ticks;
+        BoatRoutePose pose;
+        ++*work;
+        if (!boat_route_path_evaluate(&scene->traffic.actors[actor].open_path, tick, &pose, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot evaluate loop path");
+        for (unsigned j = 0; j < samples; ++j) {
+            ++*work;
+            double time = fmin(2.0 * j, obstacle->period);
+            WaterfrontVesselMotion m = waterfront_traffic_motion_routes(routes, other, time);
+            double distance = hypot(pose.x + m.position.x, pose.z - m.position.z);
+            if (!isfinite(distance) || distance <= radius)
+                return check_loop_schedule(scene, entry, actor, routes, other, ticks, path_speed,
+                    path_radius, speed, work, d);
+        }
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 // The centre-speed bound is independent of hull heading. The dock circuit is continuous only
-// at its native 14 m radius; point routes with implicit speed cannot yet be bounded here.
+// at its native 14 m radius. Implicit-speed point loops use an overestimate of
+// their rounded geometry length; stopped point routes declare their cruise speed.
 static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed)
 {
     if (!isfinite(a->period) || a->period <= 0 || a->period > WATERFRONT_ROUTE_MAX_PERIOD)
@@ -756,9 +869,11 @@ static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed)
         *speed = 2 * 3.14159265358979323846 * fmax(a->long_radius, a->short_radius) / a->period;
     else if (a->shape == WATERFRONT_ROUTE_DOCK_CIRCUIT && fabs(a->turn_radius - 14) < .001)
         *speed = a->speed;
-    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->speed > 0)
+    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->speed > 0) {
+        if (a->stop_count && !waterfront_route_stop_ramps_separate(a))
+            return false;
         *speed = a->speed;
-    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->point_count >= 3
+    } else if (a->shape == WATERFRONT_ROUTE_POINTS && a->point_count >= 3
         && a->point_count <= WATERFRONT_ROUTE_POINT_CAPACITY && !a->stop_count) {
         double length = 0;
         for (unsigned i = 0; i < a->point_count; ++i) {
@@ -795,9 +910,9 @@ static BoatPluginStatus check_open_path_traffic(const BoatSceneDefinition *scene
     double other_radius = hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5);
     uint64_t intervals = ticks / OPEN_PATH_SAMPLE_TICKS + (ticks % OPEN_PATH_SAMPLE_TICKS != 0);
     unsigned tail = (unsigned)ceil(obstacle->period);
-    if (intervals + 1 + tail + 1 > OPEN_PATH_TRAFFIC_BUDGET - *work)
+    if (2 * (intervals + tail + 2) > OPEN_PATH_TRAFFIC_BUDGET - *work)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "traffic survey exceeds work budget");
-    *work += (unsigned)intervals + tail + 2;
+    *work += 2 * ((unsigned)intervals + tail + 2);
     double finish = (double)ticks * BOAT_TICK_SECONDS;
     for (uint64_t i = 0; i <= intervals + tail + 1; ++i) {
         bool after = i > intervals;
@@ -810,13 +925,19 @@ static BoatPluginStatus check_open_path_traffic(const BoatSceneDefinition *scene
         if (!boat_route_path_evaluate(&scene->traffic.actors[actor].open_path, tick, &pose, NULL))
             return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot evaluate open path");
         WaterfrontVesselMotion m = waterfront_traffic_motion_routes(other_routes, other, time);
-        double margin = after ? .5 * speed : .05 * (path_speed + speed);
+        double margin
+            = after ? .5 * speed : .05 * (path_speed + speed) + path_speed * BOAT_TICK_SECONDS;
         double distance = hypot(pose.x + m.position.x, pose.z - m.position.z);
         // Legacy point/circuit periods can differ from their geometric loop by up to .02 s;
-        // at the 40 m/s speed cap a wrap can therefore jump up to .8 m.
-        if (!isfinite(distance) || distance <= path_radius + other_radius + margin + 1.1)
+        // at the 40 m/s speed cap a wrap can therefore jump up to .8 m, before
+        // the additional float arithmetic allowance.
+        if (!isfinite(distance)
+            || distance
+                <= path_radius + other_radius + margin + traffic_wrap_margin(obstacle, speed))
             return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
-                "open path crosses traffic vessel %s", obstacle->id);
+                after ? "terminal pose crosses traffic vessel %s"
+                      : "open path crosses traffic vessel %s",
+                obstacle->id);
     }
     return BOAT_PLUGIN_OK;
 }
@@ -891,8 +1012,8 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
             module_hl[m] = span * .5f;
             module_hb[m] = item->width * .5f;
         } else
-            module_box(item, &module_length[m], &module_beam[m], &module_centre[m],
-                &module_hl[m], &module_hb[m]);
+            module_box(item, &module_length[m], &module_beam[m], &module_centre[m], &module_hl[m],
+                &module_hb[m]);
     }
     for (uint64_t sample = 0; sample <= intervals; ++sample) {
         uint64_t tick = sample * OPEN_PATH_SAMPLE_TICKS;
@@ -931,15 +1052,15 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
     }
     unsigned work = 0;
     for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
-        if (check_open_path_traffic(
+        if ((a->open_path.loop ? check_loop_path_traffic : check_open_path_traffic)(
                 scene, entry, actor, NULL, i, total_ticks, speed_bound, radius, &work, d)
             != BOAT_PLUGIN_OK)
             return d->status;
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         if (i == actor || scene->traffic.actors[i].retain != 0xff)
             continue;
-        if (check_open_path_traffic(scene, entry, actor, &scene->traffic, (int)i, total_ticks,
-                speed_bound, radius, &work, d)
+        if ((a->open_path.loop ? check_loop_path_traffic : check_open_path_traffic)(scene, entry,
+                actor, &scene->traffic, (int)i, total_ticks, speed_bound, radius, &work, d)
             != BOAT_PLUGIN_OK)
             return d->status;
     }
@@ -1172,6 +1293,16 @@ static bool same_storm(BoatStorm a, BoatStorm b)
         && a.build == b.build;
 }
 
+static bool scene_has_open_route(const BoatSceneDefinition *scene)
+{
+    if (!scene->traffic_present)
+        return false;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+        if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH)
+            return true;
+    return false;
+}
+
 BoatPluginChange boat_plugin_classify(
     const BoatPluginVoyage *active, const BoatPluginVoyage *candidate)
 {
@@ -1181,6 +1312,10 @@ BoatPluginChange boat_plugin_classify(
         return BOAT_PLUGIN_INCOMPATIBLE;
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
+        return BOAT_PLUGIN_RESTART_SESSION;
+    if ((scene_has_open_route(&active->scene) || scene_has_open_route(&candidate->scene))
+        && waterfront_route_digest(&active->scene.traffic)
+            != waterfront_route_digest(&candidate->scene.traffic))
         return BOAT_PLUGIN_RESTART_SESSION;
     // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;

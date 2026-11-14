@@ -161,8 +161,9 @@ def schema():
                 "phase": number(-86400, 86400, "seconds"),
                 "period": number(5, 86400, "seconds"),
                 "stops": sequence(stop, 0, 8)}),
-        record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": craft},
-                "route": {"const": "open"}, "pieces": sequence(pieces, 1, 4)})]}
+        object_schema({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": craft},
+                       "route": {"const": "open"}, "pieces": sequence(pieces, 1, 4),
+                       "loop": {"type": "boolean"}}, required=("id", "recipe", "route", "pieces"))]}
     traffic = object_schema({"vessels": sequence(vessel, 0, 8)}, required=("vessels",))
     cue = object_schema({"kind": {"enum": ["feeding", "alarm"]},
                          "start": number(0, 0xffffffff, "120 Hz ticks", integer=True),

@@ -756,6 +756,19 @@ static int check_open_path(void)
     CHECK(Vector3Distance(before_join.velocity, after_join.velocity) < .2f);
     WaterfrontVesselMotion turning = waterfront_route_motion(&def, 0, 3);
     CHECK(turning.yaw_rate > 0 && Vector3Length(turning.velocity) > 0);
+    BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true,
+        .traffic = def };
+    BoatWater water = { .upstream = true };
+    WaterfrontSceneFrame frame;
+    waterfront_scene_evaluate_scene(&scene, 3, water, &frame);
+    CHECK(frame.traffic.vessel_count == 1 && frame.traffic.wake_count > 0);
+    CHECK(!memcmp(&frame.traffic.vessels[0].motion, &turning, sizeof(turning)));
+    WaterfrontTrafficContact contact;
+    Vector2 point = { -turning.position.x, turning.position.z };
+    CHECK(waterfront_traffic_contact_height_scene(&scene, point, turning.heading, 2, 1.6f, .75f,
+        -.4f, 2, water, 3, &contact) && contact.vessel == 0);
+    CHECK(!waterfront_traffic_camera_clear_scene(&scene,
+        (Vector3) { turning.position.x, 1, turning.position.z }, 3, 0));
     WaterfrontVesselMotion previous = waterfront_route_motion(&def, 0, 0);
     for (unsigned tick = 1; tick <= 720; ++tick) {
         WaterfrontVesselMotion current = waterfront_route_motion(&def, 0, boat_tick_seconds(tick));
@@ -766,6 +779,25 @@ static int check_open_path(void)
     WaterfrontVesselMotion turn = waterfront_route_motion(&def, 0, 4);
     CHECK(fabsf(turn.position.x + 10) < 1e-4f && fabsf(turn.position.z + 20) < 1e-4f);
     a->open_path.pieces[1].dwell_ticks = UINT64_MAX;
+    CHECK(!waterfront_route_validate(&def, &d));
+
+    a->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    BoatRouteArc loop = { .centre_x = 0, .centre_z = 0, .radius = 10,
+        .start_angle = 0, .sweep = BOAT_TWO_PI * .5, .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 10, .max_acceleration = 20 };
+    a->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
+    a->open_path.pieces[0].shape.arc = loop;
+    loop.start_angle = BOAT_TWO_PI * .5;
+    a->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    a->open_path.pieces[1].shape.arc = loop;
+    a->period = 10;
+    CHECK(waterfront_route_validate(&def, &d));
+    WaterfrontVesselMotion loop_start = waterfront_route_motion(&def, 0, 0);
+    WaterfrontVesselMotion loop_end = waterfront_route_motion(&def, 0, 10);
+    CHECK(Vector3Distance(loop_start.position, loop_end.position) < 1e-4f);
+    CHECK(Vector3Distance(loop_start.velocity, loop_end.velocity) < 1e-4f);
+    CHECK(Vector3Length(loop_start.velocity) > 1);
+    a->open_path.pieces[1].shape.arc.sweep *= .5;
     CHECK(!waterfront_route_validate(&def, &d));
     return 0;
 }

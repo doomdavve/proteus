@@ -19,6 +19,7 @@
 #include "support/boat_fixtures.h"
 #include "support/boat_test_cases.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -459,6 +460,19 @@ static int open_path_decode(void)
     source = harbor_variant(old, bad);
     CHECK(source
         && load(files.manifest, source, strlen(source), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
+    const char *loop
+        = "route = \"open\", loop = true, pieces = {"
+          "{kind=\"arc\",x=0,z=-110,radius=4,start_angle=0,sweep=3.141592653589793,"
+          "ticks=600,dwell=0,max_speed=10,max_acceleration=20},"
+          "{kind=\"arc\",x=0,z=-110,radius=4,start_angle=3.141592653589793,"
+          "sweep=3.141592653589793,ticks=600,dwell=0,max_speed=10,max_acceleration=20}}";
+    source = harbor_variant(old, loop);
+    CHECK(source
+        && load(files.manifest, source, strlen(source), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(voyage.scene.traffic.actors[0].open_path.loop);
+    CHECK(boat_world_resources_init(&world, boat_location_find("outer")));
+    CHECK(boat_plugin_check_location(&voyage, world.definition, &world.map, &d) == BOAT_PLUGIN_OK);
+    boat_world_resources_destroy(&world);
     return 0;
 }
 
@@ -492,7 +506,7 @@ static int open_leg_wire(void)
     actor->shape = WATERFRONT_ROUTE_OPEN_LEG;
     CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
     actor->shape = WATERFRONT_ROUTE_OPEN_PATH;
-    actor->open_path = (BoatRoutePath) { .count = 2 };
+    actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
     actor->open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 2,
         .start_z = 3,
         .end_x = 4,
@@ -515,7 +529,8 @@ static int open_leg_wire(void)
     CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
     CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
     const BoatRoutePath *roundtrip = &back.voyage.scene.traffic.actors[0].open_path;
-    CHECK(roundtrip->count == 2 && roundtrip->pieces[0].kind == BOAT_ROUTE_PATH_LINE);
+    CHECK(roundtrip->count == 2 && roundtrip->loop
+        && roundtrip->pieces[0].kind == BOAT_ROUTE_PATH_LINE);
     CHECK(roundtrip->pieces[0].dwell_ticks == 17
         && roundtrip->pieces[0].shape.line.duration_ticks == 240
         && roundtrip->pieces[0].shape.line.start_x == 2
@@ -626,13 +641,152 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
+    WaterfrontRouteDefinition loop_path = internal_path;
+    WaterfrontRouteActor *loop_actor = &loop_path.actors[0];
+    loop_actor->period = 10;
+    loop_actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    BoatRouteArc loop_arc = { .centre_x = 0,
+        .centre_z = -110,
+        .radius = 4,
+        .start_angle = 0,
+        .sweep = BOAT_TWO_PI * .5,
+        .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 5,
+        .max_acceleration = 10 };
+    loop_actor->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[0].shape.arc = loop_arc;
+    loop_arc.start_angle = BOAT_TWO_PI * .5;
+    loop_actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[1].shape.arc = loop_arc;
+    internal_free.scene.traffic = loop_path;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+
+    // Same intersecting corridors, different timetables: the native POINTS repeat
+    // is exact at 120 Hz, unlike the legacy angular/distance-wrap evaluators.
+    BoatPluginFree crossing = internal_free;
+    crossing.scene.traffic.actor_count = 2;
+    WaterfrontRouteActor *visitor = &crossing.scene.traffic.actors[0];
+    visitor->period = 20;
+    for (unsigned i = 0; i < 2; ++i) {
+        visitor->open_path.pieces[i].shape.arc.centre_x = -50;
+        visitor->open_path.pieces[i].shape.arc.centre_z = -150;
+        visitor->open_path.pieces[i].shape.arc.radius = 12;
+        visitor->open_path.pieces[i].shape.arc.max_speed = 10;
+        visitor->open_path.pieces[i].shape.arc.duration_ticks = 1200;
+    }
+    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
+    *service = (WaterfrontRouteActor) { .shape = WATERFRONT_ROUTE_POINTS,
+        .recipe = WATERFRONT_CRAFT_RUNABOUT,
+        .retain = 0xff,
+        .period = 20,
+        .point_count = 4,
+        .points = { { 40, -160, 3 }, { 40, -140, 3 }, { 60, -140, 3 }, { 60, -160, 3 } } };
+    strcpy(service->id, "crossing_service");
+    CHECK(waterfront_route_validate(&crossing.scene.traffic, &route));
+    service->phase = 10;
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    // Equivalent phases put the legacy period wrap on the opposite side of
+    // the origin while the authored loop also closes at the final sample.
+    service->phase = 30;
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    service->phase = 3;
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "loop timetable"));
+    service->phase = 10;
+    visitor->period = nextafter(20, INFINITY);
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "unsupported exact-tick"));
+    visitor->period = 20;
+    service->period = 20.001;
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "unsupported exact-tick"));
+    service->period = 20 + BOAT_TICK_SECONDS;
+    CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "work budget"));
+    service->period = 20;
+    // Structural timetable validity alone does not imply bounded motion: the
+    // legacy stopped evaluator jumps when acceleration/deceleration ramps overlap.
+    BoatPluginFree jumping = crossing;
+    WaterfrontRouteActor *jump = &jumping.scene.traffic.actors[1];
+    jump->stop_count = 1;
+    strcpy(jump->stops[0].id, "short_leg");
+    jump->stops[0].segment = 0;
+    jump->stops[0].dwell = -1;
+    jump->speed = 40;
+    jump->accel = 120;
+    jump->period = 240;
+    CHECK(waterfront_route_validate(&jumping.scene.traffic, &route));
+    CHECK(!waterfront_route_stop_ramps_separate(jump));
+    CHECK(boat_plugin_free_check_location(&jumping, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "cannot bound traffic vessel crossing_service speed"));
+    // The retained upstream ferries' existing schedules remain proof-eligible.
+    const WaterfrontRouteDefinition *retained = waterfront_route_defaults();
+    for (unsigned i = 4; i <= 6; ++i)
+        CHECK(waterfront_route_stop_ramps_separate(&retained->actors[i]));
+
+    BoatPluginFree angular_wrap = crossing;
+    WaterfrontRouteActor *ellipse = &angular_wrap.scene.traffic.actors[1];
+    ellipse->shape = WATERFRONT_ROUTE_ELLIPSE;
+    ellipse->origin_x = 50;
+    ellipse->origin_z = -150;
+    ellipse->long_radius = ellipse->short_radius = 10;
+    CHECK(waterfront_route_validate(&angular_wrap.scene.traffic, &route));
+    CHECK(boat_plugin_free_check_location(&angular_wrap, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "unsupported exact-tick"));
+
+    BoatPluginFree finite_crossing = crossing;
+    WaterfrontRouteActor *finite_service = &finite_crossing.scene.traffic.actors[1];
+    for (unsigned i = 0; i < 4; ++i) {
+        finite_service->points[i].x = 50 + (finite_service->points[i].x - 50) * 1.2f;
+        finite_service->points[i].z = -150 + (finite_service->points[i].z + 150) * 1.2f;
+    }
+    WaterfrontRouteActor *finite = &finite_crossing.scene.traffic.actors[0];
+    finite->period = 10;
+    finite->open_path = (BoatRoutePath) { .count = 2 };
+    for (unsigned i = 0; i < 2; ++i)
+        finite->open_path.pieces[i].shape.line = (BoatRouteLeg) { .start_x = -75 + 25 * (double)i,
+            .start_z = -150,
+            .end_x = -50 + 25 * (double)i,
+            .end_z = -150,
+            .duration_ticks = 600,
+            .tick_seconds = BOAT_TICK_SECONDS,
+            .max_speed = 10,
+            .max_acceleration = 10 };
+    CHECK(waterfront_route_validate(&finite_crossing.scene.traffic, &route));
+    finite_crossing.scene.traffic.actors[1].phase = 0;
+    CHECK(
+        boat_plugin_free_check_location(&finite_crossing, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    finite_crossing.scene.traffic.actors[1].phase = 10;
+    CHECK(boat_plugin_free_check_location(&finite_crossing, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "open path crosses"));
+    // The moving segment is safe, but an arrival on the service corridor must
+    // still reject when that service reaches the stationary terminal pose.
+    finite_crossing.scene.traffic.actors[1].phase = 0;
+    finite->open_path.pieces[1].shape.line.end_x = -38;
+    CHECK(boat_plugin_free_check_location(&finite_crossing, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(strstr(d.message, "terminal pose"));
+
     WaterfrontRouteDefinition berth_path = internal_path;
     berth_path.actors[0].open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 13,
-        .start_z = 130, .end_x = 13, .end_z = 140, .duration_ticks = 240,
-        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 20, .max_acceleration = 100 };
+        .start_z = 130,
+        .end_x = 13,
+        .end_z = 140,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
     berth_path.actors[0].open_path.pieces[1].shape.line = (BoatRouteLeg) { .start_x = 13,
-        .start_z = 140, .end_x = 13, .end_z = 150, .duration_ticks = 240,
-        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 20, .max_acceleration = 100 };
+        .start_z = 140,
+        .end_x = 13,
+        .end_z = 150,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
     internal_free.scene.traffic = berth_path;
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
@@ -647,15 +801,24 @@ static int free_scene_location(void)
     defaults.scene.entrance_present = false;
     defaults.scene.traffic = internal_path;
     defaults.scene.traffic.actors[0].open_path.pieces[0].shape.line
-        = (BoatRouteLeg) { .start_x = 13, .start_z = 150, .end_x = 13, .end_z = 160,
-              .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
-              .max_speed = 20, .max_acceleration = 100 };
+        = (BoatRouteLeg) { .start_x = 13,
+              .start_z = 150,
+              .end_x = 13,
+              .end_z = 160,
+              .duration_ticks = 240,
+              .tick_seconds = BOAT_TICK_SECONDS,
+              .max_speed = 20,
+              .max_acceleration = 100 };
     defaults.scene.traffic.actors[0].open_path.pieces[1].shape.line
-        = (BoatRouteLeg) { .start_x = 13, .start_z = 160, .end_x = 13, .end_z = 170,
-              .duration_ticks = 240, .tick_seconds = BOAT_TICK_SECONDS,
-              .max_speed = 20, .max_acceleration = 100 };
-    CHECK(boat_plugin_free_check_location(&defaults, outer, &world.map, &d)
-        == BOAT_PLUGIN_SCHEMA);
+        = (BoatRouteLeg) { .start_x = 13,
+              .start_z = 160,
+              .end_x = 13,
+              .end_z = 170,
+              .duration_ticks = 240,
+              .tick_seconds = BOAT_TICK_SECONDS,
+              .max_speed = 20,
+              .max_acceleration = 100 };
+    CHECK(boat_plugin_free_check_location(&defaults, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "contact envelope"));
 
     // Open water alone is insufficient: this path ends inside the compiled runabout's circuit.

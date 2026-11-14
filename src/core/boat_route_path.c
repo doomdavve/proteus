@@ -29,13 +29,15 @@ bool boat_route_path_validate(const BoatRoutePath *path, uint64_t *total_ticks)
     if (!path || !total_ticks || !path->count || path->count > BOAT_ROUTE_PATH_PIECES)
         return false;
     uint64_t total = 0;
-    BoatRoutePose end = { 0 };
+    BoatRoutePose end = { 0 }, first = { 0 };
     for (unsigned i = 0; i < path->count; ++i) {
         const BoatRoutePathPiece *p = &path->pieces[i];
         BoatRoutePose start;
         uint64_t duration;
         if (!piece(p, 0, &start, &duration))
             return false;
+        if (!i)
+            first = start;
         double mean = mean_speed(p);
         if (!isfinite(mean) || mean <= 0)
             return false;
@@ -52,6 +54,9 @@ bool boat_route_path_validate(const BoatRoutePath *path, uint64_t *total_ticks)
         if (!piece(p, duration, &end, &duration))
             return false;
     }
+    if (path->loop && (hypot(end.x - first.x, end.z - first.z) > .001
+            || fabs(remainder(end.heading - first.heading, BOAT_TWO_PI)) > .001))
+        return false;
     *total_ticks = total;
     return true;
 }
@@ -77,10 +82,12 @@ static bool moving_piece(
     uint64_t ticks = p->kind == BOAT_ROUTE_PATH_LINE ? p->shape.line.duration_ticks
                                                      : p->shape.arc.duration_ticks;
     double mean = mean_speed(p);
-    double start
-        = i && !path->pieces[i - 1].dwell_ticks ? fmin(mean, mean_speed(&path->pieces[i - 1])) : 0;
-    double end
-        = i + 1 < path->count && !p->dwell_ticks ? fmin(mean, mean_speed(&path->pieces[i + 1])) : 0;
+    unsigned previous = i ? i - 1 : path->count - 1;
+    unsigned next = i + 1 < path->count ? i + 1 : 0;
+    double start = (i || path->loop) && !path->pieces[previous].dwell_ticks
+        ? fmin(mean, mean_speed(&path->pieces[previous])) : 0;
+    double end = (i + 1 < path->count || path->loop) && !p->dwell_ticks
+        ? fmin(mean, mean_speed(&path->pieces[next])) : 0;
     double m0 = start / mean, m1 = end / mean;
     double u = (double)tick / (double)ticks;
     double u2 = u * u, u3 = u2 * u;
@@ -117,6 +124,8 @@ bool boat_route_path_evaluate(
     uint64_t total;
     if (!pose || !boat_route_path_validate(path, &total))
         return false;
+    if (path->loop)
+        tick %= total;
     BoatRoutePose result;
     for (unsigned i = 0; i < path->count; ++i) {
         const BoatRoutePathPiece *p = &path->pieces[i];

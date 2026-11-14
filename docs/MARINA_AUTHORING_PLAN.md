@@ -8,10 +8,11 @@ It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broa
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
 Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. M3 is
-underway: one bounded authored open route can approach a platform, dwell and depart. Open work:
-looping waypoint authoring, broader capacity, Apply/Undo, visual and platform qualification.
+underway: one bounded authored open or looping route can use line and arc pieces.
+C1 schedule-aware clearance is implemented and verified; example visibility and
+remaining platform qualification are open.
 Done when M3's acceptance checks below pass and the resulting contract is recorded in the API.
-Next task: qualify the example and finish the remaining route and clearance gates.
+Next task: review the M3 draft PR and finish C2–C4; final native/Wasm evidence is below.
 
 ## Agreed result
 
@@ -39,7 +40,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; unintegrated timetable and straight-leg primitives |
+| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 implemented; closure gates C2–C4 open |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -319,12 +320,15 @@ Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive bro
 
 ## M3: authored routes and docking motion
 
-Implementation in progress, 2026-11-14: one authored open route has up to four tangent line
+Implementation in progress, 2026-11-14: one authored open or looping route has up to four tangent line
 and arc pieces, integer tick durations, optional dwell and bounded speed/acceleration. Zero-dwell
 joins preserve speed. A static site survey checks water, explicit and compiled contacts and the
 permanent ferry. A moving survey checks the route duration and one full period of each other
-periodic craft after arrival, with conservative bounds and capped work. A second open path is
-rejected. The staging wire is PSTB; room definition v5 and protocol v15 carry open paths.
+periodic craft after arrival, with conservative bounds and capped work. Disjoint loop corridors
+prove safety directly; overlapping POINTS corridors can use an exact-tick common schedule,
+subject to the existing work cap and explicit unsupported-repeat rejection. A second authored
+path is rejected. The staging wire is PSTB;
+room definition v5 and protocol v15 carry paths.
 `plugins/marina-route-demo` approaches a platform, pauses and departs while retaining the upstream
 ferry and bridge service. [Plugin API](PLUGIN_API.md) describes the implemented subset.
 
@@ -335,10 +339,12 @@ frame clearly showed the visitor. A 300-frame windowed demo was interrupted afte
 display-service connection errors; no motion review is claimed. The full CTest run passed 560
 tests; a v15 LAN golden byte and the test-time lint failed, then passed with `boat_plugin_author`
 after the fixture and test registration were corrected. Thirteen tests were disabled. No human
-motion review, Apply/Undo check, GPU or browser review is claimed. Legacy preset traffic retains
-its existing 4,160-second sampled check. Open-route
-circle bounds may conservatively reject safe passages; looping routes and multiple open paths
-are not implemented. Earlier incremental full runs passed all enabled tests after the documented
+motion review, GPU or browser review is claimed. A focused native Apply/Undo test changes a dwell,
+requires a session restart and restores the previous route. Shared-frame, contact, camera and wake
+checks exercise the same moving path. Legacy preset traffic retains
+its existing 4,160-second sampled check. Route bounds may conservatively reject safe passages; overlapping loops require supported
+exact-tick repeats within the work cap. Multiple authored paths are not supported. Earlier
+incremental full runs passed all enabled tests after the documented
 socket or boundary reruns; final integrated verification is recorded below when performed.
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
@@ -364,6 +370,135 @@ Acceptance:
   swept collisions and conflicting timetables. Legal separated passages validate.
 - Direct seeks, reverse seeks, different frame steps and loop boundaries produce identical
   poses. Route edits Apply/Undo atomically under documented restart rules.
+
+### M3 bounded closure audit — 2026-11-14
+
+Audited local `feat/marina-m3-routes` at `1462e60` plus its existing uncommitted
+implementation changes. This is an evidence audit, not acceptance or a scope reduction.
+The original acceptance criteria above remain authoritative. No implementation was changed
+by this audit. M4 occupancy/handoffs and M5 modules remain deferred.
+
+| Acceptance area | Evidence in current source | Closure assessment |
+| --- | --- | --- |
+| Turns, pause, approach and departure | `plugins/marina-route-demo/main.lua`: line/arc/line/arc, dwell after piece 3; `check_open_path` in `tests/core/validate_traffic.c` checks joins, dwell, speed and acceleration | Numerically exercised; visible docking sequence still unqualified. Example uses a platform and no named berth; named berth binding belongs to M4. |
+| Shared visible/contact/camera/wake pose | `check_open_path` compares scene motion with route motion, queries contact and camera, and requires wakes | Covered by automated assertions; visual continuity still needs review. |
+| Invalid segments, limits and loop joins | Leg/arc validators, `boat_plugin.open_path_decode`, `harbor_traffic` | Substantial coverage; passing tests alone do not prove every clearance bound. |
+| Swept static and moving clearance | `check_open_path_site`, `check_open_path_traffic`, `check_loop_path_traffic` in `src/plugins/boat_plugin.c`; location fixtures reject shore, structures, contacts, traffic and excessive work | Conservative enclosing-circle checks exist. Loop checks compare spatial corridors independently of time. Legacy preset pairs retain the sampled 4,160-second check. Original combined-schedule contract is not fully demonstrated. |
+| Legal separated passages | Safe spatially separated open and loop fixtures in plugin location tests | No identified positive fixture proving a time-separated crossing. Such loop crossings can reject by design. A second authored path rejects. This is a contract gap, not just an unrun test. |
+| Direct/reverse seeks and frame steps | Leg and arc validators exercise reordered seeks/frame steps; `check_open_path` checks composed joins and loop boundary | Primitive coverage is strong; add a composed-path seek/step regression spanning dwell and loop wrap before claiming the complete acceptance clause. |
+| Atomic Apply/Undo | `boat_plugin_session.marina_route_apply_undo` edits dwell, requires restart and restores route | Native assertion coverage exists; browser behavior remains unqualified. |
+| Serialization and retained services | Plugin staging and room path roundtrips; demo retains ferry and schooner services | Native coverage exists; fresh Wasm/browser evidence is still owed. |
+
+Closure work, in order:
+
+- **C1 — implement the settled clearance contract below.** Scope is settled; the
+  implementation and targeted regressions are recorded below; integrated qualification remains
+  open. Keep the one-route/four-piece cap.
+  Replace timing-independent rejection where a bounded schedule proof can establish safety.
+- **C2 — close the targeted acceptance evidence.** Add the composed-path seek/step regression
+  above and inspect an entire demo sequence with a camera that keeps the visitor visible.
+  Capture before/at/after the dwell and both turns; inspect CPU/GPU views and windowed motion.
+  Record any display-service blocker without claiming motion acceptance.
+- **C3 — qualify the final integrated tree once.** Build and run full CTest after final fixes;
+  run the affected browser/Wasm staging/room contracts and record platform limits. Repeat only
+  failed checks while diagnosing, then perform one final full run after implementation settles.
+- **C4 — close documentation and local commits.** Reconcile API/protocol/schema/package guides,
+  record verification and unresolved limits here, and update the index's milestone summary.
+  Mark M3 done only after C1–C3 are satisfied or explicitly deferred by the user. Keep this
+  branch local pending explicit PR approval.
+
+#### C1 decision — 2026-11-14
+
+Retain the original acceptance requirement that legal separated passages validate. Do not
+close M3 merely by documenting timing-independent rejection as a limitation. Keep **one
+authored path per scene, at most four pieces**, with the existing actor capacity for retained
+services. The acceptance example explicitly requires one craft; multiple newly authored paths
+are not necessary to complete M3. The audit's suggestion that broader authored-route capacity
+was itself a blocker was too strong. Additional route capacity is a future extension, not a
+new M3 requirement. M4 still owns named berths, reservations and vessel handoffs.
+
+Required implementation boundary:
+
+- Preserve the current 120 Hz native path evaluation and three-minute authored duration cap.
+- For finite paths, prove clearance throughout travel/dwell and at the stationary terminal
+  pose for a full cycle of each periodic obstacle. Before-start behavior remains the native
+  clamped start pose; no visitor spawn/despawn semantics are introduced.
+- For loops, keep the conservative spatial-corridor proof as a cheap sufficient check for
+  disjoint traffic. When corridors overlap, use simultaneous poses over a bounded common
+  schedule rather than rejecting solely because the corridors intersect.
+- Only claim an exact common schedule for periods whose repeat semantics are represented
+  exactly on integer simulation ticks. Do not round a legacy floating period into a claimed
+  proof. If an overlapping legacy schedule cannot be proved with the supported method,
+  reject with an explicit unsupported-schedule diagnostic. Retained ferry/bridge behavior
+  must remain unchanged.
+- Bound common periods with the existing overflow-safe `boat_schedule_common_period` helper;
+  cap validation at the existing 200,000 traffic-work budget per authored actor. Account for
+  every fallback evaluation in that budget. Reject overflow or exhausted work explicitly.
+- Use conservative hull envelopes and between-sample motion bounds, including endpoint and
+  wrap behavior. Spatial separation remains sufficient regardless of period compatibility.
+  No reactive avoidance, timetable search, new route primitives or broad refactor is needed.
+
+C1 completion evidence must include a positive periodic crossing whose spatial corridors
+intersect but whose simultaneous swept envelopes remain separated, the same geometry with a
+conflicting timetable rejected, a finite-path crossing pair, wrap/endpoint cases, and explicit
+work-budget/incompatible-period rejection. Include a retained-service regression. A green
+existing test suite alone cannot close C1. If the legacy evaluator cannot supply an exact
+repeat contract, report that specific obstacle before changing its behavior or reducing scope.
+
+C1 implementation evidence, 2026-11-14, macOS/Apple Silicon Debug: the location validator now
+keeps spatial separation as sufficient proof and falls back on overlapping corridors to a
+simultaneous native-pose survey over an overflow-safe, bounded pairwise integer-tick LCM.
+Only POINTS supplies the supported legacy exact time-wrap contract; ellipse/circuit overlaps
+explicitly reject as unsupported. The authored period must exactly match its validated tick
+count. All attempted spatial and simultaneous actor evaluations consume the existing 200,000
+traffic-work cap. Finite-path surveys retain full travel/dwell plus a complete obstacle period
+at the terminal pose. Margins include tick-held motion, geometric wrap mismatch and bounded
+float intermediates; retained-service evaluation is unchanged. A focused core helper reuses
+native built leg lengths to reject stopped POINTS actors whose acceleration/deceleration ramps
+overlap. This gates every speed-based proof, including spatial and finite surveys, because the
+legacy evaluator can jump internally in that otherwise structurally valid case. The upstream
+retained ferries pass the helper unchanged.
+
+Targeted regressions cover an intersecting circle/rounded-square pair accepted at a separated
+phase and rejected at a conflicting phase, equivalent phases across wrap, an inexact authored
+period, a fractional-tick obstacle period, coprime tick periods exceeding the common-work budget,
+an overlapping legacy ellipse, finite crossing/terminal-occupancy cases, and a structurally valid
+stopped route with overlapping ramps rejected before surveying. Existing safe-loop
+and retained-service conflict checks remain active. `cmake --build build --target
+validate_boat_plugin -j 8` passed; `ctest --test-dir build -R
+'^boat_plugin\.(free_scene_location|open_path_decode|scene_traffic)$' --output-on-failure`
+passed 3/3 tests. Independent read-only review caught the overlapping-ramp discontinuity;
+the helper and rejection regression above resolve it, and final review found no remaining
+concrete blocker within the documented float/geometry assumptions.
+
+Final C1 verification, 2026-11-14, Apple Silicon/macOS: native Debug build passed and
+`ctest --preset full`, run with local socket access, passed **563/563 enabled tests** in one
+invocation; 13 tests were disabled and GPU tests were OFF. Emscripten 6.0.12 MinSizeRel
+`web` and `validate_boat_plugin` targets built. The optional Wasm validator initially failed
+because its fixture target was missing before the native CMake early return; defining that
+validator-only dependency in `cmake/Web.cmake` restored it. Node/Wasm cases
+`free_scene_location`, `open_path_decode` and `scene_traffic` all passed on the final tree.
+`git diff --check` passed. Changed documentation adds no external/local link targets; cited
+commands and named regression targets were exercised. C1 changes validation only, so no new
+visual capture was needed for this slice. Interactive browser, GPU/motion review and
+Windows/Linux remain unverified; C2–C4 remain open. Existing uncommitted M3 changes were
+preserved; no push or PR was made. No additional capacity expansion or M4/M5 work is included.
+
+Effort assessment (inference from source/history, not session usage telemetry): 15 commits
+built timetable, leg, arc, clearance, traffic, plugin, staging and room layers before the
+integrated demo. The continuous-clearance requirement and repeated cross-layer integration
+explain substantial work. Stale status text and an unresolved subset-versus-contract decision
+make repeated continuation expensive. No precise token or elapsed-work attribution is available.
+
+Fresh audit verification, 2026-11-14, Apple Silicon/macOS, existing Debug configuration:
+`cmake --build build -j 8` passed. `ctest --preset full` passed 549/563 enabled tests;
+14 socket-dependent tests failed under sandbox restrictions (including an explicit
+`PermissionError` on loopback bind). All 14 passed with local socket access using
+`ctest --preset full --rerun-failed --output-on-failure`. Thirteen tests were disabled.
+This is a full run plus a failed-test rerun, not a single clean full invocation.
+`git diff --check` passed; the audit adds no links or command examples requiring new targets.
+Earlier dated results above are historical evidence. GPU tests are disabled in this
+configuration. No new visual, browser or Windows/Linux review was performed.
 
 ## M4: occupancy, residents and visitors
 

@@ -396,6 +396,26 @@ static bool build(
 static const char *const preset_names[] = { "river_runabout", "river_cruiser", "river_sailboat",
     "river_ferry", "alvsnabben", "frihamnen", "schooner", "marina_pass" };
 
+bool waterfront_route_stop_ramps_separate(const WaterfrontRouteActor *actor)
+{
+    if (!actor || actor->shape != WATERFRONT_ROUTE_POINTS || !actor->stop_count
+        || actor->stop_count > WATERFRONT_ROUTE_STOPS || actor->point_count < 3
+        || actor->point_count > WATERFRONT_ROUTE_POINT_CAPACITY || !isfinite(actor->speed)
+        || actor->speed <= 0 || !isfinite(actor->accel) || actor->accel < 0)
+        return false;
+    Route route;
+    if (!build(&route, actor, NULL))
+        return false;
+    for (int i = 0; i < route.stop_count; ++i) {
+        // Match the float quotient in travel()'s native duration calculation.
+        // Overlap would switch directly between different ramp positions.
+        float cruise_seconds = route.legs[i] / route.speed;
+        if (!isfinite(cruise_seconds) || cruise_seconds < actor->accel)
+            return false;
+    }
+    return true;
+}
+
 unsigned waterfront_route_preset_count(void)
 {
     return (unsigned)(sizeof(preset_names) / sizeof(preset_names[0]));
@@ -585,6 +605,7 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
         }
         if (a->shape == WATERFRONT_ROUTE_OPEN_PATH) {
             hash = fold_u64(hash, a->open_path.count);
+            hash = fold_u64(hash, a->open_path.loop);
             for (unsigned p = 0; p < a->open_path.count && p < BOAT_ROUTE_PATH_PIECES; ++p) {
                 const BoatRoutePathPiece *part = &a->open_path.pieces[p];
                 hash = fold_u64(hash, part->kind);
@@ -928,8 +949,10 @@ WaterfrontVesselMotion waterfront_route_motion(
         // Clamp in seconds before converting, so a huge finite time cannot overflow the tick
         // product and a negative time resolves to the start tick.
         uint64_t tick = 0;
-        if (time > 0) {
-            double scaled = time * (double)BOAT_TICK_HZ;
+        bool loop = actor->shape == WATERFRONT_ROUTE_OPEN_PATH && actor->open_path.loop;
+        if (loop || time > 0) {
+            double sample_time = loop ? wrapped(time, actor->period) : time;
+            double scaled = sample_time * (double)BOAT_TICK_HZ;
             if (!isfinite(scaled) || scaled >= (double)duration)
                 tick = duration;
             else

@@ -468,6 +468,19 @@ static int definition_size(void)
     CHECK(back.scene.traffic.actors[0].shape == WATERFRONT_ROUTE_OPEN_PATH
         && back.scene.traffic.actors[0].open_path.pieces[0].shape.line.end_z == -10);
     CHECK(!boat_room_definition_decode(rejected, open_size - 1, &back, &rd));
+    open->period = 10;
+    open->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    BoatRouteArc arc = { .centre_x = 0, .centre_z = -110, .radius = 4,
+        .start_angle = 0, .sweep = BOAT_TWO_PI * .5, .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 5, .max_acceleration = 10 };
+    open->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
+    open->open_path.pieces[0].shape.arc = arc;
+    arc.start_angle = BOAT_TWO_PI * .5;
+    open->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    open->open_path.pieces[1].shape.arc = arc;
+    open_size = boat_room_definition_encode(&d, rejected, sizeof(rejected));
+    CHECK(open_size > 0 && boat_room_definition_decode(rejected, open_size, &back, &rd));
+    CHECK(back.scene.traffic.actors[0].open_path.loop);
     d.scene.traffic.actors[0] = saved;
 
     printf("room_package definition: maximum %zu of %d bytes, %u pages\n", size,

@@ -89,6 +89,12 @@ static void open_path_wire(Wire *w, BoatRoutePath *path)
         w->ok = false;
         return;
     }
+    unsigned loop = (unsigned)integer(w, path->loop ? 1 : 0, 1);
+    if (loop > 1) {
+        w->ok = false;
+        return;
+    }
+    path->loop = loop != 0;
     for (unsigned i = 0; i < path->count; ++i) {
         BoatRoutePathPiece *p = &path->pieces[i];
         p->kind = (BoatRoutePathKind)integer(w, p->kind, 1);

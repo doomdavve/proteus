@@ -19,6 +19,7 @@ typedef struct {
 
 typedef struct {
     unsigned count;
+    bool loop;
     BoatRoutePathPiece pieces[BOAT_ROUTE_PATH_PIECES];
 } BoatRoutePath;
 

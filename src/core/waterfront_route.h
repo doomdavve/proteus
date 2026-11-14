@@ -110,6 +110,10 @@ const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int
 // Stable generated mesh for a registered craft recipe, shared by authored traffic slots.
 const Mesh3D *waterfront_route_recipe_mesh(WaterfrontCraftRecipe recipe);
 double waterfront_route_period(const WaterfrontRouteDefinition *routes, int index);
+// Clearance proof eligibility for a structurally validated stopped POINTS actor.
+// Reuses native built leg lengths and rejects overlapping acceleration/deceleration
+// ramps, whose legacy evaluator can jump internally. Does not alter runtime motion.
+bool waterfront_route_stop_ramps_separate(const WaterfrontRouteActor *actor);
 // Closed authored routes; negative time supports trails across the start and lap boundary.
 WaterfrontVesselMotion waterfront_route_motion(
     const WaterfrontRouteDefinition *routes, int index, double time);

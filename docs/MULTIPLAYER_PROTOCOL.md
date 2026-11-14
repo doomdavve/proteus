@@ -288,7 +288,7 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 | marks, when flagged | `u8` count 1–16; per mark `u8` length + id, `u8` length + name, `f32` x, z, radius |
 
 For an open-path traffic actor, its existing traffic fields are followed by a `u8` piece count
-(1–4). Each piece carries `u8` kind (0 line, 1 arc), `u64` dwell ticks, `u64` duration ticks,
+(1–4) and a `u8` loop flag (0 or 1). Each piece carries `u8` kind (0 line, 1 arc), `u64` dwell ticks, `u64` duration ticks,
 then binary64 fields. A line carries start x/z, end x/z, tick seconds, maximum speed and maximum
 acceleration; an arc carries centre x/z, radius, start angle, sweep, tick seconds, maximum speed
 and maximum acceleration. Unknown kinds, excess counts, non-finite values and truncation reject.

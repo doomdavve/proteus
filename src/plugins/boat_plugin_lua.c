@@ -256,7 +256,7 @@ static const char *const FLOCK[] = { "id", "recipe", "x", "z", "count", "seed", 
     "height", "rate", "cues", NULL };
 static const char *const CUE[] = { "kind", "start", "stop", "fade", "amplitude", NULL };
 static const char *const VESSEL[]
-    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", "pieces", NULL };
+    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", "pieces", "loop", NULL };
 static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[]
@@ -816,7 +816,7 @@ static bool open_ticks(lua_State *L, Vm *vm, int table, const char *path, const 
 static bool scene_open_path(
     lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *actor)
 {
-    static const char *const vessel_keys[] = { "id", "recipe", "route", "pieces", NULL };
+    static const char *const vessel_keys[] = { "id", "recipe", "route", "pieces", "loop", NULL };
     static const char *const line_keys[] = { "kind", "x0", "z0", "x1", "z1", "ticks", "dwell",
         "max_speed", "max_acceleration", NULL };
     static const char *const arc_keys[] = { "kind", "x", "z", "radius", "start_angle", "sweep",
@@ -824,6 +824,11 @@ static bool scene_open_path(
     if (!only(L, vm, entry, path, vessel_keys))
         return false;
     char at[64];
+    int loop_type = field(L, entry, "loop", path, at);
+    if (loop_type != LUA_TNIL && loop_type != LUA_TBOOLEAN)
+        return reject(vm, at, "must be a boolean");
+    actor->open_path.loop = loop_type == LUA_TBOOLEAN && lua_toboolean(L, -1);
+    lua_pop(L, 1);
     int type = field(L, entry, "pieces", path, at);
     if (type != LUA_TTABLE)
         return reject(vm, at, "must be a list of route pieces");

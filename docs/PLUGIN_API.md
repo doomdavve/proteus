@@ -660,7 +660,7 @@ return {
 | `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
 | `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. |
 | `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
-| `vessels[i].route = "open"` | one per scene; 1–4 `pieces` | An independent finite path; omit `speed`, `phase`, `period` and `stops`. Each strict piece supplies integer `ticks` (1–21600), `dwell` (0–21600), `max_speed` (0–40 m/s, exclusive of zero) and positive `max_acceleration` in m/s². Total duration including dwell is at most 21600 ticks and at least 600 ticks. |
+| `vessels[i].route = "open"` | one per scene; 1–4 `pieces` | A finite path, or a repeating path with optional `loop = true`; omit `speed`, `phase`, `period` and `stops`. Each strict piece supplies integer `ticks` (1–21600), `dwell` (0–21600), `max_speed` (0–40 m/s, exclusive of zero) and positive `max_acceleration` in m/s². Total duration including dwell is at most 21600 ticks and at least 600 ticks. |
 | Open line piece | `kind = "line"`, `x0`, `z0`, `x1`, `z1` | Simulation-metre endpoints, each coordinate within ±20000 m. |
 | Open arc piece | `kind = "arc"`, `x`, `z`, `radius`, `start_angle`, `sweep` | Centre and radius in metres, angles in radians. The start angle is within ±2π; the nonzero signed sweep is at most π in magnitude. The entire circle must fit within ±20000 m. |
 | `gulls.flocks` | dense list of 0–4 records | A present list replaces every compiled gull group; empty disables gulls. No physical bird contact is implied. |
@@ -688,12 +688,24 @@ over the 4,160 s combined river timetable and must clear compiled water, the dec
 berths, solid modules, other authored craft and compiled traffic; retained actors keep their
 compiled route. An open path is evaluated on 120 Hz ticks, stops only at positive dwells and
 clamps at its final pose. Consecutive piece endpoints and headings must agree within 1 mm and
-0.001 radians; native bounds enforce the requested speed and acceleration. Its conservative
+0.001 radians, including the last-to-first join for loops; native bounds enforce the requested speed and acceleration. Its conservative
 survey checks a hull-enclosing circle against water, moored hulls and structures at up to
 12-tick intervals. It also checks other craft while the path runs and, after arrival, for one
 complete period of each periodic craft. The survey inflates intervals by speed and a safety margin,
-caps work at 200,000 samples, and may reject safe paths. A second open path or traffic whose
-speed cannot be bounded rejects. An entrance may be crossed. Open paths restart when applied;
+caps traffic work at 200,000 actor evaluations (including attempted spatial proofs), and may
+reject safe paths. For loops, disjoint spatial corridors suffice regardless of repeat compatibility.
+Overlapping corridors use simultaneous native poses at up to 12-tick intervals through an
+integer-tick common period, including its closing boundary. This fallback requires the authored
+period to equal its total tick duration exactly and a POINTS obstacle whose period is exactly
+representable in 120 Hz ticks; no legacy floating period is rounded. Legacy ellipse and dock-circuit
+angle/distance wraps reject overlapping fallback as unsupported even when their nominal period
+looks integral. Common periods use overflow-safe bounded arithmetic; unsupported repeat semantics
+and exhausted work report explicit errors. Tick-held motion, permitted join/wrap mismatch and
+bounded float arithmetic receive additional conservative margins. A second open path or traffic
+whose speed cannot be bounded rejects. Stopped POINTS actors must also have nonoverlapping
+acceleration/deceleration ramps on every built leg; otherwise all path-clearance proofs reject
+them because the legacy evaluator can jump internally. This proof check leaves runtime motion
+and retained-service timetables unchanged. An entrance may be crossed. Open paths restart when applied;
 they do not bind to berth occupancy, and depth is unverified. Ordinary traffic wakes stay visual.
 Every table is strict; lists are dense. There
 is no silent clamp, index merge or partial installation. Depth is unavailable, so discovery and
