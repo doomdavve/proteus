@@ -38,6 +38,7 @@ void boat_lockdown_describe(
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <stddef.h>
+#include <malloc.h>
 #include <netdb.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -312,6 +313,13 @@ static void warm_libc(void)
     hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
     if (getaddrinfo(NULL, "0", &hints, &result) == 0)
         freeaddrinfo(result);
+#ifdef __GLIBC__
+    // Once more than eight malloc arenas exist, glibc sizes the limit from the CPU count by
+    // reading /sys/devices/system/cpu/online (then /proc/stat) the next time a new thread
+    // allocates. WebRTC starts several threads per peer, so that happens on a later browser
+    // join. A fixed limit means glibc never asks.
+    (void)mallopt(M_ARENA_MAX, 8);
+#endif
 }
 
 bool boat_lockdown_apply(BoatLockdownMode mode, int min_landlock_abi, BoatLockdownReport *report,

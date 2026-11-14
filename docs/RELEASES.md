@@ -217,9 +217,26 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.30 — 2026-11-14
+
+Current release: **[v0.0.30](https://github.com/doomdavve/proteus/releases/tag/v0.0.30)** is
+published at `43666cb4637c3c730849321f5f6a575ec3d28394` (the merge of PR #199). It adds the glibc
+warm-up before the lockdown (`warm_libc`: timezone, address-sort configuration, name-service probe).
+Compatibility remains protocol 14 / physics 9. The Winterfell room runs it with `--lockdown log` and a
+credential-file ICE server (hosting pin `c9302eb`).
+
+On Apple Silicon/macOS, **560 CPU CTests** passed through `tools/cut_release.py`. The hosted and
+GitHub Pages browser checks passed in Chrome and the matching native bot joined with zero decode errors;
+room and relay report active on the tagged commit. The `log`-mode soak was **not clean**: the second
+browser join after an empty room logged two `openat` calls from glibc's malloc arena sizing, fixed after
+this release (see the
+[hardening plan](SERVER_HARDENING_PLAN.md#second-soak-finding-the-malloc-arena-limit)). Not performed:
+human input/audio, Windows execution, physical devices, the Release-build `--fortify` check, a relay join
+from outside the LAN. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.30/`.
+
 ### v0.0.29 — 2026-11-14
 
-Current release: **[v0.0.29](https://github.com/doomdavve/proteus/releases/tag/v0.0.29)** is
+Earlier release: **[v0.0.29](https://github.com/doomdavve/proteus/releases/tag/v0.0.29)** is
 published at `6ca3954ff327e986a8a183a1157177932e7d2f95` (the merge of PR #198). It adds the SDP
 offer filter: the server passes only numeric IP candidates from a client's offer to the WebRTC
 library, so a client can no longer cause name lookups. Compatibility remains protocol 14 / physics 9.

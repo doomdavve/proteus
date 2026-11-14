@@ -11,6 +11,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,6 +120,35 @@ static int libc_after_lock(void)
     return 0;
 }
 
+// glibc reads the CPU count when a thread needs a ninth malloc arena. WebRTC starts many threads
+// after the lockdown, so the limit must already be fixed.
+enum { ARENA_THREADS = 24 };
+static pthread_barrier_t arena_barrier;
+
+static void *arena_thread(void *arg)
+{
+    void *block = malloc(4096);
+    pthread_barrier_wait(&arena_barrier); // Keep every thread alive so each needs its own arena.
+    free(block);
+    (void)arg;
+    return block ? NULL : arg;
+}
+
+static int arenas_after_lock(void)
+{
+    if (!lock(BOAT_LOCKDOWN_KILL))
+        return 90;
+    pthread_t threads[ARENA_THREADS];
+    if (pthread_barrier_init(&arena_barrier, NULL, ARENA_THREADS) != 0)
+        return 1;
+    for (int i = 0; i < ARENA_THREADS; ++i)
+        if (pthread_create(&threads[i], NULL, arena_thread, NULL) != 0)
+            return 2;
+    for (int i = 0; i < ARENA_THREADS; ++i)
+        pthread_join(threads[i], NULL);
+    return 0;
+}
+
 static int killed_execve(void)
 {
     if (!lock(BOAT_LOCKDOWN_KILL))
@@ -175,6 +205,7 @@ int main(void)
         int expect;
     } cases[] = { { "denied calls fail", denied, 0 }, { "steady state works", steady_state, 0 },
         { "libc lookups survive the lockdown", libc_after_lock, 0 },
+        { "many threads allocate after the lockdown", arenas_after_lock, 0 },
         { "execve kills", killed_execve, 128 + SIGSYS },
         { "open kills", killed_open, 128 + SIGSYS }, { "refusal installs nothing", refusal, 0 },
         { "landlock denies files and tcp bind", landlock_files, 0 } };

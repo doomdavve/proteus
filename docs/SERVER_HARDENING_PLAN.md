@@ -1,12 +1,12 @@
 # Server hardening: limiting what `boat_server` can do and find
 
-Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged; H4 code side is merged (operator work owed); H5 is implemented on `feat/h5-lockdown`; H6 is decided (do not split); H7 is next.**
-Completed task: H5, `boat_server --lockdown kill|log|errno` (Landlock ABI 6, `no_new_privs`, hand-written seccomp allowlist); it fails closed. Evidence below.
-Open: `davve-srv`: enable `--lockdown` in the unit and soak with `--lockdown log` to tune the allowlist; H4 operator work (nftables, crash alert); H1 credential unit; the WebRTC syscalls under lockdown are unverified;
+Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and runs in `log` mode (a `kill` switch-over waits for one more fix and a clean soak); H6 is decided (do not split); H7 is next.**
+Completed task: H1 credential unit and the H5 soak findings (glibc warm-ups, malloc arena limit). Evidence below.
+Open: a release containing the arena-limit fix, a clean `log` soak across several joins and restarts, then the `kill` switch-over in `davve-srv`; H4 operator work (nftables, crash alert);
 the longer H3 fuzz campaign; relay join from outside the LAN.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: release the lockdown warm-up, confirm a clean `log` soak, switch the unit to `kill`; then H7 and the H4 operator work in `davve-srv`.
+Next task: release the arena-limit fix (v0.0.31), confirm a clean `log` soak, switch the unit to `kill`; then H7 and the H4 operator work in `davve-srv`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -176,3 +176,19 @@ on Winterfell with no `SIGSYS` and no audit records. The allowlist was not widen
 warm-up, run `log` mode again to confirm a clean journal across several joins and a restart, then
 switch the unit to `kill`; the `nscd` probe is only stopped by the warm-up, not by policy, so an
 extended soak (hundreds of lookups) should confirm glibc does not retry it.
+
+### Second soak finding: the malloc arena limit
+
+v0.0.30 (which contains the warm-up above) still logged two `openat` calls under `--lockdown log` on
+Winterfell, on the first browser join after the room had been empty. A restart-and-join loop (the hosted and
+GitHub Pages browser checks back to back) reproduced it on the first cycle, and `strace -k` gave the
+stack: a new thread's first `malloc` needed another arena, and glibc then read the CPU count from `/sys`
+(and `/proc/stat`) to size the arena limit. glibc only does this once more than eight arenas exist, which
+WebRTC's per-peer threads reach on a later join; that is why it looked intermittent. Landlock already
+denied the read, so joins worked, but `kill` would have ended the room. `warm_libc` now sets
+`mallopt(M_ARENA_MAX, 8)` before the lockdown, so glibc never asks. `validate_boat_lockdown` has a case
+that starts 24 threads after a `kill` lockdown; it fails with `SIGSYS` without the line and passes with it
+(Linux, GCC). A scratch build on Winterfell then ran `--lockdown kill` through four browser joins (hosted
+and Pages, twice each) and a native join with the server alive and no audit records. One earlier scratch
+run died to `SIGSYS` before the fix; that is the evidence above. Not changed: the allowlist; a first guess
+that libdatachannel's thread-pool sizing was the source was wrong and is not in the code.
