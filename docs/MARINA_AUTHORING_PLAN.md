@@ -1,18 +1,14 @@
 # Marina authoring expansion
 
-Status, 2026-11-04: **M1 implemented and merged in
-[PR #133](https://github.com/doomdavve/proteus/pull/133); M2 boat appearance is implemented and
-merged in [PR #142](https://github.com/doomdavve/proteus/pull/142).** This plan records the
-user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
-It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
-and [the API](PLUGIN_API.md) describes only implemented capabilities.
-
-Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. M3 is
-underway: one bounded authored open or looping route can use line and arc pieces.
-C1 schedule-aware clearance is implemented and verified; example visibility and
-remaining platform qualification are open.
-Done when M3's acceptance checks below pass and the resulting contract is recorded in the API.
-Next task: review the M3 draft PR and finish C2–C4; final native/Wasm evidence is below.
+Status, 2026-11-14: M1 structures and M2 appearance are merged; M3 authored routes and
+C1 bounded schedule clearance are merged in [PR #201](https://github.com/doomdavve/proteus/pull/201).
+M3 supports one open or looping route with up to four tangent line/arc pieces; it remains open.
+Completed: C2a composed-path regression and loop tick-conversion correction (evidence below).
+Open: full visible sequence, CPU/GPU/windowed review, integrated qualification and C4 closure.
+Done when M3's acceptance checks below pass and its contract is recorded in the API.
+Next task: C2b camera and full docking/departure review, then C3–C4.
+The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap; the [API](PLUGIN_API.md) owns
+implemented capabilities. M4 occupancy and M5 modules remain deferred.
 
 ## Agreed result
 
@@ -40,7 +36,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 implemented; closure gates C2–C4 open |
+| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 merged in #201; closure gates C2–C4 open |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -395,10 +391,12 @@ Closure work, in order:
   implementation and targeted regressions are recorded below; integrated qualification remains
   open. Keep the one-route/four-piece cap.
   Replace timing-independent rejection where a bounded schedule proof can establish safety.
-- **C2 — close the targeted acceptance evidence.** Add the composed-path seek/step regression
-  above and inspect an entire demo sequence with a camera that keeps the visitor visible.
-  Capture before/at/after the dwell and both turns; inspect CPU/GPU views and windowed motion.
-  Record any display-service blocker without claiming motion acceptance.
+- **C2a — composed-path numerical evidence.** Add finite and looping composed fixtures with
+  turns and dwell. Check exact fields across direct/reverse/reordered seeks, independent owners
+  and different tick cadences; assert geometry and stopped/moving states at boundary ticks.
+- **C2b — visual docking evidence.** Inspect an entire demo sequence with a camera that keeps
+  the visitor visible. Capture before/at/after the dwell and both turns; inspect CPU/GPU views
+  and windowed motion. Record any display-service blocker without claiming motion acceptance.
 - **C3 — qualify the final integrated tree once.** Build and run full CTest after final fixes;
   run the affected browser/Wasm staging/room contracts and record platform limits. Repeat only
   failed checks while diagnosing, then perform one final full run after implementation settles.
@@ -406,6 +404,55 @@ Closure work, in order:
   record verification and unresolved limits here, and update the index's milestone summary.
   Mark M3 done only after C1–C3 are satisfied or explicitly deferred by the user. Keep this
   branch local pending explicit PR approval.
+
+#### C2a execution contract — 2026-11-14
+
+Continue from merged #201 (`06dde10`) in local `feat/marina-m3-c2`. This is the numerical
+part of C2; C2b remains a separate focused step. It defers M4 occupancy, M5 modules and the
+unrelated Open loops board items in the documentation index. No PR or push is authorized.
+
+Done when finite mixed line/arc/line motion with an interior dwell and a looping two-arc
+path with interior/final dwells agree through the native path evaluator and production
+traffic adapter at identical ticks. Compare motion fields rather than padding across
+1/7/31-tick cadences, forward/reverse/alternating seeks and an interleaved translated owner.
+Anchor repeatability with expected positions and moving/stopped states around dwell, finite
+start/end and three loop-wrap boundaries, including negative loop time.
+
+The new regression exposed a one-tick adapter lag after wrap: seconds for tick 1441 in a
+1440-tick loop were reduced to the period before conversion, losing enough precision to
+select tick 0 rather than tick 1. Recover the absolute tick before modulo by the validated
+path duration. Preserve finite-path clamping and protect huge finite times from conversion
+overflow. No route schema, capacity, wire layout or retained-service evaluator change.
+
+Next: C2b must establish a reproducible camera/launch command keeping the visitor visible
+through the full 0–19 s sequence. Capture both turns and ticks before/at/after the 12–14 s
+dwell on CPU and GPU, then inspect full windowed motion. C3 owns final integrated
+native/browser/Wasm qualification; C4 owns milestone closure. C2a success alone closes neither
+C2 nor M3, and does not imply human acceptance.
+
+C2a result, 2026-11-14, Apple Silicon/macOS: implemented the finite mixed-path and looping
+turn/dwell regressions, exact native-to-adapter float-cast comparisons, product-form and
+division-form clock inputs, cadence/reordered seeks, translated-owner interleaving and
+expected boundary states above. Fractional-loop times hold the preceding tick; huge positive
+and negative finite times remain bounded. The regression failed on the pre-fix loop adapter
+and passes with absolute-tick wrapping. Independent read-only review found no concrete blocker.
+
+Debug configure/build passed, reusing pinned local raylib/ENet sources and vendored Lua.
+The initial clean build emitted one upstream `stb_vorbis.c` warning; the final incremental
+build emitted no warnings. Final `ctest --preset full` with local socket access passed
+**568/568 tests in 46.09 s**, GPU tests OFF. The earlier sandboxed baseline quick run passed
+362/370; its eight socket-dependent failures are covered by the successful final full run.
+`harbor_traffic` also passed separately. Added/rewritten local links (six) and `git diff
+--check` passed; existing documentation links to the renamed index heading were searched
+and none found. The test commands above were exercised in this worktree.
+
+A bounded windowed startup/load smoke completed with exit 0 using
+`./build/wake_velocity --plugin plugins/marina-route-demo --start 0,150,0 --demo --frames 120`.
+It reached 136 simulation ticks; it does not cover a wrap or the full docking sequence.
+No new CPU/GPU capture inspection, full motion review, browser/Wasm build, Windows/Linux
+qualification or human acceptance is claimed. Those remain C2b/C3 work. Exact recovery of
+arbitrary ticks beyond double-time precision is not established; huge-time cases check
+bounded output, not exact phase. The branch remains local pending explicit PR approval.
 
 #### C1 decision — 2026-11-14
 
