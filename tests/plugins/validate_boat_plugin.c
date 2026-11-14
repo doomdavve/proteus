@@ -481,6 +481,71 @@ static int free_scene_location(void)
     CHECK(boat_plugin_check_location(&voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
+    // The internal-only open shapes are valid core schedules, but a package location has no
+    // route-scene proof for them and rejects each one before sampling any actor. Both the voyage
+    // and free checks share that rejection and its indexed diagnostic.
+    WaterfrontRouteDefinition internal = { .actor_count = 1 };
+    WaterfrontRouteActor *leg = &internal.actors[0];
+    strcpy(leg->id, "internal_open_leg");
+    leg->shape = WATERFRONT_ROUTE_OPEN_LEG;
+    leg->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    leg->retain = 0xff;
+    leg->period = 10;
+    leg->phase = 0;
+    leg->open_leg = (BoatRouteLeg) { .start_x = 0,
+        .start_z = 0,
+        .end_x = 30,
+        .end_z = 40,
+        .duration_ticks = 1200,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 10,
+        .max_acceleration = 10 };
+    WaterfrontRouteDiagnostic route;
+    CHECK(waterfront_route_validate(&internal, &route));
+    BoatPluginFree internal_free = free;
+    internal_free.scene.traffic = internal;
+    BoatPluginVoyage internal_voyage = voyage;
+    internal_voyage.scene.traffic = internal;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    show("free internal open leg", &d);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+    CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+
+    WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
+    WaterfrontRouteActor *path = &internal_path.actors[0];
+    strcpy(path->id, "internal_open_path");
+    path->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    path->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    path->retain = 0xff;
+    path->period = 5;
+    path->open_path.count = 2;
+    BoatRouteLeg line = { .start_x = 0,
+        .start_z = 0,
+        .end_x = 0,
+        .end_z = -10,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
+    path->open_path.pieces[0].shape.line = line;
+    path->open_path.pieces[0].dwell_ticks = 120;
+    line.start_z = -10;
+    line.end_z = -20;
+    path->open_path.pieces[1].shape.line = line;
+    CHECK(waterfront_route_validate(&internal_path, &route));
+    internal_free.scene.traffic = internal_path;
+    internal_voyage.scene.traffic = internal_path;
+    CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    show("free internal open path", &d);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+    CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
+
     // A free scene without marina or traffic keeps the old path, even on the unmapped basin.
     const BoatWorldDefinition *basin = boat_location_find("basin");
     BoatPluginFree plain = free;

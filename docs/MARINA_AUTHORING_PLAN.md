@@ -353,7 +353,8 @@ On the full preset 559 tests passed and two boundary checks initially rejected `
 after adding that standard math function to the boundary allowlist, both checks passed on rerun.
 A later arc-yaw correction passed the focused traffic and boundary checks. This path remains
 unavailable to packages; moving turns, broader capacity, wire integration and scene clearance
-are unfinished.
+are unfinished. Location staging explicitly rejects both internal shapes, including direct
+in-memory candidates; focused free/voyage regression tests passed on macOS Debug 2026-11-14.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

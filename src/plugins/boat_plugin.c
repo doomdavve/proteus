@@ -733,6 +733,18 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
 {
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
+    // The open leg and open path are internal simulation shapes with no package-wire proof or
+    // authored-scene validation yet. Reject them before sampling any actor's timetable.
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        unsigned char shape = scene->traffic.actors[i].shape;
+        if (shape == WATERFRONT_ROUTE_OPEN_LEG || shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            char path[48];
+            snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", i + 1);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "uses the internal %s route shape, which packages cannot carry",
+                waterfront_route_shape_name((WaterfrontRouteShape)shape));
+        }
+    }
     const double step = .25, horizon = 4160; // The four river periods repeat together here.
     int samples = (int)(horizon / step);
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
