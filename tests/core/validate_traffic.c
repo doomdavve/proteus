@@ -1,3 +1,4 @@
+#include "core/boat_clock.h"
 #include "core/boat_map.h"
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_route.h"
@@ -198,7 +199,8 @@ static Vector3 legacy_gull_position(
             continue;
         float ignored;
         Vector3 delta = Vector3Subtract(p, legacy_gull_path(neighbor, time, &ignored));
-        separation = Vector3Add(separation, Vector3Scale(delta, 2 * expf(-Vector3LengthSqr(delta) / 16)));
+        separation
+            = Vector3Add(separation, Vector3Scale(delta, 2 * expf(-Vector3LengthSqr(delta) / 16)));
     }
     p = Vector3Add(p, separation);
     float speed = Vector3Length(velocity);
@@ -238,7 +240,8 @@ static void legacy_gulls(
             float trim = .035f * sinf(boat_phase(1.9f, time) + i);
             float wing = part == 1 ? -.12f - flap + trim : part == 2 ? .12f + flap + trim : 0;
             out[i][part] = (Transform3D) { .position = p,
-                .rotation = { bank + wing, yaw, pitch }, .scale = { size, size, size } };
+                .rotation = { bank + wing, yaw, pitch },
+                .scale = { size, size, size } };
         }
     }
 }
@@ -387,9 +390,7 @@ static int check_flock_definition(void)
         CHECK(!memcmp(&frame, &other, sizeof(frame)));
         if (tick)
             for (int i = 0; i < frame.count; ++i)
-                CHECK(Vector3Distance(frame.birds[i][0].position,
-                          direct.birds[i][0].position)
-                    < 4);
+                CHECK(Vector3Distance(frame.birds[i][0].position, direct.birds[i][0].position) < 4);
         direct = frame;
     }
     return 0;
@@ -483,8 +484,7 @@ static int check_route_definition(void)
             CHECK(!memcmp(&a, &b, sizeof(a)));
             CHECK(isfinite(b.position.x) && isfinite(b.position.z) && isfinite(b.velocity.x));
             if (period > 0) {
-                WaterfrontVesselMotion wrapped
-                    = waterfront_traffic_motion(i, times[t] + period);
+                WaterfrontVesselMotion wrapped = waterfront_traffic_motion(i, times[t] + period);
                 CHECK(near(wrapped.position, a.position, .002f));
                 CHECK(near(wrapped.velocity, a.velocity, .002f));
             }
@@ -506,7 +506,8 @@ static int check_route_definition(void)
             CHECK(Vector2Distance(default_stops[k], route_stops[k]) < 1e-5f);
     }
     for (int step = 0; step <= 1200; ++step)
-        CHECK(fabsf(waterfront_route_lift(defaults, step) - waterfront_upstream_lift(step)) < 1e-5f);
+        CHECK(
+            fabsf(waterfront_route_lift(defaults, step) - waterfront_upstream_lift(step)) < 1e-5f);
 
     WaterfrontTrafficFrame compiled, selected;
     waterfront_traffic_evaluate((BoatWater) { .upstream = true }, 300, &compiled);
@@ -567,6 +568,143 @@ static int check_route_definition(void)
     return 0;
 }
 
+// Marina M3: one internal straight open leg. The actor uses the shared simulation tick with no
+// phase or stops, and route motion reflects simulation X into renderer X exactly like traffic.
+static int check_open_leg(void)
+{
+    WaterfrontRouteDefinition def = { .actor_count = 1 };
+    WaterfrontRouteActor *a = &def.actors[0];
+    strcpy(a->id, "open_pass");
+    a->shape = WATERFRONT_ROUTE_OPEN_LEG;
+    a->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    a->retain = 0xff;
+    a->period = 10;
+    a->phase = 0;
+    a->open_leg = (BoatRouteLeg) { .start_x = 0,
+        .start_z = 0,
+        .end_x = 30,
+        .end_z = 40,
+        .duration_ticks = 1200,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 10,
+        .max_acceleration = 10 };
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(waterfront_route_validate(&def, &diagnostic));
+
+    // Negative, zero, middle, end and after-duration seeks, including a huge finite time that
+    // must clamp without overflowing the tick product.
+    const double times[] = { -1e300, -1, 0, 5, 10, 10.5, 1e300 };
+    for (unsigned i = 0; i < sizeof(times) / sizeof(times[0]); ++i) {
+        double time = times[i];
+        uint64_t tick = 0;
+        if (time > 0) {
+            double scaled = time * BOAT_TICK_HZ;
+            tick = !isfinite(scaled) || scaled >= 1200 ? 1200 : (uint64_t)floor(scaled);
+        }
+        BoatRoutePose pose;
+        CHECK(boat_route_leg_evaluate(&a->open_leg, tick, &pose));
+        WaterfrontVesselMotion m = waterfront_route_motion(&def, 0, time);
+        CHECK(fabs(m.position.x - (float)-pose.x) < 1e-6f);
+        CHECK(fabs(m.position.z - (float)pose.z) < 1e-6f);
+        CHECK(m.position.y == 0 && m.yaw_rate == 0);
+        CHECK(fabs(m.heading - (float)pose.heading) < 1e-7f);
+        CHECK(fabs(m.velocity.x - (float)(-sin(pose.heading) * pose.speed)) < 1e-6f);
+        CHECK(fabs(m.velocity.z - (float)(-cos(pose.heading) * pose.speed)) < 1e-6f);
+        CHECK(m.velocity.y == 0);
+    }
+
+    // The smoothstep midpoint and both clamped endpoints are explicit.
+    WaterfrontVesselMotion start = waterfront_route_motion(&def, 0, 0);
+    CHECK(fabs(start.position.x) < 1e-6f && fabs(start.position.z) < 1e-6f);
+    CHECK(Vector3Length(start.velocity) < 1e-6f);
+    BoatRoutePose tick_pose;
+    CHECK(boat_route_leg_evaluate(&a->open_leg, 123, &tick_pose));
+    WaterfrontVesselMotion tick_motion = waterfront_route_motion(&def, 0, boat_tick_seconds(123));
+    CHECK(fabs(tick_motion.position.x + (float)tick_pose.x) < 1e-6f);
+    CHECK(fabs(tick_motion.position.z - (float)tick_pose.z) < 1e-6f);
+    WaterfrontVesselMotion middle = waterfront_route_motion(&def, 0, 5);
+    CHECK(fabs(middle.position.x + 15) < 1e-5f && fabs(middle.position.z - 20) < 1e-5f);
+    CHECK(fabs(Vector3Length(middle.velocity) - 7.5f) < 1e-5f);
+    WaterfrontVesselMotion end = waterfront_route_motion(&def, 0, 10);
+    CHECK(fabs(end.position.x + 30) < 1e-5f && fabs(end.position.z - 40) < 1e-5f);
+    CHECK(Vector3Length(end.velocity) < 1e-6f);
+    WaterfrontVesselMotion late = waterfront_route_motion(&def, 0, 10.5);
+    CHECK(near(late.position, end.position, 1e-6f));
+
+    // Every structurally invalid variant is rejected: retained, bridge, stops, phase, tick
+    // cadence, period mismatch and an invalid leg.
+    WaterfrontRouteActor saved = *a;
+    *a = saved;
+    a->phase = .5f;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->open_leg.tick_seconds = 1.0 / 60.0;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->period = 10.5;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->stop_count = 1;
+    a->stops[0] = (WaterfrontRouteStop) { .id = "pier", .segment = 0, .dwell = 1 };
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->retain = 0;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->bridge = true;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->open_leg.duration_ticks = 0;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->open_leg.end_x = 0;
+    a->open_leg.end_z = 0;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    a->open_leg.max_speed = .1;
+    CHECK(!waterfront_route_validate(&def, &diagnostic));
+    *a = saved;
+    CHECK(waterfront_route_validate(&def, &diagnostic));
+
+    // Cached identity must include every open-leg field, even though no wire encodes it.
+    uint64_t digest = waterfront_route_digest(&def);
+    WaterfrontRouteDefinition changed = def;
+    changed.actors[0].open_leg.start_x += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.start_z += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.end_x += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.end_z += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.duration_ticks += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.tick_seconds += 1e-9;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.max_speed += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+    changed = def;
+    changed.actors[0].open_leg.max_acceleration += 1;
+    CHECK(waterfront_route_digest(&changed) != digest);
+
+    // Existing compiled routes still validate and evaluate through the shared traffic path.
+    const WaterfrontRouteDefinition *defaults = waterfront_route_defaults();
+    CHECK(waterfront_route_validate(defaults, &diagnostic));
+    for (int i = 0; i < WATERFRONT_ROUTE_ACTORS; ++i)
+        CHECK(defaults->actors[i].shape != WATERFRONT_ROUTE_OPEN_LEG);
+    WaterfrontVesselMotion compiled = waterfront_traffic_motion(0, 3);
+    WaterfrontVesselMotion authored = waterfront_traffic_motion_routes(defaults, 0, 3);
+    CHECK(!memcmp(&compiled, &authored, sizeof(compiled)));
+    printf("open_leg=ok tick_hz=%d period=10s digest_fields=8\n", BOAT_TICK_HZ);
+    return 0;
+}
+
 // L3.2: one authored craft flows through the shared scene frame, contact and camera queries.
 // Reordering preserves each actor's identity; removing the collection removes every consumer.
 static int check_scene_traffic(void)
@@ -612,8 +750,9 @@ static int check_scene_traffic(void)
     waterfront_scene_evaluate_scene(&removed, 12, water, &other);
     CHECK(other.traffic.vessel_count == 0 && other.traffic.wake_count == 0);
     WaterfrontVesselMotion m = waterfront_traffic_motion_routes(&reordered.traffic, 0, 12);
-    CHECK(!waterfront_traffic_contact_height_scene(&removed, (Vector2) { -m.position.x, m.position.z },
-        m.heading, 2, 1.6f, .75f, -.4f, 2, water, 12, NULL));
+    CHECK(!waterfront_traffic_contact_height_scene(&removed,
+        (Vector2) { -m.position.x, m.position.z }, m.heading, 2, 1.6f, .75f, -.4f, 2, water, 12,
+        NULL));
     return 0;
 }
 
@@ -636,10 +775,9 @@ static int check_ferry_schedule(void)
     CHECK(depart[0] - arrive[0] == 35);
     CHECK(arrive[1] > depart[0] && depart[1] >= arrive[1]);
     CHECK(arrive[2] > depart[1]);
-    WaterfrontVesselMotion before = waterfront_traffic_motion_routes(
-        &scene.traffic, 0, arrive[0] - 2);
-    WaterfrontVesselMotion stopped
-        = waterfront_traffic_motion_routes(&scene.traffic, 0, arrive[0]);
+    WaterfrontVesselMotion before
+        = waterfront_traffic_motion_routes(&scene.traffic, 0, arrive[0] - 2);
+    WaterfrontVesselMotion stopped = waterfront_traffic_motion_routes(&scene.traffic, 0, arrive[0]);
     WaterfrontVesselMotion dwell_end
         = waterfront_traffic_motion_routes(&scene.traffic, 0, depart[0] - .001);
     WaterfrontVesselMotion leaving
@@ -650,12 +788,12 @@ static int check_ferry_schedule(void)
     CHECK(Vector3Distance(stopped.position, dwell_end.position) < .01f);
     Vector2 stop_position;
     CHECK(waterfront_route_stops(&scene.traffic, 0, &stop_position, 1) == 3);
-    CHECK(hypotf(stopped.position.x - stop_position.x, stopped.position.z - stop_position.y)
+    CHECK(
+        hypotf(stopped.position.x - stop_position.x, stopped.position.z - stop_position.y) < .01f);
+    WaterfrontVesselMotion lap = waterfront_traffic_motion_routes(&scene.traffic, 0, 1200);
+    CHECK(Vector3Distance(
+              lap.position, waterfront_traffic_motion_routes(&scene.traffic, 0, 0).position)
         < .01f);
-    WaterfrontVesselMotion lap
-        = waterfront_traffic_motion_routes(&scene.traffic, 0, 1200);
-    CHECK(Vector3Distance(lap.position, waterfront_traffic_motion_routes(&scene.traffic, 0, 0)
-                                            .position) < .01f);
     BoatWater water = { .upstream = true };
     WaterfrontTrafficContact contact;
     CHECK(waterfront_traffic_contact_height_scene(&scene,
@@ -682,8 +820,8 @@ static int check_bridge_safety(void)
 {
     const WaterfrontRouteDefinition *defaults = waterfront_route_defaults();
     WaterfrontRouteDiagnostic diagnostic;
-    CHECK(waterfront_route_validate_bridge(defaults, WATERFRONT_LIFT_UNDERSIDE,
-        WATERFRONT_LIFT_HEIGHT, &diagnostic));
+    CHECK(waterfront_route_validate_bridge(
+        defaults, WATERFRONT_LIFT_UNDERSIDE, WATERFRONT_LIFT_HEIGHT, &diagnostic));
     CHECK(!waterfront_route_validate_bridge(defaults, WATERFRONT_LIFT_UNDERSIDE, 4, &diagnostic));
     CHECK(strstr(diagnostic.message, "insufficient"));
 
@@ -706,9 +844,9 @@ static int check_bridge_safety(void)
         WaterfrontVesselMotion m = waterfront_traffic_motion(
             WATERFRONT_TRAFFIC_VESSELS + WATERFRONT_UPSTREAM_SCHOONER, w.crossing);
         WaterfrontTrafficContact contact;
-        CHECK(waterfront_traffic_contact_height((Vector2) { -m.position.x, m.position.z },
-            m.heading, 2, 1.6f, .75f, -.4f, 2, (BoatWater) { .upstream = true }, w.crossing,
-            &contact));
+        CHECK(
+            waterfront_traffic_contact_height((Vector2) { -m.position.x, m.position.z }, m.heading,
+                2, 1.6f, .75f, -.4f, 2, (BoatWater) { .upstream = true }, w.crossing, &contact));
     }
 
     // A slow bridge actor would enter before the span has finished rising.
@@ -741,6 +879,7 @@ int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
     CHECK(check_route_definition() == 0);
+    CHECK(check_open_leg() == 0);
     CHECK(check_scene_traffic() == 0);
     CHECK(check_ferry_schedule() == 0);
     CHECK(check_bridge_safety() == 0);

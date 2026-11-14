@@ -213,8 +213,10 @@ static void route_wire(RoomWire *w, WaterfrontRouteDefinition *routes)
         a->recipe = (unsigned char)integer(w, a->recipe, 1);
         a->retain = (unsigned char)integer(w, a->retain, 1);
         uint8_t bridge = (uint8_t)integer(w, a->bridge ? 1u : 0u, 1);
+        // OPEN_LEG is internal only and owns no wire bytes yet; decode and encode both reject it
+        // so a round trip cannot silently drop the leg fields.
         if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            || a->shape == WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
             w->ok = false;
         a->bridge = bridge != 0;
         a->speed = real32(w, a->speed);

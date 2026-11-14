@@ -95,8 +95,10 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
         if (a->retain != 0xff && a->retain > WATERFRONT_ROUTE_ACTORS)
             w->ok = false;
         unsigned bridge = (unsigned)integer(w, a->bridge ? 1u : 0u, 1);
+        // OPEN_LEG is internal only and owns no wire bytes yet; decode and encode both reject it
+        // so a round trip cannot silently drop the leg fields.
         if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            || a->shape == WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
             w->ok = false;
         a->bridge = bridge != 0;
         a->speed = (float)number(w, a->speed);

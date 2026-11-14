@@ -412,6 +412,53 @@ static int scene_traffic(void)
     return 0;
 }
 
+// M3: the internal open leg owns no staging-wire bytes, so the wire rejects it when encoding an
+// actor and when decoding a corrupted shape byte.
+static int open_leg_wire(void)
+{
+    static BoatPluginFiles files;
+    static BoatPluginDecoded decoded, back;
+    static unsigned char wire[32768];
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    decoded.kind = BOAT_PLUGIN_KIND_VOYAGE;
+    memcpy(decoded.manifest, files.manifest, files.manifest_size);
+    decoded.manifest_size = files.manifest_size;
+    memcpy(decoded.source, files.source, files.source_size);
+    decoded.source_size = files.source_size;
+    CHECK(boat_plugin_lua_voyage(files.source, files.source_size, "@main.lua",
+              &boat_plugin_default_limits, &decoded.voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_parse_manifest(files.manifest, files.manifest_size, NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(decoded.voyage.has_scene && decoded.voyage.scene.traffic_present
+        && decoded.voyage.scene.traffic.actor_count > 0);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+
+    WaterfrontRouteActor *actor = &decoded.voyage.scene.traffic.actors[0];
+    WaterfrontRouteActor saved = *actor;
+    actor->shape = WATERFRONT_ROUTE_OPEN_LEG;
+    CHECK(!boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    *actor = saved;
+
+    // A unique ID keeps the probe out of the embedded Lua source, so the shape byte is the next
+    // byte after the actor's ID on the wire.
+    snprintf(actor->id, sizeof(actor->id), "open_leg_probe");
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    *actor = saved;
+    size_t at = 0;
+    const size_t id_size = strlen("open_leg_probe");
+    while (at + id_size < encoded && memcmp(wire + at, "open_leg_probe", id_size))
+        ++at;
+    CHECK(at + id_size < encoded);
+    CHECK(wire[at + id_size] == saved.shape);
+    wire[at + id_size] = WATERFRONT_ROUTE_OPEN_LEG;
+    CHECK(!boat_plugin_wire_decode(wire, encoded, &back, &d));
+    return 0;
+}
+
 // M3 prerequisite: free packages with a marina or traffic scene run the same structural map,
 // berth, module and traffic checks as voyages, but keep the voyage-only shelter rules.
 static int free_scene_location(void)
@@ -1844,6 +1891,7 @@ static const TestCase cases[] = {
     TEST_CASE(scene_berths),
     TEST_CASE(scene_appearance),
     TEST_CASE(scene_traffic),
+    TEST_CASE(open_leg_wire),
     TEST_CASE(free_scene_location),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),

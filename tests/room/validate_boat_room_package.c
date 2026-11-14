@@ -437,6 +437,24 @@ static int definition_size(void)
     CHECK(!boat_room_definition_decode(bytes, size - 1, &back, &rd));
     bytes[size] = 0;
     CHECK(!boat_room_definition_decode(bytes, size + 1, &back, &rd));
+
+    // M3: the internal open leg owns no definition-wire bytes; encoding and a corrupted decode
+    // both reject it.
+    const char *actor_id = d.scene.traffic.actors[0].id;
+    size_t id_size = strlen(actor_id), at = 0;
+    while (at + id_size < size && memcmp(bytes + at, actor_id, id_size))
+        ++at;
+    CHECK(at + id_size < size);
+    CHECK(bytes[at + id_size] == d.scene.traffic.actors[0].shape);
+    bytes[at + id_size] = WATERFRONT_ROUTE_OPEN_LEG;
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    bytes[at + id_size] = d.scene.traffic.actors[0].shape;
+    WaterfrontRouteActor saved = d.scene.traffic.actors[0];
+    d.scene.traffic.actors[0].shape = WATERFRONT_ROUTE_OPEN_LEG;
+    static uint8_t rejected[BOAT_ROOM_BYTES_MAX];
+    CHECK(boat_room_definition_encode(&d, rejected, sizeof(rejected)) == 0);
+    d.scene.traffic.actors[0] = saved;
+
     printf("room_package definition: maximum %zu of %d bytes, %u pages\n", size,
         BOAT_ROOM_BYTES_MAX, (unsigned)((size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES));
     return 0;

@@ -2,6 +2,7 @@
 #define PROTEUS_WATERFRONT_ROUTE_H
 
 #include "core/boat_model.h"
+#include "core/boat_route_leg.h"
 #include "core/waterfront_traffic.h"
 
 #include <stdbool.h>
@@ -22,6 +23,9 @@ typedef enum {
     WATERFRONT_ROUTE_DOCK_CIRCUIT, // Two straight lanes joined by 14 m semicircles.
     WATERFRONT_ROUTE_ELLIPSE, // Nested analytic river circuit.
     WATERFRONT_ROUTE_POINTS, // Closed loop of straight pieces and circular corners.
+    // Marina M3: one straight open leg evaluated at the shared simulation tick. Internal only;
+    // the room and plugin wire formats do not encode it yet.
+    WATERFRONT_ROUTE_OPEN_LEG,
     WATERFRONT_ROUTE_SHAPES
 } WaterfrontRouteShape;
 
@@ -59,6 +63,8 @@ typedef struct {
     unsigned point_count, stop_count;
     WaterfrontRoutePoint points[WATERFRONT_ROUTE_POINT_CAPACITY];
     WaterfrontRouteStop stops[WATERFRONT_ROUTE_STOPS];
+    // WATERFRONT_ROUTE_OPEN_LEG: one straight simulation-space leg. Unused by other shapes.
+    BoatRouteLeg open_leg;
     // WATERFRONT_ROUTE_ELLIPSE: centre, radii and shared lane vector.
     float origin_x, origin_z, long_radius, short_radius;
     // WATERFRONT_ROUTE_DOCK_CIRCUIT: straight-lane speed, start distance and turn radius.
@@ -102,12 +108,12 @@ double waterfront_route_period(const WaterfrontRouteDefinition *routes, int inde
 // Closed authored routes; negative time supports trails across the start and lap boundary.
 WaterfrontVesselMotion waterfront_route_motion(
     const WaterfrontRouteDefinition *routes, int index, double time);
-int waterfront_route_stops(const WaterfrontRouteDefinition *routes, int index, Vector2 *stops,
-    int capacity);
+int waterfront_route_stops(
+    const WaterfrontRouteDefinition *routes, int index, Vector2 *stops, int capacity);
 // Timetable interval [ARRIVE, DEPART) of STOP within one period, in seconds from actor phase
 // zero. False when the actor has no such stop. These are direct-time boundaries, not counters.
-bool waterfront_route_stop_times(const WaterfrontRouteDefinition *routes, int index, int stop,
-    double *arrive, double *depart);
+bool waterfront_route_stop_times(
+    const WaterfrontRouteDefinition *routes, int index, int stop, double *arrive, double *depart);
 // Highest lift the bridge needs for this definition at TIME, 0 when it stays down.
 float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time);
 // L3.4 bridge dependency windows. ENTRY/LEAVE bound the hull's occupancy of the lift span;

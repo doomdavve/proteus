@@ -339,6 +339,13 @@ An unintegrated circular-arc primitive now evaluates tick-addressed left and rig
 bounded start phase, signed sweep and conservative tangential-plus-centripetal acceleration.
 Focused arc, leg, clearance and core-boundary tests passed on macOS/Apple Silicon Debug
 2026-11-14. Joining legs, continuous moving turns and their complete clearance proof remain open.
+An internal-only straight-leg actor now evaluates through the shared traffic motion owner; it is
+not authorable, and room and plugin wire codecs explicitly reject it. Its native route and wire
+rejection tests passed. New route serialization and scene clearance must be implemented together
+before exposing it to packages. The existing traffic rendering and motion still require a visual
+demo when the authoring path is connected. On macOS/Apple Silicon Debug 2026-11-14, the build
+and full CTest preset passed 561 enabled tests (13 disabled). After a tick-rounding correction,
+the focused traffic validator passed again.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest
