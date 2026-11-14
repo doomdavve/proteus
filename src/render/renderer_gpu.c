@@ -539,20 +539,19 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "farLightViewProjection", "farShadowMap", "farShadowTexel", "localLightCount",
     "localLightPositionRadius[0]", "localLightColorIntensity[0]", "localLightDirection[0]",
     "localLightCone[0]", "cameraPosition", "fogColor", "fogStart", "fogEnd", "fogOpacity",
-    "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife", "wakeFieldEnabled", "wakeGrid",
-    "wakeField", "physicalWaves", "radialOrigin", "radialMotion", "stormArea", "stormPhase",
-    "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape", "wakeAmplitude", "wakeOffset",
-    "objectWakePlayerCount", "objectWakeTrafficLife", "objectWakeData", "playerWakeCount",
-    "playerWakeOrigins[0]", "playerWakeParameters[0]", "waterfrontWater", "wavePatch",
-    "waveParameters[0]", "sunDirection", "reflectionViewProjection", "crossingWakeTime",
-    "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled", "reflectionTexture",
-    "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
-    "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
-    "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
-    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
-    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
-    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
-    "emissiveGain", "reflectionTexel", NULL };
+    "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife", "physicalWaves", "radialOrigin",
+    "radialMotion", "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion",
+    "vesselShape", "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
+    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
+    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
+    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
+    "reflectionTexture", "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward",
+    "skyRight", "skyUp", "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled",
+    "stampField", "stampRect", "stampOutsideCount", "historyEnabled", "historyField", "historyRect",
+    "historySlopeGain", "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass",
+    "windowLight", "windowLit", "windowDark", "waterLight", "waterShadowFloor", "glintColor",
+    "highlightTint", "glintSheen", "glintSparkle", "lightClusterMode", "lightClusters",
+    "lightClusterCount", "lightClusterLayout", "emissiveGain", "reflectionTexel", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -2478,23 +2477,7 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         &objects, SHADER_UNIFORM_INT);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "objectWakeLife"),
         &object_life, SHADER_UNIFORM_FLOAT);
-    int field_enabled = scene->wake_field.id != 0;
-    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeFieldEnabled"),
-        &field_enabled, SHADER_UNIFORM_INT);
-    if (field_enabled) {
-        float grid[] = { (float)scene->wake_field.width, (float)scene->wake_field.height,
-            scene->wake_spacing };
-        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeGrid"), grid,
-            SHADER_UNIFORM_VEC3);
-        int slot = 13;
-        rlEnableShader(scene->water_shader.id);
-        rlActiveTextureSlot(slot);
-        rlEnableTexture(scene->wake_field.id);
-        rlSetUniform(
-            cached_location(scene->water_shader, "wakeField"), &slot, SHADER_UNIFORM_INT, 1);
-        rlActiveTextureSlot(0);
-    }
-    int physical_waves = frame->player_active && (field_enabled || boat_water_displaced(water));
+    int physical_waves = frame->player_active && boat_water_displaced(water);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;

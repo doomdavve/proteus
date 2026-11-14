@@ -8,7 +8,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 enum { POST_MODE, POST_TEXEL, POST_BLOOM, POST_GRADE, POST_LIFT, POST_GAIN, POST_BLOOM_TEXTURE };
 enum { POST_BLOOM_SLOT = 1 };
@@ -216,9 +215,6 @@ void boat_gpu_destroy(BoatGpu *gpu)
     unload_hdr_targets(&gpu->hdr_target, gpu->bloom);
     if (gpu->post.id)
         UnloadShader(gpu->post);
-    if (gpu->wake_texture.id)
-        UnloadTexture(gpu->wake_texture);
-    MemFree(gpu->wake_upload);
     boat_cargo_view_gpu_destroy(&gpu->props);
     if (gpu->basin_water.vaoId)
         UnloadMesh(gpu->basin_water);
@@ -302,40 +298,6 @@ void boat_gpu_draw(BoatGpu *gpu, const BoatViewState *view, const BoatPresentati
     const BoatWorld *world, BoatCamera camera)
 {
     boat_gpu_draw_with_ghost(gpu, view, presentation, world, camera, NULL, NULL, 0);
-}
-
-static bool candidate_strip(Mesh *m, int first, int rows)
-{
-    m->vertexCount = 322 * (rows + 1);
-    m->triangleCount = 321 * rows * 2;
-    m->vertices = MemAlloc((unsigned int)m->vertexCount * 3 * sizeof(float));
-    m->indices = MemAlloc((unsigned int)m->triangleCount * 3 * sizeof(unsigned short));
-    if (!m->vertices || !m->indices) {
-        UnloadMesh(*m);
-        *m = (Mesh) { 0 };
-        return false;
-    }
-    for (int z = 0; z <= rows; ++z)
-        for (int x = 0; x < 322; ++x) {
-            int row = first + z;
-            Vector3 v = { x == 0 ? -120
-                    : x == 321   ? 120
-                                 : -119.625f + (x - 1) * .75f,
-                0,
-                row == 0         ? -80
-                    : row == 215 ? 80
-                                 : -79.875f + (row - 1) * .75f };
-            memcpy(m->vertices + 3 * (z * 322 + x), &v, sizeof(v));
-        }
-    for (int z = 0; z < rows; ++z)
-        for (int x = 0; x < 321; ++x) {
-            unsigned short a = (unsigned short)(z * 322 + x), b = (unsigned short)(a + 322);
-            unsigned short indices[] = { a, b, (unsigned short)(b + 1), a, (unsigned short)(b + 1),
-                (unsigned short)(a + 1) };
-            memcpy(m->indices + 6 * (z * 321 + x), indices, sizeof(indices));
-        }
-    UploadMesh(m, false);
-    return m->vaoId != 0;
 }
 
 void boat_gpu_draw_with_ghost(BoatGpu *gpu, const BoatViewState *view,
@@ -434,40 +396,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
                 2 * world->definition->half_extent.x, 2 * world->definition->half_extent.y, 1, 1);
         gpu->scene.water = gpu->basin_water;
     }
-    gpu->scene.wake_field = (Texture2D) { 0 };
-    if (world->wake_field) {
-        clock_t begin = clock();
-        BoatWakeConfig c = boat_wake_config(world->wake_field);
-        if (!gpu->wake_upload) {
-            gpu->wake_upload = MemAlloc((unsigned int)(c.width * c.height * sizeof(float)));
-            if (!gpu->wake_upload)
-                goto restore_water;
-            boat_wake_copy_heights(world->wake_field, gpu->wake_upload);
-            Image image = { gpu->wake_upload, (int)c.width, (int)c.height, 1,
-                PIXELFORMAT_UNCOMPRESSED_R32 };
-            gpu->wake_texture = LoadTextureFromImage(image);
-            SetTextureFilter(gpu->wake_texture, TEXTURE_FILTER_POINT);
-            SetTextureWrap(gpu->wake_texture, TEXTURE_WRAP_CLAMP);
-        } else {
-            boat_wake_copy_heights(world->wake_field, gpu->wake_upload);
-            UpdateTexture(gpu->wake_texture, gpu->wake_upload);
-        }
-        if (!gpu->wake_texture.id)
-            goto restore_water;
-        gpu->scene.wake_field = gpu->wake_texture;
-        gpu->scene.wake_spacing = (float)c.spacing;
-        if (!gpu->wave_mesh.vaoId || !gpu->wave_mesh_extra.vaoId) {
-            if ((!gpu->wave_mesh.vaoId && !candidate_strip(&gpu->wave_mesh, 0, 128))
-                || (!gpu->wave_mesh_extra.vaoId
-                    && !candidate_strip(&gpu->wave_mesh_extra, 128, 87)))
-                goto restore_water;
-            gpu->wave_capacity = gpu->wave_mesh.vertexCount + gpu->wave_mesh_extra.vertexCount;
-        }
-        gpu->scene.near_water = gpu->wave_mesh;
-        gpu->scene.near_water_extra = gpu->wave_mesh_extra;
-        gpu->wake_upload_seconds += (double)(clock() - begin) / CLOCKS_PER_SEC;
-        ++gpu->wake_uploads;
-    } else if (boat_water_displaced(world->water)) {
+    if (boat_water_displaced(world->water)) {
         Vector2 center
             = { roundf(-boat->position.x / 12) * 12, roundf(boat->position.y / 12) * 12 };
         Mesh *mesh = &gpu->wave_mesh;
@@ -528,9 +457,6 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     EndTextureMode();
 restore_water:
     if ((world->water.objects || world->water.traffic_objects) && !gpu->scene.object_wakes.id)
-        gpu->failed = true;
-    if (world->wake_field
-        && (!gpu->wake_texture.id || !gpu->wave_mesh.vaoId || !gpu->wave_mesh_extra.vaoId))
         gpu->failed = true;
     gpu->scene.water = original_water;
     gpu->scene.near_water = (Mesh) { 0 };

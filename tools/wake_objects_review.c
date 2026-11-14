@@ -542,7 +542,7 @@ static void shader_pool_checks(
         char *source = LoadFileText(paths[stage]);
         CHECK(source);
         char *start = strstr(source, "// BEGIN OBJECT RECIPE"),
-             *end = strstr(source, "// BEGIN NATIVE WAKE FIELD");
+             *end = strstr(source, "// END PLAYER WAKE PROBE");
         CHECK(start && end && end > start);
         size_t capacity = (size_t)(end - start) + 500;
         char *code = malloc(capacity);

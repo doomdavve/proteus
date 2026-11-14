@@ -3,8 +3,13 @@
 
 #include "core/boat_clock.h"
 #include "core/boat_input.h"
-#include "core/boat_wake_player.h"
 #include "core/boat_world.h"
+
+typedef struct {
+    double x, z;
+    double vx, vz;
+    double wet;
+} BoatWakeStern;
 
 #define BOAT_STEP (1.0f / BOAT_TICK_HZ)
 #define BOAT_LIMIT_X (BOAT_BASIN_HALF_X - 2.5f)

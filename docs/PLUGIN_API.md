@@ -1440,7 +1440,7 @@ The checkpoint owns all revision source/route strings, objective and pending out
 queue, diagnostics/trace, native boat/presentation/voyage/clock/water history and both wake
 pools. Restore rebinds internal pointers; immutable map resources, handling and directory stay
 borrowed and must outlive it. Review inputs also support recovery before a step. Unsupported
-recordings/course playback, other physical boats, combat/radial sources and legacy wake-field endpoints are rejected;
+recordings/course playback, other physical boats, and combat/radial sources are rejected;
 this is a solo review checkpoint, not a whole application save, recording format or a room
 rewind. Camera/window/audio/effect playback is outside this display-free harness. Allocate
 these large bounded checkpoint/revision histories off the stack. Interactive seek controls,

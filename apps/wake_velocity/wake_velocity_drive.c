@@ -99,8 +99,8 @@ static void crossing_step(BoatSession *session, BoatInput input, ObjectStudy *st
     boat_presentation_step(&study->other_presentation, &fleet->state.slots[1].boat, &world, now);
 }
 
-void timed_boat_step(BoatSession *session, BoatInput input, BoatFrameMetrics *metrics,
-    BoatWakePlayer *wake, ObjectStudy *objects)
+void timed_boat_step(
+    BoatSession *session, BoatInput input, BoatFrameMetrics *metrics, ObjectStudy *objects)
 {
     Boat *boat = &session->boat;
     double started = boat_profile_time(IsWindowReady());
@@ -115,18 +115,10 @@ void timed_boat_step(BoatSession *session, BoatInput input, BoatFrameMetrics *me
             fprintf(stderr, "Traffic wake emission contract failed.\n");
             exit(1);
         }
-        BoatWakeStern before = wake
-            ? boat_wake_stern(boat, &session->world, boat_session_time(session))
-            : (BoatWakeStern) { 0 };
         boat_session_step(session, input);
         double now = boat_session_time(session);
         if (objects)
             object_track(objects, boat, &session->world, now, 0);
-        if (wake
-            && !boat_wake_player_step(wake, before, boat_wake_stern(boat, &session->world, now))) {
-            fprintf(stderr, "Wake field update failed.\n");
-            exit(1);
-        }
     }
     float elapsed = (float)((boat_profile_time(IsWindowReady()) - started) * 1000.0);
     if (metrics) {
@@ -158,10 +150,8 @@ BoatInput demo_input(const Boat *boat, const BoatWater *water, bool studies, int
     return (BoatInput) { .steering_rate = wheel_change, .throttle_rate = throttle_change };
 }
 
-void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWakePlayer *wake,
-    ObjectStudy *objects)
+void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, ObjectStudy *objects)
 {
     timed_boat_step(session,
-        demo_input(&session->boat, &session->world.water, wake || objects, tick), metrics, wake,
-        objects);
+        demo_input(&session->boat, &session->world.water, objects != NULL, tick), metrics, objects);
 }

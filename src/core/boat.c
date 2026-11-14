@@ -372,28 +372,20 @@ BoatWakeStern boat_wake_stern(const Boat *boat, const BoatWorld *world, double t
 {
     Vector3 p = boat_pose_attachment(boat, (Vector3) { 0, 0, BOAT_ENGINE_ARM });
     BoatPoseMotion motion = boat_pose_motion(boat, (Vector3) { 0, 0, BOAT_ENGINE_ARM });
-    BoatWaterSample water
-        = boat_water_query_field(world->water, world->wake_field, (Vector2) { -p.x, p.z }, time);
+    BoatWaterSample water = boat_water_query(world->water, (Vector2) { -p.x, p.z }, time);
     double wet = 0;
     float trim = 4 * boat->planing * (1 - boat->planing) * TRIM_TRANSITION_PITCH
         + boat->planing * TRIM_CRUISE_PITCH;
     for (int side = -1; side <= 1; side += 2) {
         Vector3 q = boat_pose_attachment(boat, (Vector3) { side * .65f, 0, 1.4f });
-        BoatWaterSample s = boat_water_query_field(
-            world->water, world->wake_field, (Vector2) { -q.x, q.z }, time);
+        BoatWaterSample s = boat_water_query(world->water, (Vector2) { -q.x, q.z }, time);
         float support = GRAVITY / 6
             + BUOYANCY_STIFFNESS / 6
                 * (s.height + PLANING_HEIGHT * boat->planing - 1.4f * sinf(trim) - q.y);
         wet += .5 * Clamp(support / (GRAVITY / 6), 0, 1);
     }
-    Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
-    Vector2 relative
-        = Vector2Subtract(boat->velocity, boat_water_current(world->water, boat->position));
-    float along = Vector2DotProduct(relative, forward);
-    double drag = Lerp(1, PLANING_DRAG_MULTIPLIER, boat->planing)
-        * (HULL_DRAG_LINEAR + HULL_DRAG_QUADRATIC * fabsf(along)) * fabsf(along);
     return (BoatWakeStern) { -p.x, p.z, -motion.velocity.x - water.velocity.x,
-        motion.velocity.z - water.velocity.z, wet, drag, drag * fabsf(along) };
+        motion.velocity.z - water.velocity.z, wet };
 }
 
 // Use the same six support locations and preload as buoyancy, rather than stern dryness.
@@ -406,8 +398,8 @@ static float hull_wet(const Boat *boat, const BoatWorld *world, double time)
         for (int side = -1; side <= 1; side += 2) {
             float fore = end * 1.4f;
             Vector3 point = boat_pose_attachment(boat, (Vector3) { side * .65f, 0, -fore });
-            BoatWaterSample water = boat_water_query_field(
-                world->water, world->wake_field, (Vector2) { -point.x, point.z }, time);
+            BoatWaterSample water
+                = boat_water_query(world->water, (Vector2) { -point.x, point.z }, time);
             float depth = water.height + PLANING_HEIGHT * boat->planing + fore * sinf(trim)
                 + GRAVITY / BUOYANCY_STIFFNESS - point.y;
             wet += depth > 0;
@@ -489,8 +481,8 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
         for (int side = -1; side <= 1; side += 2) {
             float fore = end * 1.4f, across = side * .65f;
             Vector3 point = boat_pose_attachment(boat, (Vector3) { across, 0, -fore });
-            BoatWaterSample water = boat_water_query_field(
-                world->water, world->wake_field, (Vector2) { -point.x, point.z }, time);
+            BoatWaterSample water
+                = boat_water_query(world->water, (Vector2) { -point.x, point.z }, time);
             // Exact vertical Jacobians of local roll, then pitch; heading leaves Y unchanged.
             float jp = fore * cp - across * sr * sp;
             float jr = across * cr * cp;

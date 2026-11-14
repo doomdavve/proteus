@@ -162,7 +162,7 @@ with tempfile.TemporaryDirectory() as directory:
             if row[key]:
                 value = float(row[key])
                 assert math.isfinite(value) and value >= 0, (i, key)
-        assert int(row['wave_patch_rebuilds']) >= 0 and int(row['wake_uploads']) >= 0
+        assert int(row['wave_patch_rebuilds']) >= 0 and int(row['wake_uploads']) == 0
         assert int(row['wake_live']) == int(row['wake_peak_live']) == 0
         assert int(row['wake_emitters']) == 0 and int(row['traffic_wake_live']) == 0
         # Pass and group splits partition the mesh submissions; the remainder is one batched

@@ -11,7 +11,7 @@ foreach(target validate_boat validate_boat_banking validate_boat_turn_entry vali
   target_link_libraries(${target} PRIVATE proteus_boat_session)
 endforeach()
 foreach(target validate_boat validate_boat_banking validate_boat_turn_entry validate_boat_profile
-    validate_boat_environment validate_boat_replay validate_boat_world wake_baseline
+    validate_boat_environment validate_boat_replay validate_boat_world
     boat_water_review boat_banking_review boat_flag_review boat_fleet_review)
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()

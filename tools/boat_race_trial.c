@@ -365,7 +365,7 @@ static Report measure(bool source, double delay, float thrust, float offset, boo
     BoatMotionState previous = session.boat.motion_state;
     for (unsigned t = 0; t < 90 * BOAT_TICK_HZ && next < ROUTE_COUNT; ++t) {
         Boat before = session.boat;
-        timed_boat_step(&session, pilot(&session.boat, route[next], thrust), NULL, NULL,
+        timed_boat_step(&session, pilot(&session.boat, route[next], thrust), NULL,
             player_wakes ? &objects : NULL);
         advance_target(&session.boat, &next);
         r.seconds += BOAT_TICK_SECONDS;
@@ -663,7 +663,7 @@ int main(int argc, char **argv)
             Vector2 previous = session.boat.position;
             timed_boat_step(&session,
                 pilot(&session.boat, preview_target(next, skill), skill && next > targets ? 0 : 1),
-                NULL, NULL, &objects);
+                NULL, &objects);
             preview_advance(&session.boat, previous, &next, skill);
         }
     // Captures keep the default driven path/camera so height comparisons share a view.
@@ -732,7 +732,7 @@ int main(int argc, char **argv)
                                        : pilot(&session.boat, preview_target(next, skill),
                                              next <= targets ? 1 : 0);
                 Vector2 previous = session.boat.position;
-                timed_boat_step(&session, input, NULL, NULL, &objects);
+                timed_boat_step(&session, input, NULL, &objects);
                 preview_advance(&session.boat, previous, &next, skill);
                 accumulator -= BOAT_TICK_SECONDS;
             }

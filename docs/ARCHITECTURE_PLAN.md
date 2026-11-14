@@ -1400,7 +1400,7 @@ live with their application, test or tool. Header/implementation pairs stay toge
 | `apps/wake_velocity/` | the game's `wake_velocity*`, `wake_console*`, `wake_command`, `boat_title`, `boat_directory`, `boat_music.h`, `boat_gpu_timer.h` sources; `proteus_boat_drive` with `boat_profile`, `proteus_local_drive`, `proteus_wake_objective`; `boat_plugin_worker` (links the game's plugin glue); `wake_study`, built from the same sources |
 | `apps/boat_server/`, `apps/cargo_sandbox/`, `apps/dance_study/` | each executable's main; the dance study takes `dance` and `choreography` |
 | `tests/` | validators, boundary/lint scripts, browser checks, test helpers and fixtures (AR8-2) |
-| `tools/` | developer utilities only: reviews, benchmark, bakes, generators, map pipeline, packaging and release, `plugin_author.py`, `boat_bot`, `boat_race_trial`, `gpu_fixture`, `title_backdrop`, `wake_baseline` |
+| `tools/` | developer utilities only: reviews, benchmark, bakes, generators, map pipeline, packaging and release, `plugin_author.py`, `boat_bot`, `boat_race_trial`, `gpu_fixture`, `title_backdrop` |
 
 **Preserved.** Target, executable and test names, labels, presets and CI lanes; asset paths
 and running from the repository root; generated file paths; `tools/plugin_author.py` and the

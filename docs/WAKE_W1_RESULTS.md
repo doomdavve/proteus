@@ -1,5 +1,7 @@
 # W1: baseline, strip rejection and heightfield fallback
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-21, macOS / Apple Silicon, Debug. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md).
 W1 is implemented as an isolated diagnostic. **The connected-strip prototype is rejected
 for player integration.** Tight inner fronts fold, and the measured reconstructed energy
@@ -86,7 +88,7 @@ outer patches; production mesh undersampling and camera fades were not isolated 
 
 ## Prototype and declared gates
 
-[The standalone Python experiment](../tools/wake_front_review.py) joins source positions,
+The standalone Python experiment joins source positions,
 normal directions and emission times with cubic Hermite curves. Each front has material
 coordinates (source time s, transverse distance q). Its envelope travels at group speed;
 its carrier travels at phase speed. A compact derivative profile balances transverse
@@ -189,7 +191,7 @@ was the heightfield fallback, completed in the continuation below.
 
 ## Heightfield fallback — 2026-10-21
 
-The continuation implements [a separate linear heightfield diagnostic](../tools/wake_heightfield_review.py).
+The continuation implements a separate linear heightfield diagnostic.
 The connected-strip rejection above remains in force. Both experiments stay outside the
 player, hull queries, CPU/GPU water rendering and defaults.
 

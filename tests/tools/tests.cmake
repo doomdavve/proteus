@@ -8,16 +8,6 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_combat_lighting_hour_invalid boat_combat_lighting_hour_missing
     PROPERTIES WILL_FAIL TRUE LABELS "cpu;quick")
 endif()
-add_test(NAME wake_field_refinement COMMAND wake_field_review --check)
-add_test(NAME wake_runtime_cadence COMMAND wake_runtime_review --check)
-add_test(NAME wake_packet_contracts COMMAND wake_packet_review --check)
-add_test(NAME wake_candidate_backend_queries COMMAND wake_candidate_review)
-add_test(NAME wake_candidate_moving_source COMMAND wake_candidate_review --source)
-set_tests_properties(wake_candidate_moving_source PROPERTIES TIMEOUT 600)
-if(PROTEUS_GPU_TESTS)
-  add_test(NAME wake_gpu_runtime COMMAND wake_gpu_runtime_review --check)
-  set_tests_properties(wake_gpu_runtime PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
-endif()
 add_test(NAME boat_race_plugin_preview COMMAND boat_race_trial
   --plugin plugins/river-sprint --renderer cpu --output ${CMAKE_CURRENT_BINARY_DIR}/race-plugin.png --time 3)
 set_tests_properties(boat_race_plugin_preview PROPERTIES
@@ -60,15 +50,6 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(wake_objects_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 120)
 endif()
-add_test(NAME wake_candidate_boat COMMAND wake_play_review)
-add_test(NAME wake_candidate_crossing COMMAND wake_play_review --crossing)
-set_tests_properties(wake_candidate_boat PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 180)
-set_tests_properties(wake_candidate_crossing PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 180)
-if(PROTEUS_GPU_TESTS)
-  add_test(NAME wake_candidate_gpu COMMAND wake_play_review --gpu)
-  set_tests_properties(wake_candidate_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 180)
-endif()
 add_test(NAME boat_fleet_render COMMAND boat_fleet_review --check)
 set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
@@ -100,10 +81,3 @@ add_test(NAME ferry_cpu_screenshot COMMAND harbor_review --renderer cpu --view f
   --time 40 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/ferry-cpu.png)
 add_test(NAME harbor_cpu_screenshot COMMAND harbor_review --renderer cpu --view marina
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/harbor-marina-cpu.png)
-if(Python3_Interpreter_FOUND)
-  add_test(NAME wake_front_prototype COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/wake_front_review.py --check
-    --baseline $<TARGET_FILE:wake_baseline>)
-  add_test(NAME wake_heightfield_prototype COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tools/wake_heightfield_review.py --check)
-endif()

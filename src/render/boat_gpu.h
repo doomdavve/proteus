@@ -20,10 +20,6 @@ typedef struct {
     WaterfrontScenery scenery; // Scenery the scene's map meshes were built from.
     int wave_capacity, wave_peak_triangles, wave_rebuilds;
     BoatCargoViewGpu props; // Working-harbour geometry (BoatViewProps), uploaded on first use.
-    Texture2D wake_texture;
-    float *wake_upload;
-    double wake_upload_seconds;
-    size_t wake_uploads;
     float daylight; // Presentation phase, 0 (day; init resets it) .. 1 (dusk).
     float hour; // Full-day hour used when hour_set; never aliases daylight.
     bool hour_set; // Zero-init false keeps the legacy daylight phase.

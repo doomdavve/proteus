@@ -43,14 +43,12 @@ static void baseline_track(
 }
 
 static void baseline_step(BoatSession *session, float steering, float throttle,
-    BoatFrameMetrics *metrics, BoatWakePlayer *wake, BaselineStudy *objects)
+    BoatFrameMetrics *metrics, BaselineStudy *objects)
 {
     Boat *boat = &session->boat;
     double started = boat_profile_time(IsWindowReady());
     if (objects)
         boat_wake_objects_advance(&objects->wakes);
-    BoatWakeStern before = wake ? boat_wake_stern(boat, &session->world, boat_session_time(session))
-                                : (BoatWakeStern) { 0 };
     boat_session_step(
         session, (BoatInput) { .steering_rate = steering, .throttle_rate = throttle });
     double now = boat_session_time(session);
@@ -90,10 +88,6 @@ static void baseline_step(BoatSession *session, float steering, float throttle,
             baseline_track(objects, other, &objects->other_world, other_time, 1);
         }
     }
-    if (wake && !boat_wake_player_step(wake, before, boat_wake_stern(boat, &session->world, now))) {
-        fprintf(stderr, "Wake field update failed.\n");
-        exit(1);
-    }
     float elapsed = (float)((boat_profile_time(IsWindowReady()) - started) * 1000.0);
     if (metrics) {
         metrics->physics_ms += elapsed;
@@ -103,15 +97,15 @@ static void baseline_step(BoatSession *session, float steering, float throttle,
 }
 
 static void baseline_demo(BoatSession *session, int tick, BoatFrameMetrics *metrics,
-    BoatWakePlayer *wake, BaselineStudy *objects)
+    BaselineStudy *objects)
 {
     const Boat *boat = &session->boat;
-    if (wake || objects || session->world.water.player_wake_enabled) {
+    if (objects || session->world.water.player_wake_enabled) {
         float throttle = tick < 1440 ? 1 : 0;
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
         baseline_step(session, Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
             Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
-            metrics, wake, objects);
+            metrics, objects);
         return;
     }
     if (session->world.water.wake_amplitude != 0
@@ -120,12 +114,12 @@ static void baseline_demo(BoatSession *session, int tick, BoatFrameMetrics *metr
         float target = tick < 720 ? 0 : tick < 1200 ? .65f : 0;
         baseline_step(session, 0,
             Clamp((target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
-            metrics, wake, objects);
+            metrics, objects);
         return;
     }
     // Ease through neutral into reverse with the same held steering.
     float target_wheel = tick >= 360 ? 0.65f : 0;
     float wheel_change = fmaxf(-1, fminf(1, (target_wheel - boat->wheel) / BOAT_STEP));
     float throttle_change = tick < 240 ? 1 : tick < 480 ? 0 : tick < 960 ? -1 : 0;
-    baseline_step(session, wheel_change, throttle_change, metrics, wake, objects);
+    baseline_step(session, wheel_change, throttle_change, metrics, objects);
 }

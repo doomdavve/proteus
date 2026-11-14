@@ -231,9 +231,8 @@ ENet loopback process test. Still [planned](MULTIPLAYER_PLAN.md#verification-mat
 the full impairment matrix, an OS-level impairment lane, prediction/collision feel gates and
 long-session/four-player stress.
 
-Status, 2026-10-22: the user requested a quick routine suite and suspension of the
-retired physical wake-field tests until that research resumes. Arcade wakes, handling,
-course/replay, environment, audio and renderer checks remain active.
+The routine suite covers arcade wakes, handling, course/replay, environment, audio and
+renderer checks. The retired physical wake-field experiment and its tests were removed.
 
 The cosmetic player skin check `boat_skin` runs `validate_boat_skin`: matching geometry
 across liveries, valid triangles, custom palette generation, footprint and ID fallback;
@@ -494,13 +493,7 @@ cmake --build build -j
 ctest --preset full
 ```
 
-`PROTEUS_WAKE_FIELD_TESTS` defaults to `OFF`. Fifteen registered experiments are marked
-disabled, covering the owned field, refinement, cadence, candidate sources/boats/GPU,
-compact packets and Python prototypes. CTest lists them as disabled, not failed. Their
-sources, targets and manual diagnostic commands remain available. All arcade-object tests
-stay enabled. With `PROTEUS_GPU_TESTS=ON` and Node.js available, this HUD/control worktree runs 103 active
-checks as of 2026-10-24 (including the browser event contract; counted by the current CTest run;
-historical, before the case split). GPU cases run one at a time under `RESOURCE_LOCK gpu` while
+GPU cases run one at a time under `RESOURCE_LOCK gpu` while
 independent CPU checks run concurrently; fixture dependencies still govern capture/replay comparisons.
 
 The river frame benchmark has two checks in `tests/render/validate_boat_water_benchmark.py`.
@@ -930,8 +923,8 @@ saved session resumed into the authority), slow.
 
 Developer studies (ledger L8, decision D6) run in `wake_study`, the game's sources built with
 `WAKE_VELOCITY_STUDY`: `boat_player_wake_screenshot` (and its GPU variants), the
-`wake_objects_*_rejected` and `wake_candidate_*_rejected` checks drive it, and
-`wake_velocity_study_rejected.<option>` (quick) requires the game to refuse `--wake-field`,
+`wake_objects_*_rejected` checks drive it, and
+`wake_velocity_study_rejected.<option>` (quick) requires the game to refuse
 `--player-wake`, `--no-player-wake` and `--wake-objects-crossing` and name `wake_study`.
 
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
@@ -1133,20 +1126,6 @@ mkdir -p build/bench/c3
 The soak accepts 60..86400 seconds and writes CPU frames at one minute, halfway and the end.
 Its printed hash is same-build evidence, not a cross-platform contract.
 
-## Revisit the physical field
-
-```sh
-cmake -S . -B build -DPROTEUS_WAKE_FIELD_TESTS=ON
-cmake --build build -j
-ctest --test-dir build -L wake_field --output-on-failure
-# Return to the normal suite afterwards:
-cmake -S . -B build -DPROTEUS_WAKE_FIELD_TESTS=OFF
-```
-
-The label includes only retired research tests, not the active arcade model. This is
-suspended verification of the opt-in field implementation, not evidence that the field
-meets its original performance or numerical acceptance goals.
-
 ## Measurements and verification
 
 ### Fast lanes, 2026-10-26
@@ -1210,15 +1189,13 @@ to 23.00 s and handling from 40.15 s to 11.01 s despite concurrent CPU work. The
 remaining check is `gpu_review` at 23.99 s; active GPU checks total 60.31 s. These are
 single local runs, not cross-platform guarantees.
 
-Debug configure/full build passes without project warnings. Registration checks confirm
-exactly fifteen disabled research cases and all 83 remaining checks enabled; a separate
-configure with `PROTEUS_WAKE_FIELD_TESTS=ON` enables all fifteen research cases. The
-CTest GPU label summary counts three disabled field cases too (23 listed), so the actual
-active GPU count is twenty. CMake-generated validator flags retain `-g` with `-O2`,
+At that historical checkpoint, Debug configure/full build passed without project warnings.
+Registration checks confirmed fifteen disabled research cases and 83 enabled cases. The
+CTest GPU label summary counted three disabled field cases too (23 listed), so the actual
+active GPU count was twenty. CMake-generated validator flags retain `-g` with `-O2`,
 without `NDEBUG` or fast-math. No wave recipe or gameplay physics changed here.
 
-Next: keep the routine suite active; revisit field verification only when physical-field
-work resumes. Timings and suite logs are in `build/test-speed/`. The prior default-promotion
+The physical-field experiment was later retired and its tests removed. Timings and suite logs are in `build/test-speed/`. The prior default-promotion
 run also completed before the suite policy changed, so its all-98 result remains valid
 historical evidence. New manual motion/audio review was unnecessary for these test-only
 changes; the preceding default switch has its own capture/desktop evidence.

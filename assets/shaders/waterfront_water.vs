@@ -240,58 +240,8 @@ vec3 playerWake(vec2 p)
     float divisor = sqrt(1.0 + weight * weight);
     return vec3(sum, sumG - sum * weight / (1.0 + weight * weight) * weightG) / divisor;
 }
+// END PLAYER WAKE PROBE
 
-// BEGIN NATIVE WAKE FIELD
-// Shared degree-eleven tensor interpolation; keep VS/FS and boat_wake_query in sync.
-uniform int wakeFieldEnabled;
-uniform sampler2D wakeField;
-uniform vec3 wakeGrid; // cells X/Z, spacing in metres; fixed centred simulation domain.
-int wakeMirror(int i, int n) {
-    i = ((i % (2*n)) + 2*n) % (2*n);
-    return i >= n ? 2*n-1-i : i;
-}
-void wakeWeights(float t, out float w[12], out float d[12]) {
-    const float inverse[12] = float[12](-2.505210838544172e-08, 2.7557319223985888e-07, -1.3778659611992946e-06, 4.1335978835978839e-06, -8.2671957671957678e-06, 1.1574074074074073e-05, -1.1574074074074073e-05, 8.2671957671957678e-06, -4.1335978835978839e-06, 1.3778659611992946e-06, -2.7557319223985888e-07, 2.505210838544172e-08);
-    float prefix[13],suffix[13],dp[13],ds[13];
-    prefix[0]=1.0; suffix[12]=1.0; dp[0]=0.0; ds[12]=0.0;
-    for (int k=0;k<12;++k) {
-        float v=t-float(k-5);
-        prefix[k+1]=prefix[k]*v; dp[k+1]=dp[k]*v+prefix[k];
-        int j=11-k; v=t-float(j-5);
-        suffix[j]=suffix[j+1]*v; ds[j]=ds[j+1]*v+suffix[j+1];
-    }
-    for (int k=0;k<12;++k) {
-        w[k]=prefix[k]*suffix[k+1]*inverse[k];
-        d[k]=(dp[k]*suffix[k+1]+prefix[k]*ds[k+1])*inverse[k];
-    }
-}
-vec3 wakeFieldSample(vec2 world) {
-    if (wakeFieldEnabled == 0) return vec3(0.0);
-    vec2 grid = vec2(-world.x,world.y)/wakeGrid.z+wakeGrid.xy*0.5-0.5;
-    if (any(lessThan(grid,vec2(-0.5))) || any(greaterThan(grid,wakeGrid.xy-0.5)))
-        return vec3(0.0);
-    ivec2 base = ivec2(floor(grid));
-    float wx[12],wz[12],gx[12],gz[12];
-    wakeWeights(fract(grid.x),wx,gx); wakeWeights(fract(grid.y),wz,gz);
-    vec3 q = vec3(0.0);
-    for (int j = 0; j < 12; ++j) for (int k = 0; k < 12; ++k) {
-        ivec2 cell = ivec2(wakeMirror(base.x+k-5,int(wakeGrid.x)),
-            wakeMirror(base.y+j-5,int(wakeGrid.y)));
-        float eta = texelFetch(wakeField,cell,0).r;
-        q += eta*vec3(wx[k]*wz[j],-gx[k]*wz[j]/wakeGrid.z,wx[k]*gz[j]/wakeGrid.z);
-    }
-    return q;
-}
-
-float wakeVertexHeight(vec2 world) {
-    if (wakeFieldEnabled == 0) return 0.0;
-    vec2 grid = vec2(-world.x,world.y)/wakeGrid.z+wakeGrid.xy*0.5-0.5;
-    if (all(lessThan(abs(grid-round(grid)),vec2(0.0001))))
-        return texelFetch(wakeField,ivec2(round(grid)),0).r;
-    return wakeFieldSample(world).x;
-}
-
-// END NATIVE WAKE FIELD
 void main()
 {
     vec3 position = vertexPosition;
@@ -302,8 +252,8 @@ void main()
             position.y += w.z * sin(dot(w.xy, position.xz) - w.w);
         }
         position.y += crossingWake(position.xz, crossingWakeTime).x + playerWake(position.xz).x
-            + wakeVertexHeight(position.xz) + vesselWake(position.xz).x + stormWave(position.xz).x + radialWave(position.xz).x;
-        if (waterPatchPass == 2 && wakeFieldEnabled == 0)
+            + vesselWake(position.xz).x + stormWave(position.xz).x + radialWave(position.xz).x;
+        if (waterPatchPass == 2)
             position.y *= 1.0 - smoothstep(wavePatch.z, wavePatch.w,
                 length(position.xz - wavePatch.xy));
     }

@@ -1,5 +1,7 @@
 # Compact source-packet experiment
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-22. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md). Implements the first
 isolated W3.S representation experiment. **Fixed spectral quadrature is rejected as
 the runtime representation.** It preserves useful short-history behavior with much

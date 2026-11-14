@@ -131,7 +131,7 @@ static bool study_option(const char *argument)
     return false;
 #else
     static const char *const study_options[]
-        = { "--wake-field", "--player-wake", "--no-player-wake", "--wake-objects-crossing" };
+        = { "--player-wake", "--no-player-wake", "--wake-objects-crossing" };
     for (size_t i = 0; i < sizeof(study_options) / sizeof(study_options[0]); ++i)
         if (!strcmp(argument, study_options[i]))
             return true;
@@ -188,7 +188,6 @@ static void usage(void)
         stdout, "--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
     cli_usage_line(stdout, "--no-player-wake", "Visual-only player trail");
     cli_usage_line(stdout, "--player-wake", "Legacy D3 trail (research)");
-    cli_usage_line(stdout, "--wake-field", "Coherent CPU field, native basin only (research)");
 #endif
 
     cli_usage_section(stdout, "CAMERA AND DISPLAY");
@@ -612,7 +611,7 @@ static int study(int argc, char **argv)
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
-    bool player_wake_set = false, wake_field = false;
+    bool player_wake_set = false;
     bool wake_objects = false, object_crossing = false, object_tuning = false;
     unsigned object_life = BOAT_OBJECT_LIFE_TICKS;
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
@@ -719,8 +718,6 @@ static int study(int argc, char **argv)
                 "(./build/wake_study %s).\n",
                 argv[i], argv[i]);
             return 1;
-        } else if (strcmp(argv[i], "--wake-field") == 0) {
-            wake_field = true;
         } else if (strcmp(argv[i], "--wake-objects") == 0) {
             wake_objects = true;
         } else if (strcmp(argv[i], "--wake-objects-crossing") == 0) {
@@ -919,9 +916,9 @@ static int study(int argc, char **argv)
     if (connect_to) {
 #ifdef PROTEUS_BOAT_NET
         // Any option that the room's own settings replace.
-        bool other_mode = course || ghost_path || replay_path || wake_field || wake_objects
-            || object_tuning || player_wake_set || current || crossing_wake || waves || demo
-            || screenshot || location->id != BOAT_LOCATION_BASIN;
+        bool other_mode = course || ghost_path || replay_path || wake_objects || object_tuning
+            || player_wake_set || current || crossing_wake || waves || demo || screenshot
+            || location->id != BOAT_LOCATION_BASIN;
         if (other_mode) {
             fprintf(stderr,
                 "--connect takes its water, location and wakes from the room; it cannot be "
@@ -987,8 +984,8 @@ static int study(int argc, char **argv)
     }
     if (work_mode
         && (plugin_path || package_id || connect_to || host_mode || course || replay_path
-            || ghost_path || wake_field || wake_objects || player_wake_set || current
-            || crossing_wake || waves || start_set || skin_set || bridge_path)) {
+            || ghost_path || wake_objects || player_wake_set || current || crossing_wake || waves
+            || start_set || skin_set || bridge_path)) {
         fprintf(stderr,
             "--work runs the location's working-harbour package; it cannot be combined with "
             "package, room, course, replay, wake, water, start, skin or bridge options.\n");
@@ -1081,11 +1078,11 @@ static int study(int argc, char **argv)
     }
     // Choose the default after parsing so explicit alternatives remain independent of argument
     // order. Time trials ride the same arcade wake pool as free boating and rooms.
-    if (!wake_objects && !wake_field && !player_wake_set && !work_mode)
+    if (!wake_objects && !player_wake_set && !work_mode)
         wake_objects = true;
     if ((object_tuning && !wake_objects)
         || (wake_objects
-            && (wake_field || (player_wake_set && player_wake)
+            && ((player_wake_set && player_wake)
                 || (object_crossing && (location->mapped || course))))) {
         fprintf(stderr,
             "Wake objects cannot be combined with another player-wake mode; "
@@ -1094,34 +1091,10 @@ static int study(int argc, char **argv)
     }
     if (wake_objects)
         player_wake = false;
-    if (wake_field
-        && (location->mapped || course || ghost_path || current || crossing_wake
-            || (player_wake_set && !player_wake))) {
-        fprintf(stderr,
-            "--wake-field requires still-water free boating in the basin; no current, crossing "
-            "source, course or replay.\n");
-        goto invalid;
-    }
 #if defined(__EMSCRIPTEN__)
     (void)vsync;
     (void)location_set;
-    if (wake_field) {
-        fprintf(stderr, "--wake-field is a native desktop review candidate.\n");
-        goto invalid;
-    }
 #endif
-    if (wake_field) {
-        player_wake = false;
-#ifndef NDEBUG
-        fprintf(stderr,
-            "Wake field: this is a slow Debug build. For play review, build RelWithDebInfo "
-            "in build/review and run ./build/review/wake_study --wake-field --profiler.\n");
-#endif
-        if (gpu_aa)
-            fprintf(stderr,
-                "Wake field: --gpu-aa renders 16 times as many pixels; start review without "
-                "AA to check frame pacing.\n");
-    }
     if (course || ghost_path)
         player_wake = false; // Courses and replays never use the legacy trail.
     BoatCamera camera_default
@@ -1194,7 +1167,6 @@ static int study(int argc, char **argv)
     }
     session.runs.ghost_visible = true;
     session.runs.export_path = export_path;
-    BoatWakePlayer *wake = NULL;
     ObjectStudy object_world = { 0 };
     ObjectStudy *objects = wake_objects ? &object_world : NULL;
     int result = 1;
@@ -1303,14 +1275,6 @@ static int study(int argc, char **argv)
             camera_settings.height = camera_default.height;
     }
 #endif
-    if (wake_field) {
-        wake = boat_wake_player_create(1.0 / 120);
-        if (!wake) {
-            fprintf(stderr, "Cannot allocate wake review world.\n");
-            goto cleanup;
-        }
-        session.world.wake_field = boat_wake_player_field(wake);
-    }
     if (replay_path) {
         if (!boat_replay_load(&session.runs.last, replay_path)
             || (waves && !session.runs.last.waves)) {
@@ -1361,7 +1325,7 @@ static int study(int argc, char **argv)
         .cancel = local_cancel,
     };
 #define LOCAL_ELIGIBLE()                                                                           \
-    (!networked && !work_mode && objects && !objects->crossing && !wake && !session.runs.playing   \
+    (!networked && !work_mode && objects && !objects->crossing && !session.runs.playing            \
         && plugin_active                                                                           \
         && (course ? plugin.host.kind == BOAT_PLUGIN_KIND_COURSE                                   \
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
@@ -1416,7 +1380,7 @@ static int study(int argc, char **argv)
         for (int tick = 0; !scripted_local && tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
             if (plugin_active)
                 wake_plugin_before_tick(&plugin);
-            demo_step(&session, tick, NULL, wake, objects);
+            demo_step(&session, tick, NULL, objects);
             if (plugin_active)
                 wake_plugin_after_tick(&plugin, &session);
         }
@@ -2085,10 +2049,6 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
-            if (wake) {
-                boat_wake_player_reset(wake);
-                session.world.wake_field = boat_wake_player_field(wake);
-            }
             if (objects)
                 object_study_reset(objects, &session, object_crossing, object_life, object_height);
             accumulator = 0;
@@ -2187,11 +2147,11 @@ static int study(int argc, char **argv)
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
                 if (demo)
-                    demo_step(&session, demo_tick++, &metrics, wake, objects);
+                    demo_step(&session, demo_tick++, &metrics, objects);
                 else
                     timed_boat_step(&session,
                         boat_helm_input(&session.boat, input, thrust_target, steering_target),
-                        &metrics, wake, objects);
+                        &metrics, objects);
                 if (plugin_active)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
@@ -2390,10 +2350,8 @@ static int study(int argc, char **argv)
                 : boat_gpu_hdr_active(&gpu)        ? (resolution ? "GPU high HDR" : "GPU HDR")
                 : resolution                       ? "GPU high"
                                                    : "GPU";
-            snapshot.texture_upload_kib = gpu_enabled ? (wake ? 384
-                                                                : objects ? 4
-                                                                          : 0)
-                                                      : snapshot.framebuffer_kib;
+            snapshot.texture_upload_kib
+                = gpu_enabled ? (objects ? 4 : 0) : snapshot.framebuffer_kib;
             next_snapshot_time = current_frame_started_at + 0.25;
         }
         double present_started_at = boat_profile_time(true);
@@ -2495,9 +2453,6 @@ static int study(int argc, char **argv)
             boat_ui_text("AIRBORNE", 12, 36, 16, SKYBLUE);
         else if (view->boat.motion_state == BOAT_LANDING)
             boat_ui_text("LANDING", 12, 36, 16, SKYBLUE);
-        if (wake)
-            boat_ui_text(TextFormat("WAKE FIELD / REVIEW %d", BOAT_WAKE_SOURCE_REVISION), 12,
-                (int)destination.y + (height - 48) * scale - 16, 12, SKYBLUE);
         if (course)
             course_runs_hud(&session.runs, view, ghost_view, GetScreenWidth());
         if (networked) {
@@ -2758,25 +2713,6 @@ cleanup:
     if (music_ready)
         UnloadMusicStream(music);
     boat_audio_destroy(&audio);
-    if (wake) {
-        BoatWakePlayerReport r = boat_wake_player_report(wake);
-        fprintf(stdout,
-            "Wake candidate r%d (%.0f kg): %zu ticks, %zu owned bytes; source %.3f, update %.3f, "
-            "query/audit "
-            "%.3f ms/tick; upload %.3f ms/frame\n",
-            BOAT_WAKE_SOURCE_REVISION, BOAT_WAKE_MASS, r.steps, boat_wake_player_storage(wake),
-            r.source_seconds * 1000 / fmax(1, r.steps), r.update_seconds * 1000 / fmax(1, r.steps),
-            r.query_audit_seconds * 1000 / fmax(1, r.steps),
-            gpu.wake_upload_seconds * 1000 / fmax(1, gpu.wake_uploads));
-        fprintf(stdout,
-            "Wake joules: signed %.6g (+%.6g / %.6g), retained %.6g, absorbed %.6g, retired %.6g, "
-            "residual %.6g; available drag %.6g\n",
-            r.energy.injected, r.energy.positive_work, r.energy.negative_work, r.energy.retained,
-            r.energy.absorbed, r.energy.retired, r.energy.numerical_residual, r.resistance_work);
-        fprintf(
-            stdout, "Wake nodal peaks: height %.6g m, slope %.6g\n", r.peak_height, r.peak_slope);
-    }
-    boat_wake_player_destroy(wake);
 #ifdef PROTEUS_BOAT_NET
     if (net)
         wake_room_close(net);

@@ -112,15 +112,9 @@ target_compile_options(validate_boat_drive PRIVATE
 add_test(NAME boat_drive_extraction COMMAND validate_boat_drive)
 # Time trials ride the wake pool; only the scripted crossing boat stays free-boating only.
 add_test(NAME wake_objects_course_rejected COMMAND wake_study --wake-objects-crossing --course)
-add_test(NAME wake_objects_mixed_rejected COMMAND wake_study --wake-objects --wake-field)
 add_test(NAME wake_objects_lifetime_rejected COMMAND wake_velocity --wake-objects --wake-life-ticks 1921)
-set_tests_properties(wake_objects_course_rejected wake_objects_mixed_rejected
+set_tests_properties(wake_objects_course_rejected
   wake_objects_lifetime_rejected PROPERTIES WILL_FAIL TRUE)
-add_test(NAME wake_candidate_course_rejected COMMAND wake_study --wake-field --course)
-add_test(NAME wake_candidate_map_rejected COMMAND wake_study --wake-field --location outer)
-add_test(NAME wake_candidate_current_rejected COMMAND wake_study --wake-field --current)
-set_tests_properties(wake_candidate_course_rejected wake_candidate_map_rejected
-  wake_candidate_current_rejected PROPERTIES WILL_FAIL TRUE)
 
 if(NOT EMSCRIPTEN)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
@@ -244,7 +238,7 @@ add_test(NAME boat_player_wake_screenshot COMMAND wake_study --renderer cpu --pl
 add_test(NAME boat_player_wake_course_rejected COMMAND wake_study --player-wake --course)
 set_tests_properties(boat_player_wake_course_rejected PROPERTIES WILL_FAIL TRUE)
 # D6 (L8): the game names wake_study for each developer study instead of running it.
-foreach(study wake-field player-wake no-player-wake wake-objects-crossing)
+foreach(study player-wake no-player-wake wake-objects-crossing)
   add_test(NAME wake_velocity_study_rejected.${study} COMMAND wake_velocity --${study})
   set_tests_properties(wake_velocity_study_rejected.${study} PROPERTIES
     PASS_REGULAR_EXPRESSION "--${study} is a developer study: run it with wake_study" LABELS quick)

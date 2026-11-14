@@ -1,9 +1,11 @@
 # W2.1: optimized owned field and accurate-domain proof
 
+Historical record: the physical wake-field experiment and its review tools were retired on 2026-11-14. Commands below describe the earlier revision and are no longer runnable on current source.
+
 2026-10-21, macOS / Apple Silicon. Owner: [wake rewrite plan](WAKE_REWRITE_PLAN.md).
 Previous baseline: [W2.1b at 801970a](WAKE_W2_REFINEMENT_RESULTS.md).
-Implementation: [boat_wake.c](../src/core/boat_wake.c), [API](../src/core/boat_wake.h),
-[C review](../tools/wake_field_review.c), [domain runner/collector](../tools/wake_domain_review.py).
+Implementation: boat_wake.c, API,
+C review, domain runner/collector.
 
 **Current status:** the isolated W2.1 numerical proof remains complete. The subsequent
 [runtime feasibility checkpoint](WAKE_RUNTIME_RESULTS.md) optimizes source work and tests

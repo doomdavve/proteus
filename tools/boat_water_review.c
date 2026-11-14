@@ -1393,7 +1393,7 @@ static int stress_state(void)
 
 typedef struct {
     int first_tick, end_tick, wave_rebuilds;
-    size_t destination, wake_uploads;
+    size_t destination;
     unsigned wake_live, wake_peak_live, wake_emitters, traffic_wake_live;
     float x, z, heading;
     float simulation_ms, render_ms, present_ms, frame_ms, interval_ms, gpu_ms;
@@ -1661,7 +1661,6 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         }
         double simulated = boat_profile_time(false);
         int rebuilds = gpu.wave_rebuilds;
-        size_t uploads = gpu.wake_uploads;
         bool timed = gpu_timer_begin(&timer, count);
         if (stress) {
             BoatWorld world = stress_world(&stress_fixture);
@@ -1696,7 +1695,6 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         frame->has_interval = count > 0;
         frame->interval_ms = count > 0 ? (float)((start - previous_start) * 1000) : 0;
         frame->wave_rebuilds = gpu.wave_rebuilds - rebuilds;
-        frame->wake_uploads = gpu.wake_uploads - uploads;
         if (stress) {
             frame->wake_live = stress_fixture.fleet.state.wakes.live;
             frame->wake_peak_live = stress_fixture.fleet.state.wakes.peak_live;
@@ -1762,12 +1760,13 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             snprintf(interval, sizeof(interval), "%.9g", (double)f->interval_ms);
         if (f->has_gpu)
             snprintf(gpu_ms, sizeof(gpu_ms), "%.9g", (double)f->gpu_ms);
-        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu,%u,%u,%zu",
+        fprintf(csv,
+            "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,0,%u,%u,%zu",
             i, i < BENCH_WARMUP, f->first_tick, f->end_tick, f->end_tick - f->first_tick,
             f->destination, (double)f->x, (double)f->z, (double)f->heading,
             (double)f->simulation_ms, (double)f->render_ms, (double)f->present_ms,
-            (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->wake_uploads,
-            f->total.submissions, f->total.instances, f->total.triangles);
+            (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->total.submissions,
+            f->total.instances, f->total.triangles);
         for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
             fprintf(csv, ",%u,%zu", f->pass[pass].submissions, f->pass[pass].triangles);
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group)

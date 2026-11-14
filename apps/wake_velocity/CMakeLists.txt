@@ -125,7 +125,7 @@ endif()
 
 if(NOT EMSCRIPTEN)
 add_dependencies(wake_velocity proteus_assets)
-# D6 (ledger L8): developer studies (--wake-field, --player-wake, --no-player-wake,
+# D6 (ledger L8): developer studies (--player-wake, --no-player-wake,
 # --wake-objects-crossing) run on the direct path in wake_study, the game's own sources and
 # settings with WAKE_VELOCITY_STUDY. The game rejects those options and names this tool. It is a
 # developer build only: no package or release carries it.
