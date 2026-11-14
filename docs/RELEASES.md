@@ -217,9 +217,33 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.28 — 2026-11-14
+
+Current release: **[v0.0.28](https://github.com/doomdavve/proteus/releases/tag/v0.0.28)** is
+published at `a0ba228cdf85316e0b8b6c4a112d4be9961cb87e` (the merge of PR #196). It collects the
+server hardening work (H1-H5: connection limits, mitigation build flags, fuzz and sanitizer lanes,
+and the opt-in `--lockdown` mode) and the wake-field retirement since v0.0.27. Compatibility
+remains protocol 14 / physics 9. **`--lockdown` ships off**; the Winterfell unit does not pass it.
+
+On Apple Silicon/macOS, Debug configure/build and **558 CPU CTests** passed (`ctest --preset full`,
+GPU tests off) through `tools/cut_release.py`. Both native archives were downloaded and passed
+SHA-256 (macOS `591a5613...`, Windows `5144bb7e...`), ZIP and version/commit checks. Release
+deployment ran on the first attempt (no retries). The hosted and GitHub Pages
+browser checks (`check_web_server_directory.py`, Chrome) passed, and the matching native
+`boat_bot --predict` joined `wake.davve.net:24680` for five seconds with zero decode errors.
+Hosting pin `e8b5ebe` is pushed to the private baseline; room and relay report active on the tagged
+commit.
+
+Not performed: human input/audio, local Windows execution, physical-device acceptance, Firefox/Safari,
+and the Release-build `check_binary_hardening.py --fortify` check on the Winterfell binary
+(still owed from H2). Whether the WebRTC build links under the new flags is shown only by the
+deployment succeeding, not by a dedicated check. Evidence:
+`/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/` (`verification.json`, stage logs).
+The v0.0.26 and v0.0.27 sections are on `release/v0.0.27-evidence` and are not yet on `main`.
+
 ### v0.0.25 — 2026-11-04
 
-Current release: **[v0.0.25](https://github.com/doomdavve/proteus/releases/tag/v0.0.25)**
+Earlier release: **[v0.0.25](https://github.com/doomdavve/proteus/releases/tag/v0.0.25)**
 is published at `f6152ba3eb655772dc2fcea1de177bb8c79b86be`. The
 [native release](https://github.com/doomdavve/proteus/actions/runs/41867615283) and
 [Pages](https://github.com/doomdavve/proteus/actions/runs/41867615336) workflows passed after

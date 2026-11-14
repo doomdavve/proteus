@@ -283,6 +283,17 @@ be rejected; use the release checkout's bot instead. Browser testing must reach 
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
 
+## Status and verification — 2026-11-14
+
+The release command deployed **v0.0.28** at source `a0ba228cdf85316e0b8b6c4a112d4be9961cb87e` through
+hosting pin `e8b5ebe`, pushed to the private baseline. Room and relay are active on the tagged commit
+(`Wake Velocity v0.0.28 outer room`). Directory compatibility is protocol **14 / physics 9**. The
+hosted and Pages browser directory checks passed in Chrome, and the matching native bot joined
+`wake.davve.net:24680` with zero decode errors. This build includes the H1-H5 hardening code; the
+unit does not enable `--lockdown`, so [lockdown](#in-process-lockdown) is not yet in effect on
+Winterfell. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/`. Not run: human
+input, a Release-build `--fortify` check of the deployed binary, and a relay join from outside the LAN.
+
 ## Status and verification — 2026-11-04
 
 The [release command](RELEASES.md#release-command) deployed **v0.0.25** through committed/pushed
