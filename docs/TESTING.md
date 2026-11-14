@@ -1362,7 +1362,7 @@ pinned Emscripten, see [WEB_BUILD.md](WEB_BUILD.md#build-and-deployment)):
 cd <worktree>
 cmake -S . -B build-rtc -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_WEBRTC=ON
 cmake --build build-rtc --parallel --target boat_server boat_bot wake_velocity
-source ../emsdk/emsdk_env.sh
+source ~/src/emsdk/emsdk_env.sh   # activate first if needed: ~/src/emsdk/emsdk activate "$(cat web/emsdk-version)"
 emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=MinSizeRel
 cmake --build build-web --target web --parallel
 ```
