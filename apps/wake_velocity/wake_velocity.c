@@ -226,6 +226,8 @@ static void usage(void)
     cli_usage_line(
         stdout, "--frame-capture FILE", "Save the window, HUD included, at the last of --frames");
     cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
+    cli_usage_line(
+        stdout, "--demo-idle", "Neutral helm in solo --demo or --screenshot; world time runs");
     cli_usage_line(stdout, "--work-clock-report FILE",
         "Developer review: with --work and --frames, write a live lighting CSV");
     cli_usage_line(stdout, "--work-review-pose swing|deck|approach",
@@ -596,6 +598,16 @@ static void local_view(WakePluginAuthority *authority, const WakeLocal *local)
 }
 #endif
 
+#ifdef PROTEUS_BOAT_NET
+static BoatInput idle_demo_input(void *context, const Boat *boat, uint64_t tick)
+{
+    (void)context;
+    (void)boat;
+    (void)tick;
+    return (BoatInput) { 0 };
+}
+#endif
+
 static int study(int argc, char **argv)
 {
     WakeLightingReview lighting_review = { 0 };
@@ -607,7 +619,7 @@ static int study(int argc, char **argv)
     float time = 0;
     BoatCamera camera_settings = BOAT_CAMERA_DEFAULT;
     bool camera_distance_set = false, camera_height_set = false;
-    bool time_set = false, demo = false, mouse_steering = false;
+    bool time_set = false, demo = false, demo_idle = false, mouse_steering = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_BASIN);
     bool course = false, waves = false;
     bool current = false, crossing_wake = false, player_wake = true;
@@ -796,6 +808,8 @@ static int study(int argc, char **argv)
             work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
+        } else if (strcmp(argv[i], "--demo-idle") == 0) {
+            demo_idle = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
             screenshot = argv[++i];
         } else if (strcmp(argv[i], "--time") == 0 && i + 1 < argc) {
@@ -872,6 +886,12 @@ static int study(int argc, char **argv)
     if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
         || (!replay_path && time > 60))
         goto invalid;
+    if (demo_idle
+        && (!(screenshot || demo) || connect_to || host_mode || work_mode || replay_path
+            || ghost_path || course || object_crossing)) {
+        fprintf(stderr, "--demo-idle needs a solo free/voyage --demo or --screenshot.\n");
+        goto invalid;
+    }
     if (time_scale_set && (connect_to || host_mode)) {
         fprintf(stderr, "--time-scale is for solo live play; a room keeps its own time.\n");
         goto invalid;
@@ -1232,6 +1252,10 @@ static int study(int argc, char **argv)
     // practice latch as the bundled course.
     if (plugin_active && plugin.host.kind == BOAT_PLUGIN_KIND_COURSE)
         course = true;
+    if (course && demo_idle) {
+        fprintf(stderr, "--demo-idle cannot run a course package.\n");
+        goto cleanup;
+    }
     if (course)
         boat_session_start_course(&session);
     else if (!connect_to && skin == BOAT_SKIN_EXPLORER)
@@ -1309,6 +1333,8 @@ static int study(int argc, char **argv)
     // ledger rows migrate them. L4a/L4b: the browser runs the same sessions, authoring included,
     // its authority evaluating objectives and migrations on the isolated worker.
     static WakeLocal local;
+    static const BoatLocalScript idle_script = { NULL, idle_demo_input };
+    local.script = demo_idle ? &idle_script : NULL;
 #ifdef __EMSCRIPTEN__
     static const WakeObjectiveWorker web_worker = { wake_web_objective_start,
         wake_web_objective_status, wake_web_objective_read, wake_web_objective_close };
@@ -1331,6 +1357,9 @@ static int study(int argc, char **argv)
                    : plugin.host.kind == BOAT_PLUGIN_KIND_FREE                                     \
                     || (plugin.host.kind == BOAT_PLUGIN_KIND_VOYAGE && session.voyage_route)))
 #endif
+    // A neutral review starts looking along the placed hull immediately, including tick zero.
+    if (demo_idle)
+        session.presentation.camera_heading = session.boat.heading;
     // A replay is viewed in its own recorded water, never by writing into the live session.
     BoatViewState live_view, playback;
     BoatPresentation playback_presentation;
@@ -1380,7 +1409,10 @@ static int study(int argc, char **argv)
         for (int tick = 0; !scripted_local && tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
             if (plugin_active)
                 wake_plugin_before_tick(&plugin);
-            demo_step(&session, tick, NULL, objects);
+            if (demo_idle)
+                timed_boat_step(&session, (BoatInput) { 0 }, NULL, objects);
+            else
+                demo_step(&session, tick, NULL, objects);
             if (plugin_active)
                 wake_plugin_after_tick(&plugin, &session);
         }
@@ -2146,7 +2178,9 @@ static int study(int argc, char **argv)
             while (direct_ticks && accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
-                if (demo)
+                if (demo && demo_idle)
+                    timed_boat_step(&session, (BoatInput) { 0 }, &metrics, objects);
+                else if (demo)
                     demo_step(&session, demo_tick++, &metrics, objects);
                 else
                     timed_boat_step(&session,

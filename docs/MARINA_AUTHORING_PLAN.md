@@ -3,10 +3,10 @@
 Status, 2026-11-14: M1 structures and M2 appearance are merged; M3 authored routes and
 C1 bounded schedule clearance are merged in [PR #201](https://github.com/doomdavve/proteus/pull/201).
 M3 supports one open or looping route with up to four tangent line/arc pieces; it remains open.
-Completed: C2a composed-path regression and loop tick-conversion correction (evidence below).
-Open: full visible sequence, CPU/GPU/windowed review, integrated qualification and C4 closure.
+Completed: C2a composed-path regression/tick correction and C2b CPU/GPU/windowed visual evidence.
+Open: C3 integrated native/browser/Wasm qualification and C4 closure; human acceptance is separate.
 Done when M3's acceptance checks below pass and its contract is recorded in the API.
-Next task: C2b camera and full docking/departure review, then C3–C4.
+Next task: C3 final integration qualification, then C4 documentation closure.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap; the [API](PLUGIN_API.md) owns
 implemented capabilities. M4 occupancy and M5 modules remain deferred.
 
@@ -36,7 +36,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 merged in #201; closure gates C2–C4 open |
+| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; integrated single-route subset, C1 merged in #201; C2 evidence complete; C3–C4 open |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -453,6 +453,67 @@ No new CPU/GPU capture inspection, full motion review, browser/Wasm build, Windo
 qualification or human acceptance is claimed. Those remain C2b/C3 work. Exact recovery of
 arbitrary ticks beyond double-time precision is not established; huge-time cases check
 bounded output, not exact phase. The branch remains local pending explicit PR approval.
+
+#### C2b execution contract — 2026-11-14
+
+Continue locally on `feat/marina-m3-c2`, following C2a commit `f05f74e`. Done when the entire
+visitor hull and platform stay visible from approach through both turns, the 12–14 s dwell
+and the 19 s terminal pose in CPU/GPU captures and agent-run windowed playback. Inspect ticks
+before/at/after each transition as well as the turn/dwell interiors. Human acceptance remains
+separate. C3 platform/browser/Wasm qualification, C4 closure, M4 occupancy and M5 modules are
+deferred to their owning steps; no push or PR is authorized.
+
+The existing screenshot helm drove the viewing boat away. Add `--demo-idle` for neutral helm
+in solo free/voyage screenshots and demos, using the existing local-authority script hook
+and the direct-path fallback. Keep the world clock running. Initialize its camera heading to
+the placed hull at tick zero. Reject unsupported work/course/replay/room combinations.
+
+An elevated side view exposed bridge occlusion over the old route. Translate the visitor's
+four pieces 60 m along Z into open water, preserve their timing and shape, and put the platform
+at `(12,203)`. The camera is `--start -5,185,90 --camera-distance 16 --camera-height 30
+--fixed-fov`. Keep swept-envelope checks unchanged: the paused hull stays about four metres
+from the platform edge. A closer candidate at Z=202 rejected clearance and was discarded.
+This demonstrates approach/pause/departure, not contact, mooring or an M4 berth handoff.
+
+The [package guide](../plugins/marina-route-demo/README.md) owns launch and boundary-capture
+commands. `--no-vsync --frames 1800` bounds a 60 Hz windowed review to about 30 s so the full
+19 s sequence fits regardless of the monitor's refresh rate. Capture modes retain 120 Hz
+simulation time and low-resolution integer-scaled presentation.
+
+C2b result, 2026-11-14, Apple Silicon/macOS 26.6.2, native Debug: implemented the neutral
+capture/demo helm, camera initialization and relocated example above. The final camera also
+keeps the approach above the live HUD; the first trial camera passed stills but hid the
+approaching hull behind instruments, so it was replaced. Nineteen CPU and nineteen GPU
+captures bracket both turns, dwell start/end and terminal hold at ±1 tick, plus interiors.
+All were inspected; the full visitor and platform are visible, geometry/headings agree
+between renderers, and no jump is visible at the sampled boundaries. GPU reflections/shadows
+retain their existing differences from CPU. Independent read-only code and capture review
+found no concrete blocker.
+
+The 1,800-frame GPU windowed run completed with exit 0, **3,611 simulation ticks** and zero
+restarts. A 24-second game-window-only recording includes the full approach, pause, departure
+and terminal hold; all 96 extracted samples at 4 fps were inspected. The HUD stays clear of
+the visitor throughout. Tick-zero stills cover the startup pose before the recording starts.
+The [capture sheets, recording, manifest and commands](evidence/marina-c2b/2026-11-14/README.md)
+are retained for review. This is agent-run playback and sampled motion inspection, not human
+visual/gameplay acceptance or audio review.
+
+`cmake --build build -j 8` passed without warnings. Final `ctest --preset full` with local
+socket access passed **568/568 tests in 45.42 s**, GPU CTests OFF. The GPU captures
+and agent-run windowed review above used a desktop graphics context. `plugin_author.py validate` accepted
+the final relocated scene; the closer discarded platform candidate rejected explicitly.
+Six CLI rejection checks covered idle mode without demo/capture and with work, course,
+replay, host and client modes. A separate `wake_study --no-player-wake` CPU capture exercised
+the direct fallback at 13 s: the spectator remained still and the visitor held its dwell pose;
+its water appearance differs from the normal arcade-pool path, so byte parity is not claimed.
+
+All 20 added/rewritten local links and nine retained artifact checksums passed;
+`git diff --check` passed. The documented capture/playback option combinations were exercised.
+
+C2b is complete as agent evidence for the documented platform approach/pause/departure.
+C3 still owns fresh browser/Wasm staging/room qualification and platform limits; C4 owns
+milestone closure. No new browser build, interactive browser, Windows/Linux, depth, snug
+mooring, named berth ownership or human acceptance is claimed. The branch remains local.
 
 #### C1 decision — 2026-11-14
 

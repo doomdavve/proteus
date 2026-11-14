@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**M3 routes and bounded clearance are merged in #201; next marina task: [M3 docking review and qualification](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**M3 routes and bounded clearance are merged in #201; next marina task: [M3 integrated qualification and closure](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
@@ -47,8 +47,8 @@ traffic/ferry, tram, wildlife and lighting authoring explicit implementation gat
 scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3's native berth/module
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
-twelve-berth/two-row package, M2 boat appearance and M3 routes/clearance (#201); M3 docking
-review and qualification remain. The
+twelve-berth/two-row package, M2 boat appearance and M3 routes/clearance (#201); M3 agent visual
+evidence is recorded, with integrated qualification and closure remaining. The
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
 sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are

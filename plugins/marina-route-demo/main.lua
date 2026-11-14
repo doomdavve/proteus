@@ -19,15 +19,17 @@ return {
     exposed_fraction = 0.8,
     weather_range = 2500
   },
+  -- Keep the full review sequence in the open reach north of the bridge at z=126.
+  -- 0-5 s line; 5-10 s turn; 10-12 s slow approach; 12-14 s dwell; 14-19 s departure.
   scene = { version = 3, marina = { berths = {},
-    modules = { { id = "dock", kind = "platform", x = 12, z = 145, heading = 0,
+    modules = { { id = "dock", kind = "platform", x = 12, z = 203, heading = 0,
       length = 6, width = 6, deck_height = .74 } }
   }, traffic = { vessels = {
     { id = "visitor", recipe = "runabout", route = "open", pieces = {
-      {kind="line",x0=0,z0=110,x1=0,z1=125,ticks=600,dwell=0,max_speed=5,max_acceleration=5},
-      {kind="arc",x=10,z=125,radius=10,start_angle=3.141592653589793,sweep=-1.570796326794897,ticks=600,dwell=0,max_speed=5,max_acceleration=7},
-      {kind="line",x0=10,z0=135,x1=12,z1=135,ticks=240,dwell=240,max_speed=5,max_acceleration=7},
-      {kind="arc",x=12,z=125,radius=10,start_angle=1.570796326794897,sweep=-1.570796326794897,ticks=600,dwell=0,max_speed=5,max_acceleration=7}
+      {kind="line",x0=0,z0=170,x1=0,z1=185,ticks=600,dwell=0,max_speed=5,max_acceleration=5},
+      {kind="arc",x=10,z=185,radius=10,start_angle=3.141592653589793,sweep=-1.570796326794897,ticks=600,dwell=0,max_speed=5,max_acceleration=7},
+      {kind="line",x0=10,z0=195,x1=12,z1=195,ticks=240,dwell=240,max_speed=5,max_acceleration=7},
+      {kind="arc",x=12,z=185,radius=10,start_angle=1.570796326794897,sweep=-1.570796326794897,ticks=600,dwell=0,max_speed=5,max_acceleration=7}
     } },
     { id = "river_runabout", retain = "river_runabout" },
     { id = "river_ferry", retain = "river_ferry" },
