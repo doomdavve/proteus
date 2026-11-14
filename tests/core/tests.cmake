@@ -13,6 +13,12 @@ target_link_libraries(validate_boat_cargo PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_cargo PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_cargo COMMAND validate_boat_cargo)
 set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
+# Marina M3 groundwork: exact common tick period for planned route clearance, core only.
+add_executable(validate_boat_schedule tests/core/validate_boat_schedule.c)
+target_link_libraries(validate_boat_schedule PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_schedule PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_schedule COMMAND validate_boat_schedule)
+set_tests_properties(boat_schedule PROPERTIES LABELS "core;cpu;quick")
 add_executable(validate_boat_clock tests/core/validate_boat_clock.c)
 target_link_libraries(validate_boat_clock PRIVATE proteus_boat_drive)
 target_compile_options(validate_boat_clock PRIVATE

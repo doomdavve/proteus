@@ -7,8 +7,10 @@ user's decisions after reviewing the gaps in [PR #131](https://github.com/doomda
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
-Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. Next task:
-**M3 authored routes and docking motion**. Verification evidence and limitations are recorded
+Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. M3 is
+underway: an isolated common-period helper is implemented, but is not connected to route validation.
+Next task: implement a bounded combined-timetable clearance proof using integer ticks. Verification
+evidence and limitations are recorded
 below; agreeing to features is not visual or gameplay acceptance of an implementation.
 
 ## Agreed result
@@ -37,7 +39,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
-| M3 | Authored routes, stops and docking maneuvers | M2 | Planned |
+| M3 | Authored routes, stops and docking maneuvers | M2 | In progress; timetable helper only |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
@@ -316,6 +318,17 @@ its `ok` line under parallel load, then passed when run alone. The GPU `names-po
 Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive browser/device runs remain separate.
 
 ## M3: authored routes and docking motion
+
+First groundwork, 2026-11-14: `boat_schedule_common_period` computes the exact least common
+multiple of positive tick periods, rejecting overflow and caller-budget overruns without changing
+the result. It is not yet used by traffic validation. M3 remains incomplete: the existing
+floating-point traffic schedules and fixed 4,160-second sampled horizon have not been converted
+to a proven bounded combined timetable. The next implementation must define tick conversion,
+the validation budget and conservative swept envelopes before connecting the helper. Open routes,
+docking, authoring, wire integration, Apply/Undo and visual qualification remain outstanding.
+On macOS/Apple Silicon Debug, the full build passed. The full CTest preset passed 542 tests
+inside the sandbox; the 14 socket-dependent failures passed on an unsandboxed rerun. Thirteen
+retired wake-field tests were disabled. No motion or user acceptance is claimed.
 
 Read `src/core/waterfront_traffic.[ch]`, `src/core/waterfront_upstream.[ch]`,
 validation in `src/core/boat_scene_definition.[ch]`, `src/net/boat_net_*.[ch]` and `docs/HARBOR_TRAFFIC.md`.
