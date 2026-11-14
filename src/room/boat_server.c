@@ -88,6 +88,8 @@ static void usage(FILE *out)
     cli_usage_section(out, "WEBRTC (optional build)");
     cli_usage_line(out, "--rtc-port N", "WebRTC signalling port");
     cli_usage_line(out, "--ice-server URL", "ICE server; requires --rtc-port");
+    cli_usage_line(out, "--ice-server-file PATH",
+        "Read the ICE server URL from a file, keeping credentials off the command line");
 
     fprintf(out,
         "\nRoom options and --seconds do not apply to --scripted.\n"
@@ -347,6 +349,34 @@ static void request_stop(int signal_number)
 {
     (void)signal_number;
     stop_requested = 1;
+}
+
+// Room for the longest ICE URL the RTC transport accepts.
+#define ICE_SERVER_FILE_MAX 512
+
+// Reads one trimmed line of an ICE server URL from `path` into `out`.
+static bool read_ice_server_file(const char *path, char *out, size_t size)
+{
+    FILE *file = fopen(path, "rb");
+    if (!file) {
+        fprintf(stderr, "boat_server: cannot read --ice-server-file %s.\n", path);
+        return false;
+    }
+    size_t length = fread(out, 1, size - 1, file);
+    bool too_long = length == size - 1 && fgetc(file) != EOF;
+    fclose(file);
+    out[length] = '\0';
+    char *end = out + strcspn(out, "\r\n");
+    *end = '\0';
+    while (end > out && (end[-1] == ' ' || end[-1] == '\t'))
+        *--end = '\0';
+    if (too_long || out[0] == '\0') {
+        fprintf(stderr,
+            "boat_server: --ice-server-file %s must hold one URL of at most %d bytes.\n", path,
+            ICE_SERVER_FILE_MAX - 1);
+        return false;
+    }
+    return true;
 }
 
 typedef struct {
@@ -717,6 +747,7 @@ int boat_server_main(int argc, char **argv)
     bool deathmatch = false, race = false, location_given = false;
     bool scripted_mode = false, room_option = false, package_reload = false;
     static BoatWorldResources world;
+    char ice_server_file[ICE_SERVER_FILE_MAX] = "";
     RoomOptions room_options = { .bind = "127.0.0.1",
         .token = "",
         .port = BOAT_NET_PORT,
@@ -763,7 +794,23 @@ int boat_server_main(int argc, char **argv)
             return 2;
 #endif
         } else if (strcmp(argv[i], "--ice-server") == 0 && value) {
+            if (room_options.ice_server) {
+                fprintf(
+                    stderr, "boat_server: give only one of --ice-server and --ice-server-file.\n");
+                return 2;
+            }
             room_options.ice_server = value;
+            room_option = true;
+            ++i;
+        } else if (strcmp(argv[i], "--ice-server-file") == 0 && value) {
+            if (room_options.ice_server) {
+                fprintf(
+                    stderr, "boat_server: give only one of --ice-server and --ice-server-file.\n");
+                return 2;
+            }
+            if (!read_ice_server_file(value, ice_server_file, sizeof(ice_server_file)))
+                return 2;
+            room_options.ice_server = ice_server_file;
             room_option = true;
             ++i;
         } else if (strcmp(argv[i], "--lan-port") == 0 && value) {

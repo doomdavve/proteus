@@ -727,7 +727,8 @@ in the browser URL, and permit the signaling TCP port and WebRTC ICE UDP traffic
 connectivity has been verified here. The listener provides plain WebSocket signaling, exchanging
 one complete SDP offer/answer after ICE gathering. Secure-page deployment needs a separately
 operated WSS/TLS endpoint (for example, a reverse proxy to this signaling listener), a reachable
-authority and a tested ICE route. `--ice-server URL` configures the native endpoint; the
+authority and a tested ICE route. `--ice-server URL` configures the native endpoint, and `--ice-server-file PATH` reads the
+same URL from a file so a TURN credential stays out of the process list; the
 `boatIceServers` array in [index.html](../web/index.html) configures browser STUN/TURN servers
 using standard `RTCIceServer` objects. Winterfell's separate operator deployment configures
 browser STUN and a private native TURN client; its [guide](MULTIPLAYER_HOSTING.md) owns the

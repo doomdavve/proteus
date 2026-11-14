@@ -5,7 +5,8 @@ Completed task: H0, both units sandboxed; `systemd-analyze security` 7.9 → 1.1
 Open: the relay-from-outside-the-LAN join and a soak under the sandbox were not exercised.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: **H1**, the TURN password out of the process command line.
+Next task: finish **H1** (server flag and tests done locally; `davve-srv` unit change, `SECURITY.md`
+and the Winterfell check remain), then H2.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a

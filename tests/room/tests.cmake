@@ -14,6 +14,11 @@ add_test(NAME boat_server_scripted_room_option_rejected
 add_test(NAME boat_server_port_rejected COMMAND boat_server --port 0)
 add_test(NAME boat_server_package_reload_rejected COMMAND boat_server --package-reload --ticks 1)
 add_test(NAME boat_server_bind_rejected COMMAND boat_server --bind not-an-address --ticks 1)
+add_test(NAME boat_server_ice_file_missing_rejected
+  COMMAND boat_server --ice-server-file ${CMAKE_BINARY_DIR}/does-not-exist --ticks 1)
+add_test(NAME boat_server_ice_url_and_file_rejected
+  COMMAND boat_server --ice-server turn:u:p@127.0.0.1:3478 --ice-server-file ${CMAKE_BINARY_DIR}/x
+    --ticks 1)
 add_test(NAME boat_bot_endpoint_rejected COMMAND boat_bot --connect 127.0.0.1)
 add_test(NAME boat_bot_discover_join_rejected
   COMMAND boat_bot --discover --connect 127.0.0.1:24680)
