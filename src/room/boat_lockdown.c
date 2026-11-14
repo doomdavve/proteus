@@ -38,10 +38,13 @@ void boat_lockdown_describe(
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <stddef.h>
+#include <netdb.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #if defined(__x86_64__)
@@ -285,10 +288,37 @@ static bool build_filter(Filter *f, BoatLockdownMode mode)
     return !f->overflow;
 }
 
+// glibc reads files and probes sockets lazily, the first time a function needs them: the timezone
+// file for log timestamps (libdatachannel and libjuice log with local time) and gai.conf plus
+// address probing for getaddrinfo (WebRTC resolves its ICE server and binds ICE sockets when the
+// first peer connects).
+// Once the lockdown has removed file access those first uses would be refused, and in kill mode
+// would end the server on the first browser join. Doing each once here lets glibc cache the result.
+static void warm_libc(void)
+{
+    time_t now = time(NULL);
+    struct tm local;
+    tzset();
+    (void)localtime_r(&now, &local);
+    struct addrinfo hints = { .ai_family = AF_UNSPEC,
+        .ai_socktype = SOCK_DGRAM,
+        .ai_protocol = IPPROTO_UDP,
+        .ai_flags = AI_ADDRCONFIG };
+    struct addrinfo *result = NULL;
+    if (getaddrinfo("127.0.0.1", "3478", &hints, &result) == 0)
+        freeaddrinfo(result);
+    // A wildcard bind lookup returns both families, which makes glibc sort them and read
+    // gai.conf; libjuice does exactly this for every ICE socket.
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+    if (getaddrinfo(NULL, "0", &hints, &result) == 0)
+        freeaddrinfo(result);
+}
+
 bool boat_lockdown_apply(BoatLockdownMode mode, int min_landlock_abi, BoatLockdownReport *report,
     char *error, size_t error_size)
 {
     memset(report, 0, sizeof(*report));
+    warm_libc();
     Filter filter;
     if (!build_filter(&filter, mode)) {
         snprintf(error, error_size, "syscall filter too large");

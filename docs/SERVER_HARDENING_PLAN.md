@@ -6,7 +6,7 @@ Open: `davve-srv`: enable `--lockdown` in the unit and soak with `--lockdown log
 the longer H3 fuzz campaign; relay join from outside the LAN.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: H7 closing step, with the H4/H5 operator work in `davve-srv`.
+Next task: release the lockdown warm-up, confirm a clean `log` soak, switch the unit to `kill`; then H7 and the H4 operator work in `davve-srv`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -162,3 +162,17 @@ the filter needs a release build and deployment; the `RTC poll` `openat` seen at
 main-thread `socket` are still unexplained and may remain after the filter. Rerun the soak, then decide
 the allowlist, before `kill`. The change to `boat_net_rtc.c` is compiled only in WebRTC builds and was
 not compiled locally; CI and the release build are its first compile.
+
+## H5 soak result and warm-up
+
+Winterfell, 2026-11-14. v0.0.29 under `--lockdown log` still logged a few `openat`/`socket` calls.
+`strace` on a scratch run of the same binary identified them as glibc first-use work: the timezone
+file (log timestamps, from the WebRTC threads), `gai.conf` (read when a lookup returns several
+addresses, as libjuice's wildcard bind does) and an `nscd` socket probe. None came from the game or
+from client input. `boat_lockdown_apply` now warms those up before locking (`warm_libc`) and
+`validate_boat_lockdown` has a case that performs them after a `kill` lockdown (passes on Linux,
+GCC). A scratch build of that change served a native join and a browser join under `--lockdown kill`
+on Winterfell with no `SIGSYS` and no audit records. The allowlist was not widened. Open: release the
+warm-up, run `log` mode again to confirm a clean journal across several joins and a restart, then
+switch the unit to `kill`; the `nscd` probe is only stopped by the warm-up, not by policy, so an
+extended soak (hundreds of lookups) should confirm glibc does not retry it.

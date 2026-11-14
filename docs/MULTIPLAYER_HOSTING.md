@@ -204,8 +204,10 @@ families are not allowed. The lockdown is fail-closed (see
 [COMMAND_LINE](COMMAND_LINE.md)); the achieved Landlock ABI is printed at start-up. To tune the
 list under a soak, run `--lockdown log` and read the kernel's `SECCOMP` audit records
 (`journalctl -k` or `ausearch -m SECCOMP`), then extend `build_allowlist` in
-`src/room/boat_lockdown.c`. The WebRTC threads (libdatachannel, libjuice) may need more than
-the ENet path; that is unverified. The recording file is opened before the lockdown, and
+`src/room/boat_lockdown.c`. The WebRTC threads (libdatachannel, libjuice) were exercised under `kill` on
+Winterfell with native and browser joins (2026-11-14); the lockdown warms up glibc's lazy file
+reads and address probing first (`warm_libc`), so later lookups and log timestamps do not need
+files. The recording file is opened before the lockdown, and
 `--package-reload` is refused because it needs files.
 
 The playbook adds `/etc/nginx/conf.d/wake-velocity.conf`, validates nginx, then reloads it.
@@ -282,6 +284,20 @@ Use `10.0.21.3:24680` for the LAN check. A development build with newer handling
 be rejected; use the release checkout's bot instead. Browser testing must reach the room,
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-11-14 (v0.0.29 and lockdown soak)
+
+**v0.0.29** (source `6ca3954`, hosting pin `a603dcd`) is deployed with `--lockdown log`: room and
+relay are active, protocol **14 / physics 9**, and native and hosted-browser joins passed. After the
+SDP offer filter, the kernel logged no name-lookup calls from the WebRTC threads. The remaining
+would-be violations were traced with `strace` on Winterfell (v0.0.29 binary, scratch run on the real
+ports, native and browser joins) to glibc's lazy first use, not to the game: the timezone file for log
+timestamps, `gai.conf` when a lookup returns several addresses, and a probe of the `nscd` socket.
+`boat_lockdown_apply` now performs those once before locking (`warm_libc`); a scratch build of that
+change ran `--lockdown kill` on Winterfell through a native join and a browser join with no
+`SIGSYS` and no audit records. **That change is not in v0.0.29**: the live room still runs `log`, and
+`kill` waits for a release containing it. Not checked: a relay join from outside the LAN, long soaks,
+and joins from several browsers at once.
 
 ## Status and verification — 2026-11-14
 
