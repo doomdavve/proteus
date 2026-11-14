@@ -13,6 +13,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   boat_room_definition.c boat_room_definition.h
   boat_route_clearance.c boat_route_clearance.h
   boat_route_leg.c boat_route_leg.h
+  boat_route_arc.c boat_route_arc.h
   boat_schedule.c boat_schedule.h
   boat_scene_definition.c boat_scene_definition.h
   boat_marks.c boat_marks.h

@@ -25,6 +25,12 @@ target_link_libraries(validate_boat_route_leg PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_route_leg PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_route_leg COMMAND validate_boat_route_leg)
 set_tests_properties(boat_route_leg PROPERTIES LABELS "core;cpu;quick")
+# Marina M3 groundwork: one circular turn evaluated directly at explicit simulation ticks.
+add_executable(validate_boat_route_arc tests/core/validate_boat_route_arc.c)
+target_link_libraries(validate_boat_route_arc PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_route_arc PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_route_arc COMMAND validate_boat_route_arc)
+set_tests_properties(boat_route_arc PROPERTIES LABELS "core;cpu;quick")
 # Marina M3 groundwork: conservative pairwise clearance between two straight open legs.
 add_executable(validate_boat_route_clearance tests/core/validate_boat_route_clearance.c)
 target_link_libraries(validate_boat_route_clearance PRIVATE proteus_boat_core)

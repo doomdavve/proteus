@@ -335,6 +335,10 @@ reject safe passages; the numerical rounding margins and its extension to turns,
 periodic schedules remain to be justified before it can serve as a scene proof. On 2026-11-14,
 macOS/Apple Silicon Debug, the build and focused leg, clearance, schedule and core-boundary tests
 passed. No motion or user acceptance is claimed.
+An unintegrated circular-arc primitive now evaluates tick-addressed left and right turns with
+bounded start phase, signed sweep and conservative tangential-plus-centripetal acceleration.
+Focused arc, leg, clearance and core-boundary tests passed on macOS/Apple Silicon Debug
+2026-11-14. Joining legs, continuous moving turns and their complete clearance proof remain open.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest
