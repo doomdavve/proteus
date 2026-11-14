@@ -191,6 +191,8 @@ without it, WebRTC fails to gather host candidates. Room and relay restart indep
 
 ### In-process lockdown
 
+The full picture of the layers, limits and decisions is in [SERVER_SECURITY](SERVER_SECURITY.md).
+
 `boat_server --lockdown kill` (Linux, opt-in) restricts the process after startup, on top of the
 systemd sandbox. It applies `PR_SET_NO_NEW_PRIVS`; Landlock with no rules (every filesystem right,
 plus TCP bind/connect and the abstract-socket and signal scopes, denied; open descriptors and

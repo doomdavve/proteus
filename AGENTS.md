@@ -160,7 +160,7 @@ xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
 
 - Plans describe work to do; specs describe the system as it is, in the present tense with no
   dated results. Existing specs: `docs/PLUGIN_API.md`, `docs/MULTIPLAYER_PROTOCOL.md`,
-  `docs/TESTING.md`, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`.
+  `docs/TESTING.md`, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`, `docs/SERVER_SECURITY.md`.
 - Each plan keeps a status header of at most about ten lines: current state, open items, a
   "done when" line and the next task. Dated results and evidence go below it or in history.
 - Every milestone ends with a closing step: move its contract and behaviour into the owning

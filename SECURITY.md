@@ -5,5 +5,6 @@ If you find a vulnerability, please **do not open a public issue or pull request
 privately through GitHub's "Report a vulnerability" (private security advisory) on this
 repository, with the affected version and steps to reproduce.
 
-Hardening work that is already planned is described in
+How the server limits what a compromise can do is described in
+[docs/SERVER_SECURITY.md](docs/SERVER_SECURITY.md); the work that produced it is in
 [docs/SERVER_HARDENING_PLAN.md](docs/SERVER_HARDENING_PLAN.md).
