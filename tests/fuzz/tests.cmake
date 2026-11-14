@@ -29,6 +29,7 @@ endfunction()
 
 if(NOT EMSCRIPTEN)
   proteus_fuzz_harness(fuzz_net_decode tests/fuzz/fuzz_net_decode.c 20000 proteus_boat_net)
+  proteus_fuzz_harness(fuzz_net_sdp tests/fuzz/fuzz_net_sdp.c 20000 proteus_boat_net)
   proteus_fuzz_harness(fuzz_net_server tests/fuzz/fuzz_net_server.c 300 proteus_boat_net)
   if(NOT PROTEUS_FUZZ)
     # The server harness must reach past the handshake, or it tests nothing. Its summary prints
