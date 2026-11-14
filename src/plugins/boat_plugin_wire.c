@@ -79,6 +79,57 @@ static void string(Wire *w, char *s, size_t capacity)
         w->at += n;
 }
 
+// M3: a bounded open path travels after the actor's shared fields. The count is 1..4 and each
+// piece names its kind before the dwell/duration ticks and the shape's binary64 fields, so an
+// unknown kind can never be mistaken for another shape's payload.
+static void open_path_wire(Wire *w, BoatRoutePath *path)
+{
+    path->count = (unsigned)integer(w, path->count, 1);
+    if (path->count < 1 || path->count > BOAT_ROUTE_PATH_PIECES) {
+        w->ok = false;
+        return;
+    }
+    unsigned loop = (unsigned)integer(w, path->loop ? 1 : 0, 1);
+    if (loop > 1) {
+        w->ok = false;
+        return;
+    }
+    path->loop = loop != 0;
+    for (unsigned i = 0; i < path->count; ++i) {
+        BoatRoutePathPiece *p = &path->pieces[i];
+        p->kind = (BoatRoutePathKind)integer(w, p->kind, 1);
+        if (p->kind != BOAT_ROUTE_PATH_LINE && p->kind != BOAT_ROUTE_PATH_ARC) {
+            w->ok = false;
+            return;
+        }
+        p->dwell_ticks = integer(w, p->dwell_ticks, 8);
+        if (p->kind == BOAT_ROUTE_PATH_LINE) {
+            BoatRouteLeg *l = &p->shape.line;
+            l->duration_ticks = integer(w, l->duration_ticks, 8);
+            l->start_x = number(w, l->start_x);
+            l->start_z = number(w, l->start_z);
+            l->end_x = number(w, l->end_x);
+            l->end_z = number(w, l->end_z);
+            l->tick_seconds = number(w, l->tick_seconds);
+            l->max_speed = number(w, l->max_speed);
+            l->max_acceleration = number(w, l->max_acceleration);
+        } else {
+            BoatRouteArc *a = &p->shape.arc;
+            a->duration_ticks = integer(w, a->duration_ticks, 8);
+            a->centre_x = number(w, a->centre_x);
+            a->centre_z = number(w, a->centre_z);
+            a->radius = number(w, a->radius);
+            a->start_angle = number(w, a->start_angle);
+            a->sweep = number(w, a->sweep);
+            a->tick_seconds = number(w, a->tick_seconds);
+            a->max_speed = number(w, a->max_speed);
+            a->max_acceleration = number(w, a->max_acceleration);
+        }
+        if (!w->ok)
+            return;
+    }
+}
+
 static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
 {
     routes->actor_count = (unsigned)integer(w, routes->actor_count, 4);
@@ -95,8 +146,10 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
         if (a->retain != 0xff && a->retain > WATERFRONT_ROUTE_ACTORS)
             w->ok = false;
         unsigned bridge = (unsigned)integer(w, a->bridge ? 1u : 0u, 1);
+        // OPEN_LEG is internal only and owns no wire bytes yet; decode and encode both reject it
+        // so a round trip cannot silently drop the leg fields. OPEN_PATH is encoded below.
         if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            || a->shape == WATERFRONT_ROUTE_OPEN_LEG || a->recipe >= WATERFRONT_CRAFT_RECIPES)
             w->ok = false;
         a->bridge = bridge != 0;
         a->speed = (float)number(w, a->speed);
@@ -126,6 +179,8 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
         a->short_radius = (float)number(w, a->short_radius);
         a->start_distance = (float)number(w, a->start_distance);
         a->turn_radius = (float)number(w, a->turn_radius);
+        if (a->shape == WATERFRONT_ROUTE_OPEN_PATH)
+            open_path_wire(w, &a->open_path);
     }
 }
 

@@ -8,7 +8,7 @@
 #include "plugins/boat_plugin_decode.h"
 #include "plugins/boat_plugin_revision.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535441u // PSTA: tours (ordered stops with captions).
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535442u // PSTB: tours and bounded OPEN_PATH traffic.
 
 typedef struct {
     BoatPluginKind kind;

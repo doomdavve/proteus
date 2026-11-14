@@ -1,5 +1,7 @@
 #include "plugins/boat_plugin_lua.h"
 
+#include "core/boat_clock.h"
+
 #include "lauxlib.h"
 #include "lua.h"
 #include "lualib.h"
@@ -254,7 +256,7 @@ static const char *const FLOCK[] = { "id", "recipe", "x", "z", "count", "seed", 
     "height", "rate", "cues", NULL };
 static const char *const CUE[] = { "kind", "start", "stop", "fade", "amplitude", NULL };
 static const char *const VESSEL[]
-    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", NULL };
+    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", "pieces", "loop", NULL };
 static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[]
@@ -795,6 +797,122 @@ static bool scene_stops(
 
 // L3.2: a present vessel list replaces all travelling craft. Entries either retain a
 // registered native actor or select a registered route and override its timetable.
+static bool open_ticks(lua_State *L, Vm *vm, int table, const char *path, const char *key,
+    unsigned minimum, uint64_t *out)
+{
+    char at[64];
+    int type = field(L, table, key, path, at);
+    if (type != LUA_TNUMBER || !lua_isinteger(L, -1))
+        return reject(vm, at, "must be an integer number of ticks");
+    lua_Integer value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    if (value < (lua_Integer)minimum || value > 21600)
+        return reject(vm, at, "must be %u..21600 ticks", minimum);
+    ++vm->fields;
+    *out = (uint64_t)value;
+    return true;
+}
+
+static bool scene_open_path(
+    lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *actor)
+{
+    static const char *const vessel_keys[] = { "id", "recipe", "route", "pieces", "loop", NULL };
+    static const char *const line_keys[] = { "kind", "x0", "z0", "x1", "z1", "ticks", "dwell",
+        "max_speed", "max_acceleration", NULL };
+    static const char *const arc_keys[] = { "kind", "x", "z", "radius", "start_angle", "sweep",
+        "ticks", "dwell", "max_speed", "max_acceleration", NULL };
+    if (!only(L, vm, entry, path, vessel_keys))
+        return false;
+    char at[64];
+    int loop_type = field(L, entry, "loop", path, at);
+    if (loop_type != LUA_TNIL && loop_type != LUA_TBOOLEAN)
+        return reject(vm, at, "must be a boolean");
+    actor->open_path.loop = loop_type == LUA_TBOOLEAN && lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    int type = field(L, entry, "pieces", path, at);
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a list of route pieces");
+    int list = lua_absindex(L, -1);
+    lua_Unsigned count = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > count)
+            return reject(vm, at, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != count || count < 1 || count > BOAT_ROUTE_PATH_PIECES)
+        return reject(vm, at, "must contain 1..%d route pieces", BOAT_ROUTE_PATH_PIECES);
+    actor->open_path.count = (unsigned)count;
+    for (unsigned i = 0; i < count; ++i) {
+        char part_path[64], kind[16];
+        element(part_path, sizeof(part_path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (!lua_istable(L, -1))
+            return reject(vm, part_path, "must be a table");
+        int table = lua_absindex(L, -1);
+        if (!string(L, vm, table, part_path, "kind", kind, sizeof(kind)))
+            return false;
+        bool line = !strcmp(kind, "line");
+        if (!line && strcmp(kind, "arc"))
+            return reject(vm, part_path, "kind must be line or arc");
+        if (!only(L, vm, table, part_path, line ? line_keys : arc_keys))
+            return false;
+        BoatRoutePathPiece *p = &actor->open_path.pieces[i];
+        uint64_t ticks;
+        double speed, acceleration;
+        if (!open_ticks(L, vm, table, part_path, "ticks", 1, &ticks)
+            || !open_ticks(L, vm, table, part_path, "dwell", 0, &p->dwell_ticks)
+            || !number(L, vm, table, part_path, "max_speed", &speed)
+            || !number(L, vm, table, part_path, "max_acceleration", &acceleration))
+            return false;
+        if (line) {
+            BoatRouteLeg *l = &p->shape.line;
+            p->kind = BOAT_ROUTE_PATH_LINE;
+            l->duration_ticks = ticks;
+            l->tick_seconds = BOAT_TICK_SECONDS;
+            l->max_speed = speed;
+            l->max_acceleration = acceleration;
+            if (!number(L, vm, table, part_path, "x0", &l->start_x)
+                || !number(L, vm, table, part_path, "z0", &l->start_z)
+                || !number(L, vm, table, part_path, "x1", &l->end_x)
+                || !number(L, vm, table, part_path, "z1", &l->end_z))
+                return false;
+        } else {
+            BoatRouteArc *a = &p->shape.arc;
+            p->kind = BOAT_ROUTE_PATH_ARC;
+            a->duration_ticks = ticks;
+            a->tick_seconds = BOAT_TICK_SECONDS;
+            a->max_speed = speed;
+            a->max_acceleration = acceleration;
+            if (!number(L, vm, table, part_path, "x", &a->centre_x)
+                || !number(L, vm, table, part_path, "z", &a->centre_z)
+                || !number(L, vm, table, part_path, "radius", &a->radius)
+                || !number(L, vm, table, part_path, "start_angle", &a->start_angle)
+                || !number(L, vm, table, part_path, "sweep", &a->sweep))
+                return false;
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    uint64_t total;
+    if (!boat_route_path_validate(&actor->open_path, &total))
+        return reject(vm, at, "contains invalid, disconnected or excessive route pieces");
+    for (unsigned i = 0; i < actor->open_path.count; ++i) {
+        const BoatRoutePathPiece *p = &actor->open_path.pieces[i];
+        double speed
+            = p->kind == BOAT_ROUTE_PATH_LINE ? p->shape.line.max_speed : p->shape.arc.max_speed;
+        if (speed > 40)
+            return reject(vm, at, "piece speed bounds must not exceed 40 m/s");
+        actor->speed = fmaxf(actor->speed, (float)speed);
+    }
+    actor->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    actor->retain = 0xff;
+    actor->period = (double)total * BOAT_TICK_SECONDS;
+    return true;
+}
+
 static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
 {
     char at[64];
@@ -870,8 +988,24 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
             join(route_path, sizeof(route_path), path, "route");
             join(recipe_path, sizeof(recipe_path), path, "recipe");
             if (!string(L, vm, entry, path, "route", route, sizeof(route))
-                || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe))
-                || !number(L, vm, entry, path, "speed", &speed)
+                || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe)))
+                return false;
+            if (!strcmp(route, "open")) {
+                WaterfrontCraftRecipe r;
+                if (!waterfront_route_recipe_from_name(recipe, &r))
+                    return reject(vm, recipe_path, "is not a registered craft recipe");
+                if (!scene_open_path(L, vm, entry, path, v))
+                    return false;
+                v->recipe = (unsigned char)r;
+                memcpy(v->id, id, sizeof(id));
+                lua_pop(L, 1);
+                continue;
+            }
+            if (!only(L, vm, entry, path,
+                    (const char *const[]) {
+                        "id", "recipe", "route", "speed", "phase", "period", "stops", NULL }))
+                return false;
+            if (!number(L, vm, entry, path, "speed", &speed)
                 || !number(L, vm, entry, path, "phase", &phase)
                 || !number(L, vm, entry, path, "period", &period))
                 return false;

@@ -1,5 +1,6 @@
 #include "core/waterfront_route.h"
 
+#include "core/boat_clock.h"
 #include "core/waterfront_upstream.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -46,52 +47,89 @@ typedef struct {
 
 static const CompiledActor compiled[WATERFRONT_ROUTE_ACTORS] = {
     // Four river craft. The dock circuit's two lanes have 130 m straights and 14 m turns.
-    { .shape = WATERFRONT_ROUTE_DOCK_CIRCUIT, .recipe = WATERFRONT_CRAFT_RUNABOUT, .speed = 2.2f,
-        .phase = 70, .period = (260 + 28 * (double)PI) / 2.2, .start_distance = 70,
+    { .shape = WATERFRONT_ROUTE_DOCK_CIRCUIT,
+        .recipe = WATERFRONT_CRAFT_RUNABOUT,
+        .speed = 2.2f,
+        .phase = 70,
+        .period = (260 + 28 * (double)PI) / 2.2,
+        .start_distance = 70,
         .turn_radius = 14 },
-    { .shape = WATERFRONT_ROUTE_ELLIPSE, .recipe = WATERFRONT_CRAFT_CRUISER, .period = 260,
-        .phase = -PI / 2, .origin_x = 50, .origin_z = -290, .long_radius = 210,
+    { .shape = WATERFRONT_ROUTE_ELLIPSE,
+        .recipe = WATERFRONT_CRAFT_CRUISER,
+        .period = 260,
+        .phase = -PI / 2,
+        .origin_x = 50,
+        .origin_z = -290,
+        .long_radius = 210,
         .short_radius = 28 },
-    { .shape = WATERFRONT_ROUTE_ELLIPSE, .recipe = WATERFRONT_CRAFT_SAILBOAT, .period = 260,
-        .phase = PI / 2, .origin_x = 50, .origin_z = -290, .long_radius = 210,
+    { .shape = WATERFRONT_ROUTE_ELLIPSE,
+        .recipe = WATERFRONT_CRAFT_SAILBOAT,
+        .period = 260,
+        .phase = PI / 2,
+        .origin_x = 50,
+        .origin_z = -290,
+        .long_radius = 210,
         .short_radius = 28 },
-    { .shape = WATERFRONT_ROUTE_ELLIPSE, .recipe = WATERFRONT_CRAFT_FERRY, .period = 320,
-        .phase = -PI / 2, .origin_x = 50, .origin_z = -290, .long_radius = 300,
+    { .shape = WATERFRONT_ROUTE_ELLIPSE,
+        .recipe = WATERFRONT_CRAFT_FERRY,
+        .period = 320,
+        .phase = -PI / 2,
+        .origin_x = 50,
+        .origin_z = -290,
+        .long_radius = 300,
         .short_radius = 65 },
     // Outer upstream service: two Älvsnabben loops half a timetable apart, one Frihamnen
     // ferry, and the schooner that schedules the Hisingsbron lift.
-    { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_ALVSNABBEN, .speed = 6,
-        .accel = 20, .phase = 0, .period = WATERFRONT_UPSTREAM_PERIOD, .point_count = 14,
-        .stop_count = 3, .points
-        = { { 2640, 800, 60 }, { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 },
+    { .shape = WATERFRONT_ROUTE_POINTS,
+        .recipe = WATERFRONT_CRAFT_ALVSNABBEN,
+        .speed = 6,
+        .accel = 20,
+        .phase = 0,
+        .period = WATERFRONT_UPSTREAM_PERIOD,
+        .point_count = 14,
+        .stop_count = 3,
+        .points = { { 2640, 800, 60 }, { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 },
             { 2700, 1060, 70 }, { 2041.8f, 831.8f, 60 }, { 1898.8f, 766.8f, 60 },
             { 1600, 560, 150 }, { 1000, 485, 150 }, { 473, 418.2f, 60 }, { 357, 334.2f, 60 },
             { 275, 215, 60 }, { 340, 105, 70 }, { 900, 330, 150 }, { 2000, 640, 200 } },
-        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 },
-            { "eriksberg", 8, -1 } } },
-    { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_ALVSNABBEN, .speed = 6,
-        .accel = 20, .phase = WATERFRONT_UPSTREAM_PERIOD / 2, .period = WATERFRONT_UPSTREAM_PERIOD,
-        .point_count = 14, .stop_count = 3, .points
-        = { { 2640, 800, 60 }, { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 },
+        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 }, { "eriksberg", 8, -1 } } },
+    { .shape = WATERFRONT_ROUTE_POINTS,
+        .recipe = WATERFRONT_CRAFT_ALVSNABBEN,
+        .speed = 6,
+        .accel = 20,
+        .phase = WATERFRONT_UPSTREAM_PERIOD / 2,
+        .period = WATERFRONT_UPSTREAM_PERIOD,
+        .point_count = 14,
+        .stop_count = 3,
+        .points = { { 2640, 800, 60 }, { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 },
             { 2700, 1060, 70 }, { 2041.8f, 831.8f, 60 }, { 1898.8f, 766.8f, 60 },
             { 1600, 560, 150 }, { 1000, 485, 150 }, { 473, 418.2f, 60 }, { 357, 334.2f, 60 },
             { 275, 215, 60 }, { 340, 105, 70 }, { 900, 330, 150 }, { 2000, 640, 200 } },
-        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 },
-            { "eriksberg", 8, -1 } } },
-    { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_FRIHAMNEN, .speed = 4.5f,
-        .accel = 18, .phase = 300, .period = WATERFRONT_UPSTREAM_PERIOD, .point_count = 9,
-        .stop_count = 2, .points
-        = { { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 }, { 2690, 1200, 60 },
+        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 }, { "eriksberg", 8, -1 } } },
+    { .shape = WATERFRONT_ROUTE_POINTS,
+        .recipe = WATERFRONT_CRAFT_FRIHAMNEN,
+        .speed = 4.5f,
+        .accel = 18,
+        .phase = 300,
+        .period = WATERFRONT_UPSTREAM_PERIOD,
+        .point_count = 9,
+        .stop_count = 2,
+        .points = { { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 }, { 2690, 1200, 60 },
             { 2714, 1346, 40 }, { 2541.9f, 1420.6f, 35 }, { 2565, 1530, 35 }, { 2760, 1420, 60 },
             { 2700, 1100, 80 }, { 2675, 775, 40 } },
         .stops = { { "stenpiren", 0, -1 }, { "frihamnen", 3, -1 } } },
-    { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_SCHOONER, .bridge = true,
-        .speed = 0, .accel = 0, .phase = 0, .period = WATERFRONT_UPSTREAM_PERIOD,
-        .point_count = 12, .points
-        = { { 2590, 870, 60 }, { 2880, 1180, 200 }, { 3200, 1600, 200 },
-            { 3513.1f, 1949.8f, 300 }, { 3700, 2080, 80 }, { 3990, 2185, 42 },
-            { 3955, 2265, 42 }, { 3700, 2160, 80 }, { 3499.7f, 1969.6f, 300 },
-            { 3160, 1640, 200 }, { 2840, 1240, 200 }, { 2510, 1010, 60 } } },
+    { .shape = WATERFRONT_ROUTE_POINTS,
+        .recipe = WATERFRONT_CRAFT_SCHOONER,
+        .bridge = true,
+        .speed = 0,
+        .accel = 0,
+        .phase = 0,
+        .period = WATERFRONT_UPSTREAM_PERIOD,
+        .point_count = 12,
+        .points = { { 2590, 870, 60 }, { 2880, 1180, 200 }, { 3200, 1600, 200 },
+            { 3513.1f, 1949.8f, 300 }, { 3700, 2080, 80 }, { 3990, 2185, 42 }, { 3955, 2265, 42 },
+            { 3700, 2160, 80 }, { 3499.7f, 1969.6f, 300 }, { 3160, 1640, 200 }, { 2840, 1240, 200 },
+            { 2510, 1010, 60 } } },
 };
 
 static WaterfrontRouteDefinition defaults;
@@ -113,7 +151,7 @@ static BoatModel recipe_models[WATERFRONT_CRAFT_RECIPES];
 static bool recipe_models_ready;
 
 static const char *const shape_names[WATERFRONT_ROUTE_SHAPES]
-    = { "dock_circuit", "ellipse", "points" };
+    = { "dock_circuit", "ellipse", "points", "open_leg", "open_path" };
 static const char *const recipe_names[WATERFRONT_CRAFT_RECIPES] = { "runabout", "cruiser",
     "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner", "workboat" };
 
@@ -150,11 +188,21 @@ static void set_id(char *destination, size_t size, const char *source)
 
 static void copy_actor(WaterfrontRouteActor *out, const CompiledActor *in)
 {
-    *out = (WaterfrontRouteActor) { .shape = in->shape, .recipe = in->recipe, .retain = 0xff,
-        .bridge = in->bridge, .speed = in->speed, .accel = in->accel, .phase = in->phase,
-        .period = in->period, .point_count = in->point_count, .stop_count = in->stop_count,
-        .origin_x = in->origin_x, .origin_z = in->origin_z, .long_radius = in->long_radius,
-        .short_radius = in->short_radius, .start_distance = in->start_distance,
+    *out = (WaterfrontRouteActor) { .shape = in->shape,
+        .recipe = in->recipe,
+        .retain = 0xff,
+        .bridge = in->bridge,
+        .speed = in->speed,
+        .accel = in->accel,
+        .phase = in->phase,
+        .period = in->period,
+        .point_count = in->point_count,
+        .stop_count = in->stop_count,
+        .origin_x = in->origin_x,
+        .origin_z = in->origin_z,
+        .long_radius = in->long_radius,
+        .short_radius = in->short_radius,
+        .start_distance = in->start_distance,
         .turn_radius = in->turn_radius };
     for (unsigned i = 0; i < in->point_count; ++i)
         out->points[i] = in->points[i];
@@ -167,8 +215,8 @@ const WaterfrontRouteDefinition *waterfront_route_defaults(void)
     if (!defaults_ready) {
         defaults.actor_count = WATERFRONT_ROUTE_ACTORS;
         static const char *const ids[WATERFRONT_ROUTE_ACTORS]
-            = { "river_runabout", "river_cruiser", "river_sailboat", "river_ferry",
-                "alvsnabben_a", "alvsnabben_b", "frihamnen", "schooner" };
+            = { "river_runabout", "river_cruiser", "river_sailboat", "river_ferry", "alvsnabben_a",
+                  "alvsnabben_b", "frihamnen", "schooner" };
         for (unsigned i = 0; i < WATERFRONT_ROUTE_ACTORS; ++i) {
             copy_actor(&defaults.actors[i], &compiled[i]);
             set_id(defaults.actors[i].id, sizeof(defaults.actors[i].id), ids[i]);
@@ -189,8 +237,7 @@ static bool finite_in(float value, float low, float high)
     return isfinite(value) && value >= low && value <= high;
 }
 
-static void fail(
-    WaterfrontRouteDiagnostic *d, const char *field, const char *message)
+static void fail(WaterfrontRouteDiagnostic *d, const char *field, const char *message)
 {
     if (!d)
         return;
@@ -238,15 +285,14 @@ static bool identifier(const char *text)
     return true;
 }
 
-static bool build(Route *route, const WaterfrontRouteActor *actor,
-    WaterfrontRouteDiagnostic *diagnostic)
+static bool build(
+    Route *route, const WaterfrontRouteActor *actor, WaterfrontRouteDiagnostic *diagnostic)
 {
     *route = (Route) { 0 };
     int n = (int)actor->point_count;
     Vector2 enter[WATERFRONT_ROUTE_POINT_CAPACITY], leave[WATERFRONT_ROUTE_POINT_CAPACITY];
     for (int i = 0; i < n; ++i) {
-        const WaterfrontRoutePoint *a = &actor->points[(i + n - 1) % n],
-                                   *p = &actor->points[i],
+        const WaterfrontRoutePoint *a = &actor->points[(i + n - 1) % n], *p = &actor->points[i],
                                    *b = &actor->points[(i + 1) % n];
         Vector2 to_p = { p->x - a->x, p->z - a->z }, to_b = { b->x - p->x, b->z - p->z };
         float before = Vector2Length(to_p), after = Vector2Length(to_b);
@@ -271,10 +317,12 @@ static bool build(Route *route, const WaterfrontRouteActor *actor,
         Vector2 centre
             = { enter[i].x - d0.y * p->radius * side, enter[i].y + d0.x * p->radius * side };
         route->pieces[route->piece_count++].arc = true;
-        route->pieces[route->piece_count - 1] = (Piece) { .arc = true, .centre = centre,
+        route->pieces[route->piece_count - 1] = (Piece) { .arc = true,
+            .centre = centre,
             .radius = p->radius,
             .angle = atan2f(enter[i].y - centre.y, enter[i].x - centre.x),
-            .turn = turn, .length = p->radius * fabsf(turn) };
+            .turn = turn,
+            .length = p->radius * fabsf(turn) };
         route->pieces[route->piece_count++].arc = false; // The line after it, below.
     }
     float line_middle[WATERFRONT_ROUTE_POINT_CAPACITY], s = 0;
@@ -286,7 +334,8 @@ static bool build(Route *route, const WaterfrontRouteActor *actor,
             return false;
         }
         route->pieces[2 * i + 1] = (Piece) { .start = a,
-            .direction = Vector2Scale(Vector2Subtract(b, a), 1 / length), .length = length };
+            .direction = Vector2Scale(Vector2Subtract(b, a), 1 / length),
+            .length = length };
         s += route->pieces[2 * i].length;
         line_middle[i] = s + length * .5f;
         s += length;
@@ -355,8 +404,28 @@ static bool build(Route *route, const WaterfrontRouteActor *actor,
     return true;
 }
 
-static const char *const preset_names[] = { "river_runabout", "river_cruiser",
-    "river_sailboat", "river_ferry", "alvsnabben", "frihamnen", "schooner", "marina_pass" };
+static const char *const preset_names[] = { "river_runabout", "river_cruiser", "river_sailboat",
+    "river_ferry", "alvsnabben", "frihamnen", "schooner", "marina_pass" };
+
+bool waterfront_route_stop_ramps_separate(const WaterfrontRouteActor *actor)
+{
+    if (!actor || actor->shape != WATERFRONT_ROUTE_POINTS || !actor->stop_count
+        || actor->stop_count > WATERFRONT_ROUTE_STOPS || actor->point_count < 3
+        || actor->point_count > WATERFRONT_ROUTE_POINT_CAPACITY || !isfinite(actor->speed)
+        || actor->speed <= 0 || !isfinite(actor->accel) || actor->accel < 0)
+        return false;
+    Route route;
+    if (!build(&route, actor, NULL))
+        return false;
+    for (int i = 0; i < route.stop_count; ++i) {
+        // Match the float quotient in travel()'s native duration calculation.
+        // Overlap would switch directly between different ramp positions.
+        float cruise_seconds = route.legs[i] / route.speed;
+        if (!isfinite(cruise_seconds) || cruise_seconds < actor->accel)
+            return false;
+    }
+    return true;
+}
 
 unsigned waterfront_route_preset_count(void)
 {
@@ -377,9 +446,12 @@ bool waterfront_route_preset(const char *id, WaterfrontRouteActor *actor)
             break;
     if (!strcmp(id, "marina_pass")) {
         *actor = (WaterfrontRouteActor) { .shape = WATERFRONT_ROUTE_POINTS,
-            .recipe = WATERFRONT_CRAFT_RUNABOUT, .retain = 0xff, .speed = 0, .period = 1,
-            .point_count = 4, .points = { { -20, 184, 5 }, { 20, 184, 5 }, { 20, 198, 5 },
-                { -20, 198, 5 } } };
+            .recipe = WATERFRONT_CRAFT_RUNABOUT,
+            .retain = 0xff,
+            .speed = 0,
+            .period = 1,
+            .point_count = 4,
+            .points = { { -20, 184, 5 }, { 20, 184, 5 }, { 20, 198, 5 }, { -20, 198, 5 } } };
         set_id(actor->id, sizeof(actor->id), "marina_pass");
         Route route;
         if (!build(&route, actor, NULL))
@@ -475,6 +547,24 @@ static uint64_t fold_float(uint64_t hash, float value)
     return fold(hash, bytes, sizeof(bytes));
 }
 
+static uint64_t fold_double(uint64_t hash, double value)
+{
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    unsigned char bytes[8] = { (unsigned char)bits, (unsigned char)(bits >> 8),
+        (unsigned char)(bits >> 16), (unsigned char)(bits >> 24), (unsigned char)(bits >> 32),
+        (unsigned char)(bits >> 40), (unsigned char)(bits >> 48), (unsigned char)(bits >> 56) };
+    return fold(hash, bytes, sizeof(bytes));
+}
+
+static uint64_t fold_u64(uint64_t hash, uint64_t value)
+{
+    unsigned char bytes[8];
+    for (unsigned i = 0; i < 8; ++i)
+        bytes[i] = (unsigned char)(value >> (i * 8));
+    return fold(hash, bytes, sizeof(bytes));
+}
+
 uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
 {
     uint64_t hash = 14695981039346656037ull;
@@ -510,6 +600,51 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
         hash = fold_float(hash, a->short_radius);
         hash = fold_float(hash, a->start_distance);
         hash = fold_float(hash, a->turn_radius);
+        if (a->shape == WATERFRONT_ROUTE_OPEN_LEG) {
+            hash = fold_double(hash, a->open_leg.start_x);
+            hash = fold_double(hash, a->open_leg.start_z);
+            hash = fold_double(hash, a->open_leg.end_x);
+            hash = fold_double(hash, a->open_leg.end_z);
+            uint64_t ticks = a->open_leg.duration_ticks;
+            unsigned char bytes[8];
+            for (unsigned byte = 0; byte < 8; ++byte)
+                bytes[byte] = (unsigned char)(ticks >> (byte * 8));
+            hash = fold(hash, bytes, sizeof(bytes));
+            hash = fold_double(hash, a->open_leg.tick_seconds);
+            hash = fold_double(hash, a->open_leg.max_speed);
+            hash = fold_double(hash, a->open_leg.max_acceleration);
+        }
+        if (a->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            hash = fold_u64(hash, a->open_path.count);
+            hash = fold_u64(hash, a->open_path.loop);
+            for (unsigned p = 0; p < a->open_path.count && p < BOAT_ROUTE_PATH_PIECES; ++p) {
+                const BoatRoutePathPiece *part = &a->open_path.pieces[p];
+                hash = fold_u64(hash, part->kind);
+                hash = fold_u64(hash, part->dwell_ticks);
+                if (part->kind == BOAT_ROUTE_PATH_LINE) {
+                    const BoatRouteLeg *l = &part->shape.line;
+                    hash = fold_double(hash, l->start_x);
+                    hash = fold_double(hash, l->start_z);
+                    hash = fold_double(hash, l->end_x);
+                    hash = fold_double(hash, l->end_z);
+                    hash = fold_u64(hash, l->duration_ticks);
+                    hash = fold_double(hash, l->tick_seconds);
+                    hash = fold_double(hash, l->max_speed);
+                    hash = fold_double(hash, l->max_acceleration);
+                } else if (part->kind == BOAT_ROUTE_PATH_ARC) {
+                    const BoatRouteArc *r = &part->shape.arc;
+                    hash = fold_double(hash, r->centre_x);
+                    hash = fold_double(hash, r->centre_z);
+                    hash = fold_double(hash, r->radius);
+                    hash = fold_double(hash, r->start_angle);
+                    hash = fold_double(hash, r->sweep);
+                    hash = fold_u64(hash, r->duration_ticks);
+                    hash = fold_double(hash, r->tick_seconds);
+                    hash = fold_double(hash, r->max_speed);
+                    hash = fold_double(hash, r->max_acceleration);
+                }
+            }
+        }
     }
     return hash;
 }
@@ -547,8 +682,7 @@ static const WaterfrontRouteActor *actor_at(
     return &routes->actors[index];
 }
 
-static const WaterfrontRouteDefinition *definition(
-    const WaterfrontRouteDefinition *routes)
+static const WaterfrontRouteDefinition *definition(const WaterfrontRouteDefinition *routes)
 {
     return routes ? routes : waterfront_route_defaults();
 }
@@ -583,10 +717,10 @@ static void prepare(const WaterfrontRouteDefinition *routes)
         for (float s = 0; s < r->total && found < 2; s += step) {
             Vector2 a = sample(r, s, &tangent, &curvature);
             Vector2 b = sample(r, s + step, &tangent, &curvature);
-            Vector2 da = { a.x - WATERFRONT_HISINGSBRON_NORTH.x,
-                a.y - WATERFRONT_HISINGSBRON_NORTH.y };
-            Vector2 db = { b.x - WATERFRONT_HISINGSBRON_NORTH.x,
-                b.y - WATERFRONT_HISINGSBRON_NORTH.y };
+            Vector2 da
+                = { a.x - WATERFRONT_HISINGSBRON_NORTH.x, a.y - WATERFRONT_HISINGSBRON_NORTH.y };
+            Vector2 db
+                = { b.x - WATERFRONT_HISINGSBRON_NORTH.x, b.y - WATERFRONT_HISINGSBRON_NORTH.y };
             float across_a = axis.x * da.y - axis.y * da.x;
             float across_b = axis.x * db.y - axis.y * db.x;
             if ((across_a < 0) == (across_b < 0))
@@ -604,13 +738,12 @@ static void prepare(const WaterfrontRouteDefinition *routes)
                     high = mid;
             }
             double station = (low + high) * .5 / r->speed - actor->phase;
-            crossings[crossing_count].time
-                = (float)wrapped(station, actor->period);
+            crossings[crossing_count].time = (float)wrapped(station, actor->period);
             crossings[crossing_count].period = actor->period;
             crossings[crossing_count].actor = i;
             Vector2 p = sample(r, (float)((low + high) * .5), &tangent, &curvature);
-            Vector2 d = { p.x - WATERFRONT_HISINGSBRON_NORTH.x,
-                p.y - WATERFRONT_HISINGSBRON_NORTH.y };
+            Vector2 d
+                = { p.x - WATERFRONT_HISINGSBRON_NORTH.x, p.y - WATERFRONT_HISINGSBRON_NORTH.y };
             crossings[crossing_count].along = axis.x * d.x + axis.y * d.y;
             ++crossing_count;
             ++found;
@@ -629,10 +762,14 @@ static BoatModelSpec recipe_spec(unsigned recipe, bool orange_runabout)
             spec.trim = (Color) { 242, 227, 196, 255 };
         }
         return spec;
-    case WATERFRONT_CRAFT_CRUISER: return boat_model_preset(BOAT_MODEL_CRUISER);
-    case WATERFRONT_CRAFT_SAILBOAT: return boat_model_preset(BOAT_MODEL_SAILBOAT);
-    case WATERFRONT_CRAFT_FERRY: return boat_model_preset(BOAT_MODEL_FERRY);
-    case WATERFRONT_CRAFT_WORKBOAT: return boat_model_preset(BOAT_MODEL_WORKBOAT);
+    case WATERFRONT_CRAFT_CRUISER:
+        return boat_model_preset(BOAT_MODEL_CRUISER);
+    case WATERFRONT_CRAFT_SAILBOAT:
+        return boat_model_preset(BOAT_MODEL_SAILBOAT);
+    case WATERFRONT_CRAFT_FERRY:
+        return boat_model_preset(BOAT_MODEL_FERRY);
+    case WATERFRONT_CRAFT_WORKBOAT:
+        return boat_model_preset(BOAT_MODEL_WORKBOAT);
     case WATERFRONT_CRAFT_ALVSNABBEN:
         spec = boat_model_preset(BOAT_MODEL_FERRY);
         spec.hull = (Color) { 236, 234, 226, 255 };
@@ -671,7 +808,8 @@ static BoatModelSpec recipe_spec(unsigned recipe, bool orange_runabout)
         spec.deck = (Color) { 184, 147, 98, 255 };
         spec.trim = (Color) { 232, 224, 204, 255 };
         return spec;
-    default: return (BoatModelSpec) { 0 };
+    default:
+        return (BoatModelSpec) { 0 };
     }
 }
 
@@ -732,9 +870,8 @@ const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int
         if (count > WATERFRONT_ROUTE_ACTORS)
             count = WATERFRONT_ROUTE_ACTORS;
         for (unsigned i = 0; i < count; ++i) {
-            WaterfrontCraftRecipe recipe
-                = routes ? (WaterfrontCraftRecipe)routes->actors[i].recipe
-                         : (WaterfrontCraftRecipe)compiled[i].recipe;
+            WaterfrontCraftRecipe recipe = routes ? (WaterfrontCraftRecipe)routes->actors[i].recipe
+                                                  : (WaterfrontCraftRecipe)compiled[i].recipe;
             if (recipe == WATERFRONT_CRAFT_SCHOONER)
                 build_schooner(&models[i]);
             else
@@ -778,16 +915,14 @@ WaterfrontVesselMotion waterfront_route_motion(
         return out;
     Vector2 p, v, a = { 0 };
     if (actor->shape == WATERFRONT_ROUTE_DOCK_CIRCUIT) {
-        double distance
-            = wrapped(time * actor->speed + actor->phase, actor->period * actor->speed);
+        double distance = wrapped(time * actor->speed + actor->phase, actor->period * actor->speed);
         float arc = actor->turn_radius * PI;
         if (distance < 130) {
             p = (Vector2) { 2, -45 + (float)distance };
             v = (Vector2) { 0, actor->speed };
         } else if (distance < 130 + arc) {
             float u = ((float)distance - 130) / actor->turn_radius;
-            p = (Vector2) { 16 - actor->turn_radius * cosf(u),
-                85 + actor->turn_radius * sinf(u) };
+            p = (Vector2) { 16 - actor->turn_radius * cosf(u), 85 + actor->turn_radius * sinf(u) };
             v = (Vector2) { actor->speed * sinf(u), actor->speed * cosf(u) };
             a = (Vector2) { actor->speed * actor->speed / actor->turn_radius * cosf(u),
                 -actor->speed * actor->speed / actor->turn_radius * sinf(u) };
@@ -796,8 +931,7 @@ WaterfrontVesselMotion waterfront_route_motion(
             v = (Vector2) { 0, -actor->speed };
         } else {
             float u = ((float)distance - 260 - arc) / actor->turn_radius;
-            p = (Vector2) { 16 + actor->turn_radius * cosf(u),
-                -45 - actor->turn_radius * sinf(u) };
+            p = (Vector2) { 16 + actor->turn_radius * cosf(u), -45 - actor->turn_radius * sinf(u) };
             v = (Vector2) { -actor->speed * sinf(u), -actor->speed * cosf(u) };
             a = (Vector2) { -actor->speed * actor->speed / actor->turn_radius * cosf(u),
                 actor->speed * actor->speed / actor->turn_radius * sinf(u) };
@@ -809,19 +943,52 @@ WaterfrontVesselMotion waterfront_route_motion(
         Vector2 local = { actor->long_radius * cosf(u), actor->short_radius * sinf(u) };
         Vector2 first = { -actor->long_radius * sinf(u) * (float)rate,
             actor->short_radius * cosf(u) * (float)rate };
-        Vector2 second
-            = { -local.x * (float)(rate * rate), -local.y * (float)(rate * rate) };
+        Vector2 second = { -local.x * (float)(rate * rate), -local.y * (float)(rate * rate) };
         p = Vector2Add((Vector2) { actor->origin_x, actor->origin_z },
             Vector2Add(Vector2Scale(along, local.x), Vector2Scale(across, local.y)));
         v = Vector2Add(Vector2Scale(along, first.x), Vector2Scale(across, first.y));
         a = Vector2Add(Vector2Scale(along, second.x), Vector2Scale(across, second.y));
+    } else if (actor->shape == WATERFRONT_ROUTE_OPEN_LEG
+        || actor->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+        const BoatRouteLeg *leg = &actor->open_leg;
+        uint64_t duration;
+        if (actor->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            if (!boat_route_path_validate(&actor->open_path, &duration))
+                return out;
+        } else
+            duration = leg->duration_ticks;
+        // Clamp in seconds before converting, so a huge finite time cannot overflow the tick
+        // product and a negative time resolves to the start tick.
+        uint64_t tick = 0;
+        bool loop = actor->shape == WATERFRONT_ROUTE_OPEN_PATH && actor->open_path.loop;
+        if (loop || time > 0) {
+            double sample_time = loop ? wrapped(time, actor->period) : time;
+            double scaled = sample_time * (double)BOAT_TICK_HZ;
+            if (!isfinite(scaled) || scaled >= (double)duration)
+                tick = duration;
+            else
+                // Converting tick / 120 back to ticks can round one ULP below the integer.
+                tick = (uint64_t)floor(nextafter(scaled, INFINITY));
+        }
+        BoatRoutePose pose;
+        double yaw_rate = 0;
+        if (!(actor->shape == WATERFRONT_ROUTE_OPEN_PATH
+                    ? boat_route_path_evaluate(&actor->open_path, tick, &pose, &yaw_rate)
+                    : boat_route_leg_evaluate(leg, tick, &pose)))
+            return out;
+        float heading = (float)pose.heading;
+        float speed = (float)pose.speed;
+        out.position = (Vector3) { (float)-pose.x, 0, (float)pose.z };
+        out.velocity = (Vector3) { -sinf(heading) * speed, 0, -cosf(heading) * speed };
+        out.heading = heading;
+        out.yaw_rate = (float)yaw_rate;
+        return out;
     } else {
         prepare(routes);
         const Route *route = &built_routes[index];
         float speed = 0, curvature = 0;
         Vector2 tangent;
-        float s = travel(
-            route, actor->accel, wrapped(time + actor->phase, actor->period), &speed);
+        float s = travel(route, actor->accel, wrapped(time + actor->phase, actor->period), &speed);
         p = sample(route, s, &tangent, &curvature);
         out.position = (Vector3) { p.x, 0, p.y };
         out.velocity = (Vector3) { tangent.x * speed, 0, tangent.y * speed };
@@ -836,8 +1003,8 @@ WaterfrontVesselMotion waterfront_route_motion(
     return out;
 }
 
-int waterfront_route_stops(const WaterfrontRouteDefinition *routes, int index, Vector2 *stops,
-    int capacity)
+int waterfront_route_stops(
+    const WaterfrontRouteDefinition *routes, int index, Vector2 *stops, int capacity)
 {
     bool compiled_actor = false;
     const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
@@ -851,8 +1018,8 @@ int waterfront_route_stops(const WaterfrontRouteDefinition *routes, int index, V
     return (int)actor->stop_count;
 }
 
-bool waterfront_route_stop_times(const WaterfrontRouteDefinition *routes, int index, int stop,
-    double *arrive, double *depart)
+bool waterfront_route_stop_times(
+    const WaterfrontRouteDefinition *routes, int index, int stop, double *arrive, double *depart)
 {
     bool compiled_actor = false;
     const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
@@ -892,8 +1059,8 @@ float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time
 }
 
 // Hull occupancy around crossing I, using the vessel's actual cruise speed and length.
-static bool bridge_window_at(const WaterfrontRouteDefinition *routes, int i,
-    WaterfrontBridgeWindow *window)
+static bool bridge_window_at(
+    const WaterfrontRouteDefinition *routes, int i, WaterfrontBridgeWindow *window)
 {
     const WaterfrontRouteDefinition *def = definition(routes);
     if (i < 0 || i >= crossing_count)
@@ -902,11 +1069,13 @@ static bool bridge_window_at(const WaterfrontRouteDefinition *routes, int i,
     if (actor >= def->actor_count || !def->actors[actor].bridge)
         return false;
     BoatModelSpec spec = waterfront_route_spec(def, (int)actor);
-    float cruise = def->actors[actor].speed > 0 ? def->actors[actor].speed
-                                                : built_routes[actor].speed;
+    float cruise
+        = def->actors[actor].speed > 0 ? def->actors[actor].speed : built_routes[actor].speed;
     double half = (spec.length * .5 + 1) / fmax(cruise, .1);
-    *window = (WaterfrontBridgeWindow) { .actor = actor, .crossing = crossings[i].time,
-        .entry = crossings[i].time - half, .leave = crossings[i].time + half };
+    *window = (WaterfrontBridgeWindow) { .actor = actor,
+        .crossing = crossings[i].time,
+        .entry = crossings[i].time - half,
+        .leave = crossings[i].time + half };
     return true;
 }
 
@@ -984,8 +1153,7 @@ bool waterfront_route_validate_bridge(const WaterfrontRouteDefinition *routes, f
         for (int c = 0; c < crossing_count; ++c)
             if (crossings[c].actor == w->actor) {
                 float station = crossings[c].along;
-                if (fabsf(station - (float)middle) + spec.length * .5f
-                    > (float)span_half) {
+                if (fabsf(station - (float)middle) + spec.length * .5f > (float)span_half) {
                     fail(diagnostic, path, "does not cross inside the Hisingsbron lift span");
                     return false;
                 }
@@ -1066,7 +1234,8 @@ bool waterfront_route_validate(
         }
         if (!finite_in(a->speed, 0, 40) || !finite_in(a->accel, 0, 120)
             || !finite_in(a->phase, -WATERFRONT_ROUTE_MAX_PERIOD, WATERFRONT_ROUTE_MAX_PERIOD)) {
-            fail(diagnostic, "scene.traffic.vessels", "has an invalid speed, acceleration or phase");
+            fail(
+                diagnostic, "scene.traffic.vessels", "has an invalid speed, acceleration or phase");
             return false;
         }
         if (a->stop_count > WATERFRONT_ROUTE_STOPS) {
@@ -1083,10 +1252,10 @@ bool waterfront_route_validate(
                 return false;
             }
             for (unsigned p = 0; p < a->point_count; ++p) {
-                if (!finite_in(a->points[p].x, -WATERFRONT_ROUTE_HALF_EXTENT,
-                        WATERFRONT_ROUTE_HALF_EXTENT)
-                    || !finite_in(a->points[p].z, -WATERFRONT_ROUTE_HALF_EXTENT,
-                        WATERFRONT_ROUTE_HALF_EXTENT)
+                if (!finite_in(
+                        a->points[p].x, -WATERFRONT_ROUTE_HALF_EXTENT, WATERFRONT_ROUTE_HALF_EXTENT)
+                    || !finite_in(
+                        a->points[p].z, -WATERFRONT_ROUTE_HALF_EXTENT, WATERFRONT_ROUTE_HALF_EXTENT)
                     || !finite_in(a->points[p].radius, 0, 5000)) {
                     fail(diagnostic, "scene.traffic.vessels", "has an invalid route point");
                     return false;
@@ -1118,10 +1287,9 @@ bool waterfront_route_validate(
             if (!build(&route, a, diagnostic))
                 return false;
         } else if (a->shape == WATERFRONT_ROUTE_ELLIPSE) {
-            if (!finite_in(a->origin_x, -WATERFRONT_ROUTE_HALF_EXTENT,
-                    WATERFRONT_ROUTE_HALF_EXTENT)
-                || !finite_in(a->origin_z, -WATERFRONT_ROUTE_HALF_EXTENT,
-                    WATERFRONT_ROUTE_HALF_EXTENT)
+            if (!finite_in(a->origin_x, -WATERFRONT_ROUTE_HALF_EXTENT, WATERFRONT_ROUTE_HALF_EXTENT)
+                || !finite_in(
+                    a->origin_z, -WATERFRONT_ROUTE_HALF_EXTENT, WATERFRONT_ROUTE_HALF_EXTENT)
                 || !finite_in(a->long_radius, 0, 5000) || !finite_in(a->short_radius, 0, 5000)
                 || a->stop_count) {
                 fail(diagnostic, "scene.traffic.vessels", "has an invalid ellipse route");
@@ -1130,9 +1298,28 @@ bool waterfront_route_validate(
         } else if (a->shape == WATERFRONT_ROUTE_DOCK_CIRCUIT) {
             float total = 260 + 2 * PI * a->turn_radius;
             if (!finite_in(a->turn_radius, .1f, 5000) || !finite_in(a->start_distance, -1e6f, 1e6f)
-                || a->stop_count || a->speed <= 0
-                || fabs(total / a->speed - a->period) > .02) {
+                || a->stop_count || a->speed <= 0 || fabs(total / a->speed - a->period) > .02) {
                 fail(diagnostic, "scene.traffic.vessels", "has an invalid dock circuit");
+                return false;
+            }
+        } else if (a->shape == WATERFRONT_ROUTE_OPEN_LEG) {
+            const BoatRouteLeg *leg = &a->open_leg;
+            double duration = (double)leg->duration_ticks * leg->tick_seconds;
+            bool period_matches = isfinite(duration) && duration > 0
+                && fabs(a->period - duration) <= 1e-6 * duration;
+            // Internal-only shape: only an independent, non-bridge actor may use it, at the
+            // shared simulation tick with no timetable phase offset or stops.
+            if (a->retain != 0xff || a->bridge || a->stop_count || !boat_route_leg_validate(leg)
+                || leg->tick_seconds != BOAT_TICK_SECONDS || a->phase != 0 || !period_matches) {
+                fail(diagnostic, "scene.traffic.vessels", "has an invalid open leg");
+                return false;
+            }
+        } else if (a->shape == WATERFRONT_ROUTE_OPEN_PATH) {
+            uint64_t ticks;
+            if (a->retain != 0xff || a->bridge || a->stop_count || a->phase != 0
+                || !boat_route_path_validate(&a->open_path, &ticks)
+                || fabs(a->period - (double)ticks * BOAT_TICK_SECONDS) > 1e-6 * a->period) {
+                fail(diagnostic, "scene.traffic.vessels", "has an invalid open path");
                 return false;
             }
         }

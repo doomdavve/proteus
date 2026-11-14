@@ -141,6 +141,18 @@ def schema():
              "workboat"]
     stop = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
                    "dwell": number(0, 86400, "seconds")})
+    timing = {"ticks": number(1, 21600, "120 Hz ticks", integer=True),
+              "dwell": number(0, 21600, "120 Hz ticks", integer=True),
+              "max_speed": {"type": "number", "exclusiveMinimum": 0, "maximum": 40},
+              "max_acceleration": {"type": "number", "exclusiveMinimum": 0}}
+    coordinate = number(-20000, 20000, "metres")
+    pieces = {"oneOf": [
+        record({"kind": {"const": "line"}, "x0": coordinate, "z0": coordinate,
+                "x1": coordinate, "z1": coordinate, **timing}),
+        record({"kind": {"const": "arc"}, "x": coordinate, "z": coordinate,
+                "radius": number(0, 20000, "metres"),
+                "start_angle": number(-math.tau, math.tau, "radians"),
+                "sweep": number(-math.pi, math.pi, "radians"), **timing})]}
     vessel = {"oneOf": [
         record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "retain": {"enum": routes},
                 "stops": sequence(stop, 0, 8)}),
@@ -148,7 +160,10 @@ def schema():
                 "route": {"enum": routes}, "speed": number(0, 40, "m/s"),
                 "phase": number(-86400, 86400, "seconds"),
                 "period": number(5, 86400, "seconds"),
-                "stops": sequence(stop, 0, 8)})]}
+                "stops": sequence(stop, 0, 8)}),
+        object_schema({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": craft},
+                       "route": {"const": "open"}, "pieces": sequence(pieces, 1, 4),
+                       "loop": {"type": "boolean"}}, required=("id", "recipe", "route", "pieces"))]}
     traffic = object_schema({"vessels": sequence(vessel, 0, 8)}, required=("vessels",))
     cue = object_schema({"kind": {"enum": ["feeding", "alarm"]},
                          "start": number(0, 0xffffffff, "120 Hz ticks", integer=True),
@@ -254,8 +269,9 @@ def schema():
                     "Gangways need a land anchor, floating target and perpendicular 2..20 m horizontal span",
                     "scene.traffic.vessels is 0..8; a present list replaces all travelling craft",
                     "Retain entries copy a compiled actor and may override its named stop dwells;",
-                    "authored entries select a registered route and recipe. Stop IDs must match",
-                    "the preset in order; omitted dwell shares the period remainder",
+                    "authored entries select a registered route or one bounded open path and recipe",
+                    "open paths have 1..4 tangent line/arc pieces, 120 Hz ticks and at most 180 s",
+                    "Stop IDs must match the preset in order; omitted dwell shares the period remainder",
                     "Hulls must clear the map, marina and scheduled craft",
                     "scene.gulls.flocks is 0..4 with 1..8 birds each and at most 32 total",
                     "Cues use half-open 120 Hz tick intervals, 0..1 amplitude and optional fade",

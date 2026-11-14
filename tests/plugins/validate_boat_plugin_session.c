@@ -114,6 +114,37 @@ static BoatPluginBundle harbor_edit(const char *from, const char *to)
     return boat_plugin_bundle(&edited);
 }
 
+static int marina_route_apply_undo(void)
+{
+    static WakePlugin plugin;
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic diagnostic;
+    BoatSession session;
+    boat_session_init(&session, outer(), calm());
+    session.presentation_enabled = false;
+    CHECK(wake_plugin_open(&plugin, "plugins/marina-route-demo", &session, 0));
+    CHECK(boat_plugin_read("plugins/marina-route-demo", NULL, &files, &diagnostic)
+        == BOAT_PLUGIN_OK);
+    char *dwell = strstr(files.source, "dwell=240");
+    CHECK(dwell);
+    memcpy(dwell, "dwell=360", 9);
+    BoatPluginBundle candidate = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_host_stage(&plugin.host, &candidate));
+    CHECK(plugin.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(!wake_plugin_frame(&plugin, &session, false, false, false, 1));
+    CHECK(boat_plugin_host_active(&plugin.host)->number == 1);
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 2));
+    boat_session_restart(&session, calm());
+    CHECK(session.world.scene->traffic.actors[0].open_path.pieces[2].dwell_ticks == 360);
+    CHECK(!wake_plugin_frame(&plugin, &session, false, true, false, 3));
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 4));
+    boat_session_restart(&session, calm());
+    CHECK(session.world.scene->traffic.actors[0].open_path.pieces[2].dwell_ticks == 240);
+    wake_plugin_close(&plugin, &session);
+    boat_session_destroy(&session);
+    return 0;
+}
+
 static int harbor_life_scene(void)
 {
     static WakePlugin p;
@@ -1972,6 +2003,7 @@ static const TestCase cases[] = {
     TEST_CASE(catalog_runtime),
     TEST_CASE(default_sessions),
     TEST_CASE(harbor_life_scene),
+    TEST_CASE(marina_route_apply_undo),
     SLOW_CASE(grodan_tour),
     SLOW_CASE(compiled_parity),
 };

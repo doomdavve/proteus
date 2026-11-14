@@ -507,7 +507,7 @@ class Worker(unittest.TestCase):
         self.assertEqual(self.run_worker(payload)[1]["status"], "runtime")
 
     def test_examples_and_job(self):
-        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour"):
+        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour", "marina-route-demo"):
             payload = author.snapshot(ROOT / "plugins" / name)
             code, result = self.run_worker(payload)
             self.assertEqual(code, 0, result)

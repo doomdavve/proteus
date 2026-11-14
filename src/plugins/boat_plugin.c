@@ -1,6 +1,9 @@
 #include "plugins/boat_plugin.h"
 
 #include "core/boat_cargo.h"
+#include "core/boat_clock.h"
+#include "core/boat_route_path.h"
+#include "core/boat_schedule.h"
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_outer.h"
 #include "plugins/boat_plugin_decode.h"
@@ -8,6 +11,7 @@
 #include "raymath.h"
 #include "json/boat_json.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -566,6 +570,15 @@ static bool box_contains(Vector2 centre, Vector2 length, Vector2 beam, float hal
         && fabsf(delta.x * beam.x + delta.y * beam.y) < half_beam + margin;
 }
 
+static bool circle_box_overlap(Vector2 point, double radius, Vector2 centre, Vector2 length,
+    Vector2 beam, float half_length, float half_beam)
+{
+    double x = (double)point.x - centre.x, z = (double)point.y - centre.y;
+    double along = fmax(fabs(x * length.x + z * length.y) - half_length, 0);
+    double across = fmax(fabs(x * beam.x + z * beam.y) - half_beam, 0);
+    return hypot(along, across) <= radius;
+}
+
 static void module_box(const BoatSceneModule *m, Vector2 *length, Vector2 *beam, Vector2 *centre,
     float *half_length, float *half_beam)
 {
@@ -599,10 +612,10 @@ static bool module_surface(const BoatMap *map, const BoatSceneModule *m)
     return true;
 }
 
-static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
-    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
+static BoatPluginStatus check_scene_modules(const BoatSceneDefinition *scene, const char *entry,
+    const BoatVoyageRoute *route, const BoatWorldDefinition *location, const BoatMap *map,
+    BoatPluginDiagnostic *d)
 {
-    const BoatSceneDefinition *scene = &voyage->scene;
     Vector2 centre[BOAT_SCENE_MODULES], length[BOAT_SCENE_MODULES], beam[BOAT_SCENE_MODULES];
     float half_length[BOAT_SCENE_MODULES], half_beam[BOAT_SCENE_MODULES];
     bool solid[BOAT_SCENE_MODULES] = { false };
@@ -613,25 +626,24 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
         if (m->kind == BOAT_SCENE_MODULE_GANGWAY) {
             const BoatSceneModule *target = boat_scene_find_module(scene, m->attaches);
             if (!target)
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "attaches to a missing pontoon");
+                return diagnose(
+                    d, BOAT_PLUGIN_SCHEMA, entry, path, "attaches to a missing pontoon");
             Vector2 landing = { target->x + target->width * .5f * cosf(target->heading),
                 target->z + target->width * .5f * sinf(target->heading) };
             float span = hypotf(m->anchor_x - landing.x, m->anchor_z - landing.y);
             if (span < BOAT_SCENE_GANGWAY_MIN_LENGTH || span > BOAT_SCENE_GANGWAY_MAX_LENGTH
                 || fabsf(span - m->length) > .05f)
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "gangway span %.1f m is outside 2..20 m", span);
             if (boat_map_water(map, (Vector2) { m->anchor_x, m->anchor_z }, 0))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "gangway shore anchor is not land");
+                return diagnose(
+                    d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway shore anchor is not land");
             if (!boat_map_water(map, landing, 0))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "gangway landing is not water");
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway landing is not water");
             Vector2 delta = { m->anchor_x - landing.x, m->anchor_z - landing.y };
             if (fabsf(delta.x * -sinf(target->heading) + delta.y * cosf(target->heading)) > .01f
                 || delta.x * cosf(target->heading) + delta.y * sinf(target->heading) <= 0)
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "gangway must approach perpendicular to the target's shore-side edge");
             centre[i]
                 = (Vector2) { (m->anchor_x + landing.x) * .5f, (m->anchor_z + landing.y) * .5f };
@@ -644,20 +656,18 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
         solid[i] = true;
         if (box_contains(
                 centre[i], length[i], beam[i], half_length[i], half_beam[i], location->spawn, 4))
-            return diagnose(
-                d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path, "blocks spawn and restart");
-        for (unsigned j = 0; j < voyage->route.shelter_count; ++j)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "blocks spawn and restart");
+        for (unsigned j = 0; route && j < route->shelter_count; ++j)
             if (box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
-                    voyage->route.shelters[j].position, 4))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "blocks a recovery shelter");
+                    route->shelters[j].position, 4))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "blocks a recovery shelter");
         if (scene->entrance_present
             && box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
                 (Vector2) { scene->entrance_x, scene->entrance_z }, scene->entrance_width * .5f))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                "blocks the declared marina entrance");
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, entry, path, "blocks the declared marina entrance");
         if (m->kind != BOAT_SCENE_MODULE_GANGWAY && !module_surface(map, m))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                 "module footprint crosses shore or lacks its required land/water support");
         if (m->kind == BOAT_SCENE_MODULE_QUAY) {
             // Outer terrain is the same compiled bilinear lattice used by presentation.
@@ -673,7 +683,7 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
                         ? waterfront_outer_ground(-x, z)
                         : 3.5f;
                     if (ground + .3f > m->deck_height + .001f)
-                        return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                             "deck must clear its land support by at least .3 m");
                 }
         }
@@ -685,8 +695,8 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
             berth_box(berth, spec, &bl, &bb, &bc, &bhl, &bhb);
             if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], bc, bl, bb,
                     bhl, bhb, .3f))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "overlaps scene.marina.berths[%u]", b + 1);
+                return diagnose(
+                    d, BOAT_PLUGIN_SCHEMA, entry, path, "overlaps scene.marina.berths[%u]", b + 1);
         }
     }
     for (unsigned b = 0; b < scene->berth_count; ++b) {
@@ -703,7 +713,7 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
         if (best > 20) {
             char path[32];
             snprintf(path, sizeof(path), "scene.marina.berths[%u]", b + 1);
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                 "mooring is pontoon but no authored pontoon is within rope reach");
         }
     }
@@ -720,30 +730,372 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
             bool penetrates = box_overlap(centre[i], length[i], beam[i], half_length[i],
                 half_beam[i], centre[j], length[j], beam[j], half_length[j], half_beam[j], -.02f);
             if (joined && !near)
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "attachment must meet its parent's boundary");
             if (penetrates || (near && !joined))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "overlaps scene.marina.modules[%u]", i + 1);
+                return diagnose(
+                    d, BOAT_PLUGIN_SCHEMA, entry, path, "overlaps scene.marina.modules[%u]", i + 1);
         }
+    return BOAT_PLUGIN_OK;
+}
+
+#define OPEN_PATH_SAMPLE_TICKS 12
+#define OPEN_PATH_SAMPLE_BUDGET 1800 // ceil(ticks / 12): three minutes at 120 Hz.
+#define OPEN_PATH_TRAFFIC_BUDGET 200000
+
+static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed);
+
+// A POINTS route has <=64 geometric pieces and <=8 stops. Reserve gamma_128
+// for positive length/duration accumulation, quotient and float dwell conversion:
+// gamma_n = n*epsilon/(1-n*epsilon). Convert the relative timing allowance to
+// distance with the speed bound, in addition to the validator's .02 s mismatch.
+// The 1.1 m minimum and .1 m absolute reserve cover bounded local coordinate,
+// join and libm rounding on the supported float builds; no bitwise repeat is claimed.
+static double traffic_wrap_margin(const WaterfrontRouteActor *actor, double speed)
+{
+    double relative = 128 * FLT_EPSILON / (1 - 128 * FLT_EPSILON);
+    return fmax(1.1, (.02 + relative * actor->period) * speed + .1);
+}
+
+// Only POINTS wraps time itself by the declared period. The older ellipse/circuit
+// evaluators wrap an angle/distance product; rounding their period would invent a repeat
+// contract. Require an exact tick representation, never a nearest-tick approximation.
+static bool traffic_repeat_ticks(const WaterfrontRouteActor *actor, uint64_t *ticks)
+{
+    double scaled = actor->period * BOAT_TICK_HZ;
+    if (actor->shape != WATERFRONT_ROUTE_POINTS || !isfinite(scaled) || scaled < 1
+        || scaled > WATERFRONT_ROUTE_MAX_PERIOD * BOAT_TICK_HZ || floor(scaled) != scaled)
+        return false;
+    *ticks = (uint64_t)scaled;
+    return actor->period == (double)*ticks * BOAT_TICK_SECONDS;
+}
+
+static BoatPluginStatus check_loop_schedule(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, double speed, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition = routes ? routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    uint64_t periods[2] = { ticks, 0 }, common;
+    if (scene->traffic.actors[actor].period != (double)ticks * BOAT_TICK_SECONDS
+        || !traffic_repeat_ticks(obstacle, &periods[1]))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+            "unsupported exact-tick schedule for traffic vessel %s", obstacle->id);
+    // Each sample evaluates both actors, including the closing boundary sample.
+    uint64_t samples = (OPEN_PATH_TRAFFIC_BUDGET - *work) / 2;
+    uint64_t limit = samples > 1 ? (samples - 1) * OPEN_PATH_SAMPLE_TICKS : 0;
+    if (!boat_schedule_common_period(periods, 2, limit, &common))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+            "common traffic schedule exceeds work budget or overflows");
+    BoatModelSpec spec = waterfront_traffic_spec_routes(routes, other);
+    // A native path is held between integer ticks. Add one full tick of path travel
+    // as well as the nearest-sample bound. POINTS permits at most .02 s of geometric
+    // wrap mismatch (<= .8 m at the validated 40 m/s cap); the separate seam
+    // allowance includes float arithmetic without treating a jump as continuous motion.
+    double radius = path_radius + hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .05 * (path_speed + speed) + path_speed * BOAT_TICK_SECONDS
+        + traffic_wrap_margin(obstacle, speed);
+    uint64_t intervals = common / OPEN_PATH_SAMPLE_TICKS + (common % OPEN_PATH_SAMPLE_TICKS != 0);
+    for (uint64_t i = 0; i <= intervals; ++i) {
+        uint64_t tick = i * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > common)
+            tick = common;
+        *work += 2;
+        double time = (double)tick * BOAT_TICK_SECONDS;
+        WaterfrontVesselMotion a
+            = waterfront_traffic_motion_routes(&scene->traffic, (int)actor, time);
+        WaterfrontVesselMotion b = waterfront_traffic_motion_routes(routes, other, time);
+        double distance
+            = hypot((double)a.position.x - b.position.x, (double)a.position.z - b.position.z);
+        if (!isfinite(distance) || distance <= radius)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+                "loop timetable crosses traffic vessel %s", obstacle->id);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
+// Spatial separation is sufficient even for incompatible periods. Overlap requests
+// a simultaneous bounded schedule proof instead of being treated as a collision.
+static BoatPluginStatus check_loop_path_traffic(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition = routes ? routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    double speed;
+    if (!traffic_speed_bound(obstacle, &speed))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot bound traffic vessel %s speed",
+            obstacle->id);
+    uint64_t count = ticks / 60 + (ticks % 60 != 0) + 1;
+    unsigned samples = (unsigned)ceil(obstacle->period / 2) + 1;
+    if (count > (OPEN_PATH_TRAFFIC_BUDGET - *work) / (samples + 1))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "loop survey exceeds work budget");
+    BoatModelSpec spec = waterfront_traffic_spec_routes(routes, other);
+    double radius = path_radius + hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .25 * path_speed + speed + traffic_wrap_margin(obstacle, speed);
+    for (uint64_t i = 0; i < count; ++i) {
+        uint64_t tick = i * 60;
+        if (tick > ticks)
+            tick = ticks;
+        BoatRoutePose pose;
+        ++*work;
+        if (!boat_route_path_evaluate(&scene->traffic.actors[actor].open_path, tick, &pose, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot evaluate loop path");
+        for (unsigned j = 0; j < samples; ++j) {
+            ++*work;
+            double time = fmin(2.0 * j, obstacle->period);
+            WaterfrontVesselMotion m = waterfront_traffic_motion_routes(routes, other, time);
+            double distance = hypot(pose.x + m.position.x, pose.z - m.position.z);
+            if (!isfinite(distance) || distance <= radius)
+                return check_loop_schedule(scene, entry, actor, routes, other, ticks, path_speed,
+                    path_radius, speed, work, d);
+        }
+    }
+    return BOAT_PLUGIN_OK;
+}
+
+// The centre-speed bound is independent of hull heading. The dock circuit is continuous only
+// at its native 14 m radius. Implicit-speed point loops use an overestimate of
+// their rounded geometry length; stopped point routes declare their cruise speed.
+static bool traffic_speed_bound(const WaterfrontRouteActor *a, double *speed)
+{
+    if (!isfinite(a->period) || a->period <= 0 || a->period > WATERFRONT_ROUTE_MAX_PERIOD)
+        return false;
+    if (a->shape == WATERFRONT_ROUTE_ELLIPSE)
+        *speed = 2 * 3.14159265358979323846 * fmax(a->long_radius, a->short_radius) / a->period;
+    else if (a->shape == WATERFRONT_ROUTE_DOCK_CIRCUIT && fabs(a->turn_radius - 14) < .001)
+        *speed = a->speed;
+    else if (a->shape == WATERFRONT_ROUTE_POINTS && a->speed > 0) {
+        if (a->stop_count && !waterfront_route_stop_ramps_separate(a))
+            return false;
+        *speed = a->speed;
+    } else if (a->shape == WATERFRONT_ROUTE_POINTS && a->point_count >= 3
+        && a->point_count <= WATERFRONT_ROUTE_POINT_CAPACITY && !a->stop_count) {
+        double length = 0;
+        for (unsigned i = 0; i < a->point_count; ++i) {
+            const WaterfrontRoutePoint *p = &a->points[i];
+            const WaterfrontRoutePoint *q = &a->points[(i + 1) % a->point_count];
+            if (!isfinite(p->x) || !isfinite(p->z) || !isfinite(p->radius) || p->radius < 0)
+                return false;
+            length += hypot((double)p->x - q->x, (double)p->z - q->z)
+                + 3.14159265358979323846 * p->radius;
+        }
+        *speed = length / a->period;
+    } else
+        return false;
+    return isfinite(*speed) && *speed > 0 && *speed <= 40;
+}
+
+// Survey against one periodic actor during the finite path and a complete period after its
+// endpoint. Circle envelopes remove any dependence on hull orientation; the Lipschitz margin
+// covers travel to the nearest sample. This is independent of other actors' periods.
+static BoatPluginStatus check_open_path_traffic(const BoatSceneDefinition *scene, const char *entry,
+    unsigned actor, const WaterfrontRouteDefinition *other_routes, int other, uint64_t ticks,
+    double path_speed, double path_radius, unsigned *work, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteDefinition *definition
+        = other_routes ? other_routes : waterfront_route_defaults();
+    const WaterfrontRouteActor *obstacle = &definition->actors[other];
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", actor + 1);
+    double speed;
+    if (!traffic_speed_bound(obstacle, &speed))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot bound traffic vessel %s speed",
+            obstacle->id);
+    BoatModelSpec spec = waterfront_traffic_spec_routes(other_routes, other);
+    double other_radius = hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5);
+    uint64_t intervals = ticks / OPEN_PATH_SAMPLE_TICKS + (ticks % OPEN_PATH_SAMPLE_TICKS != 0);
+    unsigned tail = (unsigned)ceil(obstacle->period);
+    if (2 * (intervals + tail + 2) > OPEN_PATH_TRAFFIC_BUDGET - *work)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "traffic survey exceeds work budget");
+    *work += 2 * ((unsigned)intervals + tail + 2);
+    double finish = (double)ticks * BOAT_TICK_SECONDS;
+    for (uint64_t i = 0; i <= intervals + tail + 1; ++i) {
+        bool after = i > intervals;
+        uint64_t tick = after ? ticks : i * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > ticks)
+            tick = ticks;
+        double offset = after ? fmin((double)(i - intervals - 1), obstacle->period) : 0;
+        double time = after ? finish + offset : (double)tick * BOAT_TICK_SECONDS;
+        BoatRoutePose pose;
+        if (!boat_route_path_evaluate(&scene->traffic.actors[actor].open_path, tick, &pose, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "cannot evaluate open path");
+        WaterfrontVesselMotion m = waterfront_traffic_motion_routes(other_routes, other, time);
+        double margin
+            = after ? .5 * speed : .05 * (path_speed + speed) + path_speed * BOAT_TICK_SECONDS;
+        double distance = hypot(pose.x + m.position.x, pose.z - m.position.z);
+        // Legacy point/circuit periods can differ from their geometric loop by up to .02 s;
+        // at the 40 m/s speed cap a wrap can therefore jump up to .8 m, before
+        // the additional float arithmetic allowance.
+        if (!isfinite(distance)
+            || distance
+                <= path_radius + other_radius + margin + traffic_wrap_margin(obstacle, speed))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+                after ? "terminal pose crosses traffic vessel %s"
+                      : "open path crosses traffic vessel %s",
+                obstacle->id);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
+static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, const char *entry,
+    const BoatMap *map, unsigned actor, BoatPluginDiagnostic *d)
+{
+    const WaterfrontRouteActor *a = &scene->traffic.actors[actor];
+    char path[48];
+    snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", actor + 1);
+    uint64_t total_ticks = 0;
+    if (!boat_route_path_validate(&a->open_path, &total_ticks))
+        return diagnose(
+            d, BOAT_PLUGIN_SCHEMA, entry, path, "has an invalid or non-finite open path");
+    uint64_t intervals
+        = total_ticks / OPEN_PATH_SAMPLE_TICKS + (total_ticks % OPEN_PATH_SAMPLE_TICKS != 0);
+    if (intervals > OPEN_PATH_SAMPLE_BUDGET)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+            "open path spans %llu ticks and needs %llu samples at %d-tick intervals, beyond the "
+            "%d-sample three-minute survey budget",
+            (unsigned long long)total_ticks, (unsigned long long)(intervals + 1),
+            OPEN_PATH_SAMPLE_TICKS, OPEN_PATH_SAMPLE_BUDGET);
+    // Each validated piece's max_speed bounds its translation speed; the path-wide bound also
+    // covers every intermediate sample and any dwell at an endpoint.
+    double speed_bound = 0;
+    for (unsigned p = 0; p < a->open_path.count; ++p) {
+        const BoatRoutePathPiece *piece = &a->open_path.pieces[p];
+        double max_speed = piece->kind == BOAT_ROUTE_PATH_LINE ? piece->shape.line.max_speed
+                                                               : piece->shape.arc.max_speed;
+        if (!isfinite(max_speed) || max_speed <= 0 || max_speed > 40)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path piece %u needs a speed bound in (0, 40] m/s", p + 1);
+        speed_bound = fmax(speed_bound, max_speed);
+    }
+    BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)actor);
+    // Enclose the travelling hull, then inflate by half a sample interval of travel and a small
+    // numerical margin. Double arithmetic plus the finite check keeps the cast to the map query's
+    // float radius well defined.
+    double interval_seconds = (double)OPEN_PATH_SAMPLE_TICKS * BOAT_TICK_SECONDS;
+    double radius = hypot((double)spec.length * .5 + .5, (double)spec.beam * .5 + .5)
+        + .5 * interval_seconds * speed_bound + .1;
+    float hull_radius = (float)radius;
+    if (!isfinite(radius) || !isfinite(hull_radius))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "open path sweep radius is not finite");
+    Vector2 berth_centre[BOAT_SCENE_BERTHS], berth_length[BOAT_SCENE_BERTHS],
+        berth_beam[BOAT_SCENE_BERTHS];
+    float berth_hl[BOAT_SCENE_BERTHS], berth_hb[BOAT_SCENE_BERTHS];
+    for (unsigned b = 0; b < scene->berth_count; ++b) {
+        BoatModelSpec bs = boat_scene_berth_resolve(&scene->berths[b]);
+        berth_box(&scene->berths[b], bs, &berth_length[b], &berth_beam[b], &berth_centre[b],
+            &berth_hl[b], &berth_hb[b]);
+    }
+    Vector2 module_centre[BOAT_SCENE_MODULES], module_length[BOAT_SCENE_MODULES],
+        module_beam[BOAT_SCENE_MODULES];
+    float module_hl[BOAT_SCENE_MODULES], module_hb[BOAT_SCENE_MODULES];
+    for (unsigned m = 0; m < scene->module_count; ++m) {
+        const BoatSceneModule *item = &scene->modules[m];
+        if (item->kind == BOAT_SCENE_MODULE_GANGWAY) {
+            const BoatSceneModule *target = boat_scene_find_module(scene, item->attaches);
+            if (!target)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway target is missing");
+            Vector2 landing = { target->x + target->width * .5f * cosf(target->heading),
+                target->z + target->width * .5f * sinf(target->heading) };
+            Vector2 delta = { item->anchor_x - landing.x, item->anchor_z - landing.y };
+            float span = hypotf(delta.x, delta.y);
+            if (!isfinite(span) || span < BOAT_SCENE_GANGWAY_MIN_LENGTH)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path, "gangway span is invalid");
+            module_centre[m] = (Vector2) { (item->anchor_x + landing.x) * .5f,
+                (item->anchor_z + landing.y) * .5f };
+            module_length[m] = (Vector2) { delta.x / span, delta.y / span };
+            module_beam[m] = (Vector2) { -module_length[m].y, module_length[m].x };
+            module_hl[m] = span * .5f;
+            module_hb[m] = item->width * .5f;
+        } else
+            module_box(item, &module_length[m], &module_beam[m], &module_centre[m], &module_hl[m],
+                &module_hb[m]);
+    }
+    for (uint64_t sample = 0; sample <= intervals; ++sample) {
+        uint64_t tick = sample * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > total_ticks)
+            tick = total_ticks;
+        BoatRoutePose pose;
+        double yaw_rate = 0;
+        if (!boat_route_path_evaluate(&a->open_path, tick, &pose, &yaw_rate) || !isfinite(pose.x)
+            || !isfinite(pose.z))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path cannot be evaluated at tick %llu", (unsigned long long)tick);
+        // Open-path poses are already in simulation X/Z; the map query takes that space directly.
+        Vector2 centre = { (float)pose.x, (float)pose.z };
+        if (!isfinite(centre.x) || !isfinite(centre.y))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "open path pose at tick %llu is not finite", (unsigned long long)tick);
+        if (!boat_map_water(map, centre, hull_radius))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "swept hull is not open water of the compiled map");
+        for (unsigned b = 0; b < scene->berth_count; ++b)
+            if (circle_box_overlap(centre, hull_radius, berth_centre[b], berth_length[b],
+                    berth_beam[b], berth_hl[b], berth_hb[b]))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                    "swept hull crosses scene.marina.berths[%u]", b + 1);
+        for (unsigned m = 0; m < scene->module_count; ++m)
+            if (circle_box_overlap(centre, hull_radius, module_centre[m], module_length[m],
+                    module_beam[m], module_hl[m], module_hb[m]))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                    "swept hull crosses scene.marina.modules[%u]", m + 1);
+        // Also cover compiled defaults and the permanent ferry when a scene does not replace
+        // them. This shared contact query uses conservative water-plane excursion envelopes.
+        if (waterfront_harbor_contact_height_scene(
+                scene, centre, hull_radius, -INFINITY, INFINITY, (BoatWater) { 0 }, 0, NULL))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "swept hull crosses a marina or ferry contact envelope");
+    }
+    unsigned work = 0;
+    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
+        if ((a->open_path.loop ? check_loop_path_traffic : check_open_path_traffic)(
+                scene, entry, actor, NULL, i, total_ticks, speed_bound, radius, &work, d)
+            != BOAT_PLUGIN_OK)
+            return d->status;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        if (i == actor || scene->traffic.actors[i].retain != 0xff)
+            continue;
+        if ((a->open_path.loop ? check_loop_path_traffic : check_open_path_traffic)(scene, entry,
+                actor, &scene->traffic, (int)i, total_ticks, speed_bound, radius, &work, d)
+            != BOAT_PLUGIN_OK)
+            return d->status;
+    }
     return BOAT_PLUGIN_OK;
 }
 
 // L3.2: sample every authored craft over the combined river timetable. The hull envelope is
 // inflated by half a sample step of travel, so a thin diagonal cannot slip between samples.
-static BoatPluginStatus check_scene_traffic(
-    const BoatPluginVoyage *voyage, const BoatMap *map, BoatPluginDiagnostic *d)
+static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, const char *entry,
+    const BoatMap *map, BoatPluginDiagnostic *d)
 {
-    const BoatSceneDefinition *scene = &voyage->scene;
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
+    // Open paths use their own bounded static and moving-traffic surveys.
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+        if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH
+            && check_scene_open_path(scene, entry, map, i, d) != BOAT_PLUGIN_OK)
+            return d->status;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        unsigned char shape = scene->traffic.actors[i].shape;
+        if (shape == WATERFRONT_ROUTE_OPEN_LEG) {
+            char path[48];
+            snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", i + 1);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
+                "uses the internal %s route shape, which packages cannot carry",
+                waterfront_route_shape_name((WaterfrontRouteShape)shape));
+        }
+    }
     const double step = .25, horizon = 4160; // The four river periods repeat together here.
     int samples = (int)(horizon / step);
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         const WaterfrontRouteActor *a = &scene->traffic.actors[i];
         // Retained actors keep their compiled schedule; authored craft are sampled against them
         // below, so a retained actor never needs its own full sweep.
-        if (a->retain != 0xff)
+        if (a->retain != 0xff || a->shape == WATERFRONT_ROUTE_OPEN_PATH)
             continue;
         BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
         char path[48];
@@ -762,13 +1114,13 @@ static BoatPluginStatus check_scene_traffic(
             float half_beam = spec.beam * .5f + margin;
             // An authored craft needs new map/marina clearance and must clear retained craft.
             if (!box_water(map, centre, length, beam, half_length, half_beam, .5f))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull is not open water of the compiled map");
             if (scene->entrance_present
                 && box_contains(centre, length, beam, half_length, half_beam,
                     (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "crosses the declared marina entrance");
+                return diagnose(
+                    d, BOAT_PLUGIN_SCHEMA, entry, path, "crosses the declared marina entrance");
             for (unsigned b = 0; b < scene->berth_count; ++b) {
                 const BoatSceneBerth *berth = &scene->berths[b];
                 BoatModelSpec bs = boat_scene_berth_resolve(berth);
@@ -777,7 +1129,7 @@ static BoatPluginStatus check_scene_traffic(
                 berth_box(berth, bs, &bl, &bb, &bc, &bhl, &bhb);
                 if (box_overlap(
                         centre, length, beam, half_length, half_beam, bc, bl, bb, bhl, bhb, .3f))
-                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                         "crosses scene.marina.berths[%u]", b + 1);
             }
             for (unsigned m = 0; m < scene->module_count; ++m) {
@@ -788,12 +1140,13 @@ static BoatPluginStatus check_scene_traffic(
                 module_box(&scene->modules[m], &ml, &mb, &mc, &mhl, &mhb);
                 if (box_overlap(
                         centre, length, beam, half_length, half_beam, mc, ml, mb, mhl, mhb, .3f))
-                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                         "crosses scene.marina.modules[%u]", m + 1);
             }
             for (unsigned j = i + 1; j < scene->traffic.actor_count; ++j) {
                 // Two retained compiled actors keep their existing relative schedules.
-                if (scene->traffic.actors[j].retain != 0xff)
+                if (scene->traffic.actors[j].retain != 0xff
+                    || scene->traffic.actors[j].shape == WATERFRONT_ROUTE_OPEN_PATH)
                     continue;
                 BoatModelSpec os = waterfront_traffic_spec_routes(&scene->traffic, (int)j);
                 WaterfrontVesselMotion om
@@ -803,7 +1156,7 @@ static BoatPluginStatus check_scene_traffic(
                 Vector2 ob = { cosf(om.heading), sinf(om.heading) };
                 if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,
                         os.length * .5f + .5f, os.beam * .5f + .5f, .3f))
-                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                         "crosses scene.traffic.vessels[%u]", j + 1);
             }
             // Compare against the compiled service as well: a present list replaces it only
@@ -816,7 +1169,7 @@ static BoatPluginStatus check_scene_traffic(
                 Vector2 ob = { cosf(om.heading), sinf(om.heading) };
                 if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,
                         os.length * .5f + .5f, os.beam * .5f + .5f, .3f))
-                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                         "crosses compiled traffic vessel %d", j + 1);
             }
         }
@@ -825,20 +1178,23 @@ static BoatPluginStatus check_scene_traffic(
     return BOAT_PLUGIN_OK;
 }
 
-static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
-    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
+static BoatPluginStatus check_scene_location(const BoatSceneDefinition *scene, bool has_scene,
+    const char *entry, const BoatVoyageRoute *route, const BoatWorldDefinition *location,
+    const BoatMap *map, BoatPluginDiagnostic *d)
 {
-    const BoatSceneDefinition *scene = &voyage->scene;
-    if (!voyage->has_scene
+    if (!has_scene
         || (!scene->berths_present && !scene->modules_present && !scene->traffic_present))
         return BOAT_PLUGIN_OK;
     if (!location->mapped)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
             "scene marina requires a mapped location");
+    if (!map)
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, entry, "location", "scene marina requires the location's map");
     if (scene->entrance_present
         && !boat_map_water(
             map, (Vector2) { scene->entrance_x, scene->entrance_z }, scene->entrance_width * .5f))
-        return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, "scene.marina.entrance",
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, "scene.marina.entrance",
             "is not open water with half its declared width clear");
     Vector2 centre[BOAT_SCENE_BERTHS], length[BOAT_SCENE_BERTHS], beam[BOAT_SCENE_BERTHS];
     float half_length[BOAT_SCENE_BERTHS], half_beam[BOAT_SCENE_BERTHS];
@@ -849,22 +1205,22 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
         char path[32];
         snprintf(path, sizeof(path), "scene.marina.berths[%u]", i + 1);
         if (!box_water(map, centre[i], length[i], beam[i], half_length[i], half_beam[i], .5f))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                 "hull and mooring excursion are not open water of the %s map", location->name);
         if (scene->entrance_present
             && box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
                 (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                "overlaps the declared marina entrance");
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, entry, path, "overlaps the declared marina entrance");
         // The compiled spawn and every recovery shelter must offer a usable restart.
         if (box_contains(
                 centre[i], length[i], beam[i], half_length[i], half_beam[i], location->spawn, 4))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                "blocks the location's spawn and restart");
-        for (unsigned s = 0; s < voyage->route.shelter_count; ++s)
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, entry, path, "blocks the location's spawn and restart");
+        for (unsigned s = 0; route && s < route->shelter_count; ++s)
             if (box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
-                    voyage->route.shelters[s].position, 4))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    route->shelters[s].position, 4))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "blocks voyage.shelters[%u] and its recovery", s + 1);
     }
     for (unsigned i = 0; i < scene->berth_count; ++i)
@@ -873,12 +1229,13 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
             snprintf(path, sizeof(path), "scene.marina.berths[%u]", j + 1);
             if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], centre[j],
                     length[j], beam[j], half_length[j], half_beam[j], .45f))
-                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "overlaps scene.marina.berths[%u] with no hull clearance", i + 1);
         }
-    if (scene->modules_present && check_scene_modules(voyage, location, map, d) != BOAT_PLUGIN_OK)
+    if (scene->modules_present
+        && check_scene_modules(scene, entry, route, location, map, d) != BOAT_PLUGIN_OK)
         return d->status;
-    if (check_scene_traffic(voyage, map, d) != BOAT_PLUGIN_OK)
+    if (check_scene_traffic(scene, entry, map, d) != BOAT_PLUGIN_OK)
         return d->status;
     return BOAT_PLUGIN_OK;
 }
@@ -914,7 +1271,8 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
         return diagnose(d, BOAT_PLUGIN_SCHEMA, file,
             route->ordered ? "tour.arrival" : "voyage.arrival",
             "is not open water of the %s map with %.0f m clear", location->name, arrival_clear);
-    if (check_scene_location(voyage, location, map, d) != BOAT_PLUGIN_OK)
+    if (check_scene_location(&voyage->scene, voyage->has_scene, file, route, location, map, d)
+        != BOAT_PLUGIN_OK)
         return d->status;
     BoatPluginCost cost = d->cost;
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
@@ -935,6 +1293,16 @@ static bool same_storm(BoatStorm a, BoatStorm b)
         && a.build == b.build;
 }
 
+static bool scene_has_open_route(const BoatSceneDefinition *scene)
+{
+    if (!scene->traffic_present)
+        return false;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+        if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH)
+            return true;
+    return false;
+}
+
 BoatPluginChange boat_plugin_classify(
     const BoatPluginVoyage *active, const BoatPluginVoyage *candidate)
 {
@@ -944,6 +1312,10 @@ BoatPluginChange boat_plugin_classify(
         return BOAT_PLUGIN_INCOMPATIBLE;
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
+        return BOAT_PLUGIN_RESTART_SESSION;
+    if ((scene_has_open_route(&active->scene) || scene_has_open_route(&candidate->scene))
+        && waterfront_route_digest(&active->scene.traffic)
+            != waterfront_route_digest(&candidate->scene.traffic))
         return BOAT_PLUGIN_RESTART_SESSION;
     // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;
@@ -1185,6 +1557,10 @@ BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
             location ? location->name : "none");
     if (free->has_scene && free->scene.work_present
         && check_work_sites(free, location, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
+    if (check_scene_location(
+            &free->scene, free->has_scene, free->manifest.entry, NULL, location, map, d)
+        != BOAT_PLUGIN_OK)
         return d->status;
     if (free->marks.count) {
         if (location->mapped && !map)

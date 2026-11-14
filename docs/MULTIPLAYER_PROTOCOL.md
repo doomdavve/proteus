@@ -1,4 +1,4 @@
-# Multiplayer protocol v14
+# Multiplayer protocol v15
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -6,6 +6,10 @@ validation rules and version policy of the boating network protocol. Task status
 and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`src/net/boat_net_protocol.[ch]`](../src/net/boat_net_protocol.h) and its fixtures are in
 [`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
+
+v15 uses room definition version 5 and adds the bounded open traffic-path encoding below.
+Older peers reject the version at Hello. The authority validates open paths against their map,
+marina and other traffic before accepting them.
 
 v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
 position validation to cover the mapped world, and fingerprints the complete compiled map
@@ -273,7 +277,7 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 
 | Field | Type |
 | --- | --- |
-| version (4) | u8 |
+| version (5) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
 | location (0 basin, 1 outer; v12) | u8 |
 | flags: bit 0 has rules, bit 1 has a scene, bit 2 has marks | u8 |
@@ -282,6 +286,12 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 | deathmatch: match rules and combat rules | `u32`/`f32` fields as in the checkpoint's rules |
 | scene, when present | the L1–L4 fieldwise scene (marina, traffic, gulls) |
 | marks, when flagged | `u8` count 1–16; per mark `u8` length + id, `u8` length + name, `f32` x, z, radius |
+
+For an open-path traffic actor, its existing traffic fields are followed by a `u8` piece count
+(1–4) and a `u8` loop flag (0 or 1). Each piece carries `u8` kind (0 line, 1 arc), `u64` dwell ticks, `u64` duration ticks,
+then binary64 fields. A line carries start x/z, end x/z, tick seconds, maximum speed and maximum
+acceleration; an arc carries centre x/z, radius, start angle, sweep, tick seconds, maximum speed
+and maximum acceleration. Unknown kinds, excess counts, non-finite values and truncation reject.
 
 Marks are valid only in free rooms; clients check them structurally (count, id and name text,
 finite bounded coordinates, radius, no overlap) like the rest of the definition.
@@ -800,7 +810,7 @@ rate limit in the process; the firewall owns that (hardening plan H4).
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v14 rejects every other version, v1–v13 included; there is no negotiation or
+  protocol version. v15 rejects every other version, v1–v14 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
@@ -824,7 +834,7 @@ rate limit in the process; the firewall owns that (hardening plan H4).
   `objective_state` memory-transport case, where two clients and a late joiner mirror the
   server's HUD, including under loss profile F;
 - the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`4fc3a7e799ace302` at v14 and `84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
+  digest of a hand-built snapshot's bytes (`4a3e64a040257a35` at v15, `4fc3a7e799ace302` at v14 and `84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
   `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's `690c711d99578e10`);
 - round trips of all 29 types (Accept now carries the revision), rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from
