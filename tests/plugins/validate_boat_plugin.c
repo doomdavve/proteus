@@ -412,6 +412,50 @@ static int scene_traffic(void)
     return 0;
 }
 
+static int open_path_decode(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    const char *old = "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540";
+    const char *good = "route = \"open\", pieces = {"
+                       "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240,dwell=120,"
+                       "max_speed=20,max_acceleration=100},"
+                       "{kind=\"line\",x0=0,z0=-10,x1=0,z1=-20,ticks=240,dwell=0,"
+                       "max_speed=20,max_acceleration=100}}";
+    const char *source = harbor_variant(old, good);
+    CHECK(source);
+    BoatPluginVoyage voyage;
+    BoatPluginStatus status = load(files.manifest, source, strlen(source), NULL, &voyage, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("open path decode", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    CHECK(voyage.scene.traffic.actors[0].shape == WATERFRONT_ROUTE_OPEN_PATH);
+    CHECK(voyage.scene.traffic.actors[0].open_path.count == 2);
+    CHECK(voyage.scene.traffic.actors[0].period == 5);
+    const char *bad = "route = \"open\", pieces = {"
+                      "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240,dwell=0,"
+                      "max_speed=20,max_acceleration=100,extra=1}}";
+    source = harbor_variant(old, bad);
+    CHECK(source
+        && load(files.manifest, source, strlen(source), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
+    bad = "route = \"open\", pieces = {"
+          "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240.5,dwell=0,"
+          "max_speed=20,max_acceleration=100}}";
+    source = harbor_variant(old, bad);
+    CHECK(source
+        && load(files.manifest, source, strlen(source), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
+    bad = "route = \"open\", pieces = {"
+          "{kind=\"line\",x0=0,z0=0,x1=0,z1=-10,ticks=240,dwell=0,"
+          "max_speed=20,max_acceleration=100},"
+          "{kind=\"line\",x0=2,z0=-10,x1=2,z1=-20,ticks=240,dwell=0,"
+          "max_speed=20,max_acceleration=100}}";
+    source = harbor_variant(old, bad);
+    CHECK(source
+        && load(files.manifest, source, strlen(source), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
+    return 0;
+}
+
 // M3: the internal open leg owns no staging-wire bytes, so the wire rejects it when encoding an
 // actor and when decoding a corrupted shape byte.
 static int open_leg_wire(void)
@@ -2016,6 +2060,7 @@ static const TestCase cases[] = {
     TEST_CASE(scene_berths),
     TEST_CASE(scene_appearance),
     TEST_CASE(scene_traffic),
+    TEST_CASE(open_path_decode),
     TEST_CASE(open_leg_wire),
     TEST_CASE(free_scene_location),
     TEST_CASE(memory_exhaustion),
