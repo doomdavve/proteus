@@ -2,10 +2,10 @@
 
 Status, 2026-11-14: **H0 (systemd sandbox) is deployed on Winterfell; H1-H3 are merged (H1's credential unit is deployed); H4 code side is merged (operator work owed); H5 is merged and **Winterfell runs `--lockdown kill` since v0.0.31**; H6 is decided (do not split); H7 is next.**
 Completed task: H1 credential unit and the H5 `kill` switch-over (v0.0.31), after two glibc first-use findings and a TURN quota finding. Evidence below.
-Open: a longer `kill` soak under real play (it is short so far); H4 operator work (nftables, a crash alert so a `SIGSYS` exit is noticed); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
+Open: a longer `kill` soak under real play (it is short so far); H4 operator work (nftables; the crash alert is done); the longer H3 fuzz campaign; relay join from outside the LAN; the libjuice allocation leak below.
 Done when: every step's gate passes, the closing step has moved the contract into a spec, and
 the remaining risk is written down as a decision, not an omission.
-Next task: H4 operator work (crash alert first), then H7, the closing spec `docs/SERVER_SECURITY.md`.
+Next task: H4 nftables limits, then H7, the closing spec `docs/SERVER_SECURITY.md`.
 
 `boat_server` is C, public on GitHub, and reachable from the internet over UDP (ENet) and
 WebSocket signalling (WebRTC). A memory-safety bug in anything that parses network bytes is a
@@ -215,3 +215,13 @@ port range holds 41), which makes this much harder to hit but does not remove th
 is a lifetime-0 refresh on close, which means patching or upgrading the vendored libdatachannel. That is an
 open item, not done. The relay only accepts allocations from the room over loopback, so the higher quota
 does not open anything to the public.
+
+### H4 crash alert (operator side)
+
+Winterfell, 2026-11-14 (`davve-srv` `7265890`). `OnFailure=` does not fire for units systemd restarts, so the
+room and relay units run `ExecStopPost=+-/usr/local/bin/service-exit-alert.sh %n`, which mails root for any
+non-`success` `SERVICE_RESULT` (signal, exit status, unit log, kernel seccomp lines; one mail per unit per
+10 minutes). Deployed with the `wake_velocity` role. Proof: `systemctl kill -s SEGV wake-velocity` restarted
+the room and postfix relayed one alert to the operator's address; a plain `systemctl restart` sent no mail.
+**Not exercised:** a real `SIGSYS` from the lockdown (the script's `SYS` note is covered by a simulated
+run only) and the relay unit's alert.
