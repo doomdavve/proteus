@@ -329,6 +329,12 @@ floating-point traffic schedules and fixed 4,160-second sampled horizon have not
 to a proven bounded combined timetable. The next implementation must define tick conversion,
 the validation budget and conservative swept envelopes before connecting the helper. Open routes,
 docking, authoring, wire integration, Apply/Undo and visual qualification remain outstanding.
+An unintegrated pairwise straight-leg clearance helper samples synchronized tick positions and
+inflates enclosing circles by a half-tick maximum relative travel bound. It may conservatively
+reject safe passages; the numerical rounding margins and its extension to turns, scenery and
+periodic schedules remain to be justified before it can serve as a scene proof. On 2026-11-14,
+macOS/Apple Silicon Debug, the build and focused leg, clearance, schedule and core-boundary tests
+passed. No motion or user acceptance is claimed.
 The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
 checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
 the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest

@@ -11,6 +11,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   boat_map.h boat_map_tiles.c boat_map_tiles.h
   boat_model.c boat_model.h boat_pose.c boat_pose.h
   boat_room_definition.c boat_room_definition.h
+  boat_route_clearance.c boat_route_clearance.h
   boat_route_leg.c boat_route_leg.h
   boat_schedule.c boat_schedule.h
   boat_scene_definition.c boat_scene_definition.h
