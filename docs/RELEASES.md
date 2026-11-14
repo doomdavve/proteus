@@ -217,9 +217,27 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.29 — 2026-11-14
+
+Current release: **[v0.0.29](https://github.com/doomdavve/proteus/releases/tag/v0.0.29)** is
+published at `6ca3954ff327e986a8a183a1157177932e7d2f95` (the merge of PR #198). It adds the SDP
+offer filter: the server passes only numeric IP candidates from a client's offer to the WebRTC
+library, so a client can no longer cause name lookups. Compatibility remains protocol 14 / physics 9.
+The Winterfell room runs it with `--lockdown log`.
+
+On Apple Silicon/macOS, Debug configure/build and **560 CPU CTests** passed through
+`tools/cut_release.py` (`ctest --preset full`, GPU tests off). Both native archives passed SHA-256
+(macOS `affe2ff6...`, Windows `4bedcc00...`), ZIP and version/commit checks. The first deployment
+attempt succeeded. The hosted and GitHub Pages browser checks passed in Chrome and the matching
+native bot joined with zero decode errors. Room and relay report active on the tagged commit;
+hosting pin `a603dcd` is on the private baseline. Not performed: human input/audio, Windows
+execution, physical devices, the Release-build `--fortify` check of the deployed binary. Evidence:
+`/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.29/` (the worktree was reused for the
+second release).
+
 ### v0.0.28 — 2026-11-14
 
-Current release: **[v0.0.28](https://github.com/doomdavve/proteus/releases/tag/v0.0.28)** is
+Earlier release: **[v0.0.28](https://github.com/doomdavve/proteus/releases/tag/v0.0.28)** is
 published at `a0ba228cdf85316e0b8b6c4a112d4be9961cb87e` (the merge of PR #196). It collects the
 server hardening work (H1-H5: connection limits, mitigation build flags, fuzz and sanitizer lanes,
 and the opt-in `--lockdown` mode) and the wake-field retirement since v0.0.27. Compatibility

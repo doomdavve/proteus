@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
@@ -93,6 +94,31 @@ static int steady_state(void)
     return 0;
 }
 
+// glibc's first localtime and address-sort use read files and probe sockets. The lockdown warms
+// them up first, so WebRTC's lookups and log timestamps after it do not hit the kill filter.
+static int libc_after_lock(void)
+{
+    if (!lock(BOAT_LOCKDOWN_KILL))
+        return 90;
+    time_t now = time(NULL);
+    struct tm local;
+    if (!localtime_r(&now, &local))
+        return 1;
+    struct addrinfo hints = { .ai_family = AF_UNSPEC,
+        .ai_socktype = SOCK_DGRAM,
+        .ai_protocol = IPPROTO_UDP,
+        .ai_flags = AI_PASSIVE | AI_ADDRCONFIG };
+    struct addrinfo *result = NULL;
+    if (getaddrinfo(NULL, "0", &hints, &result) != 0)
+        return 2;
+    freeaddrinfo(result);
+    hints.ai_flags = AI_ADDRCONFIG;
+    if (getaddrinfo("127.0.0.1", "3478", &hints, &result) != 0)
+        return 3;
+    freeaddrinfo(result);
+    return 0;
+}
+
 static int killed_execve(void)
 {
     if (!lock(BOAT_LOCKDOWN_KILL))
@@ -148,6 +174,7 @@ int main(void)
         Case body;
         int expect;
     } cases[] = { { "denied calls fail", denied, 0 }, { "steady state works", steady_state, 0 },
+        { "libc lookups survive the lockdown", libc_after_lock, 0 },
         { "execve kills", killed_execve, 128 + SIGSYS },
         { "open kills", killed_open, 128 + SIGSYS }, { "refusal installs nothing", refusal, 0 },
         { "landlock denies files and tcp bind", landlock_files, 0 } };
