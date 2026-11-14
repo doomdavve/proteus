@@ -547,6 +547,10 @@ compiled actors. Both renderers, physics contact, combat and camera exclusion co
 accepted lists. A missing subsystem keeps its compiled default; a present empty list disables it.
 `scene.define` does not enable a second package, a callback or a browser/room path.
 
+Free-package marina and traffic scenes use the same location checks as voyage scenes, including
+map, berth, module and traffic checks. Voyage recovery-shelter checks apply only to voyages.
+The current traffic check samples a fixed horizon; it is not a proof for arbitrary schedules.
+
 ### Package composition
 
 The existing single `kind = "voyage"`, `location = "outer"` package gains an optional top-level

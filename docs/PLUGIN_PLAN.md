@@ -2719,11 +2719,12 @@ merged to main (2026-11-07), as are S1e's F1–F4 and SV1 (#169); S3+ is not imp
 | SV1 (SV1a–SV1i merged in #169, 2026-11-07) | [Local save and resume](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume): the work-site job's committed P3 objective checkpoint (state bytes, HUD rows, timers, grants, RNG, acknowledgment, tick, schema, generation, quarantine) is **saved automatically**, never by a player action. It is written to a native file at between-tick boundaries (committed batches, cargo milestones, a periodic dirty write, pause, leaving to the menu and quit), together with its unacknowledged events, sequence and the native cargo/site snapshot, all from one snapshot; resume installs it unchanged and re-derives nothing. A save's header names its **content identity**: package id, a work digest that excludes display text (`scene.work.notices`; HUD strings live in source, which is not compared), `state_version`, physics revision and tick rate. The game menu discovers saves by reading only that header. A changed work digest makes a save unavailable, and it is set aside rather than deleted; a source edit with the same `state_version` resumes with the new code. SV1i lets a free work-site job return `migrate`, run with the P3.3b contract at load when `state_version` changed. The job runs inside `wake_velocity` as a catalog Working Harbour content (still no `--plugin` live reload) | Browser storage, rooms and recorded/replayed saves; restarting a job beside built sites or a supplied load (its init would supply again); live reload or Undo of a work session |
 | S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction. Like SV1, all persisted objective and native state saves automatically; no package or player action is needed to save | Rooms until P5 authority |
 
-Finding from S1a: `boat_plugin_free_check_location` runs no map checks on a free package's
+Superseded finding from S1a: `boat_plugin_free_check_location` ran no map checks on a free package's
 marina or traffic scene (only S1a work sites are surveyed there). Free scenes reach players
 through rooms, whose package loader checks spawn/grid contacts and open water around each
-berth, but not the voyage path's module shore/support checks or authored-traffic sweep. This
-predates S1a and needs its own fix.
+berth, but did not use the voyage path's module shore/support checks or authored-traffic sweep.
+The M3 prerequisite now shares those checks with free packages. The existing fixed-horizon
+traffic sampling remains subject to M3's stronger combined-timetable proof.
 
 Rules carried over from P3 and the location-life track:
 

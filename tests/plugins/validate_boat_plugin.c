@@ -412,6 +412,78 @@ static int scene_traffic(void)
     return 0;
 }
 
+// M3 prerequisite: free packages with a marina or traffic scene run the same structural map,
+// berth, module and traffic checks as voyages, but keep the voyage-only shelter rules.
+static int free_scene_location(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    BoatPluginVoyage voyage;
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer = boat_location_find("outer");
+    CHECK(boat_world_resources_init(&world, outer));
+
+    // The valid authored scene passes unchanged for both a voyage and a free package.
+    BoatPluginFree free = { .manifest = voyage.manifest, .has_scene = true, .scene = voyage.scene };
+    strcpy(free.manifest.kind, "free");
+    CHECK(boat_plugin_check_location(&voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+
+    // A free scene without marina or traffic keeps the old path, even on the unmapped basin.
+    const BoatWorldDefinition *basin = boat_location_find("basin");
+    BoatPluginFree plain = free;
+    plain.scene = (BoatSceneDefinition) { .version = BOAT_SCENE_VERSION };
+    strcpy(plain.manifest.location, "basin");
+    CHECK(boat_plugin_free_check_location(&plain, basin, NULL, &d) == BOAT_PLUGIN_OK);
+
+    // Marina content on the unmapped basin is rejected just like a voyage scene.
+    BoatPluginFree basin_free = free;
+    strcpy(basin_free.manifest.location, "basin");
+    CHECK(boat_plugin_free_check_location(&basin_free, basin, NULL, &d) == BOAT_PLUGIN_MANIFEST);
+    show("free scene on basin", &d);
+    CHECK(!strcmp(d.field, "location") && strstr(d.message, "mapped"));
+
+    // A mapped scene needs its compiled map and names the owning entry.
+    CHECK(boat_plugin_free_check_location(&free, outer, NULL, &d) == BOAT_PLUGIN_MANIFEST);
+    show("free scene without map", &d);
+    CHECK(!strcmp(d.file, free.manifest.entry) && !strcmp(d.field, "location")
+        && strstr(d.message, "map"));
+
+    // Invalid free berth placement on land uses the voyage structural diagnostic.
+    BoatPluginFree bad = free;
+    bad.scene.berths[0].x = 500;
+    bad.scene.berths[0].z = 500;
+    CHECK(boat_plugin_free_check_location(&bad, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    show("free berth ashore", &d);
+    CHECK(!strcmp(d.field, "scene.marina.berths[1]") && strstr(d.message, "open water"));
+    BoatSceneBerth saved = voyage.scene.berths[0];
+    voyage.scene.berths[0] = bad.scene.berths[0];
+    CHECK(boat_plugin_check_location(&voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.marina.berths[1]") && strstr(d.message, "open water"));
+    voyage.scene.berths[0] = saved;
+
+    // Invalid free traffic is caught by the same retained-timetable conflict check.
+    const char *conflict = harbor_variant(
+        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
+        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+    CHECK(conflict);
+    BoatPluginVoyage traffic;
+    CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &traffic, &d) == BOAT_PLUGIN_OK);
+    BoatPluginFree bad_traffic = free;
+    bad_traffic.scene = traffic.scene;
+    CHECK(
+        boat_plugin_free_check_location(&bad_traffic, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    show("free traffic conflict", &d);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]"));
+    CHECK(boat_plugin_check_location(&traffic, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
 static int scene_appearance(void)
 {
     static BoatPluginFiles files;
@@ -1772,6 +1844,7 @@ static const TestCase cases[] = {
     TEST_CASE(scene_berths),
     TEST_CASE(scene_appearance),
     TEST_CASE(scene_traffic),
+    TEST_CASE(free_scene_location),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),
     TEST_CASE(last_good_survives),

@@ -329,6 +329,11 @@ floating-point traffic schedules and fixed 4,160-second sampled horizon have not
 to a proven bounded combined timetable. The next implementation must define tick conversion,
 the validation budget and conservative swept envelopes before connecting the helper. Open routes,
 docking, authoring, wire integration, Apply/Undo and visual qualification remain outstanding.
+The related S1a gap is fixed: free-package marina and traffic scenes now use the voyage location
+checks, except for voyage-only shelters. Their existing fixed-horizon traffic check still requires
+the stronger M3 proof. On 2026-11-14 macOS/Apple Silicon Debug, the full build and full CTest
+preset passed all 558 enabled tests with local sockets allowed; 13 retired wake-field tests were
+disabled. No visual or human motion check was performed for this validation-only change.
 On macOS/Apple Silicon Debug, the full build passed. The full CTest preset passed 542 tests
 inside the sandbox; the 14 socket-dependent failures passed on an unsandboxed rerun. Thirteen
 retired wake-field tests were disabled. No motion or user acceptance is claimed.
