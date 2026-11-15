@@ -2,12 +2,10 @@
 
 Status, 2026-11-15: **done.** M1 structures, M2 appearance, M3 authored routes and M4 vessels with
 one-shot services are merged (M4: #209); M5 (package-local modules, the shared Eriksberg marina module
-and the integrated example `marina-integrated-demo`) is implemented on `feat/marina-m5` (W1-W7) and
-local: the PR is pending. The contracts live in the [Plugin API](PLUGIN_API.md): M4 in
+and the integrated example `marina-integrated-demo`) is merged (#211). The contracts live in the [Plugin API](PLUGIN_API.md): M4 in
 [Marina vessel services](PLUGIN_API.md#marina-vessel-services-m4), M5 in
 [Package modules](PLUGIN_API.md#package-modules-m5). What remains is listed as explicit open items in
-[Closing leftovers](#closing-leftovers--2026-11-15). Next task: open the M5 PR once the user approves
-it (not yet approved). Automated verification and human acceptance are separate; no human review of
+[Closing leftovers](#closing-leftovers--2026-11-15). No next task is scheduled. Automated verification and human acceptance are separate; no human review of
 M5 motion has happened. The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -38,7 +36,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Complete, merged #209; contract in the Plugin API; browser/Wasm, room and motion review owed |
-| M5 | Package-local Lua modules and integrated marina example | M4 | Complete locally (W1-W7), PR pending; contract in the [Plugin API](PLUGIN_API.md#package-modules-m5); [execution package](#m5-execution-package--2026-11-15) |
+| M5 | Package-local Lua modules and integrated marina example | M4 | Done (W1-W7), merged #211; contract in the [Plugin API](PLUGIN_API.md#package-modules-m5); [execution package](#m5-execution-package--2026-11-15) |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
 native owner and plugin integration into explicitly dependent PRs with the same completion
