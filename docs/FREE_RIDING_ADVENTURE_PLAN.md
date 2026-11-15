@@ -1,5 +1,12 @@
 # Free-riding adventure: Gothenburg to Vinga
 
+Status, 2026-11-15: A0–A2 complete; the A3 map/voyage exists and later city work is on main.
+A4 is planned in the [Vinga integration plan](VINGA_INTEGRATION_PLAN.md), which owns execution.
+Open: corridor terrain acquisition, map extension, voyage content, scenery and qualification.
+Done when: continuous full/short Vinga outings pass A4 acceptance and their contracts are documented.
+Next task: V0 source acquisition, raster coverage validation and corridor selection.
+The October street/moored-life handoff below is historical; it does not gate A4.
+
 Direction update, 2026-11-06: [Free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md) now owns the
 proposed cargo/crane interactions, Creative/Working Harbour rules, economy and player changes
 to places. Its next task is a small handling experiment on the current `outer` map. This plan
@@ -100,7 +107,8 @@ three ferries, a schooner and Hisingsbron's animated lift, shared by CPU/GPU wit
 contacts in `outer` ([result and limits](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35j-river-traffic-result-2026-10-28)).
 The same playtest accepts the upstream map and landmark work, superseding their unplayed
 status above. Street and moored life remain.
-**Next: the remaining A3.5j street and moored life.**
+**Historical next task (2026-10-28):** the remaining A3.5j street and moored life.
+Current geographic work follows the [Vinga integration plan](VINGA_INTEGRATION_PLAN.md).
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
 extension beyond Älvsborgsbron with one sheltered destination and one exposed-water encounter.
@@ -365,8 +373,9 @@ The [first-steps handoff for Sol](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) owns the
 A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance checks.
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
-completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5i (scenery packs and on-demand browser loading, 2026-10-28) and A3.5f (upstream past Hisingsbron) and A3.5g (Karlatornet, Lilla Bommen, Hisingsbron), both 2026-10-28, are complete; A3.5d (the rest of the OSM landmarks) and the remaining A3.5j street and moored life are planned; A3.5j river traffic is implemented and user-accepted, and the rest of A3.5j is next.
+completed 2026-10-25. A2 is complete: A2.1 (counters) and A2.2 (tile catalogue and indexed
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5i (scenery packs and on-demand browser loading, 2026-10-28) and A3.5f (upstream past Hisingsbron) and A3.5g (Karlatornet, Lilla Bommen, Hisingsbron), both 2026-10-28, are complete; A3.5d (the rest of the OSM landmarks) and the remaining A3.5j street and moored life are planned; A3.5j river traffic is implemented and user-accepted, and the rest of A3.5j was the October next task. Current A4 execution is owned by the
+[Vinga integration plan](VINGA_INTEGRATION_PLAN.md).
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
