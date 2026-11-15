@@ -39,15 +39,17 @@ claude                              # terminal 2: the agent, started in the repo
 Paste this prompt into the agent:
 
 > Read docs/AGENT_AUTHORING.md and docs/PLUGIN_API.md. The draft is ~/wake-agent-trial/langedrag
-> and the running game's bridge is ~/.wake-velocity-bridge. Add one more shelter objective to the
-> voyage (keep it small). Follow the loop in the guide: validate, preview and capture before you
+> and the running game's bridge is ~/.wake-velocity-bridge. Move one of the four shelters in the
+> voyage to a nearby spot (langedrag is at the 4-shelter cap, so do not add one). Follow the loop in the guide: validate, preview and capture before you
 > stage anything, then live-inspect, live-stage with the pins it returns, and live-apply. Show me
 > the capture, report each command's status, and stop if a stage is rejected twice. Do not read the
 > bridge's session file. Afterwards, run live-undo and confirm the previous revision is back.
 
-Then check each [trial](#trial) item in the running game and note the result. Item 5: afterwards
-ask for something the API cannot do (for example "make the ferry sink") and see whether you get a
-gap report.
+Then check each [trial](#trial) item in the running game and note the result. Item 5: ask for something the
+API cannot do and see whether you get a gap report. A first session on 2026-11-15 got one by
+accident: the agent was asked to add a fifth shelter, validated a scratch copy, quoted `voyage.shelters:
+must list 2 to 4 shelters, not 5`, named the C limit as the work item and staged nothing. That
+session never reached stage, apply or undo.
 
 ## The loop
 
