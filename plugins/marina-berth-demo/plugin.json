@@ -1,0 +1,13 @@
+{
+  "id": "proteus.marina-berth-demo",
+  "name": "Marina berth demo",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": [
+    "voyage.define",
+    "scene.define"
+  ],
+  "state_version": 1
+}

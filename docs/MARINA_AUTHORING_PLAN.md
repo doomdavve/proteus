@@ -7,7 +7,7 @@ Contract: [Plugin API](PLUGIN_API.md#location-life-scene-contract-l11l43), [traf
 [protocol v15](MULTIPLAYER_PROTOCOL.md); evidence and limits are recorded below.
 Open: M4 occupancy, M5 local modules; human acceptance and wider-platform review remain separate.
 Done when all five marina milestones are closed; M3's implementation/qualification gate is met.
-Next task: M4 O4 example plugin, evidence and renderer/browser checks (branch `feat/marina-m4`); O1a ownership, O1b scene data, O2 frames/contacts and O3 Lua/wire/survey are done locally. Decisions are in the M4 section.
+Next task: M4 O4 remainder (browser/Wasm, room and independent-session checks, user motion review), then O5 closing (branch `feat/marina-m4`); O1a–O3 and the O4 example `plugins/marina-berth-demo` with CPU/GPU stills are done locally. Decisions are in the M4 section.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -37,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a–O3 local (ownership, scene data, frames/contacts, Lua/wire/survey); O4 example and evidence next |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | In progress; O1a–O3 local (ownership, scene data, frames/contacts, Lua/wire/survey); O4 example and stills local; browser/Wasm, room and motion review owed |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
@@ -761,8 +761,16 @@ a service vessel uses its own hull, may touch only its berth's pier during docki
 empty berths are open water. Cases `marina_service_decode` and `marina_service_survey`; the full
 run passed 573/573. The JSON schema tool lists the new fields. Not yet done: the example package,
 CPU/GPU frames, browser/Wasm and room end-to-end runs, and a loop-path service.
-Limits: a serviced vessel has no visual wake yet; no CPU/GPU frame has been rendered yet; the
-harbor-view model cache path is unchanged and untested with a service.
+Limits: a serviced vessel has no visual wake yet.
+
+O4 status, 2026-11-15 (macOS Debug, local): `plugins/marina-berth-demo` has two empty berths, a
+resident round trip (5–25 s) and a visitor stay (2–21 s, moored 14–16 s). CPU and GPU stills
+show authored hull colours and no doubled or missing hull at the handoffs; the model cache builds
+per-vessel models. A service timetable edit now classifies as a session restart (it was live).
+Case `marina_berth_apply_undo`; the full run passed 574/574. Evidence:
+[2026-11-15](evidence/marina-m4/2026-11-15/README.md). Not done: browser/Wasm (no Emscripten
+here), room end to end, independent sessions, and a watched motion review (the windowed run
+exited cleanly but was not observed).
 
 Acceptance:
 

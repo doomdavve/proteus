@@ -1477,6 +1477,22 @@ static bool scene_has_open_route(const BoatSceneDefinition *scene)
     return false;
 }
 
+// M4: a service timetable (who uses which berth along which route, and when) is a schedule edit.
+static bool same_services(const BoatSceneDefinition *a, const BoatSceneDefinition *b)
+{
+    if (a->service_count != b->service_count)
+        return false;
+    for (unsigned i = 0; i < a->service_count; ++i) {
+        const BoatSceneService *x = &a->services[i], *y = &b->services[i];
+        if (strncmp(x->id, y->id, sizeof(x->id)) || strncmp(x->vessel, y->vessel, sizeof(x->vessel))
+            || strncmp(x->berth, y->berth, sizeof(x->berth))
+            || strncmp(x->route, y->route, sizeof(x->route)) || x->kind != y->kind
+            || x->dock_piece != y->dock_piece || x->start_tick != y->start_tick)
+            return false;
+    }
+    return true;
+}
+
 BoatPluginChange boat_plugin_classify(
     const BoatPluginVoyage *active, const BoatPluginVoyage *candidate)
 {
@@ -1490,6 +1506,8 @@ BoatPluginChange boat_plugin_classify(
     if ((scene_has_open_route(&active->scene) || scene_has_open_route(&candidate->scene))
         && waterfront_route_digest(&active->scene.traffic)
             != waterfront_route_digest(&candidate->scene.traffic))
+        return BOAT_PLUGIN_RESTART_SESSION;
+    if (!same_services(&active->scene, &candidate->scene))
         return BOAT_PLUGIN_RESTART_SESSION;
     // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;
