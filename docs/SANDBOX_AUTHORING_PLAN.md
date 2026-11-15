@@ -43,8 +43,11 @@ tools run them is open (SA2).
 2. **Command line (decided by the user, 2026-11-15: "`--work` should just be a plugin").** A
    working harbour is a package like any other: `--plugin DIR` runs a `free` package with
    `scene.work` as the working-harbour session, and `--work` is removed rather than kept as an
-   alias. The work-only options (`--work-clock-report`, `--work-review-pose`, `--new`) stay
-   and apply when the running package has work sites. Still to decide: how the bundled
+   alias. The save options (`--new`, `--save`, `--data-dir`) are player
+   state, not tooling, and stay, applying when the running package has work sites. The two
+   developer review options (`--work-review-pose`, `--work-clock-report`) are tooling, so they
+   leave the command line and are exposed through the plugin interface instead
+   (user, 2026-11-15; see SA1). Still to decide: how the bundled
    package is chosen without a directory (the title's START and scripted runs). Proposed: the
    existing catalog selector `--package proteus.outer-work`, with the title passing it; say
    if you want another spelling. The bridge continues to need a window.
@@ -59,15 +62,21 @@ One branch (`feat/sandbox-authoring`), one commit per step, one pull request aft
 - **SA1. A work package is just a plugin.** `--plugin DIR` (and the catalog selector from
   SA0.2) accepts a `free` package with work sites and runs the working-harbour session,
   loading and watching it through the existing plugin host and its revisions instead of the
-  compiled catalog entry; the refusal in `wake_velocity_plugin.c` goes. `--work` is removed
-  and its users move: the title's START, `docs/COMMAND_LINE.md`, `PLAYING.md`, `TESTING.md`,
+  compiled catalog entry; the refusal in `wake_velocity_plugin.c` goes. `--work` is removed.
+  So are `--work-review-pose swing|deck|approach` (prepare a real cargo pose for a capture) and
+  `--work-clock-report FILE` (a CSV of GL sun/mask observations): they become requests on the
+  running game through the live bridge and its console, `live-console --line TEXT` and
+  `./wv console`, so an agent or a scripted test asks for a pose or a report the same way.
+  Scripted runs that need them without a human use the bridge with a virtual clock. The exact
+  line names are chosen in SA1 and recorded in the API. The users of `--work` move: the title's START, `docs/COMMAND_LINE.md`, `PLAYING.md`, `TESTING.md`,
   `WEB_BUILD.md`, the sandbox and other plans' commands, `tests/app/tests.cmake` and
   `tests/render/tests.cmake`. Existing saves and the autosave rules are unchanged. A stage, Undo or reload restarts the cargo session per SA0.1 and
   restages the job's `init`. `--plugin-bridge` works with it (inspect, stage, apply, undo,
   discard, console). Unknown until read: how far `WakeWork`'s static revision and
   `wake_plugin_*` can share one host; if the work session needs its own host, say so and
   size the step then. Tests: a virtual-clock bridge case beside `wake_velocity_bridge`, a
-  restart case in the work-session tests, and the retargeted `--work` tests and captures (byte-identical frames expected).
+  restart case in the work-session tests, and the retargeted `--work` tests and captures (byte-identical frames expected); the six
+  `tests/app/tests.cmake` cases on the two review options move to the bridge requests.
 - **SA2. The tools accept work packages.** `capabilities` reports `live.kinds` and the
   workspace kind; `init --from plugins/outer-work` writes instructions about sites, the job
   and the survey diagnostics instead of voyage shelters; `./wv play` starts `--plugin DIR` as for a voyage;
