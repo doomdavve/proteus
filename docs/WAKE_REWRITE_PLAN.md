@@ -1,8 +1,10 @@
 # Coherent, crossable wakes
 
-Status, 2026-11-14: the physical wake-field experiment and its disabled tests are retired.
-The arcade objects and D3 remain available. Next: play the stability candidate and assess
-tight-turn readability. Done when play feedback resolves those open questions.
+Status, 2026-11-15: the physical wake-field experiment is retired; arcade objects and D3 remain.
+The [wake research plan](WAKE_RESEARCH_PLAN.md) now owns moving-hull coverage, turn continuity
+and affordable longer persistence, with paired demos and timings at every step. Next: R0 baseline.
+Stability play feedback remains open in [its owning plan](ARCADE_STABILITY.md).
+Done when the research closes its chosen behavior into a spec and records remaining open items.
 
 Retirement verification, 2026-11-14, macOS arm64: Debug build passed. CPU and GPU basin
 and outer captures at 3 s were inspected; a 180-frame scripted GPU demo completed. These
