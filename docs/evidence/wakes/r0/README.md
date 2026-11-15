@@ -2,6 +2,8 @@
 
 Owner: [wake research plan](../../../WAKE_RESEARCH_PLAN.md). Research baseline only; the
 production wake source, surface, shaders, physics, capacity and protocol are unchanged.
+Current: native CPU/GPU baseline, paired media, visible demo and full verification complete;
+budget/criteria agreement and human review remain open.
 
 ## Method and interpretation
 
@@ -159,9 +161,10 @@ before interpreting improvement. The coarse field reel alone cannot score contin
 
 ## Review status and limits
 
-R0 implementation and baseline evidence are recorded below when collected. No R1–R3 candidate
-has been implemented. Budget agreement, the remaining continuity metric design, full moving
-scene human review, browser/slower-GPU measurements and player acceptance remain open.
+R0 native implementation and automated baseline verification are complete locally. No R1–R3
+candidate has been implemented. Budget agreement, refinement of diagnostic continuity metrics
+for R2 acceptance, human scene review, browser/slower-GPU measurements and player acceptance
+remain open.
 The old continuity work already shortened pieces from one second to half a second and aligned
 local-age envelopes; R2's shorter-span candidate is a control, not a new selected solution.
 
@@ -185,7 +188,7 @@ to close the corrected baseline. Preserve them as discarded-harness history, not
 The retained CPU matrix is `cpu-final`; `media-final` records only completed, checksum-matched
 reels. No movie is claimed from an incomplete frame folder.
 
-### Corrected baseline results — 2026-11-15
+### Corrected CPU baseline and first verification checkpoint — 2026-11-15
 
 The Release CPU matrix completed **240 runs / 60 neutrality comparisons**: five paths,
 one/four emitters, dense/dispersed sources, four measurement modes and three repetitions.
@@ -236,30 +239,30 @@ as contact sheets, and the movies decoded completely. This is capture/sequence i
 not visible paced playback, hands-on driving, listening or user acceptance.
 
 Debug configure/build passed without project warnings. The initial full CTest run passed
-614/614 before the final probe/CSV corrections. The final corrected run attempted
+614/614 before the final probe/CSV corrections. The pre-resume corrected run attempted
 `ctest --preset full`: **581/616 passed; all 35 failures were GPU tests whose graphics
 context could not initialize** (`GLFW: Failed to determine Monitor to center Window`).
 All non-GPU cases, including the three new baseline contracts and boundary/time lints, passed.
 Desktop access had been granted; direct GPU retries failed with the same missing-monitor
-condition. The unavailable corrected GPU matrix, stationary/turn/transient/fleet reels,
-outer/high-resolution captures and paced visible demo remain explicit R0 verification debt.
-No corrected GPU baseline or high-resolution performance number is claimed.
+condition. At this checkpoint the corrected GPU matrix, remaining reels and visible demo
+were verification debt. The resumed native qualification below supersedes this limitation.
 
 ### Proposed next decision
 
 Astra found no remaining blocking code defect after the corrections. Keep R0 open for
-external verification and budget/criteria agreement. A provisional native **screening**
+budget/criteria agreement and human review. A provisional native **screening**
 allocation for the current four-emitter/30-query CPU workload is .10 ms p95 / .15 ms p99
 for the enclosing aggregate workload, with component regressions above 10% investigated.
 This allocation is for this synthetic fixture, not an authority/server tick or arbitrary
 future fleet size. The graphics ceilings above remain unchanged; a separate absolute wake
-GPU allocation awaits corrected measurements. Keep production memory/network unchanged until
+GPU allocation is not isolated by these whole-scene measurements; fixture screens are proposed
+below. Keep production memory/network unchanged until
 an explicit R1/R3 resource proposal: the present 5,320-byte player pool, 128 records and
 2 births/s per continuously wet player are baselines, not permission to increase replication
 traffic. CPU/GPU resource and protocol growth need their own numeric proposal before promotion.
 These screening criteria have not been agreed by the user.
 
-When a desktop monitor/context is available, resume with fresh output directories:
+Recorded qualification commands (for a repeat, choose fresh output directories):
 
 ```sh
 python3 tools/wake_research.py --binary build-release/wake_research --output build-release/wake-r0/gpu-verified --gpu --traffic --paths circle --emitters 1 4 --layouts dense
@@ -273,3 +276,78 @@ ctest --preset full
 Run uncapped matrices without simultaneous GPU tests or encoding/playback. Retain the paired
 media separately from timing; review their framing/motion, then request the R0 evidence review
 and budget decision before R1/R2. Refresh the manifest/archive after new evidence is collected.
+
+
+### Resumed native qualification — 2026-11-15
+
+The user confirmed the earlier graphics failures followed power save. `caffeinate -di` held
+the display awake during the sequential matrices, captures, visible demo and tests; `-diu`
+was used for the later scene-capture correction and final suite. These temporary assertions
+do not change saved power settings. All native graphics initialization succeeded on the resume.
+
+The corrected Release GPU matrix completed **48 runs / 12 neutrality comparisons** across
+four configurations, with three alternating repetitions per measurement mode. All continuously
+emitting player pools remained saturated. Traffic occupancy varied from 88 to 128; combined
+load peaked at 256 pieces, not 256 continuously. Substantial outside-field work remained;
+record uploads were 12,288 bytes/frame, with 8 MiB stamp and 5 MiB history fields. Driver,
+allocator and other scene/HDR resources are excluded from these field-memory counts.
+
+Milliseconds, median of three baseline run percentiles:
+
+| Fixture, all with physical traffic | GPU p50/p95/p99 | Enclosing p50/p95/p99 | GPU p95 range across runs |
+| --- | --- | --- | --- |
+| Basin 320x200, one emitter | 2.210 / 2.412 / 2.525 | 2.875 / 3.145 / 3.527 | 2.395–2.782 |
+| Basin 320x200, four emitters | 2.894 / 3.174 / 3.355 | 3.628 / 4.002 / 4.265 | 3.172–3.188 |
+| Outer 320x200, four emitters | 5.539 / 6.419 / 6.627 | 6.528 / 7.464 / 7.742 | 6.408–6.468 |
+| Outer 1280x800 HDR, four emitters | 6.621 / 7.421 / 7.668 | 7.517 / 8.378 / 8.697 | 7.407–7.443 |
+
+[GPU timings](gpu-timings.csv) retain all modes, component statistics and repetition spread;
+the raw summary reports also retain absolute/percentage deltas. Wake-off GPU p95 medians
+were 1.236/1.261/2.505/2.425 ms in the four rows respectively. Those differences include
+interaction effects and are not isolated wake cost. The one-emitter basin's third repetition
+reached 2.782 ms GPU p95 and 3.290 ms p99; preserve this variation rather than hiding it behind
+the median. No cause is established. These are synchronous fixed-fixture timings, not gameplay
+latency or evidence that the differently configured original graphics gates passed.
+
+Astra reviewed the corrected GPU reports and recommends these provisional **whole-fixture GPU
+screens**, based on the four-emitter median p95 plus 10%: basin low 3.491 ms, outer low
+7.061 ms, outer HDR 8.164 ms. The CPU .10 ms p95 / .15 ms p99 aggregate-workload screens remain
+proposals; observed corrected aggregate maxima were about .089/.092 ms. Require contemporary
+alternating baseline/candidate runs and investigate relative regressions as well as absolute
+ceilings. Available headroom is not permission to spend it. Existing gameplay graphics gates
+remain independently applicable. These proposals await user agreement.
+
+All **twenty scene/view pairs** completed: straight, circle, figure-eight, stop, dry interval,
+reversal, teleport, serviced marina, outer and high/HDR, each with chase and stationary overview.
+Each pair has one production-render movie and one height/foam movie: forty movies, each 100
+frames at 10 Hz. All 200 corresponding source PNG pairs per view matched exactly, totaling
+4,000 matching PNG pairs. Temporal samples from circle, stop, dry, reversal, teleport, service,
+outer and high captures were inspected. Fixed-source circle patterns retain concentrated inner
+fronts and separated outer pieces; stop/dry fields travel after emission ceases. The raw teleport
+fixture intentionally exposes the missing-tracker-discontinuity case. These are agent inspections
+of scripted fixtures, not human handling or appearance acceptance.
+
+Capture inspection caught an additional harness issue: `SESSION_VIEW` omitted `world.scene`,
+so the first service movies rendered the compiled marina despite their scene digest. Those two
+movies are superseded. The harness now passes `boat_session_view()` to the renderer; its new
+`wake_research_scene` contract checks authored harbor slots and hidden serviced routes at
+7/12/17 seconds in production render frames. Both service views were recaptured; inspected
+frames show the two authored docks and distinct moving boats. Circle chase/overview controls
+remain identical across the fix (400 PNG pairs). Neutrality checks alone did not prove that
+the intended authored scene was exercised; the render-frame contract and inspection address it.
+
+**Provenance:** CPU/GPU timings belong to the original `1031166` harness; its exact executable
+is retained as `build-release/wake-r0/wake_research-timing-baseline`. The manifest distinguishes
+`timing_sources`/`binary` from `current_sources`/`current_binary`. Corrected service captures
+and the scene contract use the updated harness. Ordinary circle image equality establishes
+unchanged sampled imagery, not measured timing equivalence or an optimization. No timing win
+is claimed for this scene-only wiring correction. Original service captures remain history;
+the manifest's current media list points to the replacements in `media-scene-verified`.
+
+The visible scripted rig completed **80 seconds / 9,600 ticks**, including all 3,600 measured
+frames. Debug/Release builds passed without project warnings. The first awake full suite passed
+616/616; after adding the scene contract, the final `ctest --preset full` passed **617/617**,
+including all 36 GPU-labelled cases, in 100.33 seconds. Astra found no blocking issue in the
+native evidence or narrow scene correction. No new hands-on input, audio listening, browser,
+slower-GPU or user-acceptance claim is made. The next decision is R0 budget/criteria agreement
+before R1 coverage or R2 geometry candidates.

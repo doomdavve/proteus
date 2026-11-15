@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: R0 implementation reviewed; corrected CPU baseline complete.
-Current step: R0 graphics/media qualification; macOS currently reports no monitor.
-Open: corrected GPU matrix, remaining reels/visible demo, budget agreement and human checks.
+Status, 2026-11-15: R0 native baseline and automated verification complete locally.
+Current step: R0 review and agreement on behavioral/performance screening criteria.
+Open: budget agreement, human review, browser/slower-GPU and unavailable counters.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: restore graphics access and finish R0 verification; no R1/R2 candidate or PR promotion.
+Next: agree R0 criteria before R1 coverage / R2 geometry candidates; no PR promotion.
 
 ## Scope and existing work
 
@@ -101,7 +101,7 @@ clips plus a common straight/turn/crossing regression reel.
 
 ## R0 — Baseline and measurement harness
 
-**Status:** implemented locally; review/exit gates pending. [R0 evidence bundle](evidence/wakes/r0/README.md)
+**Status:** implemented and natively verified; budget/criteria agreement pending. [R0 evidence bundle](evidence/wakes/r0/README.md)
 owns commands, fixtures, source coverage, raw artifact locations, measurements and limits.
 Audit every moving-hull class and location/scene, naming the source,
 visual-only versus physical behavior, thresholds, and omissions. Include player/remote boats,
@@ -283,7 +283,7 @@ review and budget/criteria agreement before the first coverage/geometry candidat
 slower-GPU/platform, complete network/authority counters and human acceptance remain open.
 Detailed dated verification and review findings belong to the linked evidence bundle.
 
-R0 verification checkpoint: corrected Release CPU matrix completed 240 runs / 60 passing
+First R0 verification checkpoint (native verification superseded below): corrected Release CPU matrix completed 240 runs / 60 passing
 neutrality comparisons; the source coverage and 27-case encounter tables are retained. Astra
 reviewed the corrections and found no remaining blocking implementation defect. Straight/chase
 production and height/foam paired reels completed with identical PNGs; other reels and the
@@ -292,3 +292,28 @@ passed 581/616; all 35 failures were GPU cases unable to initialize the missing 
 The earlier 614/614 full pass predates final probe corrections and is not final verification.
 The evidence bundle owns commands, raw checksums, numbers and the provisional screening budget.
 R0 stays open until its remaining verification and agreement gates are resolved.
+
+### R0 resumed native qualification — 2026-11-15
+
+The user confirmed the machine had entered power save. Holding the display awake restored
+GPU access. Corrected Release matrices completed 48 runs / 12 matching-hash comparisons across
+basin low (one/four emitters), outer low and outer HDR (four emitters), all with the supported
+physical traffic pool. The primary timing baseline is retained at `1031166`; its exact binary
+and source hashes are in the evidence archive. The native fixture results and proposed screening
+ceilings are in the [evidence bundle](evidence/wakes/r0/README.md#resumed-native-qualification--2026-11-15).
+
+Completed twenty matched scene/view pairs (forty ten-second movies), including stationary
+views, service arrivals/departures and outer/high modes. Inspection found that the harness's
+old `SESSION_VIEW` omitted the authored scene: the initial service reels showed the compiled
+marina. Switched the harness to `boat_session_view`, added a CPU render-frame scene contract,
+and recaptured both service views. Both circle control views remain byte-identical across
+this wiring fix; no timing equivalence or performance improvement is inferred from that.
+The archive distinguishes timing sources/binary from corrected scene-capture sources/binary.
+Production mechanics, renderer recipes and protocol remain unchanged.
+
+The 80-second / 9,600-tick visible scripted demo completed. Debug/Release builds are project
+warning-clean. The final full CTest run passed **617/617**, including 36 GPU-labelled cases and
+the new scene contract. Astra reviewed the native metrics and narrow scene fix with no blocking
+issue. Agent-run capture/sequence inspection and playback are recorded separately from human
+input/audio review and acceptance. R0 now awaits criteria/budget agreement, rather than graphics
+access. Platform/authority counters and human acceptance remain explicit open items.

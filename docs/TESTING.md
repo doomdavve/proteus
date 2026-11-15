@@ -1462,6 +1462,7 @@ cmake --build build-release --target wake_research wake_coverage wake_encounters
 mkdir -p build-release/wake-r0
 python3 tools/wake_research.py --binary build-release/wake_research --output build-release/wake-r0/cpu
 python3 tools/wake_research.py --binary build-release/wake_research --output build-release/wake-r0/gpu --gpu --traffic --paths circle --emitters 1 4 --layouts dense
+./build-release/wake_research --output build-release/wake-r0/scene-check --location outer --scene plugins/marina-berth-demo --check-scene
 ./build-release/wake_coverage plugins/marina-berth-demo build-release/wake-r0/coverage.csv
 ./build-release/wake_encounters build-release/wake-r0/encounters
 ./build-release/wake_turn_probes build-release/wake-r0/turns.csv
@@ -1477,7 +1478,9 @@ The matrix performs three alternating repetitions with 20 simulated seconds of p
 60 measured seconds each. It writes raw CSV, per-run JSON and `summary.json` with p50/p95/p99,
 absolute/percentage deltas, checksums and unavailable counters. Aggregate timing controls expose
 the cost of phase timers; separate diagnostic runs count support passes outside the query timer.
-The contract test checks deterministic neutrality, 128-record sustained occupancy, wake-off,
+The authored-scene contract checks that accepted berths and hidden service routes reach render
+frames through the same production session-view builder used for captures. The contract test
+checks deterministic neutrality, 128-record sustained occupancy, wake-off,
 slow-source suppression, and raw teleport versus explicit restart. `wake_research_encounters`
 checks signed source-off fields and finite-difference derivatives while retaining a 27-case
 calm-twin outcome table. Neither test gates on wall-clock timing.

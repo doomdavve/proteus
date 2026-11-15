@@ -110,3 +110,10 @@ add_test(NAME wake_research_coverage COMMAND wake_coverage
   ${CMAKE_CURRENT_BINARY_DIR}/wake-research-coverage.csv)
 set_tests_properties(wake_research_coverage PROPERTIES LABELS "cpu;slow"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME wake_research_scene COMMAND wake_research
+  --output ${CMAKE_CURRENT_BINARY_DIR}/wake-research-scene --location outer
+  --scene plugins/marina-berth-demo --check-scene)
+set_tests_properties(wake_research_scene PROPERTIES LABELS "cpu;render;slow"
+  PASS_REGULAR_EXPRESSION "wake_research_scene=ok"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

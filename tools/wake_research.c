@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 /* R0 fixed-source baseline. Diagnostic counters run outside timed query sections. */
+#include "core/waterfront_service.h"
 #include "external/glad.h"
 #include "plugins/boat_plugin_io.h"
 #include "plugins/boat_plugin_load.h"
@@ -129,6 +130,30 @@ static uint64_t digest(uint64_t h, const void *data, size_t size)
     return h;
 }
 
+static void scene_contract(BoatSession *session)
+{
+    REQUIRE(session->world.scene);
+    const BoatSceneDefinition *scene = session->world.scene;
+    const unsigned ticks[] = { 840, 1440, 2040 };
+    for (unsigned i = 0; i < 3; ++i) {
+        boat_session_set_tick(session, ticks[i]);
+        BoatViewState view = boat_session_view(session);
+        WaterfrontSceneFrame frame;
+        boat_scene_frame(
+            &view, &session->presentation, &session->world, BOAT_CAMERA_DEFAULT, &frame);
+        REQUIRE(view.scene == scene);
+        if (scene->berths_present)
+            REQUIRE(frame.harbor.berth_count == (int)waterfront_service_hull_slots(scene));
+        if (scene->traffic_present) {
+            REQUIRE(frame.traffic.vessel_count == (int)scene->traffic.actor_count);
+            for (unsigned r = 0; r < scene->traffic.actor_count; ++r)
+                if (waterfront_service_for_route(scene, r) >= 0)
+                    REQUIRE(frame.traffic.hidden[r]);
+        }
+    }
+    puts("wake_research_scene=ok: authored harbor and hidden serviced routes reach render frames");
+}
+
 int main(int argc, char **argv)
 {
     const char *prefix = NULL, *path = "circle", *location = "basin", *clip = NULL,
@@ -136,12 +161,15 @@ int main(int argc, char **argv)
     unsigned emitters = 4, frames = FRAMES;
     bool dispersed = false, off = false, diagnostics = false, graphics = false, aggregate = false;
     bool high = false, visible = false, overhead = false, traffic = false, restart = false;
+    bool check_scene = false;
     unsigned clip_start = WARMUP;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--output") && i + 1 < argc)
             prefix = argv[++i];
         else if (!strcmp(argv[i], "--path") && i + 1 < argc)
             path = argv[++i];
+        else if (!strcmp(argv[i], "--check-scene"))
+            check_scene = true;
         else if (!strcmp(argv[i], "--scene") && i + 1 < argc)
             scene_path = argv[++i];
         else if (!strcmp(argv[i], "--location") && i + 1 < argc)
@@ -185,7 +213,7 @@ int main(int argc, char **argv)
                 "[--off] [--diagnostics] [--aggregate] [--gpu] [--high] [--location basin|outer] "
                 "[--visible] "
                 "[--overhead] [--traffic] [--scene VOYAGE_PLUGIN] [--restart] [--clip DIR "
-                "--clip-start SECONDS]\n");
+                "--clip-start SECONDS] [--check-scene]\n");
             return 2;
         }
     }
@@ -213,6 +241,12 @@ int main(int argc, char **argv)
         REQUIRE(boat_plugin_load_voyage(&bundle, NULL, &authored, &d) == BOAT_PLUGIN_OK);
         REQUIRE(authored.has_scene);
         session.world.scene = &authored.scene;
+    }
+    if (check_scene) {
+        REQUIRE(scene_path && !graphics && !clip);
+        scene_contract(&session);
+        test_worlds_close();
+        return 0;
     }
     BoatWakeObjects w;
     REQUIRE(boat_wake_objects_init(&w, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
@@ -366,8 +400,8 @@ int main(int argc, char **argv)
                 : BOAT_CAMERA_DEFAULT;
             if (timed_gpu)
                 glBeginQuery(GL_TIME_ELAPSED, timer);
-            boat_gpu_draw(
-                &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, camera);
+            BoatViewState view = boat_session_view(&session);
+            boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
             REQUIRE(!gpu.failed);
             if (timed_gpu)
                 glEndQuery(GL_TIME_ELAPSED);
