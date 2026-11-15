@@ -32,6 +32,9 @@ add_executable(validate_boat_room_package tests/room/validate_boat_room_package.
 target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus_plugin_catalog
   proteus_boat_net)
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/room-package-test")
+target_compile_definitions(validate_boat_room_package PRIVATE
+  BOAT_ROOM_PACKAGE_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/room-package-test")
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # P5b: a free package's room objective runs only behind the authority's rules adapter.
@@ -68,6 +71,9 @@ add_executable(validate_boat_session_record_contract tests/room/validate_boat_se
 target_link_libraries(validate_boat_session_record_contract PRIVATE proteus_session_record
   proteus_plugins proteus_plugin_catalog)
 target_compile_options(validate_boat_session_record_contract PRIVATE ${PROTEUS_WARNINGS})
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/session-record-modules-test")
+target_compile_definitions(validate_boat_session_record_contract PRIVATE
+  BOAT_SESSION_RECORD_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/session-record-modules-test")
 proteus_add_case_tests(boat_session_record validate_boat_session_record_contract LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 set(BOAT_SESSION_RECORD_FIXTURE "${CMAKE_CURRENT_BINARY_DIR}/session-record-hunt.p5gr")

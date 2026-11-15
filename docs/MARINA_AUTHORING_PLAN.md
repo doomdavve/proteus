@@ -5,10 +5,10 @@ resident/visitor services are complete and merged (M4: #209; contract in the
 [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). M5 (package-local modules and an
 integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
 D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
-W1 (manifest `modules`, source image, module IO, wider diagnostic file) and W2 (`require` in the VM)
-are done; carriers are unchanged until W3. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+W1 (manifest `modules`, source image, module IO, wider diagnostic file), W2 (`require` in the VM) and
+W3 (carriers) are done; the bundle JSON and authoring tools are W4. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
 loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: M5-W3 (carriers).
+Done when all five marina milestones are closed. Next task: M5-W4 (authoring tools).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -933,6 +933,61 @@ from a module equals the inline scene), the malformed-image rejection `image_ref
 `boat_plugin_state.module_callbacks` (callbacks reload modules; errors and budget name the module).
 Not verified: carriers storing an image (W3), the browser/Wasm VM, and any shipped plugin using
 modules (W5).
+
+### M5 W3 result
+
+Implemented 2026-11-15 in one commit. A package's source image travels in the existing
+`(source, source_size)` buffers through every carrier; no wire layout or version changed.
+
+**New check.** `boat_plugin_check_source(manifest, source, size, d)` (data only, in
+`boat_plugin.c`) runs wherever a manifest and a source meet: `boat_plugin_bundle_manifest` (every
+`boat_plugin_load_*`, so the host, room packages and `--plugin`), `boat_plugin_load_race`, the stage
+and query workers, the catalog generator and the catalog wire decoder. Modules are declared exactly
+when the source is an image, the image unpacks completely, its entry name is the manifest's `entry`,
+and its module names equal the manifest list in the same order; otherwise `plugin.json modules` (or
+`entry`) is refused with a message, or `malformed package source image` (syntax class).
+
+**Classification rule.** Identity of a revision includes its source image, compared as bytes, exactly
+where source is compared today. Classification is by decoded data (`boat_plugin_classify` and its
+free/course/race/match forms); for a voyage objective package the retained source bytes are also
+compared, so a module-only edit that changes a callback is migrate or restart like an entry edit.
+A module-only edit that changes neither decoded data nor an objective package's bytes is
+`BOAT_PLUGIN_UNCHANGED`: nothing is installed and no revision is made, exactly as for an entry edit
+(non-objective revisions do not retain source). The save-polling key (`boat_plugin_read_key`) folds
+the whole image, so a module-only edit is seen as a change. Unchanged pre-existing gap, not made
+worse: free-kind objective classification does not compare source, for entry or module edits alike.
+
+**Per carrier.** Changed: `boat_plugin_stage.c` workers, `boat_plugin_wire.c` decode, `boat_plugin_load.c`
+(check), catalog generator (check) and CMake (module files are build dependencies of bundled
+packages), `wake_velocity_plugin.c` (`/save` wrote the image as `main.lua`; now writes entry and
+module files; the regenerated manifest of `wake_plugin_promote`/`wake_plugin_save` dropped `modules`,
+now kept), `wake_command.c` (console edits and queries wrap the entry as text; they refuse a package
+with modules), `boat_plugin_bench.c` (refuses modules), `boat_room_package.c` (a module failure's
+error carries `modules/x.lua:LINE`). Needed nothing: `boat_plugin_io.c` (W1), eval request/worker and
+`boat_plugin_state.c` (length-framed, never text-checked), stage wire framing, host revisions and
+`boat_plugin_revision.h`, stage backends (posix, windows, web), `boat_plugin_worker.c`,
+`wake_velocity_bridge.c`, `boat_race_plugin.c`, `boat_plugin_review.c`, `boat_room_objective.c`,
+`boat_room_record_objective.c`, `boat_session_record.c` (length plus byte hash; no format or version
+change, `MULTIPLAYER_PROTOCOL.md` and `SESSION_RECORDING.md` untouched), `wake_velocity_objective.c`,
+`wake_velocity_plugin_web.c` (byte pairs). `cargo_sandbox`'s self-test wraps entry text but runs only
+shipped single-file packages.
+
+**Verification (macOS Debug, native).** New: `boat_plugin_modules` (read, host revision, real stage
+worker, module-only edit with RESTART_VOYAGE, Apply and Undo of images, a decoded-data edit, UNCHANGED
+for comment-only module and entry edits, three module failures leaving the active revision with the
+module file named, manifest/image mismatch rejections, query, save and regenerated-manifest round
+trip, console refusal), eval case `image_source`, `boat_plugin_catalog_modules` (+ `_syntax`,
+`_runtime`: the generator fails naming `modules/route.lua:2`), `boat_room_package.module_directory`,
+`boat_session_record.hunt_modules`, and an image case in `boat_plugin_stage_web` (the web backend
+compiled natively over its page model). Full `ctest --test-dir build -j 8` on the sandboxed
+run: 591/591 passed (the W2 `require_*` cases now declare their modules in the manifest).
+
+**Not verified / W4 must do.** The bundle JSON (`wake-velocity-plugin` version 2 with `modules`),
+`plugin_author.py`/`plugin_schema.py`, `web/plugin_author.js` and its worker (import must build the
+image with the same entry name and module order; export must unpack it), the browser export
+(`console_save` passes the image as `source` today), the `wake_web_plugin_*` import path. Not run:
+Windows read/save branches, Wasm, a nested-module `/save` (single-level only is tested), the
+`F5` live reload of a module edit in a windowed game.
 
 ## Verification and handoff
 

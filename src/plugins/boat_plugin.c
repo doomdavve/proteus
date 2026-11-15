@@ -1701,6 +1701,39 @@ BoatPluginStatus boat_plugin_decode_course(const BoatPluginManifest *manifest,
     return BOAT_PLUGIN_OK;
 }
 
+BoatPluginStatus boat_plugin_check_source(
+    const BoatPluginManifest *manifest, const char *source, size_t size, BoatPluginDiagnostic *d)
+{
+    bool image = boat_plugin_image_is(source, size);
+    if (!image) {
+        if (manifest->module_count)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "modules",
+                "declares %u module%s but the package source is not a module image",
+                manifest->module_count, manifest->module_count == 1 ? "" : "s");
+        return BOAT_PLUGIN_OK;
+    }
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count = 0;
+    if (!boat_plugin_image_unpack(source, size, files, &count))
+        return diagnose(
+            d, BOAT_PLUGIN_SYNTAX, manifest->entry, "", "malformed package source image");
+    if (!manifest->module_count)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "modules",
+            "declares no modules but the package source is a module image");
+    if (files[0].name_size != strlen(manifest->entry)
+        || memcmp(files[0].name, manifest->entry, files[0].name_size))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "entry",
+            "is not the entry file the module image carries");
+    bool same = count == 1 + manifest->module_count;
+    for (unsigned i = 0; same && i < manifest->module_count; ++i)
+        same = files[1 + i].name_size == strlen(manifest->modules[i])
+            && !memcmp(files[1 + i].name, manifest->modules[i], files[1 + i].name_size);
+    if (!same)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "modules",
+            "do not match the modules in the package source image (names and order must agree)");
+    return BOAT_PLUGIN_OK;
+}
+
 BoatPluginStatus boat_plugin_bundle_manifest(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginKind kind, BoatPluginManifest *manifest,
     BoatPluginDiagnostic *d)
@@ -1718,7 +1751,7 @@ BoatPluginStatus boat_plugin_bundle_manifest(const BoatPluginBundle *bundle,
             bundle->source_size,
             limits->source_bytes < BOAT_PLUGIN_SOURCE_MAX ? limits->source_bytes
                                                           : (size_t)BOAT_PLUGIN_SOURCE_MAX);
-    return BOAT_PLUGIN_OK;
+    return boat_plugin_check_source(manifest, bundle->source, bundle->source_size, d);
 }
 
 static BoatPluginStatus check_work_sites(const BoatPluginFree *free,

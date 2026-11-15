@@ -8,12 +8,15 @@
 #include "net/boat_net_server.h"
 #include "net/boat_net_transport.h"
 #include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_io.h"
 #include "plugins/boat_plugin_load.h"
+#include "plugins/boat_plugin_state.h"
 #include "plugins/boat_plugin_wire.h"
 #include "room/boat_fleet_bots.h"
 #include "room/boat_room_package.h"
 #include "support/boat_test_cases.h"
+#include "support/boat_test_module_package.h"
 
 #include "support/boat_fixtures.h"
 #include <math.h>
@@ -460,9 +463,14 @@ static int definition_size(void)
     open->phase = 0;
     open->period = 5;
     open->open_path = (BoatRoutePath) { .count = 1 };
-    open->open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 0, .start_z = 0,
-        .end_x = 0, .end_z = -10, .duration_ticks = 600, .tick_seconds = BOAT_TICK_SECONDS,
-        .max_speed = 20, .max_acceleration = 100 };
+    open->open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 0,
+        .start_z = 0,
+        .end_x = 0,
+        .end_z = -10,
+        .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
     size_t open_size = boat_room_definition_encode(&d, rejected, sizeof(rejected));
     CHECK(open_size > 0 && boat_room_definition_decode(rejected, open_size, &back, &rd));
     CHECK(back.scene.traffic.actors[0].shape == WATERFRONT_ROUTE_OPEN_PATH
@@ -470,9 +478,15 @@ static int definition_size(void)
     CHECK(!boat_room_definition_decode(rejected, open_size - 1, &back, &rd));
     open->period = 10;
     open->open_path = (BoatRoutePath) { .count = 2, .loop = true };
-    BoatRouteArc arc = { .centre_x = 0, .centre_z = -110, .radius = 4,
-        .start_angle = 0, .sweep = BOAT_TWO_PI * .5, .duration_ticks = 600,
-        .tick_seconds = BOAT_TICK_SECONDS, .max_speed = 5, .max_acceleration = 10 };
+    BoatRouteArc arc = { .centre_x = 0,
+        .centre_z = -110,
+        .radius = 4,
+        .start_angle = 0,
+        .sweep = BOAT_TWO_PI * .5,
+        .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 5,
+        .max_acceleration = 10 };
     open->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
     open->open_path.pieces[0].shape.arc = arc;
     arc.start_angle = BOAT_TWO_PI * .5;
@@ -804,11 +818,65 @@ static int scene_resync_contact_room(void)
     return 0;
 }
 
+// M5 W3: a package directory with modules loads as a room from its source image: the same room
+// definition as the single-file package, the same objective marks, and an image the room's
+// authority evaluates. The scratch copies hold the shipped source as one module each.
+static int module_directory(void)
+{
+    char directory[600], error[220];
+    BoatRoomDefinition inline_room, module_room;
+    // A scene room (free, no objective).
+    CHECK(boat_test_module_package("plugins/harbor-room", BOAT_ROOM_PACKAGE_TEST_DIR,
+        "harbor-room-modules", directory, sizeof(directory)));
+    CHECK(boat_room_package_load("plugins/harbor-room", false, false, BOAT_LOCATION_OUTER,
+        &WORLDS[BOAT_LOCATION_OUTER], &inline_room, error, sizeof(error)));
+    CHECK(boat_room_package_load(directory, false, false, BOAT_LOCATION_OUTER,
+        &WORLDS[BOAT_LOCATION_OUTER], &module_room, error, sizeof(error)));
+    CHECK(boat_room_definition_digest(&module_room) == boat_room_definition_digest(&inline_room));
+    CHECK(module_room.scene.berth_count == inline_room.scene.berth_count
+        && boat_scene_digest(&module_room.scene) == boat_scene_digest(&inline_room.scene));
+    // An objective room: the marks and callbacks arrive with the image as the source.
+    BoatRoomObjectiveSource inline_hunt, module_hunt;
+    CHECK(boat_test_module_package("plugins/outer-hunt", BOAT_ROOM_PACKAGE_TEST_DIR,
+        "outer-hunt-modules", directory, sizeof(directory)));
+    CHECK(boat_room_package_load_objective("plugins/outer-hunt", false, false, BOAT_LOCATION_OUTER,
+        &WORLDS[BOAT_LOCATION_OUTER], &inline_room, &inline_hunt, error, sizeof(error)));
+    CHECK(boat_room_package_load_objective(directory, false, false, BOAT_LOCATION_OUTER,
+        &WORLDS[BOAT_LOCATION_OUTER], &module_room, &module_hunt, error, sizeof(error)));
+    CHECK(boat_room_definition_digest(&module_room) == boat_room_definition_digest(&inline_room));
+    CHECK(module_hunt.present && module_hunt.migrates == inline_hunt.migrates
+        && module_hunt.state_version == inline_hunt.state_version
+        && module_room.marks.count == inline_room.marks.count);
+    CHECK(boat_plugin_image_is(module_hunt.source, module_hunt.source_size)
+        && !boat_plugin_image_is(inline_hunt.source, inline_hunt.source_size));
+    BoatPluginObjective objective = { .generation = 1, .rng = 12345, .state_version = 1 };
+    BoatPluginObjective reference = objective;
+    BoatPluginDiagnostic pd;
+    CHECK(boat_plugin_objective_step(&objective, module_hunt.source, module_hunt.source_size,
+              BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &pd)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_objective_step(&reference, inline_hunt.source, inline_hunt.source_size,
+              BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &pd)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_objective_digest(&objective) == boat_plugin_objective_digest(&reference));
+    // A module that fails is a clear refusal naming the module file, and no room starts.
+    char path[700];
+    snprintf(path, sizeof(path), "%s/modules/shipped.lua", directory);
+    FILE *file = fopen(path, "wb");
+    CHECK(file && fputs("error('module broke')\n", file) >= 0 && !fclose(file));
+    CHECK(!boat_room_package_load_objective(directory, false, false, BOAT_LOCATION_OUTER,
+        &WORLDS[BOAT_LOCATION_OUTER], &module_room, &module_hunt, error, sizeof(error)));
+    CHECK(strstr(error, "modules/shipped.lua:1") && strstr(error, "module broke"));
+    puts("room_package modules: directory with modules loads as the single-file room");
+    return 0;
+}
+
 static const TestCase cases[] = {
     SLOW_CASE(scene_contact_room),
     SLOW_CASE(scene_moving_contact_room),
     SLOW_CASE(scene_resync_contact_room),
     TEST_CASE(catalog_rooms),
+    TEST_CASE(module_directory),
     SLOW_CASE(race_room),
     SLOW_CASE(match_room),
     TEST_CASE(definition_size),

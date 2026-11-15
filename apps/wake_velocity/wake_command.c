@@ -1,6 +1,7 @@
 #include "wake_velocity/wake_command.h"
 
 #include "core/boat_scene_definition.h"
+#include "plugins/boat_plugin_image.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -78,6 +79,11 @@ static bool prepare_base(WakeCommand *command, WakePlugin *plugin, bool edit)
     size_t size = wake_plugin_source(plugin, &text);
     if (!size || size > sizeof(command->base)) {
         emit(command, "THE ACTIVE PACKAGE HAS NO SOURCE TO EDIT");
+        return false;
+    }
+    // Console edits and queries wrap the entry as text; a module image has no such form (M5 W3).
+    if (boat_plugin_image_is(text, size)) {
+        emit(command, "THIS PACKAGE HAS MODULES; EDIT ITS FILES AND RELOAD");
         return false;
     }
     memcpy(command->base, text, size);

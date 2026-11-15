@@ -2189,7 +2189,17 @@ static BoatPluginStatus load_modules(const char *prefix, const TestModule *modul
     size_t size;
     if (!boat_plugin_image_pack(files, count + 1, image, sizeof(image), &size))
         return BOAT_PLUGIN_MANIFEST;
-    return load(MANIFEST, image, size, limits, out, d);
+    // The manifest declares exactly the packed modules (W3 checks the pair).
+    static char manifest[1024];
+    char list[512] = "";
+    size_t at = 0;
+    for (unsigned i = 0; i < count; ++i)
+        at += (size_t)snprintf(
+            list + at, sizeof(list) - at, "%s\"%s\"", i ? ", " : "", modules[i].name);
+    snprintf(manifest, sizeof(manifest), "%.*s, \"modules\": [%s]}", (int)strlen(MANIFEST) - 1,
+        MANIFEST, list);
+    return load(count ? manifest : MANIFEST, count ? image : files[0].data,
+        count ? size : files[0].size, limits, out, d);
 }
 
 static int modules_expect(const char *label, const char *prefix, const TestModule *modules,
@@ -2232,8 +2242,20 @@ static int require_modules(void)
         kinds, 5, BOAT_PLUGIN_OK, NULL, -1, NULL));
     // Declared but never required, and an image that carries no modules at all.
     CHECK(!modules_expect("unused", "", chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
-    CHECK(!modules_expect(
-        "no modules", "assert(require == nil); ", NULL, 0, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // An image that carries only the entry is the evaluator's business (here: no require); a
+    // manifest that declares no modules refuses such a package before evaluation.
+    BoatPluginVoyageData bare;
+    BoatPluginDiagnostic bare_d;
+    BoatPluginImageFile solo = { "main.lua", 8, "assert(require == nil) return {}", 32 };
+    char solo_image[128];
+    size_t solo_size;
+    CHECK(boat_plugin_image_pack(&solo, 1, solo_image, sizeof(solo_image), &solo_size));
+    BoatPluginStatus solo_status = boat_plugin_lua_voyage(
+        solo_image, solo_size, "main.lua", &boat_plugin_default_limits, &bare, &bare_d);
+    CHECK(solo_status != BOAT_PLUGIN_SYNTAX || !strstr(bare_d.message, "malformed"));
+    BoatPluginVoyage refused;
+    CHECK(load(MANIFEST, solo_image, solo_size, NULL, &refused, &bare_d) == BOAT_PLUGIN_MANIFEST
+        && strstr(bare_d.message, "declares no modules"));
     CHECK(
         !modules_expect("no package", "assert(package == nil and load == nil and dofile == nil); ",
             chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
@@ -2349,7 +2371,10 @@ static int require_scene(void)
     static char image[BOAT_PLUGIN_SOURCE_MAX];
     size_t size;
     CHECK(boat_plugin_image_pack(files, 2, image, sizeof(image), &size));
-    CHECK(load(scene_manifest, image, size, NULL, &module_voyage, &d) == BOAT_PLUGIN_OK);
+    static char module_manifest[1024];
+    snprintf(module_manifest, sizeof(module_manifest), "%.*s, \"modules\": [\"scene.eriksberg\"]}",
+        (int)strlen(scene_manifest) - 1, scene_manifest);
+    CHECK(load(module_manifest, image, size, NULL, &module_voyage, &d) == BOAT_PLUGIN_OK);
     CHECK(module_voyage.has_scene && module_voyage.scene_digest == inline_voyage.scene_digest);
     CHECK(!same_route(&module_voyage.route, &inline_voyage.route));
     return 0;

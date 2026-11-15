@@ -186,6 +186,12 @@ const char *boat_plugin_status_name(BoatPluginStatus status);
 // (may be NULL) is always written.
 BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
     const BoatPluginLimits *limits, BoatPluginManifest *out, BoatPluginDiagnostic *diagnostic);
+// Whether MANIFEST and SOURCE (the entry text, or a source image) describe one package: modules
+// are declared exactly when SOURCE is an image, the image is well formed, its entry is named by
+// MANIFEST's entry and its modules are MANIFEST's, same names in the same order. Data only; no
+// Lua runs. DIAGNOSTIC (may be NULL) names plugin.json or the entry on failure.
+BoatPluginStatus boat_plugin_check_source(const BoatPluginManifest *manifest, const char *source,
+    size_t size, BoatPluginDiagnostic *diagnostic);
 void boat_plugin_voyage_copy(BoatPluginVoyage *destination, const BoatPluginVoyage *source);
 // FNV-1a over every field of ROUTE, names included, with float bits least significant first.
 uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route);

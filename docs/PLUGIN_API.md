@@ -1152,7 +1152,7 @@ SAVED ~/drafts/my-harbor
 | `/apply`, `/discard`, `/undo` | The F7/F6 transactions, named |
 | `/restart` | Restart the session |
 | `/capability NAME` | Add `scene.define` to this session's manifest copy (voyages only) |
-| `/save DIR` | Write `plugin.json` and `main.lua`; refuses a non-empty directory that is not this session's package |
+| `/save DIR` | Write `plugin.json`, `main.lua` and any `modules/` files; refuses a non-empty directory that is not this session's package |
 | `/clear` | Clear the scrollback |
 
 The first edit moves a runtime session to authoring using the catalog revision's embedded source.
@@ -1212,6 +1212,18 @@ if (boat_plugin_read("plugins/langedrag", NULL, files, &d) == BOAT_PLUGIN_OK) {
   source image (`boat_plugin_image.h`) only when modules are declared; otherwise the source stays
   the raw entry bytes. `BoatPluginDiagnostic.file` is 64 bytes so `modules/marina/berths.lua`
   fits; its serialised form is length-prefixed, so wire layouts are unchanged.
+- **Carriers (M5 W3).** The `(source, source_size)` pair is the package's identity wherever it
+  travels (native `--plugin` read, eval request, stage and query workers, catalog wire, host
+  revisions, room objective and recording): the entry bytes without modules, the image with them.
+  Every place that holds a manifest and a source checks them with `boat_plugin_check_source`:
+  modules are declared exactly when the source is an image, the image is well formed, its entry is
+  the manifest's `entry`, and its module names equal the manifest's list in the same order;
+  otherwise the package is refused (`plugin.json modules ...`), never evaluated. A module-only
+  edit changes the source bytes, so it is a real edit: the stage worker rebuilds it as a whole,
+  classification is the same as for an entry edit (descriptor data decides, plus, for an objective
+  voyage, any difference in the source bytes: migrate or restart), and a failed stage leaves the
+  active revision untouched with the module's file in the diagnostic. `/save` writes the entry and
+  each module under `modules/`; the PC console's edits and queries refuse a package with modules.
 - `boat_plugin_route_digest` is FNV-1a over every route field with field names, float bits
   least significant byte first, and shelter names. The reference digest is `e8509272172cb7c4`,
   the same for the fixture route and on Wasm.
