@@ -537,6 +537,12 @@ bool wake_plugin_stage_files(
     return stage(plugin, session, true, now);
 }
 
+void wake_plugin_hold_saves(WakePlugin *plugin)
+{
+    plugin->watching = false;
+    snprintf(plugin->detail, sizeof(plugin->detail), "F5 RELOAD / F6 UNDO / SAVES HELD (BRIDGE)");
+}
+
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
 {
     close_stage(plugin);
