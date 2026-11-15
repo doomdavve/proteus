@@ -6,6 +6,7 @@
 // classifies, applies and undoes it; module-only edits are real changes; failures name the file.
 #include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_load.h"
+#include "support/boat_test_module_edit.h"
 #include "wake_velocity/wake_command.h"
 #include "wake_velocity/wake_velocity_plugin.h"
 
@@ -390,6 +391,43 @@ int main(int argc, char **argv)
     CHECK(stage(second, edited) == 1 && second->change != BOAT_PLUGIN_UNCHANGED && second->held);
     free(twin);
     free(second);
+
+    // M5 W6: the integrated marina example through the real stage worker. A timetable edit in a
+    // nested module is a session restart that Apply installs and Undo restores; a broken module
+    // names its file and leaves the active revision.
+    BoatPluginFiles *marina_files = calloc(1, sizeof(*marina_files));
+    BoatPluginFiles *marina_edit = calloc(1, sizeof(*marina_edit));
+    BoatPluginHost *marina = calloc(1, sizeof(*marina));
+    CHECK(marina_files && marina_edit && marina);
+    CHECK(boat_plugin_read("plugins/marina-integrated-demo", NULL, marina_files, &d)
+        == BOAT_PLUGIN_OK);
+    BoatPluginBundle marina_bundle = boat_plugin_bundle(marina_files);
+    CHECK(boat_plugin_host_start(marina, resources.definition, &resources.map, &marina_bundle));
+    CHECK(boat_plugin_host_active(marina)->voyage.scene.service_count == 2);
+    CHECK(stage(marina, marina_files) == 1 && marina->change == BOAT_PLUGIN_UNCHANGED);
+    CHECK(boat_test_edit_module(
+        marina_files, "guests.services", "start_tick = 240", "start_tick = 120", marina_edit));
+    CHECK(stage(marina, marina_edit) == 1 && marina->change == BOAT_PLUGIN_RESTART_SESSION
+        && marina->held);
+    CHECK(boat_plugin_host_held(marina)->voyage.scene.services[1].start_tick == 120);
+    CHECK(boat_plugin_host_active(marina)->voyage.scene.services[1].start_tick == 240);
+    CHECK(boat_plugin_host_commit(marina)
+        && boat_plugin_host_active(marina)->voyage.scene.services[1].start_tick == 120);
+    CHECK(boat_plugin_host_undo(marina) && boat_plugin_host_commit(marina)
+        && boat_plugin_host_active(marina)->voyage.scene.services[1].start_tick == 240);
+    unsigned marina_numbered = marina->numbered;
+    CHECK(boat_test_edit_module(
+        marina_files, "guests.routes", "local z = 231", "local z = = 231", marina_edit));
+    CHECK(stage(marina, marina_edit) == -1 && marina->diagnostic.status == BOAT_PLUGIN_SYNTAX);
+    CHECK(!strcmp(marina->diagnostic.file, "modules/guests/routes.lua") && marina->diagnostic.line);
+    CHECK(!marina->held && marina->numbered == marina_numbered);
+    CHECK(boat_test_edit_module(marina_files, "guests.services", "start_tick = 240",
+        "start_tick = 360", marina_edit));
+    CHECK(stage(marina, marina_edit) == -1 && !marina->held
+        && marina->numbered == marina_numbered); // The visit would cross the racetrack.
+    free(marina);
+    free(marina_edit);
+    free(marina_files);
 
     // Queries carry the image to the worker too.
     CHECK(boat_plugin_read(directory, NULL, files, &d) == BOAT_PLUGIN_OK);

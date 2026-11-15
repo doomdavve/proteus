@@ -768,6 +768,50 @@ class SharedModules(unittest.TestCase):
             _, original = self.worker_check(source)
             self.assertEqual(result["gameplay_digest"], original["gameplay_digest"])
 
+    def test_integrated_marina_example(self):
+        """M5 W6: four modules (one a shared copy, two nested), exported, imported and staged."""
+        source = ROOT / "plugins/marina-integrated-demo"
+        manifest = json.loads((source / "plugin.json").read_text())
+        self.assertEqual(manifest["modules"],
+                         ["eriksberg_marina", "marina", "guests.routes", "guests.services"])
+        for name in manifest["modules"]:
+            self.assertTrue((source / author.module_file(name)).is_file(), name)
+        self.assertEqual((source / "modules/eriksberg_marina.lua").read_bytes(),
+                         (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes())
+        bundle = author.export_bundle(source)
+        self.assertEqual(bundle["version"], 2)
+        self.assertEqual(sorted(bundle["modules"]), sorted(manifest["modules"]))
+        target = Path(self.scratch.name) / "integrated"
+        author.import_bundle(json.dumps(bundle), target)
+        self.assertEqual(author.snapshot(target), author.snapshot(source))
+        self.assertTrue((target / "modules/guests/services.lua").is_file())
+        code, result = self.worker_check(target)
+        self.assertEqual((code, result["status"]), (0, "ok"), result)
+        self.assertEqual(result["scene"]["berths"], 14)
+        self.assertEqual(result["scene"]["modules"], 15)
+        self.assertEqual(result["scene"]["vessels"], 6)
+        _, original = self.worker_check(source)
+        self.assertEqual(result["scene"]["digest"], original["scene"]["digest"])
+        # A module-only edit changes the package's identity and its scene; a broken module is
+        # reported with its file.
+        edited = Path(self.scratch.name) / "edited"
+        author.import_bundle(json.dumps(bundle), edited)
+        services = edited / "modules/guests/services.lua"
+        services.write_text(services.read_text().replace("start_tick = 240", "start_tick = 120"))
+        self.assertNotEqual(author.snapshot(edited), author.snapshot(source))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"]), (0, "ok"), result)
+        self.assertNotEqual(result["scene"]["digest"], original["scene"]["digest"])
+        services.write_text(services.read_text().replace("start_tick = 120", "start_tick = 360"))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"]), (1, "schema"), result)
+        self.assertIn("crosses scene.traffic.vessels", result["message"])
+        routes = edited / "modules/guests/routes.lua"
+        routes.write_text(routes.read_text().replace("local z = 231", "local z = = 231"))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"], result["file"]),
+                         (1, "syntax", "modules/guests/routes.lua"), result)
+
     def worker_check(self, directory):
         run = subprocess.run([WORKER], input=author.snapshot(directory), capture_output=True,
                              timeout=20)
@@ -801,7 +845,8 @@ class Worker(unittest.TestCase):
         self.assertEqual(self.run_worker(payload)[1]["status"], "runtime")
 
     def test_examples_and_job(self):
-        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour", "marina-route-demo", "marina-berth-demo"):
+        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour", "marina-route-demo", "marina-berth-demo",
+                     "marina-integrated-demo"):
             payload = author.snapshot(ROOT / "plugins" / name)
             code, result = self.run_worker(payload)
             self.assertEqual(code, 0, result)

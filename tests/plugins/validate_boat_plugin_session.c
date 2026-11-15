@@ -9,6 +9,7 @@
 #include "core/waterfront_service.h"
 #include "core/waterfront_traffic.h"
 #include "plugins/boat_plugin_host.h"
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_load.h"
 #include "plugins/boat_plugin_lua.h"
 #include "raylib.h"
@@ -17,6 +18,7 @@
 #include "support/boat_fixtures.h"
 #include "support/boat_test_cases.h"
 #include "support/boat_test_flat_package.h"
+#include "support/boat_test_module_edit.h"
 #include "wake_velocity/wake_velocity_plugin.h"
 
 #include <math.h>
@@ -207,6 +209,121 @@ static int marina_berth_apply_undo(void)
     scene = session.world.scene;
     CHECK(scene->services[1].start_tick == 240);
     CHECK(waterfront_service_hull(scene, 1, 240 / 120.0, &hull));
+    wake_plugin_close(&plugin, &session);
+    boat_session_destroy(&session);
+    return 0;
+}
+
+// M5 W6: the integrated example (shared marina module, guest dock, a resident round trip and a
+// visitor's stay, built from four modules) owned by tick; a module-only timetable edit restarts the
+// session and is undone; a module edit that does not stage leaves the active revision and names the
+// module file.
+static int marina_integrated_apply_undo(void)
+{
+    static WakePlugin plugin;
+    static BoatPluginFiles files, edited;
+    BoatPluginDiagnostic diagnostic;
+    BoatSession session;
+    boat_session_init(&session, outer(), calm());
+    session.presentation_enabled = false;
+    CHECK(wake_plugin_open(&plugin, "plugins/marina-integrated-demo", &session, 0));
+    CHECK(boat_plugin_read("plugins/marina-integrated-demo", NULL, &files, &diagnostic)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_image_is(files.source, files.source_size));
+    const BoatSceneDefinition *scene = session.world.scene;
+    // Twelve shared hulls plus two empty guest berths; thirteen shared structures plus two docks;
+    // the four shared craft plus the two authored paths; two vessels and their two services.
+    CHECK(scene && scene->berth_count == 14 && scene->module_count == 15);
+    CHECK(scene->traffic.actor_count == 6 && scene->vessel_count == 2 && scene->service_count == 2);
+    CHECK(!scene->berths[0].empty && scene->berths[12].empty && scene->berths[13].empty);
+    CHECK(!strcmp(scene->berths[7].appearance.name, "MIRA")
+        && !strcmp(scene->berths[8].appearance.name, "SALT"));
+    CHECK(!strcmp(scene->vessels[0].appearance.name, "TENDER")
+        && !strcmp(scene->vessels[1].appearance.name, "GUEST"));
+    CHECK(!strcmp(scene->traffic.actors[4].id, "racetrack")
+        && !strcmp(scene->traffic.actors[5].id, "visit"));
+    WaterfrontServiceHull hull;
+    // Resident "tender" (vessel 0): moored, travelling 5-25 s, moored again. Visitor "guest"
+    // (vessel 1): absent, travelling from 2 s, moored over 14-16 s, absent from 21 s. Each window
+    // is half open: the first tick of a state is the tick it begins.
+    static const struct {
+        unsigned vessel, tick;
+        bool present;
+        BoatOwner owner;
+    } at[] = { { 0, 0, true, BOAT_OWNER_MOORED }, { 0, 599, true, BOAT_OWNER_MOORED },
+        { 0, 600, true, BOAT_OWNER_TRAVELLING }, { 0, 2999, true, BOAT_OWNER_TRAVELLING },
+        { 0, 3000, true, BOAT_OWNER_MOORED }, { 0, 100000, true, BOAT_OWNER_MOORED },
+        { 1, 0, false, 0 }, { 1, 239, false, 0 }, { 1, 240, true, BOAT_OWNER_TRAVELLING },
+        { 1, 1679, true, BOAT_OWNER_TRAVELLING }, { 1, 1680, true, BOAT_OWNER_MOORED },
+        { 1, 1919, true, BOAT_OWNER_MOORED }, { 1, 1920, true, BOAT_OWNER_TRAVELLING },
+        { 1, 2519, true, BOAT_OWNER_TRAVELLING }, { 1, 2520, false, 0 },
+        { 1, 100000, false, 0 } };
+    for (unsigned i = 0; i < sizeof(at) / sizeof(at[0]); ++i) {
+        bool present = waterfront_service_hull(scene, at[i].vessel, at[i].tick / 120.0, &hull);
+        CHECK(present == at[i].present);
+        CHECK(!present || hull.owner == at[i].owner);
+    }
+    // Repeated and reversed queries agree: ownership is a pure function of the tick.
+    CHECK(waterfront_service_hull(scene, 1, 1680 / 120.0, &hull) && hull.owner == BOAT_OWNER_MOORED);
+    CHECK(waterfront_service_hull(scene, 0, 600 / 120.0, &hull)
+        && hull.owner == BOAT_OWNER_TRAVELLING);
+
+    // A module-only edit: the visitor's start tick lives in guests.services, not the entry.
+    // Shifting the visit to 3 s makes its path cross the resident's racetrack: staging refuses it
+    // and the active revision stays. Moving it to 1 s is valid.
+    CHECK(boat_test_edit_module(
+        &files, "guests.services", "start_tick = 240", "start_tick = 360", &edited));
+    BoatPluginBundle clash = boat_plugin_bundle(&edited);
+    CHECK(!boat_plugin_host_stage(&plugin.host, &clash));
+    CHECK(!plugin.host.held && boat_plugin_host_active(&plugin.host)->number == 1);
+    CHECK(boat_test_edit_module(
+        &files, "guests.services", "start_tick = 240", "start_tick = 120", &edited));
+    BoatPluginBundle candidate = boat_plugin_bundle(&edited);
+    CHECK(candidate.source_size != files.source_size
+        || memcmp(candidate.source, files.source, files.source_size));
+    CHECK(boat_plugin_host_stage(&plugin.host, &candidate));
+    CHECK(plugin.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(!wake_plugin_frame(&plugin, &session, false, false, false, 1));
+    CHECK(boat_plugin_host_active(&plugin.host)->number == 1);
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 2));
+    boat_session_restart(&session, calm());
+    scene = session.world.scene;
+    CHECK(scene->services[1].start_tick == 120 && scene->berth_count == 14);
+    CHECK(!waterfront_service_hull(scene, 1, 119 / 120.0, &hull));
+    CHECK(waterfront_service_hull(scene, 1, 120 / 120.0, &hull));
+    CHECK(!wake_plugin_frame(&plugin, &session, false, true, false, 3));
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 4));
+    boat_session_restart(&session, calm());
+    scene = session.world.scene;
+    CHECK(scene->services[1].start_tick == 240);
+    CHECK(!waterfront_service_hull(scene, 1, 239 / 120.0, &hull));
+    CHECK(waterfront_service_hull(scene, 1, 240 / 120.0, &hull));
+
+    // Edits that do not stage: each leaves the active revision, the revision count and the scene,
+    // and the diagnostic names the module file (nested modules by their directory path).
+    static const struct {
+        const char *module, *from, *to, *file;
+    } bad[] = {
+        { "guests.routes", "local z = 231", "local z = = 231", "modules/guests/routes.lua" },
+        { "guests.routes", "local pi = 3.14", "local pi = nil + 3.14", "modules/guests/routes.lua" },
+        { "guests.services", "require(\"guests.routes\")", "require(\"guests.nowhere\")",
+            "modules/guests/services.lua" },
+        { "marina", "table.insert(marina.berths, { id = \"home\"",
+            "error(\"no guest berths\")\ntable.insert(marina.berths, { id = \"home\"",
+            "modules/marina.lua" },
+    };
+    unsigned numbered = plugin.host.numbered;
+    unsigned active_number = boat_plugin_host_active(&plugin.host)->number;
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        CHECK(boat_test_edit_module(&files, bad[i].module, bad[i].from, bad[i].to, &edited));
+        BoatPluginBundle broken = boat_plugin_bundle(&edited);
+        CHECK(!boat_plugin_host_stage(&plugin.host, &broken));
+        CHECK(!plugin.host.held && plugin.host.numbered == numbered);
+        CHECK(!strcmp(plugin.host.diagnostic.file, bad[i].file) && plugin.host.diagnostic.line > 0);
+    }
+    CHECK(boat_plugin_host_active(&plugin.host)->number == active_number);
+    CHECK(session.world.scene == &boat_plugin_host_active(&plugin.host)->voyage.scene);
+    CHECK(session.world.scene->services[1].start_tick == 240);
     wake_plugin_close(&plugin, &session);
     boat_session_destroy(&session);
     return 0;
@@ -2072,6 +2189,7 @@ static const TestCase cases[] = {
     TEST_CASE(harbor_life_scene),
     TEST_CASE(marina_route_apply_undo),
     TEST_CASE(marina_berth_apply_undo),
+    TEST_CASE(marina_integrated_apply_undo),
     SLOW_CASE(grodan_tour),
     SLOW_CASE(compiled_parity),
 };

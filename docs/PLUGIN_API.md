@@ -808,7 +808,9 @@ an authored open path. The contract:
   older content is refused by version. Limits: 4 vessels, 8 services, 32 hulls.
 - **Not provided.** A serviced vessel has no visual wake, depth is unsurveyed, and nothing
   chooses slips or avoids traffic reactively. The reference package is
-  [`marina-berth-demo`](../plugins/marina-berth-demo/README.md).
+  [`marina-berth-demo`](../plugins/marina-berth-demo/README.md); the
+  [`marina-integrated-demo`](../plugins/marina-integrated-demo/README.md) example (M5 W6) uses the
+  same services on the shared twelve-hull marina and is built from package-local modules.
 
 ### Replacement, restart and owner lifetime
 
