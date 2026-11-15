@@ -122,6 +122,7 @@ looks (nobody watched the window), `./wv play`, held/stale pins, a staged edit d
 crate, and any other platform.
 
 Found: `./wv check` fails for a free package (`preview is not available for free or course
-packages`); SA2 must make it run the survey without the preview. The restart keeps the clock?
-Not examined: `boat_work_session_reset` resets the tick, so a restart is a fresh session, not
-the boat-and-clock-kept policy SA0.1 proposed; decide in SA1's remaining work.
+packages`); SA2 must make it run the survey without the preview. The restart is the session's ordinary reset (`boat_work_session_reset`, read from the code, not
+measured beyond the tick returning to 25): the boat returns to the service berth, the job
+starts over and the tick resets; the session clock's hour is kept. That is a fresh job rather
+than SA0.1's proposed "keep the boat", so SA0.1 still needs the user's decision.
