@@ -20,7 +20,7 @@ navigation and repeated-session cleanup, and records native costs on Linux and W
 browser qualification is now [manual-only](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30);
 relevant PRs retain Node contracts and Wasm compilation/packaging.
 P4.9 adds a bounded objective wire protocol, reusable isolated Wasm evaluator and asynchronous
-init/update/migration/Undo with host-owned in-session state. There is no in-game agent. The agreed direction
+init/update/migration/Undo with host-owned in-session state. There is no in-game agent, and P6 now means [external agent authoring](AGENT_AUTHORING.md). The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
@@ -1762,25 +1762,30 @@ virtual time. Verify mixed native/browser clients with matching content and expl
 of old clients. Recheck resource/page limits and four-player load; human multiplayer play is
 its own acceptance gate. Seamless mid-round source swaps are not required for this milestone.
 
-### P6 — in-game asynchronous agent
+### P6 — external agent authoring instead of an in-game agent
 
-The [live console step](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) of the
-plugins-by-default plan supplies this milestone's command layer and live-apply policy. PC's
-`apps/wake_velocity/wake_command.[ch]` is now the dispatcher: the agent submits the same edit and `/` command
-lines as a player, appears in the console, is undone the same way and cannot move the boat.
+Decision 2026-11-15 (user): the plan's original goal was an in-game agent. Provided an external
+agent can author as powerfully, do not build one in-game now. The PC command layer
+(`apps/wake_velocity/wake_command.[ch]`), the P4 tools and the live tool bridge already give an
+outside agent the same path a player has, with no provider code in the game.
 
-**Deliverable:** an optional in-game conversation can use the proven P4 authoring tools to
-make and test a supported change, show its result and apply it under the current authoring
-policy. Begin in a solo development session; shared/public-room editing is a separate host
-permission and protocol feature.
+**Deliverable:** [Authoring plugins with an external agent](AGENT_AUTHORING.md): a documented loop
+(read the contract, edit a draft, validate/preview/capture, inspect, stage, apply or undo) and a
+trial that records whether it is enough. No game code. The bridge, pins and staging already make
+stale results impossible to apply and keep model latency out of the tick.
 
-Keep a provider adapter and tool dispatcher outside Lua and outside the fixed tick. The
-adapter handles asynchronous requests, streaming UI, cancellation, bounded retries, token/
-cost limits and offline/provider errors. Start with Claude if desired while keeping requests,
-tools and artifacts provider-independent. Model latency never pauses simulation or becomes
-simulation time. A completed request supplies candidate bytes; the existing staging pipeline
-chooses the commit tick. Discard responses for stale session/base revisions unless rebased
-and tested explicitly.
+**Deferred, not dropped:** an in-game conversation, its provider adapter and streaming UI,
+credential storage, cost limits and offline/provider errors, and agent editing of rooms or the
+browser. Reopen only if the trial shows a gap that cannot be closed outside the game (for example
+players without an agent installed, or a need for in-game history). The adapter design notes below
+are kept for that case. Shared-room editing remains a separate host permission and protocol
+feature.
+
+**Original design (unscheduled).** Keep a provider adapter and tool dispatcher outside Lua and
+outside the fixed tick, handling asynchronous requests, cancellation, bounded retries and cost
+limits, with provider-independent requests and artifacts. A completed request supplies candidate
+bytes and the existing staging pipeline chooses the commit tick; stale base revisions are
+discarded.
 
 Credentials belong to the native host's appropriate credential storage or an explicit
 session-only path, never `plugin.json`, Lua globals, tool transcripts, screenshots or exported
@@ -2795,7 +2800,7 @@ generation are not prerequisites for that loop.
 | P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. P3.3b adds live schema migration, resource retirement/composition and native inspection/seek. P3.4 adds native storage/budget/latency qualification and retains synchronous trusted edits; imported/background isolation is a P4 gate. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
-| P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |
+| P6 | Deferred with the in-game agent (2026-11-15): provider/key UX, native versus browser agent support and autonomy policy. The external agent uses the same host tools and workspace; keep provider/secret work entirely outside plugins. |
 
 ## Verification and known limits of this planning change (history)
 

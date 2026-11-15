@@ -375,7 +375,7 @@ wording.
 **Outcome.** During solo play, a key opens a Quake-style console. Typing Lua changes the session's
 definition, and the game rebuilds around the player without a reset: the boat, clock, water and wakes
 carry on. Anything unsafe is held rather than moving the boat. Every operation can be undone and saved
-as a package. The tool bridge gets the same commands, which gives the later [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent)
+as a package. The tool bridge gets the same commands, which gives the later [P6](PLUGIN_PLAN.md#p6--external-agent-authoring-instead-of-an-in-game-agent)
 agent its tool surface.
 
 Today's blocker is reload policy, not the console. Most useful edits restart: any scene layout change
@@ -385,7 +385,7 @@ progress. So this PR's core is a new live-apply policy, which also improves `--p
 
 Read first: [hot reload](PLUGIN_PLAN.md#hot-reload-is-the-normal-development-path), the
 [replacement rules](PLUGIN_API.md#replacement-restart-and-owner-lifetime), the
-[live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent),
+[live bridge](PLUGIN_API.md#live-tool-bridge-p46), [P6](PLUGIN_PLAN.md#p6--external-agent-authoring-instead-of-an-in-game-agent),
 `apps/wake_velocity/wake_velocity_plugin.[ch]`, `apps/wake_velocity/wake_velocity_bridge.c`, `src/plugins/boat_plugin_host.c`,
 `src/plugins/boat_plugin_stage.c`, `src/session/boat_session.c`, `src/core/boat_scene_definition.[ch]`, and the scene
 consumers in `src/core/boat.c`, `src/core/boat_combat.c`, `src/waterfront_*.c`, `src/render/boat_view.c`, `src/render/boat_gpu.c`.
@@ -1402,7 +1402,7 @@ Safari, and a browser marina play check.
 - **[Room content](ROOM_CONTENT_PLAN.md):** PD2 and PD3 deliver the descriptor part of R1 and R3 on
   built-in maps. They do not deliver R2 (loaded maps) or R4 (distribution).
 
-- **[In-game agent (P6)](PLUGIN_PLAN.md#p6--in-game-asynchronous-agent):** builds on PC. The agent adapter
+- **[In-game agent (P6)](PLUGIN_PLAN.md#p6--external-agent-authoring-instead-of-an-in-game-agent):** builds on PC. The agent adapter
   submits the same lines and commands as a player, so its work appears in the console, is undone the same
   way and cannot move the boat. Provider, credentials and cost controls stay P6's work.
 
