@@ -1,12 +1,12 @@
 # Sandbox authoring: an agent edits the working harbour
 
-Status, 2026-11-15: **proposed; nothing implemented.** Goal: the
-[external agent workspace](AGENT_AUTHORING.md) works on a working-harbour package
-(`kind: "free"` with `scene.work`, for example `plugins/outer-work`) as it does on a voyage:
-the agent edits sites and the job, stages the change into the running game and the user plays
-it. Open items: decisions SA0, steps SA1-SA4. Done when: the user plays a work-site change
-that an agent staged through `./wv` in `wake_velocity --plugin`, and the contract is in the
-specs (SA4). Next task: SA0 items 1 and 3 (the restart rule and first-pass scope); the command line is decided.
+Status, 2026-11-15: **SA1 partly implemented locally** on `feat/sandbox-authoring` (not pushed).
+Done: SA0.2 (a working harbour is a plugin run; `--work` removed; `--package` implies its
+location) and the live stage/Undo path on a running work session (see the
+[SA1 result](#sa1-result-2026-11-15)). Open: the review options as bridge requests (rest of
+SA1), SA2-SA4. Done when: the user plays a work-site change that an agent staged through `./wv`
+in `wake_velocity --plugin`, and the contract is in the specs (SA4). Next task: the rest of SA1,
+then SA2 (`./wv check` fails on free packages today).
 
 This plan owns the authoring loop for work packages. The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) still owns the gameplay and the saves, the
@@ -100,3 +100,28 @@ One branch (`feat/sandbox-authoring`), one commit per step, one pull request aft
 
 Nothing here is run. SA1's size is an estimate from reading `wake_velocity_work.c` and
 `wake_velocity.c` only. No human acceptance exists for authoring a work package.
+
+## SA1 result (2026-11-15)
+
+Implemented: `--plugin DIR` and `--package ID` run a free package with work sites as the
+working-harbour session (the revision comes from the plugin host); a changed revision restarts
+the cargo session at once; the title starts WORKING HARBOUR with `--package proteus.outer-work`;
+`--work` is gone and the tests and specs use the new spelling.
+
+Automated (macOS arm64, Debug, 2026-11-15): the full CTest preset passed (601 of 601) before
+the location change and the 31 work and title-start tests after it. CPU frames of the berth
+drive at 14 s are byte-identical between the old `--work`, `--package` and `--plugin DIR`.
+
+Windowed, agent-run, bounded `--frames` run of `--plugin DIR --plugin-bridge DIR` on a
+workspace made by `init --from plugins/outer-work`: `./wv status` answered; a stage that moved
+the landing onto the quay and one that put it where the survey rejects it were refused with
+`scene.work.sites[N]` diagnostics and the running session untouched; a stage of the landing's
+heading applied as R2 (tick back to 25, nothing held) and `./wv undo` returned to R1 with the
+same restart; the run's bounded exit wrote its autosave. Not checked: how the restarted site
+looks (nobody watched the window), `./wv play`, held/stale pins, a staged edit during a carried
+crate, and any other platform.
+
+Found: `./wv check` fails for a free package (`preview is not available for free or course
+packages`); SA2 must make it run the survey without the preview. The restart keeps the clock?
+Not examined: `boat_work_session_reset` resets the tick, so a restart is a fresh session, not
+the boat-and-clock-kept policy SA0.1 proposed; decide in SA1's remaining work.
