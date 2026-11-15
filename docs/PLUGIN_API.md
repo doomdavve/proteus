@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-**P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; M3 adds bounded authored open/loop line/arc traffic paths with stops and schedule clearance; M4 adds vessels and one-shot resident/visitor berth services. Its README lists the remaining native scene gaps (crane/building restyling and lighting).
+**P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; M3 adds bounded authored open/loop line/arc traffic paths with stops and schedule clearance; M4 adds vessels and one-shot resident/visitor berth services; M5 adds package-local modules, a shared marina module and an integrated example. Its README lists the remaining native scene gaps (crane/building restyling and lighting).
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
@@ -26,7 +26,7 @@ The browser offers an opt-in [voyage import workflow](#browser-source-bundles-p4
 
 ## Package
 
-One directory, one manifest, one text entry. The reference is
+One directory, one manifest, one text entry and optional [package modules](#package-modules-m5). The reference is
 [`plugins/langedrag`](../plugins/langedrag/).
 
 ```text
@@ -49,7 +49,7 @@ rejected. Strings are non-empty printable ASCII.
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
 | `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c), and one with [marks](#marks-p5a) requests `["free.define", "objective.hud"]` (optionally with `"scene.define"` between them). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
-| `modules` (M5 W1, optional) | Up to 8 package-local module names, none by default. A name is 1-3 dot-separated segments of `[a-z][a-z0-9_]*`, at most 32 bytes; `a` is the file `modules/a.lua` and `a.b` is `modules/a/b.lua`. Names are unique and never `main`. `boat_plugin_read` packs the entry and modules into one source image sharing the 64 KiB source limit; the evaluators accept an image and give it `require` ([below](#require-m5-w2)). |
+| `modules` (optional) | Up to 8 package-local module names, none by default; grammar, files, limits and `require` are in [Package modules](#package-modules-m5). |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
 package's.
@@ -472,40 +472,114 @@ The environment keeps these globals, and everything else is removed:
   hook cannot bound, and no `dump`.
 - `table`: `concat insert pack remove sort unpack`. There is no `move`, whose loop runs in C
   outside the hook.
-- `require` exists only for a package that declares modules (next section); otherwise it is
-  absent like the rest.
+- `require` exists only for a package that declares modules ([Package modules](#package-modules-m5));
+  otherwise it is absent like the rest.
 
-### Shared source and copies (M5 W5)
-
-A package cannot import another package or a shared directory, so content several packages use
-is a repository source copied into each. `plugins/_shared/<name>.lua` is the source (it has no
-`plugin.json` and is never a package); a package carries a checked-in, byte-identical copy at
-`modules/<name>.lua` and declares it in `modules`. A module whose name exists in `_shared` is such
-a copy and is not edited in place. `python3 tools/plugin_author.py sync-shared` (add `--check` to
-only report) rewrites the copies, and the CTest `plugin_shared` fails with that command when one
-differs. `eriksberg_marina` (the twelve-berth marina scene of `harbor-life` and `harbor-room`) is
-the first; it returns plain scene data, which one evaluation caches, so a package that tweaks it
-copies the table first.
-
-### require (M5 W2)
-
-For a source image, `require(name)` is a native function over the image's declared modules and
-nothing else: it opens no file and there is no `package` table. The name must be a string in the
-module grammar (else `module name "x" is invalid`) and declared in the manifest (else `module 'x'
-is not declared in the manifest`; the entry is not a module). The first call compiles
-`modules/<path>.lua` under that chunk name, runs it once in the same globals as the entry, and
-caches its single result in a table Lua code cannot reach; later calls, from any module or
-callback, return the same value (the same table identity). A module that returns nothing or `nil`
-yields `true`. A cycle fails as `module cycle: a -> b -> a`; nesting is bounded by the declared
-count (at most 8). The cache, like the Lua state, belongs to one evaluation, so evaluations and
-callback transitions never share module tables. Instructions and heap are the evaluation's, summed
-across entry and modules, and a module's functions called later spend the same budgets. An error
-or syntax error raised in a module reports `modules/<path>.lua` and its line as the diagnostic's
-file and line. A raw entry (no modules) has no `require`. The full authoring contract lands with W7.
 - `math`: every function except `random` and `randomseed`.
 - `io`, `os`, `debug`, `package`, `coroutine` and `utf8` do not exist.
 
 Calling a removed function is an ordinary runtime error on its line.
+
+### Package modules (M5)
+
+A package may split its Lua over a few package-local modules. This section owns the contract; the
+sections that mention modules link here.
+
+**Manifest `modules`.** An optional list of at most 8 module names (none by default; an
+entry-only package is unchanged and its source stays the raw entry bytes). A name is 1-3
+dot-separated segments of `[a-z][a-z0-9_]*`, at most 32 bytes in all, unique, and never `main`. A
+name maps to a file: `a` is `modules/a.lua` and `a.b.c` is `modules/a/b/c.lua`. The manifest fixes
+the list and its order; there is no directory discovery, so an undeclared file is ignored.
+
+**Reading.** `boat_plugin_read` reads each declared module after the entry. Each must be a regular
+file reached without following a link: on POSIX every directory component and the file are opened
+with `O_NOFOLLOW`; the Windows branch refuses reparse points per component. A name cannot hold `/`,
+`.` segments or `..`, so there is no traversal or absolute path. A missing file, directory or link
+fails the read naming the module file (`BoatPluginDiagnostic.file` holds 64 bytes, enough for
+`modules/marina/berths.lua`).
+
+**Source image.** With modules the package's source is one image, packed by
+`src/plugins/boat_plugin_image.[ch]`; without modules it is the raw entry text. The image starts
+with the five bytes `00 'P' 'M' 'I' 01` (magic and version 1), then a one-byte file count (the entry
+plus its modules, at most 9), then per file, entry first, a one-byte name length (1-32), the name
+(`main.lua` or the dotted module name), a u32 little-endian byte length and the bytes. No trailing
+bytes, duplicate names or names outside the grammar are accepted, and an entry that begins with the
+magic is refused. The entry, all modules and the framing (6 header bytes, then 1 + name + 4 bytes
+per file) share the 64 KiB source limit. The C packer, `tools/plugin_author.py` and
+`web/plugin_author.js` agree byte for byte on one golden vector,
+`tests/support/fixtures/plugin_image_golden.hex`.
+
+**Consistency.** `boat_plugin_check_source` runs wherever a manifest and a source meet (every
+`boat_plugin_load_*`, the stage and query workers, the catalog generator and the catalog wire
+decoder): modules are declared exactly when the source is an image, the image unpacks completely, its
+first file is the manifest's `entry`, and its module names equal the manifest's list in order.
+Otherwise the package is refused (`plugin.json modules ...` or `malformed package source image`)
+and never evaluated.
+
+**`require(name)`.** Installed only when the package declares modules, as a native function over the
+image's modules. It opens no file and there is no `package` table. The name must be a string in the
+module grammar (`module name "x" is invalid`) and declared in the manifest (`module 'x' is not
+declared in the manifest`); the entry is not a module. The first call compiles
+`modules/<path>.lua` as text under that chunk name, runs it once with the entry's globals and
+caches its single result in a table Lua cannot reach; later calls from any module or callback return
+the same value (the same table identity). A module that returns nothing or `nil` caches `true`. A
+cycle fails as `module cycle: a -> b -> a`; nesting is also bounded by the declared count
+(`modules are nested too deeply`). The cache belongs to one evaluation, as the Lua state does, so
+evaluations, callback transitions and revisions never share module tables; a module whose table a
+package changes must copy it first (the shared marina scene is returned as plain data, cached for the
+whole evaluation). Instructions and heap are the evaluation's, summed across entry and modules, and
+functions a module defines spend the same budgets when called later.
+
+**Diagnostics.** A syntax or runtime error raised in a module reports `modules/<path>.lua` and its
+line as the diagnostic's file and line; instruction-budget exhaustion names the function's own line.
+Known limits: `error(msg, 0)` (no position) and an out-of-memory error inside a module report the
+entry file, and a layout or timetable the decoder rejects names its scene field under `main.lua`
+because the decoder sees the assembled scene, not the module that built it.
+
+**Carriers.** The `(source, source_size)` pair is the package's identity wherever it travels: native
+`--plugin` read, eval request, stage and query workers, catalog wire, host revisions, room objective
+and recording. No wire, record or room version changed, and the budgets are the entry-only ones. A
+module-only edit changes the source bytes, so it is a real edit: the stage worker rebuilds the whole
+package, and classification is by decoded data as for an entry edit; for a voyage objective package
+the retained source bytes are also compared, so a callback change in a module migrates or restarts
+like one in the entry. An edit that changes neither decoded data nor an objective package's bytes is
+`BOAT_PLUGIN_UNCHANGED` and installs nothing. (Classification of a free-kind objective does not compare
+source, for entry and module edits alike.) A failed stage keeps the active revision and names the
+module file. The save-reload watch folds the whole image, so a module-only save is seen. `/save`
+writes the entry and each module under `modules/`, and the regenerated manifest keeps `modules`. A
+room package's module failure carries `modules/x.lua:LINE`.
+
+**Catalog.** Bundled packages are evaluated at build time from their directories; every
+`modules/*.lua` is a build dependency, so editing a module regenerates the catalog, and a module
+failure fails the build naming the file (`modules/route.lua:2`). A package under `plugins/_shared`
+is not a catalog entry.
+
+**Authoring tools and browser.** `plugin_author.py` `export` writes bundle `wake-velocity-plugin`
+version 2 (see [Browser source bundles](#browser-source-bundles-p43)); `import DIRECTORY < bundle`
+writes the package into a new directory; `workspace-read` and `workspace-write` handle module files
+as `modules/<path>.lua` (`workspace-write` edits a declared module or `plugin.json` but cannot create a
+module file: write a manifest only after its files exist); `validate`, `preview` and capture read the
+modules; `schema` and `plugin_schema.py` describe `modules`. The browser editor packs the same image,
+rewrites the manifest when a module is added or removed, and rejects version 1 bundles.
+
+**Shared source and copies.** A package cannot import another package or a shared directory, so
+content several packages use is a repository source copied into each. `plugins/_shared/<name>.lua`
+is the source (it has no `plugin.json` and is never a package); a package carries a checked-in,
+byte-identical copy at `modules/<name>.lua` and declares it in `modules`. A module whose name exists
+in `_shared` is such a copy and is not edited in place. `python3 tools/plugin_author.py sync-shared`
+(add `--check` to only report) rewrites the copies, creating `modules/` as needed, and the CTest
+`plugin_shared` fails with that command when one differs. `eriksberg_marina` (the twelve-berth marina
+scene) is the shared module of `harbor-life`, `harbor-room` and `marina-integrated-demo`.
+
+**PC console.** The console edits the entry only. It wraps the active entry as before and re-packs it
+with the active image's modules (`stage_form` in `apps/wake_velocity/wake_command.c`); queries see
+the edited package. It never creates, edits or removes a module, and its `/save` writes the entry
+and the modules.
+
+**Not provided.** No import of another installed package or a shared directory; no `load`,
+`dofile`, `loadfile` or `package`; no module reload outside the ordinary Apply and Undo; no module
+creation by `workspace-write` or the console; no file or network access from Lua; no more than 8
+modules or 64 KiB in all.
 
 ## Voyage schema
 
@@ -809,7 +883,7 @@ an authored open path. The contract:
 - **Not provided.** A serviced vessel has no visual wake, depth is unsurveyed, and nothing
   chooses slips or avoids traffic reactively. The reference package is
   [`marina-berth-demo`](../plugins/marina-berth-demo/README.md); the
-  [`marina-integrated-demo`](../plugins/marina-integrated-demo/README.md) example (M5 W6) uses the
+  [`marina-integrated-demo`](../plugins/marina-integrated-demo/README.md) example uses the
   same services on the shared twelve-hull marina and is built from package-local modules.
 
 ### Replacement, restart and owner lifetime
@@ -1221,23 +1295,8 @@ if (boat_plugin_read("plugins/langedrag", NULL, files, &d) == BOAT_PLUGIN_OK) {
 - `boat_plugin_read` opens `plugin.json`, checks it, then opens its entry. On POSIX each file
   is opened with `O_NOFOLLOW` and must `fstat` as a regular file; on Windows reparse points and
   directories are refused. Reads stop at the limit, so an oversized file is detected by one
-  extra byte, not a size query. Declared modules (M5 W1) are read the same way, each directory
-  component opened without following a link, and packed after the entry into a length-prefixed
-  source image (`boat_plugin_image.h`) only when modules are declared; otherwise the source stays
-  the raw entry bytes. `BoatPluginDiagnostic.file` is 64 bytes so `modules/marina/berths.lua`
-  fits; its serialised form is length-prefixed, so wire layouts are unchanged.
-- **Carriers (M5 W3).** The `(source, source_size)` pair is the package's identity wherever it
-  travels (native `--plugin` read, eval request, stage and query workers, catalog wire, host
-  revisions, room objective and recording): the entry bytes without modules, the image with them.
-  Every place that holds a manifest and a source checks them with `boat_plugin_check_source`:
-  modules are declared exactly when the source is an image, the image is well formed, its entry is
-  the manifest's `entry`, and its module names equal the manifest's list in the same order;
-  otherwise the package is refused (`plugin.json modules ...`), never evaluated. A module-only
-  edit changes the source bytes, so it is a real edit: the stage worker rebuilds it as a whole,
-  classification is the same as for an entry edit (descriptor data decides, plus, for an objective
-  voyage, any difference in the source bytes: migrate or restart), and a failed stage leaves the
-  active revision untouched with the module's file in the diagnostic. `/save` writes the entry and
-  each module under `modules/`; the PC console wraps the entry and keeps the modules (M5 W5).
+  extra byte, not a size query. Declared modules are read the same way and, when present, packed with the entry into a source image
+  ([Package modules](#package-modules-m5) owns that format, the carriers and their classification).
 - `boat_plugin_route_digest` is FNV-1a over every route field with field names, float bits
   least significant byte first, and shelter names. The reference digest is `e8509272172cb7c4`,
   the same for the fixture route and on Wasm.
@@ -1940,7 +1999,7 @@ route/water restarts, and **Undo / discard** for the existing native revision po
 UI staging is in flight cancels that request first. **Export draft** downloads the editor's current
 source, including invalid drafts; exporting is not validation or permission to apply.
 
-Modules (see Carriers (M5 W3) for how a package's source image travels) have a **Module** selector under
+Modules ([Package modules](#package-modules-m5)) have a **Module** selector under
 `main.lua`: it lists the editor's modules, one text area edits the chosen `modules/<path>.lua`, and
 **Add module** (a name typed in the box) and **Remove module** create or delete one and rewrite the
 `modules` array in `plugin.json` (reformatted JSON). `plugin.json` fixes the names and their order;
@@ -1986,8 +2045,8 @@ The browser builds the source image itself (`packImage` in `web/plugin_author.js
 image the Wasm side holds for `/save` and export. The layout in `src/plugins/boat_plugin_image.h`,
 `tools/plugin_author.py` and the web code are held to the same bytes by one golden vector,
 `tests/support/fixtures/plugin_image_golden.hex`, asserted by the native, Python and Node tests.
-The PC console edits and queries a package with modules by wrapping its entry and keeping the
-modules (M5 W5); the console's `/save` in the browser downloads the version 2 bundle.
+The console's `/save` in the browser downloads the version 2 bundle; for a package with modules the
+console edits only the entry ([PC console](#package-modules-m5)).
 
 Successful staging saves source in host-owned localStorage where permitted. Storage denial
 or invalid saved source is visible and nonfatal; export remains available. A new page/session

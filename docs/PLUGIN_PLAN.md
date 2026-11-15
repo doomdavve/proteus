@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Marina M3 routes, bounded clearance and C1–C4 qualification/closure are complete; M4 vessels and services merged (#209); next marina task: [M5 modules](MARINA_AUTHORING_PLAN.md#m5-execution-package--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**All five marina milestones are complete (M4 merged #209; M5 modules and the integrated example are local, PR pending); the module contract is in the [Plugin API](PLUGIN_API.md#package-modules-m5) and the open items are in the [marina plan](MARINA_AUTHORING_PLAN.md#closing-leftovers--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
@@ -1820,7 +1820,7 @@ craft, a retained ferry with an edited dwell, the retained schooner/lift depende
 authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
 records the historical seven-berth counts and gaps; the marina plan and current API supersede
 its structures/appearance/routes limits.
-M1 structures, M2 boat appearance and M3 routes are complete; the next marina work is [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
+M1 structures, M2 boat appearance, M3 routes, M4 occupancy and M5 modules are complete (see the [marina plan](MARINA_AUTHORING_PLAN.md)); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 

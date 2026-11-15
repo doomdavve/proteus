@@ -517,7 +517,7 @@ and appends bounded result lines. The first edit promotes a bundled session to a
 catalog revision's embedded source. A second edit while one is staging is refused with a clear
 message; syntax and schema failures drop that chunk and keep the active revision. `/undo` steps
 revisions and chunks together; `/capability scene.define` rewrites only the session manifest copy;
-`/save DIR` writes `plugin.json` and `main.lua` atomically and refuses a non-empty directory that is
+`/save DIR` writes `plugin.json` and `main.lua` (and, since Marina M5, any `modules/` files) atomically and refuses a non-empty directory that is
 not this session's package. Queries run in the same worker, render a depth- and size-bounded value
 and create no revision.
 
