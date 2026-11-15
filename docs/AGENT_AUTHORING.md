@@ -12,12 +12,12 @@ so nothing is accepted. [The plugin API](PLUGIN_API.md#agent-workspaces) owns th
 Native builds only; from the repository root with a built `./build/wake_velocity`:
 
 ```sh
-python3 tools/plugin_author.py init ~/my-voyage     # a voyage plugin plus the agent's workspace
+python3 tools/plugin_author.py init ~/my-voyage --from langedrag  # a voyage plugin plus the agent's workspace
 cd ~/my-voyage && ./wv play                         # terminal 1: the game, with the live bridge
 cd ~/my-voyage && claude                            # terminal 2: the agent, scoped to this directory
 ```
 
-`init` copies `langedrag` (or `--example NAME` / `--example DIRECTORY`), the agent's instructions
+`init` copies the package named by the required `--from NAME` (a shipped example such as `langedrag`) or `--from DIRECTORY`, the agent's instructions
 (`AGENTS.md`, imported by `CLAUDE.md`), a Claude Code permission file, a copy of the API reference and
 the `./wv` wrapper. A release package has the same tools in its `authoring/` directory. The agent
 opens in that directory and sees the plugin, not the game's source.

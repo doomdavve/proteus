@@ -1918,9 +1918,9 @@ retract a request the game has read; a request is answered within a poll plus th
 
 ## Agent workspaces
 
-`plugin_author.py init DIR [--example NAME-or-DIRECTORY] [--bridge DIR]` makes a new, empty-or-absent
+`plugin_author.py init DIR --from NAME-or-DIRECTORY [--bridge DIR]` makes a new, empty-or-absent
 directory that a coding agent can be launched in, so it sees the plugin and nothing else of the
-game. It holds the example's `plugin.json`, `main.lua` and modules (default `langedrag`), and:
+game. It holds the chosen package's `plugin.json`, `main.lua` and modules (`--from` is required; there is no default), and:
 
 | File | Purpose |
 | --- | --- |
