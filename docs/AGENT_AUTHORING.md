@@ -9,7 +9,7 @@ recorded. [The plugin API](PLUGIN_API.md) owns every command and schema named be
 ## Setup
 
 Native builds only. Work in a plugin directory outside the checkout (copy an example from
-`assets/plugins/`, for example `langedrag`) and start the game against it with a bridge:
+`plugins/` (a release package: `assets/plugins/`), for example `langedrag`) and start the game against it with a bridge:
 
 ```sh
 ./build/wake_velocity --plugin ~/drafts/my-voyage --plugin-bridge ~/.wake-velocity-bridge
@@ -19,6 +19,35 @@ Open the agent in the source checkout (or the release package's `authoring/` dir
 it the draft directory and the bridge directory. The agent needs only to read and write those
 paths, read `docs/PLUGIN_API.md`, and run `python3 tools/plugin_author.py`. The bridge's token
 file is private to the user; do not paste it into prompts or logs.
+
+## Quick start
+
+From the repository root with a built `./build/wake_velocity`:
+
+```sh
+tools/agent_trial.sh setup          # copies plugins/langedrag to ~/wake-agent-trial/langedrag, runs
+                                    # validate, preview and a baseline capture (baseline.png)
+tools/agent_trial.sh play           # terminal 1: the game on that draft, with the live bridge
+claude                              # terminal 2: the agent, started in the repository root
+```
+
+`setup` refuses to overwrite an existing draft; pass another path to either command to use one
+(`tools/agent_trial.sh setup ~/wake-agent-trial/two`). The bridge directory is
+`~/.wake-velocity-bridge`, or `$WAKE_BRIDGE`. The scripted offline checks were run on 2026-11-15;
+`play` and the whole agent session have not been.
+
+Paste this prompt into the agent:
+
+> Read docs/AGENT_AUTHORING.md and docs/PLUGIN_API.md. The draft is ~/wake-agent-trial/langedrag
+> and the running game's bridge is ~/.wake-velocity-bridge. Add one more shelter objective to the
+> voyage (keep it small). Follow the loop in the guide: validate, preview and capture before you
+> stage anything, then live-inspect, live-stage with the pins it returns, and live-apply. Show me
+> the capture, report each command's status, and stop if a stage is rejected twice. Do not read the
+> bridge's session file. Afterwards, run live-undo and confirm the previous revision is back.
+
+Then check each [trial](#trial) item in the running game and note the result. Item 5: afterwards
+ask for something the API cannot do (for example "make the ferry sink") and see whether you get a
+gap report.
 
 ## The loop
 
@@ -70,7 +99,7 @@ history are the record. A browser can use bundle import/export instead of the br
 Done when the user has run these against one agent session and recorded the outcome here:
 
 1. From a copy of `langedrag`, ask for a small change (for example a second objective or a moved
-   mark). Record whether the agent finds the contract unaided or needed hints.
+   mark; the [quick start](#quick-start) has a prompt). Record whether the agent finds the contract unaided or needed hints.
 2. The change passes `validate`, `preview` and `capture` before it is staged.
 3. `live-stage` and `live-apply` succeed on the first try with correct pins, or the failure mode
    (stale pin, busy, rejected) is recorded.
