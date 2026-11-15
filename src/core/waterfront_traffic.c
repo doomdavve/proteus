@@ -2,14 +2,14 @@
 
 #include "core/boat_scene_definition.h"
 #include "core/waterfront_route.h"
+#include "core/waterfront_service.h"
 #include "core/waterfront_upstream.h"
 #include "raylib.h"
 #include "raymath.h"
 
 #include <math.h>
 
-BoatModelSpec waterfront_traffic_spec_routes(
-    const WaterfrontRouteDefinition *routes, int index)
+BoatModelSpec waterfront_traffic_spec_routes(const WaterfrontRouteDefinition *routes, int index)
 {
     return waterfront_route_spec(routes, index);
 }
@@ -122,19 +122,18 @@ bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time)
     return track_wakes(wakes, time);
 }
 
-void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
+static void evaluate_impl(const WaterfrontRouteDefinition *routes, const bool *serviced,
     BoatWater water, double time, WaterfrontTrafficFrame *frame)
 {
     *frame = (WaterfrontTrafficFrame) { 0 };
     frame->routes = routes;
     frame->vessel_count = routes ? (int)routes->actor_count
-                                 : water.upstream ? WATERFRONT_TRAFFIC_ALL
-                                                  : WATERFRONT_TRAFFIC_VESSELS;
+        : water.upstream         ? WATERFRONT_TRAFFIC_ALL
+                                 : WATERFRONT_TRAFFIC_VESSELS;
     for (int i = 0; i < frame->vessel_count; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
         WaterfrontVesselState *vessel = &frame->vessels[i];
-        frame->mesh[i] = routes ? (unsigned char)(WATERFRONT_TRAFFIC_ALL
-                                         + routes->actors[i].recipe)
+        frame->mesh[i] = routes ? (unsigned char)(WATERFRONT_TRAFFIC_ALL + routes->actors[i].recipe)
                                 : (unsigned char)i;
         vessel->id = 3000 + i;
         vessel->motion = waterfront_traffic_motion_routes(routes, i, time);
@@ -144,6 +143,12 @@ void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
             vessel->lights[light] = boat_model_point(vessel->pose,
                 (Vector3) { light == 2 ? 0 : (light ? 1 : -1) * spec.beam * .42f,
                     spec.freeboard + .32f, light == 2 ? spec.length * .42f : -spec.length * .12f });
+        // M4: a serviced actor only provides a path. Its hull is drawn from the harbor frame, so
+        // it has no mesh, lights or wake here.
+        if (serviced && serviced[i]) {
+            frame->hidden[i] = true;
+            continue;
+        }
         // Stopping services keep the longer visual trails and fade out as they slow.
         bool upstream = routes ? (unsigned)routes->actors[i].recipe >= WATERFRONT_CRAFT_ALVSNABBEN
                                : i >= WATERFRONT_TRAFFIC_VESSELS;
@@ -164,9 +169,8 @@ void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
                 }
                 Vector3 a = routes ? wake_point_routes(routes, i, time, age, side, physical)
                                    : wake_point(i, time, age, side, physical);
-                Vector3 b = routes
-                    ? wake_point_routes(routes, i, time, age + step, side, physical)
-                    : wake_point(i, time, age + step, side, physical);
+                Vector3 b = routes ? wake_point_routes(routes, i, time, age + step, side, physical)
+                                   : wake_point(i, time, age + step, side, physical);
                 Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
                 float length = Vector3Distance(a, b);
                 Vector3 direction = Vector3Subtract(b, a);
@@ -231,6 +235,25 @@ void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
     }
 }
 
+void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes, BoatWater water,
+    double time, WaterfrontTrafficFrame *frame)
+{
+    evaluate_impl(routes, NULL, water, time, frame);
+}
+
+void waterfront_traffic_evaluate_scene(
+    const BoatSceneDefinition *scene, BoatWater water, double time, WaterfrontTrafficFrame *frame)
+{
+    bool serviced[WATERFRONT_TRAFFIC_ALL] = { false };
+    bool any = false;
+    for (unsigned i = 0; scene && scene->traffic_present && i < scene->traffic.actor_count
+        && i < WATERFRONT_TRAFFIC_ALL;
+        ++i)
+        any |= serviced[i] = waterfront_service_for_route(scene, i) >= 0;
+    evaluate_impl(scene && scene->traffic_present ? &scene->traffic : NULL, any ? serviced : NULL,
+        water, time, frame);
+}
+
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)
 {
     waterfront_traffic_evaluate_routes(NULL, water, time, frame);
@@ -268,9 +291,49 @@ bool waterfront_traffic_contact(Vector2 position, float heading, float bow, floa
         INFINITY, (BoatWater) { 0 }, time, contact);
 }
 
-static bool contact_height_routes(const WaterfrontRouteDefinition *routes, Vector2 position,
-    float heading, float bow, float stern, float half_beam, float bottom, float top, BoatWater water,
-    double time, WaterfrontTrafficContact *contact)
+// One moving or moored hull against the player's rectangle. MOTION is renderer-space.
+static bool hull_contact(int index, BoatModelSpec spec, WaterfrontVesselMotion motion,
+    Vector2 position, Vector2 forward, Vector2 right, Vector2 center, float bow, float stern,
+    float half_beam, float mid, float bottom, float top, BoatWater water, double time,
+    WaterfrontTrafficContact *contact)
+{
+    Vector2 ship = { -motion.position.x, motion.position.z };
+    Vector2 vf = { sinf(motion.heading), -cosf(motion.heading) };
+    Vector2 vr = { cosf(motion.heading), sinf(motion.heading) };
+    Vector2 normal;
+    float depth;
+    if (!rectangles(Vector2Subtract(center, ship), forward, right, vf, vr,
+            (Vector2) { half_beam + .15f, (bow + stern) * .5f + .15f },
+            (Vector2) { spec.beam * .5f + .25f, spec.length * .5f + .5f }, &normal, &depth))
+        return false;
+    Transform3D pose
+        = boat_water_pose(water, time, motion.position, motion.heading, spec.length, spec.beam);
+    float low, high;
+    boat_model_vertical_bounds(spec, pose, &low, &high);
+    if (bottom > high || top < low)
+        return false;
+    float nr = Vector2DotProduct(normal, right), nf = Vector2DotProduct(normal, forward);
+    Vector2 local = { fabsf(nr) < .001f ? 0 : -copysignf(half_beam, nr),
+        fabsf(nf) < .001f ? mid
+            : nf < 0      ? bow
+                          : -stern };
+    Vector2 point = Vector2Add(
+        position, Vector2Add(Vector2Scale(right, local.x), Vector2Scale(forward, local.y)));
+    Vector2 arm = Vector2Subtract(point, ship);
+    if (contact)
+        *contact = (WaterfrontTrafficContact) { .vessel = index,
+            .normal = normal,
+            .local = local,
+            .penetration = depth,
+            .velocity = { -motion.velocity.x - motion.yaw_rate * arm.y,
+                motion.velocity.z + motion.yaw_rate * arm.x } };
+    return true;
+}
+
+static bool contact_height_routes(const BoatSceneDefinition *scene,
+    const WaterfrontRouteDefinition *routes, Vector2 position, float heading, float bow,
+    float stern, float half_beam, float bottom, float top, BoatWater water, double time,
+    WaterfrontTrafficContact *contact)
 {
     Vector2 forward = { sinf(heading), -cosf(heading) }, right = { cosf(heading), sinf(heading) };
     float mid = (bow - stern) * .5f;
@@ -303,37 +366,25 @@ static bool contact_height_routes(const WaterfrontRouteDefinition *routes, Vecto
                 water.vessel.direction.y * speed };
             motion.yaw_rate = 0;
         }
-        Vector2 ship = { -motion.position.x, motion.position.z };
-        Vector2 vf = { sinf(motion.heading), -cosf(motion.heading) };
-        Vector2 vr = { cosf(motion.heading), sinf(motion.heading) };
-        Vector2 normal;
-        float depth;
-        if (!rectangles(Vector2Subtract(center, ship), forward, right, vf, vr,
-                (Vector2) { half_beam + .15f, (bow + stern) * .5f + .15f },
-                (Vector2) { spec.beam * .5f + .25f, spec.length * .5f + .5f }, &normal, &depth))
+        if (waterfront_service_for_route(scene, (unsigned)i) >= 0)
+            continue; // Its vessel is evaluated below from the same service pose that is drawn.
+        if (hull_contact(i, spec, motion, position, forward, right, center, bow, stern, half_beam,
+                mid, bottom, top, water, time, contact))
+            return true;
+    }
+    // M4: moored and travelling service hulls. The contact names the route actor, as before.
+    for (unsigned v = 0; scene && scene->services_present && v < scene->vessel_count; ++v) {
+        WaterfrontServiceHull hull;
+        if (!waterfront_service_hull(scene, v, time, &hull))
             continue;
-        Transform3D pose
-            = boat_water_pose(water, time, motion.position, motion.heading, spec.length, spec.beam);
-        float low, high;
-        boat_model_vertical_bounds(spec, pose, &low, &high);
-        if (bottom > high || top < low)
-            continue;
-        float nr = Vector2DotProduct(normal, right), nf = Vector2DotProduct(normal, forward);
-        Vector2 local = { fabsf(nr) < .001f ? 0 : -copysignf(half_beam, nr),
-            fabsf(nf) < .001f ? mid
-                : nf < 0      ? bow
-                              : -stern };
-        Vector2 point = Vector2Add(
-            position, Vector2Add(Vector2Scale(right, local.x), Vector2Scale(forward, local.y)));
-        Vector2 arm = Vector2Subtract(point, ship);
-        if (contact)
-            *contact = (WaterfrontTrafficContact) { .vessel = i,
-                .normal = normal,
-                .local = local,
-                .penetration = depth,
-                .velocity = { -motion.velocity.x - motion.yaw_rate * arm.y,
-                    motion.velocity.z + motion.yaw_rate * arm.x } };
-        return true;
+        int actor = boat_scene_find_route(scene, scene->services[hull.service].route);
+        WaterfrontVesselMotion motion = { .position = hull.position,
+            .velocity = hull.velocity,
+            .heading = hull.heading,
+            .yaw_rate = hull.yaw_rate };
+        if (hull_contact(actor, hull.spec, motion, position, forward, right, center, bow, stern,
+                half_beam, mid, bottom, top, water, time, contact))
+            return true;
     }
     return false;
 }
@@ -343,32 +394,46 @@ bool waterfront_traffic_contact_height(Vector2 position, float heading, float bo
     WaterfrontTrafficContact *contact)
 {
     return contact_height_routes(
-        NULL, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
+        NULL, NULL, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
 }
 
 bool waterfront_traffic_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,
-    float heading, float bow, float stern, float half_beam, float bottom, float top, BoatWater water,
-    double time, WaterfrontTrafficContact *contact)
+    float heading, float bow, float stern, float half_beam, float bottom, float top,
+    BoatWater water, double time, WaterfrontTrafficContact *contact)
 {
     const WaterfrontRouteDefinition *routes
         = scene && scene->traffic_present ? &scene->traffic : NULL;
     return contact_height_routes(
-        routes, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
+        scene, routes, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
 }
 
-static bool camera_clear_routes(
+static bool hull_blocks_camera(
+    BoatModelSpec spec, Vector3 position, float heading, Vector3 p, float clearance)
+{
+    Vector3 q = Vector3Transform(Vector3Subtract(p, position), MatrixRotateY(-heading));
+    float top = fmaxf(
+        spec.mast_height, spec.freeboard + spec.cabin_height + (spec.passenger_deck ? 2.6f : .8f));
+    return fabsf(q.x) < spec.beam * .5f + clearance
+        && fabsf(q.z) < spec.length * .5f + 1 + clearance && q.y > -spec.draft - clearance
+        && q.y < top + clearance;
+}
+
+static bool camera_clear_routes(const BoatSceneDefinition *scene,
     const WaterfrontRouteDefinition *routes, Vector3 p, double time, float clearance)
 {
     int count = routes ? (int)routes->actor_count : WATERFRONT_TRAFFIC_VESSELS;
     for (int i = 0; i < count; ++i) {
-        BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
+        if (waterfront_service_for_route(scene, (unsigned)i) >= 0)
+            continue;
         WaterfrontVesselMotion m = waterfront_traffic_motion_routes(routes, i, time);
-        Vector3 q = Vector3Transform(Vector3Subtract(p, m.position), MatrixRotateY(-m.heading));
-        float top = fmaxf(spec.mast_height,
-            spec.freeboard + spec.cabin_height + (spec.passenger_deck ? 2.6f : .8f));
-        if (fabsf(q.x) < spec.beam * .5f + clearance
-            && fabsf(q.z) < spec.length * .5f + 1 + clearance && q.y > -spec.draft - clearance
-            && q.y < top + clearance)
+        if (hull_blocks_camera(
+                waterfront_traffic_spec_routes(routes, i), m.position, m.heading, p, clearance))
+            return false;
+    }
+    for (unsigned v = 0; scene && scene->services_present && v < scene->vessel_count; ++v) {
+        WaterfrontServiceHull hull;
+        if (waterfront_service_hull(scene, v, time, &hull)
+            && hull_blocks_camera(hull.spec, hull.position, hull.heading, p, clearance))
             return false;
     }
     return true;
@@ -376,7 +441,7 @@ static bool camera_clear_routes(
 
 bool waterfront_traffic_camera_clear(Vector3 p, double time, float clearance)
 {
-    return camera_clear_routes(NULL, p, time, clearance);
+    return camera_clear_routes(NULL, NULL, p, time, clearance);
 }
 
 bool waterfront_traffic_camera_clear_scene(
@@ -384,5 +449,5 @@ bool waterfront_traffic_camera_clear_scene(
 {
     const WaterfrontRouteDefinition *routes
         = scene && scene->traffic_present ? &scene->traffic : NULL;
-    return camera_clear_routes(routes, p, time, clearance);
+    return camera_clear_routes(scene, routes, p, time, clearance);
 }

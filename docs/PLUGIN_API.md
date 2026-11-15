@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-**P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; M3 adds one bounded authored open/loop line/arc traffic path with stops and schedule clearance. Its README lists the remaining native scene gaps (crane/building restyling, occupancy and lighting).
+**P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; M3 adds bounded authored open/loop line/arc traffic paths with stops and schedule clearance; M4 adds vessels and one-shot resident/visitor berth services. Its README lists the remaining native scene gaps (crane/building restyling and lighting).
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
@@ -643,6 +643,16 @@ return {
 | `appearance.mast_height` | finite `freeboard + 2` through 12 m above calm water | Only `sailboat` and `sailboat_7m`; zero, removal and fields on mastless recipes reject. |
 | `appearance.hull`, `appearance.deck`, `appearance.trim` | dense triples of Lua integers 0–255 | Opaque RGB; alpha, extra/missing channels, fractions and coercion reject. |
 | `appearance.name` | optional 1–16 ASCII characters: A–Z, 0–9, space, period, hyphen, apostrophe; include a letter/digit | Painted on both hull sides. Empty, unsupported or overlong text rejects without truncation. No lowercase/accented glyphs. |
+| `berths[i].empty` | optional boolean, default false | M4: a slot with no static hull. Its recipe/appearance give the largest hull it fits (length and beam). It has no static contact or camera exclusion; a vessel service occupies it. |
+| `marina.vessels` | dense list of 0–4 records | M4: vessel identity and appearance, separate from any berth. A vessel is drawn only where a service places it. |
+| `vessels[i].id`, `.recipe`, `.appearance` | as a berth's | IDs are unique across berths, modules and vessels. `appearance` is validated like a berth's and is the hull every renderer, contact and camera check uses. |
+| `marina.services` | dense list of 0–8 records | M4: one-shot services (no repeat). A resident is moored at its berth outside its path window; a visitor is absent outside it and moored during the dock dwell. |
+| `services[i].id` | 1–23, same spelling; unique among services | Stable service identity. |
+| `services[i].vessel`, `.berth` | a vessel ID; an **empty** berth ID | The vessel must fit the berth's resolved length and beam. A berth holds one service over its reserved window; a resident reserves it forever. |
+| `services[i].route` | a `traffic.vessels` entry with `route = "open"` and no `loop` | Its path is the vessel's motion; that actor is not drawn, lit or given a wake. Each route belongs to one service. |
+| `services[i].kind` | `resident` or `visitor` | Resident: the path starts and ends at the berth pose. Visitor: the path's `dock_piece` ends at the berth pose and its dwell is the stay. |
+| `services[i].dock_piece` | whole number 1–4 (visitor only) | The 1-based path piece whose dwell is the stay. A resident rejects the field. |
+| `services[i].start_tick` | whole number 0–4294967295 | 120 Hz simulation tick at which the path's tick zero occurs. Windows are half-open: the first tick travels, the tick after the last is moored (resident) or absent (visitor). |
 | `marina.modules` | dense list of 0–64 records | A present list replaces the entire compiled dock furniture. Empty disables it. The ferry and bridge stay independent. |
 | `modules[i].id` | 1–23, same spelling; unique across the scene including berths | Stable attachment identity. |
 | `modules[i].kind` | `walkway`, `finger_pier`, `platform`, `gangway`, `quay_deck` | Native dimensioned pieces; removed recipe names reject. |
@@ -659,7 +669,7 @@ return {
 | `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
 | `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. |
 | `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
-| `vessels[i].route = "open"` | one per scene; 1–4 `pieces` | A finite path, or a repeating path with optional `loop = true`; omit `speed`, `phase`, `period` and `stops`. Each strict piece supplies integer `ticks` (1–21600), `dwell` (0–21600), `max_speed` (0–40 m/s, exclusive of zero) and positive `max_acceleration` in m/s². Total duration including dwell is at most 21600 ticks and at least 600 ticks. |
+| `vessels[i].route = "open"` | several per scene (pairwise survey, below); 1–4 `pieces` | A finite path, or a repeating path with optional `loop = true`; omit `speed`, `phase`, `period` and `stops`. Each strict piece supplies integer `ticks` (1–21600), `dwell` (0–21600), `max_speed` (0–40 m/s, exclusive of zero) and positive `max_acceleration` in m/s². Total duration including dwell is at most 21600 ticks and at least 600 ticks. |
 | Open line piece | `kind = "line"`, `x0`, `z0`, `x1`, `z1` | Simulation-metre endpoints, each coordinate within ±20000 m. |
 | Open arc piece | `kind = "arc"`, `x`, `z`, `radius`, `start_angle`, `sweep` | Centre and radius in metres, angles in radians. The start angle is within ±2π; the nonzero signed sweep is at most π in magnitude. The entire circle must fit within ±20000 m. |
 | `gulls.flocks` | dense list of 0–4 records | A present list replaces every compiled gull group; empty disables gulls. No physical bird contact is implied. |
@@ -704,14 +714,14 @@ representable in 120 Hz ticks; no legacy floating period is rounded. Legacy elli
 angle/distance wraps reject overlapping fallback as unsupported even when their nominal period
 looks integral. Common periods use overflow-safe bounded arithmetic; unsupported repeat semantics
 and exhausted work report explicit errors. Tick-held motion, permitted join/wrap mismatch and
-bounded float arithmetic receive additional conservative margins. A second open path or traffic
+bounded float arithmetic receive additional conservative margins. Several open paths are checked pairwise over the ticks where both can be present (M4); traffic
 whose speed cannot be bounded rejects. Stopped POINTS actors must also have nonoverlapping
 acceleration/deceleration ramps on every built leg; otherwise all path-clearance proofs reject
 them because the legacy evaluator can jump internally. This proof check leaves runtime motion
 and retained-service timetables unchanged. An entrance may be crossed. Open-path edits are held
 for Apply and restart the session; Undo restores the complete prior route revision under the
 same restart rule. Visible hull, contact, camera and visual wake queries share the native pose.
-Open paths do not bind to berth occupancy, and depth is unverified. Ordinary traffic wakes stay visual.
+Only a `marina.services` entry binds an open path to a berth (M4); depth is unverified. Ordinary traffic wakes stay visual.
 Every table is strict; lists are dense. There
 is no silent clamp, index merge or partial installation. Depth is unavailable, so discovery and
 diagnostics report **depth unverified** instead of inventing a
@@ -732,6 +742,42 @@ the map's ground while its far endpoint follows the assembly. CPU/GPU boxes, pla
 and camera exclusion use the authored dimensions; camera checks conservatively include wave
 excursion. The compiled fallback furniture remains independent. PST9 staging, room definition
 v3 and multiplayer v11 reject older content/pairs; there is no compatibility shim.
+
+### Marina vessel services (M4)
+
+`marina.vessels` and `marina.services` (field tables above) let a vessel use an `empty` berth along
+an authored open path. The contract:
+
+- **One owner per tick.** Ownership is a pure function of `(service, tick)` evaluated natively:
+  *moored* (the berth owns the hull: shared wave pose, ropes, berth contact), *travelling* (the
+  path owns its pose and moving contact) or *absent* (no hull, contact, camera exclusion or wake).
+  Harbor frames, traffic frames, contacts, camera exclusion and both renderers use that one
+  evaluation, so a vessel is never drawn or contacted twice and never vanishes at a handoff.
+  Seeks, restarts and independent sessions agree because nothing is stored.
+- **Windows are half-open** `[start_tick, start_tick + path ticks)`. A resident is travelling in
+  the window and moored at its berth outside it. A visitor is travelling in the window except
+  *moored* over the `dock_piece` dwell, and absent outside it. Services are one-shot: no repeat.
+  A visitor parked elsewhere before arrival is not supported.
+- **The berth owns the terminal pose.** A resident's path starts and ends at the berth pose; a
+  visitor's `dock_piece` ends there. Positions agree within 1 mm and 0.001 rad, otherwise
+  validation names the field and prints the expected pose. The route must be an open, non-looping
+  path used by only one service.
+- **Fit and reservations.** The vessel's resolved length and beam must fit the empty berth's
+  recipe/appearance. A berth holds one service over its reserved window (forever for a resident);
+  one vessel cannot have overlapping services; a resident has no other service. Missing vessel,
+  berth or route IDs, static-hull berths and more than 32 hulls reject.
+- **Survey.** Authored paths are checked pairwise over their shared window at up to 12-tick
+  samples inside a 1,800-sample budget. A service vessel is checked with its own hull; it may touch
+  only the pier or quay nearest its berth and only during its dock pieces. Empty berths are open
+  water, static hull berths and other piers still block. Windows that make two paths cross reject
+  (`scene.traffic.vessels[n] crosses scene.traffic.vessels[m]`).
+- **Reload.** A service timetable (any service field) is a schedule edit: held for Apply, it
+  restarts the session, and Undo restores the previous revision under the same rule.
+- **Wire and budgets.** The staging wire is `PSTC`, the room definition v6 inside protocol v16;
+  older content is refused by version. Limits: 4 vessels, 8 services, 32 hulls.
+- **Not provided.** A serviced vessel has no visual wake, depth is unsurveyed, and nothing
+  chooses slips or avoids traffic reactively. The reference package is
+  [`marina-berth-demo`](../plugins/marina-berth-demo/README.md).
 
 ### Replacement, restart and owner lifetime
 
@@ -885,15 +931,15 @@ than `"`, `\` and `` ` ``, without leading or trailing spaces. A tour has no `ex
 
 Recovery returns to the last stop passed, facing along the stop's heading. Objectives see the same
 `voyage.shelter_reached` and `voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
-worker's wire (`PSTB`) carries tours and captions.
+worker's wire (`PSTC`) carries tours, captions and, from M4, empty berths, vessels and services.
 
 ### Scene authoring not exposed yet
 
-Crane/building restyling, sculptures, arbitrary meshes, berth occupancy schedules, an interactive
+Crane/building restyling, sculptures, arbitrary meshes, parked visitors and repeating services, an interactive
 route editor and lighting remain outside this contract. M1 supplies larger marinas and
 fixed/floating deck geometry; M2 supplies bounded hull appearance; M3 supplies the bounded
-open/loop line/arc paths specified above. [M4–M5](MARINA_AUTHORING_PLAN.md) own vessel/berth
-ownership schedules and local source modules. No berth handoff or traffic avoidance is implied.
+open/loop line/arc paths specified above. M4 supplies vessel/berth ownership schedules (above); [M5](MARINA_AUTHORING_PLAN.md) owns local source
+modules. No traffic avoidance is implied.
 
 
 ## River race authoring (P2)
@@ -1515,7 +1561,7 @@ Payload is a subset of the reservation, so adding the two would double count it.
 Native inspection and the benchmark report the complete `WakePlugin` reservation (all ten
 revision slots, files, state/pending output, events, diagnostics and trace) plus the single
 allowed Lua heap as `owned_ceiling`. A compile-time assertion keeps the native owner within
-1 MiB; Lua adds at most 2 MiB. This is owned storage, excluding allocator metadata, C stack,
+1.25 MiB (raised from 1 MiB by Marina M4's vessel and service data); Lua adds at most 2 MiB. This is owned storage, excluding allocator metadata, C stack,
 borrowed directory/map/world/view resources and process RSS. Stack scratch includes candidate
 revisions, transaction copies and recursive state decoding; the validators also run under a
 1 MiB stack limit. Preview checkpoints own another full plugin/session/wake copy; their

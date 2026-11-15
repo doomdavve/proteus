@@ -40,6 +40,8 @@ typedef struct {
     int vessel_count; // WATERFRONT_TRAFFIC_VESSELS, or WATERFRONT_TRAFFIC_ALL upstream.
     unsigned char mesh[WATERFRONT_TRAFFIC_ALL]; // 0..7 compiled slots; 8+ registered recipe.
     WaterfrontVesselState vessels[WATERFRONT_TRAFFIC_ALL];
+    // M4: actors that only provide a service vessel's path; renderers skip them entirely.
+    bool hidden[WATERFRONT_TRAFFIC_ALL];
     bool lift; // Upstream: Hisingsbron's lift span, at LIFT_POSE (waterfront_upstream.h).
     Transform3D lift_pose;
     int wake_count;
@@ -60,8 +62,10 @@ BoatModelSpec waterfront_traffic_spec(int index);
 const Mesh3D *waterfront_traffic_mesh(int index);
 const Mesh3D *waterfront_traffic_mesh_slot(int slot);
 // L3.1: the same queries against a caller-owned definition; NULL selects compiled defaults.
-BoatModelSpec waterfront_traffic_spec_routes(const struct WaterfrontRouteDefinition *routes, int index);
-const Mesh3D *waterfront_traffic_mesh_routes(const struct WaterfrontRouteDefinition *routes, int index);
+BoatModelSpec waterfront_traffic_spec_routes(
+    const struct WaterfrontRouteDefinition *routes, int index);
+const Mesh3D *waterfront_traffic_mesh_routes(
+    const struct WaterfrontRouteDefinition *routes, int index);
 // Closed authored routes; negative time supports wakes across the start and lap boundary.
 WaterfrontVesselMotion waterfront_traffic_motion(int index, double time);
 WaterfrontVesselMotion waterfront_traffic_motion_routes(
@@ -71,6 +75,10 @@ double waterfront_traffic_period_routes(const struct WaterfrontRouteDefinition *
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame);
 void waterfront_traffic_evaluate_routes(const struct WaterfrontRouteDefinition *routes,
     BoatWater water, double time, WaterfrontTrafficFrame *frame);
+// M4: as evaluate_routes for SCENE, but actors whose route a service uses are hidden: the harbor
+// frame draws that vessel, so it is not drawn, lit or given a wake twice.
+void waterfront_traffic_evaluate_scene(const struct BoatSceneDefinition *scene, BoatWater water,
+    double time, WaterfrontTrafficFrame *frame);
 int waterfront_traffic_actor_count(const struct WaterfrontRouteDefinition *routes);
 // Opt-in race fixture: an independent four-emitter pool seeded from 16 seconds of actual
 // scenery motion. Advance once per fixed tick before boat physics; ordinary traffic is unchanged.

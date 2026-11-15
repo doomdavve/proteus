@@ -124,6 +124,157 @@ static bool joined_edges(const BoatSceneModule *parent, const BoatSceneModule *c
     return (fabsf(x - w) <= .01f && l - z >= .25f) || (fabsf(z - l) <= .01f && w - x >= .25f);
 }
 
+// Shared by static berth hulls and M4 vessels: recipe, dimensions, colors, name and the resolved
+// native geometry. BASE names the owning field, such as "scene.marina.berths[2]".
+static bool check_hull(const BoatSceneBerth *b, const char *base, BoatSceneDiagnostic *d)
+{
+    char at[64];
+    dotted(at, sizeof(at), base, "recipe");
+    if (b->recipe >= BOAT_SCENE_BERTH_RECIPES)
+        return fail(d, at, "is not a registered berth recipe");
+    BoatModelSpec proto = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+    const BoatSceneAppearance *a = &b->appearance;
+    dotted(at, sizeof(at), base, "appearance.length");
+    if (a->length != 0 && !finite_in(a->length, proto.length * .75f, proto.length * 1.25f))
+        return fail(d, at, "must be finite, 0.75..1.25 times recipe length in metres");
+    dotted(at, sizeof(at), base, "appearance.beam");
+    if (a->beam != 0 && !finite_in(a->beam, proto.beam * .75f, proto.beam * 1.25f))
+        return fail(d, at, "must be finite, 0.75..1.25 times recipe beam in metres");
+    dotted(at, sizeof(at), base, "appearance.mast_height");
+    if (a->mast_height != 0
+        && (proto.mast_height == 0 || !finite_in(a->mast_height, proto.freeboard + 2, 12)))
+        return fail(d, at, "requires a sailboat mast, freeboard + 2 through 12 metres");
+    const Color colors[] = { a->hull, a->deck, a->trim };
+    const char *const suffix[] = { "appearance.hull", "appearance.deck", "appearance.trim" };
+    for (unsigned c = 0; c < 3; ++c) {
+        dotted(at, sizeof(at), base, suffix[c]);
+        if (colors[c].a != 255 && (colors[c].a != 0 || colors[c].r || colors[c].g || colors[c].b))
+            return fail(d, at, "must be opaque RGB or the all-zero inherited color");
+    }
+    dotted(at, sizeof(at), base, "appearance.name");
+    if (!boat_model_name_valid(a->name))
+        return fail(d, at,
+            "must be 1..16 A-Z, 0-9, space, period, hyphen or apostrophe; include a "
+            "letter/digit");
+    dotted(at, sizeof(at), base, "appearance");
+    if (!boat_model_spec_valid(boat_scene_berth_resolve(b)))
+        return fail(d, at, "resolved recipe violates native geometry limits");
+    return true;
+}
+
+static bool scene_id_taken(const BoatSceneDefinition *scene, const char *id)
+{
+    return boat_scene_find_berth(scene, id) || boat_scene_find_module(scene, id);
+}
+
+// M4: vessels, services and their cross-checks against berths and the traffic routes.
+static bool validate_services(const BoatSceneDefinition *scene, BoatSceneDiagnostic *d)
+{
+    if (scene->vessel_count > BOAT_SCENE_VESSELS)
+        return fail(d, "scene.marina.vessels", "exceeds the 4-vessel capacity");
+    if (scene->service_count > BOAT_SCENE_SERVICES)
+        return fail(d, "scene.marina.services", "exceeds the 8-service capacity");
+    if (!scene->services_present)
+        return scene->vessel_count || scene->service_count
+            ? fail(d, "scene.marina.services", "is absent but has entries")
+            : true;
+    if (scene->service_count && !scene->vessel_count)
+        return fail(d, "scene.marina.services", "need at least one vessel");
+    char base[64], at[64];
+    for (unsigned i = 0; i < scene->vessel_count; ++i) {
+        const BoatSceneVessel *v = &scene->vessels[i];
+        indexed(base, sizeof(base), "scene.marina.vessels", i + 1, "");
+        indexed(at, sizeof(at), "scene.marina.vessels", i + 1, ".id");
+        if (!bounded_text(v->id, sizeof(v->id)) || !boat_scene_identifier(v->id))
+            return fail(d, at, "must be a-z, 0-9 or '_', starting with a letter");
+        if (scene_id_taken(scene, v->id))
+            return fail(d, at, "repeats an existing scene ID");
+        for (unsigned j = 0; j < i; ++j)
+            if (!strcmp(scene->vessels[j].id, v->id))
+                return fail(d, at, "repeats an existing scene ID");
+        BoatSceneBerth hull = { .recipe = v->recipe, .appearance = v->appearance };
+        if (!check_hull(&hull, base, d))
+            return false;
+    }
+    unsigned hulls = scene->vessel_count;
+    for (unsigned i = 0; i < scene->berth_count && i < BOAT_SCENE_BERTHS; ++i)
+        hulls += !scene->berths[i].empty;
+    if (hulls > BOAT_SCENE_BERTHS)
+        return fail(d, "scene.marina.vessels",
+            "plus static berth hulls exceed the 32-hull drawing capacity");
+    uint64_t begin[BOAT_SCENE_SERVICES], end[BOAT_SCENE_SERVICES];
+    int actor[BOAT_SCENE_SERVICES];
+    for (unsigned i = 0; i < scene->service_count; ++i) {
+        const BoatSceneService *s = &scene->services[i];
+        indexed(at, sizeof(at), "scene.marina.services", i + 1, ".id");
+        if (!bounded_text(s->id, sizeof(s->id)) || !boat_scene_identifier(s->id))
+            return fail(d, at, "must be a-z, 0-9 or '_', starting with a letter");
+        for (unsigned j = 0; j < i; ++j)
+            if (!strcmp(scene->services[j].id, s->id))
+                return fail(d, at, "repeats an existing service ID");
+        indexed(at, sizeof(at), "scene.marina.services", i + 1, ".vessel");
+        const BoatSceneVessel *vessel = boat_scene_find_vessel(scene, s->vessel);
+        if (!vessel)
+            return fail(d, at, "names a missing vessel");
+        indexed(at, sizeof(at), "scene.marina.services", i + 1, ".berth");
+        const BoatSceneBerth *berth = boat_scene_find_berth(scene, s->berth);
+        if (!berth)
+            return fail(d, at, "names a missing berth");
+        if (!berth->empty)
+            return fail(d, at, "names a berth that holds a static hull; use an empty berth");
+        BoatModelSpec slot = boat_scene_berth_resolve(berth);
+        BoatModelSpec hull = boat_scene_vessel_resolve(vessel);
+        if (hull.length > slot.length + .001f || hull.beam > slot.beam + .001f)
+            return fail(d, at, "names a berth too small for the vessel's length and beam");
+        indexed(at, sizeof(at), "scene.marina.services", i + 1, ".route");
+        actor[i] = boat_scene_find_route(scene, s->route);
+        if (actor[i] < 0)
+            return fail(d, at, "names a missing traffic route");
+        const WaterfrontRouteActor *route = &scene->traffic.actors[actor[i]];
+        if (route->shape != WATERFRONT_ROUTE_OPEN_PATH || route->open_path.loop)
+            return fail(d, at, "must name an open (non-looping) path route");
+        for (unsigned j = 0; j < i; ++j)
+            if (actor[j] == actor[i])
+                return fail(d, at, "is already used by another service");
+        indexed(at, sizeof(at), "scene.marina.services", i + 1, ".kind");
+        if (s->kind >= BOAT_SERVICE_KINDS)
+            return fail(d, at, "must be resident or visitor");
+        BoatServiceDefinition def = { (BoatServiceKind)s->kind, s->start_tick, s->dock_piece };
+        BoatServiceBerthPose pose = { berth->x, berth->z, berth->heading };
+        BoatRoutePose got = { 0 };
+        BoatServiceFault fault = boat_service_validate(&def, &route->open_path, pose, &got);
+        if (fault == BOAT_SERVICE_FAULT_DWELL) {
+            indexed(at, sizeof(at), "scene.marina.services", i + 1, ".dock_piece");
+            return fail(d, at, "must name a path piece with a positive dwell");
+        }
+        if (fault) {
+            indexed(at, sizeof(at), "scene.marina.services", i + 1, ".route");
+            return fail(d, at,
+                fault == BOAT_SERVICE_FAULT_PATH
+                    ? "is not a valid open path"
+                    : "must start/end (resident) or dock (visitor) exactly at the berth pose");
+        }
+        boat_service_reservation(&def, &route->open_path, &begin[i], &end[i]);
+        for (unsigned j = 0; j < i; ++j) {
+            const BoatSceneService *o = &scene->services[j];
+            bool resident = s->kind == BOAT_SERVICE_RESIDENT || o->kind == BOAT_SERVICE_RESIDENT;
+            if (!strcmp(o->berth, s->berth)
+                && boat_service_intervals_overlap(begin[j], end[j], begin[i], end[i])) {
+                indexed(at, sizeof(at), "scene.marina.services", i + 1, ".berth");
+                return fail(d, at, "double-books the berth over an arrival/stay/departure window");
+            }
+            if (!strcmp(o->vessel, s->vessel)
+                && (resident
+                    || boat_service_intervals_overlap(begin[j], end[j], begin[i], end[i]))) {
+                indexed(at, sizeof(at), "scene.marina.services", i + 1, ".vessel");
+                return fail(
+                    d, at, "has overlapping services; a resident vessel has no other service");
+            }
+        }
+    }
+    return true;
+}
+
 bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *diagnostic)
 {
     char path[64];
@@ -158,38 +309,10 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
             return fail(diagnostic, at, "must be a-z, 0-9 or '_', starting with a letter");
         if (!unique(scene, i, 0, b->id, diagnostic, at))
             return false;
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".recipe");
-        if (b->recipe >= BOAT_SCENE_BERTH_RECIPES)
-            return fail(diagnostic, at, "is not a registered berth recipe");
-        BoatModelSpec base = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
-        const BoatSceneAppearance *a = &b->appearance;
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.length");
-        if (a->length != 0 && !finite_in(a->length, base.length * .75f, base.length * 1.25f))
-            return fail(diagnostic, at, "must be finite, 0.75..1.25 times recipe length in metres");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.beam");
-        if (a->beam != 0 && !finite_in(a->beam, base.beam * .75f, base.beam * 1.25f))
-            return fail(diagnostic, at, "must be finite, 0.75..1.25 times recipe beam in metres");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.mast_height");
-        if (a->mast_height != 0
-            && (base.mast_height == 0 || !finite_in(a->mast_height, base.freeboard + 2, 12)))
-            return fail(
-                diagnostic, at, "requires a sailboat mast, freeboard + 2 through 12 metres");
-        const Color colors[] = { a->hull, a->deck, a->trim };
-        const char *const suffix[] = { ".appearance.hull", ".appearance.deck", ".appearance.trim" };
-        for (unsigned c = 0; c < 3; ++c) {
-            indexed(at, sizeof(at), "scene.marina.berths", i + 1, suffix[c]);
-            if (colors[c].a != 255
-                && (colors[c].a != 0 || colors[c].r || colors[c].g || colors[c].b))
-                return fail(diagnostic, at, "must be opaque RGB or the all-zero inherited color");
-        }
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.name");
-        if (!boat_model_name_valid(a->name))
-            return fail(diagnostic, at,
-                "must be 1..16 A-Z, 0-9, space, period, hyphen or apostrophe; include a "
-                "letter/digit");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance");
-        if (!boat_model_spec_valid(boat_scene_berth_resolve(b)))
-            return fail(diagnostic, at, "resolved recipe violates native geometry limits");
+        char base[64];
+        indexed(base, sizeof(base), "scene.marina.berths", i + 1, "");
+        if (!check_hull(b, base, diagnostic))
+            return false;
         indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".mooring");
         if (b->mooring > BOAT_SCENE_MOORING_PONTOON)
             return fail(diagnostic, at, "must be pontoon or none");
@@ -277,6 +400,8 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
                     "must share at least .25 m of boundary with its parent; joins are orthogonal");
         }
     }
+    if (!validate_services(scene, diagnostic))
+        return false;
     if (scene->work_count > BOAT_SCENE_WORK_SITES)
         return fail(diagnostic, "scene.work.sites", "exceeds the 4-site capacity");
     if (scene->work_present && !scene->work_count)
@@ -339,7 +464,8 @@ bool boat_scene_has_content(const BoatSceneDefinition *scene)
         && (scene->berths_present || scene->modules_present || scene->entrance_present
             || scene->traffic_present || scene->gulls_present || scene->berth_count
             || scene->module_count || scene->traffic.actor_count || scene->gulls.flock_count
-            || scene->work_present || scene->work_count);
+            || scene->work_present || scene->work_count || scene->services_present
+            || scene->vessel_count || scene->service_count);
 }
 
 static void fold(uint64_t *hash, const void *bytes, size_t size)
@@ -404,6 +530,8 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         fold(&hash, colors, sizeof(colors));
         fold(&hash, "berth.name", 11);
         fold(&hash, spec.name, strlen(spec.name) + 1);
+        if (b->empty) // Static berths keep their earlier digests.
+            fold(&hash, "berth.empty", 12);
     }
     count(&hash, "modules", scene->module_count);
     for (unsigned i = 0; i < scene->module_count; ++i) {
@@ -429,6 +557,39 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         fold(&hash, "traffic", 8);
         count(&hash, "traffic.actors", scene->traffic.actor_count);
         fold(&hash, &traffic, sizeof(traffic));
+    }
+    // Absent services keep every earlier digest unchanged.
+    if (scene->services_present) {
+        fold(&hash, "services", 9);
+        count(&hash, "vessels", scene->vessel_count);
+        for (unsigned i = 0; i < scene->vessel_count; ++i) {
+            const BoatSceneVessel *v = &scene->vessels[i];
+            BoatModelSpec spec = boat_scene_vessel_resolve(v);
+            fold(&hash, "vessel.id", 10);
+            fold(&hash, v->id, strlen(v->id) + 1);
+            count(&hash, "vessel.recipe", v->recipe);
+            value(&hash, "vessel.length", spec.length);
+            value(&hash, "vessel.beam", spec.beam);
+            value(&hash, "vessel.mast_height", spec.mast_height);
+            const unsigned char colors[] = { spec.hull.r, spec.hull.g, spec.hull.b, spec.deck.r,
+                spec.deck.g, spec.deck.b, spec.trim.r, spec.trim.g, spec.trim.b };
+            fold(&hash, "vessel.colors", 14);
+            fold(&hash, colors, sizeof(colors));
+            fold(&hash, "vessel.name", 12);
+            fold(&hash, spec.name, strlen(spec.name) + 1);
+        }
+        count(&hash, "services", scene->service_count);
+        for (unsigned i = 0; i < scene->service_count; ++i) {
+            const BoatSceneService *sv = &scene->services[i];
+            fold(&hash, "service.id", 11);
+            fold(&hash, sv->id, strlen(sv->id) + 1);
+            fold(&hash, sv->vessel, strlen(sv->vessel) + 1);
+            fold(&hash, sv->berth, strlen(sv->berth) + 1);
+            fold(&hash, sv->route, strlen(sv->route) + 1);
+            count(&hash, "service.kind", sv->kind);
+            count(&hash, "service.dock", sv->dock_piece);
+            count(&hash, "service.start", sv->start_tick);
+        }
     }
     if (scene->gulls_present) {
         uint64_t gulls = waterfront_flock_digest(&scene->gulls);
@@ -643,6 +804,32 @@ const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, co
         if (!strcmp(scene->berths[i].id, id))
             return &scene->berths[i];
     return NULL;
+}
+
+const BoatSceneVessel *boat_scene_find_vessel(const BoatSceneDefinition *scene, const char *id)
+{
+    if (!scene || !id)
+        return NULL;
+    for (unsigned i = 0; i < scene->vessel_count && i < BOAT_SCENE_VESSELS; ++i)
+        if (!strncmp(scene->vessels[i].id, id, BOAT_SCENE_TEXT))
+            return &scene->vessels[i];
+    return NULL;
+}
+
+BoatModelSpec boat_scene_vessel_resolve(const BoatSceneVessel *vessel)
+{
+    BoatSceneBerth hull = { .recipe = vessel->recipe, .appearance = vessel->appearance };
+    return boat_scene_berth_resolve(&hull);
+}
+
+int boat_scene_find_route(const BoatSceneDefinition *scene, const char *id)
+{
+    if (!scene || !id)
+        return -1;
+    for (unsigned i = 0; i < scene->traffic.actor_count && i < WATERFRONT_ROUTE_ACTORS; ++i)
+        if (!strncmp(scene->traffic.actors[i].id, id, WATERFRONT_ROUTE_TEXT))
+            return (int)i;
+    return -1;
 }
 
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id)

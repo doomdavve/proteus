@@ -19,6 +19,7 @@ typedef struct {
     Vector3 position; // Renderer coordinates; fixed mooring centre, Y=0.
     float heading;
     BoatSceneAppearance appearance;
+    bool empty; // M4: a slot without a static hull; skipped by frames, contacts and camera.
 } WaterfrontBerth;
 
 // The docked Gothenburg-Frederikshavn ro-pax ferry across the river from the Eriksberg crane:
@@ -41,7 +42,10 @@ typedef struct {
     Transform3D boats[BOAT_SCENE_BERTHS];
     unsigned char recipes[BOAT_SCENE_BERTHS]; // Mesh recipe per drawn boat.
     BoatModelSpec specs[BOAT_SCENE_BERTHS]; // Same resolved appearance as contacts and ropes.
+    // Hull slots, not berth indices: static berth hulls in order, then M4 vessels. Empty berths
+    // own no slot; a vessel keeps its slot while absent (VISIBLE false) so models stay indexed.
     int berth_count;
+    bool visible[BOAT_SCENE_BERTHS];
     Transform3D ferry;
     // Compiled dock furniture (NULL/length-zero authored-module scenes use modules instead).
     Transform3D pontoon;

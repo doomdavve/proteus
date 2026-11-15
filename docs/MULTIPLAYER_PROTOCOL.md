@@ -1,4 +1,4 @@
-# Multiplayer protocol v15
+# Multiplayer protocol v16
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -7,8 +7,12 @@ and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`src/net/boat_net_protocol.[ch]`](../src/net/boat_net_protocol.h) and its fixtures are in
 [`tests/net/validate_boat_net.c`](../tests/net/validate_boat_net.c).
 
-v15 uses room definition version 5 and carries finite and looping authored traffic paths
-with the bounded open-path encoding below; the loop flag selects repeat behavior.
+v16 uses room definition version 6. It adds the Marina M4 scene blocks to the definition: a
+per-berth `empty` byte, a scene flag bit (32) for services, and, between the module list and
+traffic, `u8` vessel and service counts followed by vessels (ID, recipe, appearance) and services
+(vessel, berth and route IDs, `u8` kind, `u8` dock piece, `u32` start tick). v15 added finite and
+looping authored traffic paths with the bounded open-path encoding below; the loop flag selects
+repeat behavior.
 Older peers reject the version at Hello. The authority validates open paths against their map,
 marina and other traffic before accepting them.
 
@@ -817,7 +821,7 @@ rate limit in the process; the firewall owns that (hardening plan H4).
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v15 rejects every other version, v1–v14 included; there is no negotiation or
+  protocol version. v16 rejects every other version, v1–v15 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
@@ -841,7 +845,7 @@ rate limit in the process; the firewall owns that (hardening plan H4).
   `objective_state` memory-transport case, where two clients and a late joiner mirror the
   server's HUD, including under loss profile F;
 - the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`4a3e64a040257a35` at v15, `4fc3a7e799ace302` at v14 and `84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
+  digest of a hand-built snapshot's bytes (`ba5cc3b24b7e9b48` at v16, `4a3e64a040257a35` at v15, `4fc3a7e799ace302` at v14 and `84f8b6b8504d881f` at v13, only the header's version byte changing; `7bb4635201d38223` earlier; v8 was `413083c341105850`, v5 was
   `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's `690c711d99578e10`);
 - round trips of all 29 types (Accept now carries the revision), rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from

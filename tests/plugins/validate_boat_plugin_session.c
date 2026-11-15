@@ -6,6 +6,7 @@
 #include "core/boat_steering.h"
 #include "core/boat_throttle.h"
 #include "core/waterfront_outer.h"
+#include "core/waterfront_service.h"
 #include "core/waterfront_traffic.h"
 #include "plugins/boat_plugin_host.h"
 #include "plugins/boat_plugin_load.h"
@@ -123,8 +124,8 @@ static int marina_route_apply_undo(void)
     boat_session_init(&session, outer(), calm());
     session.presentation_enabled = false;
     CHECK(wake_plugin_open(&plugin, "plugins/marina-route-demo", &session, 0));
-    CHECK(boat_plugin_read("plugins/marina-route-demo", NULL, &files, &diagnostic)
-        == BOAT_PLUGIN_OK);
+    CHECK(
+        boat_plugin_read("plugins/marina-route-demo", NULL, &files, &diagnostic) == BOAT_PLUGIN_OK);
     char *dwell = strstr(files.source, "dwell=240");
     CHECK(dwell);
     memcpy(dwell, "dwell=360", 9);
@@ -140,6 +141,70 @@ static int marina_route_apply_undo(void)
     CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 4));
     boat_session_restart(&session, calm());
     CHECK(session.world.scene->traffic.actors[0].open_path.pieces[2].dwell_ticks == 240);
+    wake_plugin_close(&plugin, &session);
+    boat_session_destroy(&session);
+    return 0;
+}
+
+// M4: the berth demo's resident and visitor, owned by tick through the game's plugin session, and
+// a held start_tick edit that restarts the session and is undone atomically.
+static int marina_berth_apply_undo(void)
+{
+    static WakePlugin plugin;
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic diagnostic;
+    BoatSession session;
+    boat_session_init(&session, outer(), calm());
+    session.presentation_enabled = false;
+    CHECK(wake_plugin_open(&plugin, "plugins/marina-berth-demo", &session, 0));
+    CHECK(
+        boat_plugin_read("plugins/marina-berth-demo", NULL, &files, &diagnostic) == BOAT_PLUGIN_OK);
+    const BoatSceneDefinition *scene = session.world.scene;
+    CHECK(
+        scene && scene->services_present && scene->service_count == 2 && scene->vessel_count == 2);
+    WaterfrontServiceHull hull;
+    // Resident "tender" (vessel 0): moored, travelling 5-25 s, moored again. Visitor "guest"
+    // (vessel 1): absent, travelling from 2 s, moored over 14-16 s, absent from 21 s.
+    static const struct {
+        unsigned vessel, tick;
+        bool present;
+        BoatOwner owner;
+    } at[] = { { 0, 0, true, BOAT_OWNER_MOORED }, { 0, 599, true, BOAT_OWNER_MOORED },
+        { 0, 600, true, BOAT_OWNER_TRAVELLING }, { 0, 2999, true, BOAT_OWNER_TRAVELLING },
+        { 0, 3000, true, BOAT_OWNER_MOORED }, { 1, 239, false, 0 },
+        { 1, 240, true, BOAT_OWNER_TRAVELLING }, { 1, 1679, true, BOAT_OWNER_TRAVELLING },
+        { 1, 1680, true, BOAT_OWNER_MOORED }, { 1, 1919, true, BOAT_OWNER_MOORED },
+        { 1, 1920, true, BOAT_OWNER_TRAVELLING }, { 1, 2519, true, BOAT_OWNER_TRAVELLING },
+        { 1, 2520, false, 0 } };
+    for (unsigned i = 0; i < sizeof(at) / sizeof(at[0]); ++i) {
+        bool present = waterfront_service_hull(scene, at[i].vessel, at[i].tick / 120.0, &hull);
+        CHECK(present == at[i].present);
+        CHECK(!present || hull.owner == at[i].owner);
+    }
+    char *start = strstr(files.source, "start_tick = 240");
+    CHECK(start);
+    // Shifting the visit to 3 s makes it cross the resident's racetrack: staging refuses it.
+    memcpy(start, "start_tick = 360", 16);
+    BoatPluginBundle clash = boat_plugin_bundle(&files);
+    CHECK(!boat_plugin_host_stage(&plugin.host, &clash));
+    memcpy(start, "start_tick = 120", 16);
+    BoatPluginBundle candidate = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_host_stage(&plugin.host, &candidate));
+    CHECK(plugin.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(!wake_plugin_frame(&plugin, &session, false, false, false, 1));
+    CHECK(boat_plugin_host_active(&plugin.host)->number == 1);
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 2));
+    boat_session_restart(&session, calm());
+    scene = session.world.scene;
+    CHECK(scene->services[1].start_tick == 120);
+    CHECK(!waterfront_service_hull(scene, 1, 119 / 120.0, &hull));
+    CHECK(waterfront_service_hull(scene, 1, 120 / 120.0, &hull));
+    CHECK(!wake_plugin_frame(&plugin, &session, false, true, false, 3));
+    CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 4));
+    boat_session_restart(&session, calm());
+    scene = session.world.scene;
+    CHECK(scene->services[1].start_tick == 240);
+    CHECK(waterfront_service_hull(scene, 1, 240 / 120.0, &hull));
     wake_plugin_close(&plugin, &session);
     boat_session_destroy(&session);
     return 0;
@@ -2004,6 +2069,7 @@ static const TestCase cases[] = {
     TEST_CASE(default_sessions),
     TEST_CASE(harbor_life_scene),
     TEST_CASE(marina_route_apply_undo),
+    TEST_CASE(marina_berth_apply_undo),
     SLOW_CASE(grodan_tour),
     SLOW_CASE(compiled_parity),
 };

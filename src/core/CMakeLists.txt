@@ -16,6 +16,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   boat_route_arc.c boat_route_arc.h
   boat_route_path.c boat_route_path.h
   boat_schedule.c boat_schedule.h
+  boat_service.c boat_service.h
   boat_scene_definition.c boat_scene_definition.h
   boat_marks.c boat_marks.h
   waterfront_flock.c waterfront_flock.h
@@ -26,6 +27,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   waterfront_city.c waterfront_city.h waterfront_harbor.c waterfront_harbor.h
   waterfront_outer.c waterfront_outer.h
   waterfront_route.c waterfront_route.h
+  waterfront_service.c waterfront_service.h
   waterfront_traffic.c waterfront_traffic.h
   waterfront_upstream.c waterfront_upstream.h)
 add_library(proteus_boat_core STATIC ${PROTEUS_BOAT_CORE_SOURCES})

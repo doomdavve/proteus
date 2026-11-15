@@ -119,8 +119,20 @@ def schema():
                     "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
                                         "sailboat_7m", "workboat"]},
                     **point, "heading": number(-math.tau, math.tau, "radians"),
-                    "mooring": {"enum": ["pontoon", "none"]}, "appearance": appearance},
+                    "mooring": {"enum": ["pontoon", "none"]}, "appearance": appearance,
+                    "empty": {"type": "boolean", "description": "M4: a slot with no static hull; a vessel service occupies it"}},
                     required=("id", "recipe", "x", "z", "heading", "mooring"))
+    # M4: a vessel's identity and appearance, and its one-shot service of an empty berth.
+    vessel = object_schema({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                    "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
+                                        "sailboat_7m", "workboat"]}, "appearance": appearance},
+                    required=("id", "recipe"))
+    service = object_schema({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                    "vessel": text(23, r"^[a-z][a-z0-9_]*$"), "berth": text(23, r"^[a-z][a-z0-9_]*$"),
+                    "route": text(23, r"^[a-z][a-z0-9_]*$"), "kind": {"enum": ["resident", "visitor"]},
+                    "dock_piece": number(1, 4, "1-based path piece holding the stay; visitors only", integer=True),
+                    "start_tick": number(0, 4294967295, "120 Hz tick at which path tick zero occurs", integer=True)},
+                    required=("id", "vessel", "berth", "route", "kind", "start_tick"))
     module_common = {"id": text(23, r"^[a-z][a-z0-9_]*$"),
                      "length": number(.5, 60, "metres"), "width": number(.5, 20, "metres")}
     floating = {**module_common, "kind": {"enum": ["walkway", "platform", "finger_pier"]},
@@ -134,7 +146,9 @@ def schema():
                 "attaches": text(23), "deck_height": number(.25, 2, "landing height metres")})]}
     marina = object_schema({"entrance": record({**point, "width": number(4, 40, "metres")}),
                             "berths": sequence(berth, 0, 32),
-                            "modules": sequence(module, 0, 64)}, required=())
+                            "modules": sequence(module, 0, 64),
+                            "vessels": sequence(vessel, 0, 4),
+                            "services": sequence(service, 0, 8)}, required=())
     routes = ["river_runabout", "river_cruiser", "river_sailboat", "river_ferry", "alvsnabben",
               "frihamnen", "schooner", "marina_pass"]
     craft = ["runabout", "cruiser", "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner",
@@ -259,6 +273,9 @@ def schema():
                     "Mast height is sailboat-only, freeboard + 2 through 12 metres; RGB triples are opaque integers",
                     "Painted names use 1..16 A-Z/0-9/space/period/hyphen/apostrophe, including a letter or digit",
                     "marina.modules is 0..64; missing modules keeps the compiled dock furniture",
+                    "marina.vessels is 0..4 and marina.services 0..8; a service names a vessel, an empty",
+                    "berth and an open-path traffic route used by no other service; the route's berth pose",
+                    "is the berth's; a resident has no dock_piece and a berth holds one service at a time",
                     "Berth/module IDs are unique scene-wide; recipes are registered native hulls",
                     "Hull plus mooring excursion must clear compiled water, other berths, the",
                     "declared entrance and the spawn/recovery shelters; depth is unverified",

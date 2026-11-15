@@ -1154,7 +1154,7 @@ accounting exclusions, benchmark commands and synchronous staging policy.
   staged, committed, Undo and failed-stage accounting. Ten 64 KiB slots are preallocated;
   logical retirement does not free their physical reservation. Native inspection includes
   all adapter-owned buffers, objective/pending state, events and trace. A static assertion
-  caps the persistent native owner at 1 MiB; its single Lua heap adds 2 MiB. Compiler/state
+  caps the persistent native owner at 1 MiB (1.25 MiB since Marina M4); its single Lua heap adds 2 MiB. Compiler/state
   scratch stack, allocator metadata, borrowed world/view and extra preview copies are separate.
 - Location validation previously cleared successful Lua cost diagnostics. Staging now keeps
   descriptor cost and aggregates the init probe, taking the maximum sequential heap peak.

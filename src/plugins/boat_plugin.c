@@ -6,6 +6,7 @@
 #include "core/boat_schedule.h"
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_outer.h"
+#include "core/waterfront_service.h"
 #include "plugins/boat_plugin_decode.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -942,6 +943,162 @@ static BoatPluginStatus check_open_path_traffic(const BoatSceneDefinition *scene
     return BOAT_PLUGIN_OK;
 }
 
+// M4: a service vessel may touch its own pier or quay while it docks, and nothing else. The dock
+// window is the path piece that holds the stay (visitor) or the first and last pieces (resident).
+typedef struct {
+    int module; // The module exempt from the swept-hull check, or -1.
+    uint64_t begin[2], end[2]; // Path-tick windows, half-open; end == begin when unused.
+} DockExemption;
+
+static uint64_t piece_ticks_of(const BoatRoutePathPiece *p)
+{
+    return p->kind == BOAT_ROUTE_PATH_LINE ? p->shape.line.duration_ticks
+                                           : p->shape.arc.duration_ticks;
+}
+
+static DockExemption dock_exemption(const BoatSceneDefinition *scene, unsigned actor)
+{
+    DockExemption x = { .module = -1 };
+    int service = waterfront_service_for_route(scene, actor);
+    if (service < 0)
+        return x;
+    const BoatSceneService *sv = &scene->services[service];
+    const BoatSceneBerth *berth = boat_scene_find_berth(scene, sv->berth);
+    const BoatRoutePath *path = &scene->traffic.actors[actor].open_path;
+    if (!berth || !path->count)
+        return x;
+    float best = 20; // Rope reach, as for berth mooring.
+    for (unsigned m = 0; m < scene->module_count; ++m) {
+        if (scene->modules[m].kind == BOAT_SCENE_MODULE_GANGWAY)
+            continue;
+        float distance = boat_scene_module_distance(&scene->modules[m], berth->x, berth->z);
+        if (distance < best) {
+            best = distance;
+            x.module = (int)m;
+        }
+    }
+    uint64_t start[BOAT_ROUTE_PATH_PIECES + 1] = { 0 };
+    for (unsigned i = 0; i < path->count; ++i)
+        start[i + 1] = start[i] + piece_ticks_of(&path->pieces[i]) + path->pieces[i].dwell_ticks;
+    unsigned first = sv->kind == BOAT_SERVICE_VISITOR ? sv->dock_piece : 0;
+    if (first >= path->count)
+        return x;
+    x.begin[0] = start[first];
+    x.end[0] = start[first + 1];
+    if (sv->kind == BOAT_SERVICE_RESIDENT) {
+        x.begin[1] = start[path->count - 1];
+        x.end[1] = start[path->count];
+    }
+    return x;
+}
+
+static bool dock_exempt(const DockExemption *x, unsigned module, uint64_t tick)
+{
+    return x->module == (int)module
+        && ((tick >= x->begin[0] && tick < x->end[0]) || (tick >= x->begin[1] && tick < x->end[1]));
+}
+
+// One authored path craft's hull at an absolute simulation tick, as the world shows it: a
+// service vessel follows its service (absent outside its window); any other path rests at its end.
+typedef struct {
+    bool present;
+    Vector2 centre, length, beam;
+    float half_length, half_beam;
+} PathHull;
+
+static PathHull path_hull_at(const BoatSceneDefinition *scene, unsigned actor, uint64_t tick)
+{
+    PathHull h = { 0 };
+    const WaterfrontRouteActor *a = &scene->traffic.actors[actor];
+    BoatModelSpec spec;
+    BoatRoutePose pose;
+    int service = waterfront_service_for_route(scene, actor);
+    if (service >= 0) {
+        unsigned v = 0;
+        while (v < scene->vessel_count
+            && strcmp(scene->vessels[v].id, scene->services[service].vessel))
+            ++v;
+        WaterfrontServiceHull hull;
+        if (!waterfront_service_hull(scene, v, (double)tick * BOAT_TICK_SECONDS, &hull))
+            return h;
+        spec = hull.spec;
+        pose = (BoatRoutePose) { -hull.position.x, hull.position.z, hull.heading, 0 };
+    } else {
+        spec = waterfront_traffic_spec_routes(&scene->traffic, (int)actor);
+        if (!boat_route_path_evaluate(&a->open_path, tick, &pose, NULL))
+            return h;
+    }
+    h.present = true;
+    h.centre = (Vector2) { (float)pose.x, (float)pose.z };
+    h.length = (Vector2) { sinf((float)pose.heading), -cosf((float)pose.heading) };
+    h.beam = (Vector2) { cosf((float)pose.heading), sinf((float)pose.heading) };
+    h.half_length = spec.length * .5f + .5f;
+    h.half_beam = spec.beam * .5f + .5f;
+    return h;
+}
+
+// Window in which actor ACTOR can move or appear, in absolute ticks; every tick outside it the
+// craft is static (a service resident at its berth, a path at its end) or absent.
+static bool path_window(const BoatSceneDefinition *scene, unsigned actor, uint64_t *first,
+    uint64_t *last, double *speed)
+{
+    const BoatRoutePath *path = &scene->traffic.actors[actor].open_path;
+    uint64_t total;
+    if (!boat_route_path_validate(path, &total))
+        return false;
+    *speed = 0;
+    for (unsigned p = 0; p < path->count; ++p) {
+        const BoatRoutePathPiece *piece = &path->pieces[p];
+        *speed = fmax(*speed,
+            piece->kind == BOAT_ROUTE_PATH_LINE ? piece->shape.line.max_speed
+                                                : piece->shape.arc.max_speed);
+    }
+    int service = waterfront_service_for_route(scene, actor);
+    uint64_t start = service >= 0 ? scene->services[service].start_tick : 0;
+    *first = service >= 0 && scene->services[service].kind == BOAT_SERVICE_VISITOR ? start : 0;
+    *last = start + total;
+    return true;
+}
+
+// Exact pairwise clearance of two authored path craft, including service windows. The sampled
+// interval reaches from the first tick both can be present to the last tick either moves; after
+// it both are static, which the final sample covers.
+static BoatPluginStatus check_path_pair(const BoatSceneDefinition *scene, const char *entry,
+    unsigned a, unsigned b, BoatPluginDiagnostic *d)
+{
+    uint64_t first_a, last_a, first_b, last_b;
+    double speed_a, speed_b;
+    char field[48];
+    snprintf(field, sizeof(field), "scene.traffic.vessels[%u]", b + 1);
+    if (!path_window(scene, a, &first_a, &last_a, &speed_a)
+        || !path_window(scene, b, &first_b, &last_b, &speed_b))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field, "has an invalid or non-finite path");
+    uint64_t lo = first_a > first_b ? first_a : first_b, hi = last_a > last_b ? last_a : last_b;
+    if (hi < lo)
+        lo = hi;
+    uint64_t intervals
+        = (hi - lo) / OPEN_PATH_SAMPLE_TICKS + ((hi - lo) % OPEN_PATH_SAMPLE_TICKS != 0);
+    if (intervals > OPEN_PATH_SAMPLE_BUDGET)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+            "shares %llu ticks with scene.traffic.vessels[%u], beyond the %d-sample survey budget",
+            (unsigned long long)(hi - lo), a + 1, OPEN_PATH_SAMPLE_BUDGET);
+    float margin
+        = .3f + (float)(.5 * OPEN_PATH_SAMPLE_TICKS * BOAT_TICK_SECONDS * (speed_a + speed_b));
+    for (uint64_t i = 0; i <= intervals; ++i) {
+        uint64_t tick = lo + i * OPEN_PATH_SAMPLE_TICKS;
+        if (tick > hi)
+            tick = hi;
+        PathHull ha = path_hull_at(scene, a, tick), hb = path_hull_at(scene, b, tick);
+        if (ha.present && hb.present
+            && box_overlap(ha.centre, ha.length, ha.beam, ha.half_length, ha.half_beam, hb.centre,
+                hb.length, hb.beam, hb.half_length, hb.half_beam, margin))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, field,
+                "crosses scene.traffic.vessels[%u] near tick %llu", a + 1,
+                (unsigned long long)tick);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, const char *entry,
     const BoatMap *map, unsigned actor, BoatPluginDiagnostic *d)
 {
@@ -973,6 +1130,14 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
         speed_bound = fmax(speed_bound, max_speed);
     }
     BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)actor);
+    int service = waterfront_service_for_route(scene, actor);
+    if (service >= 0) { // The vessel's own customized hull is what travels.
+        const BoatSceneVessel *vessel
+            = boat_scene_find_vessel(scene, scene->services[service].vessel);
+        if (vessel)
+            spec = boat_scene_vessel_resolve(vessel);
+    }
+    const DockExemption dock = dock_exemption(scene, actor);
     // Enclose the travelling hull, then inflate by half a sample interval of travel and a small
     // numerical margin. Double arithmetic plus the finite check keeps the cast to the map query's
     // float radius well defined.
@@ -1034,12 +1199,14 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
             return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                 "swept hull is not open water of the compiled map");
         for (unsigned b = 0; b < scene->berth_count; ++b)
-            if (circle_box_overlap(centre, hull_radius, berth_centre[b], berth_length[b],
+            if (!scene->berths[b].empty
+                && circle_box_overlap(centre, hull_radius, berth_centre[b], berth_length[b],
                     berth_beam[b], berth_hl[b], berth_hb[b]))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.berths[%u]", b + 1);
         for (unsigned m = 0; m < scene->module_count; ++m)
-            if (circle_box_overlap(centre, hull_radius, module_centre[m], module_length[m],
+            if (!dock_exempt(&dock, m, tick)
+                && circle_box_overlap(centre, hull_radius, module_centre[m], module_length[m],
                     module_beam[m], module_hl[m], module_hb[m]))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, entry, path,
                     "swept hull crosses scene.marina.modules[%u]", m + 1);
@@ -1057,8 +1224,9 @@ static BoatPluginStatus check_scene_open_path(const BoatSceneDefinition *scene, 
             != BOAT_PLUGIN_OK)
             return d->status;
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
-        if (i == actor || scene->traffic.actors[i].retain != 0xff)
-            continue;
+        if (i == actor || scene->traffic.actors[i].retain != 0xff
+            || scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH)
+            continue; // Authored paths are checked against each other exactly, below.
         if ((a->open_path.loop ? check_loop_path_traffic : check_open_path_traffic)(scene, entry,
                 actor, &scene->traffic, (int)i, total_ticks, speed_bound, radius, &work, d)
             != BOAT_PLUGIN_OK)
@@ -1079,6 +1247,12 @@ static BoatPluginStatus check_scene_traffic(const BoatSceneDefinition *scene, co
         if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH
             && check_scene_open_path(scene, entry, map, i, d) != BOAT_PLUGIN_OK)
             return d->status;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+        for (unsigned j = i + 1; j < scene->traffic.actor_count; ++j)
+            if (scene->traffic.actors[i].shape == WATERFRONT_ROUTE_OPEN_PATH
+                && scene->traffic.actors[j].shape == WATERFRONT_ROUTE_OPEN_PATH
+                && check_path_pair(scene, entry, i, j, d) != BOAT_PLUGIN_OK)
+                return d->status;
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         unsigned char shape = scene->traffic.actors[i].shape;
         if (shape == WATERFRONT_ROUTE_OPEN_LEG) {
@@ -1303,6 +1477,22 @@ static bool scene_has_open_route(const BoatSceneDefinition *scene)
     return false;
 }
 
+// M4: a service timetable (who uses which berth along which route, and when) is a schedule edit.
+static bool same_services(const BoatSceneDefinition *a, const BoatSceneDefinition *b)
+{
+    if (a->service_count != b->service_count)
+        return false;
+    for (unsigned i = 0; i < a->service_count; ++i) {
+        const BoatSceneService *x = &a->services[i], *y = &b->services[i];
+        if (strncmp(x->id, y->id, sizeof(x->id)) || strncmp(x->vessel, y->vessel, sizeof(x->vessel))
+            || strncmp(x->berth, y->berth, sizeof(x->berth))
+            || strncmp(x->route, y->route, sizeof(x->route)) || x->kind != y->kind
+            || x->dock_piece != y->dock_piece || x->start_tick != y->start_tick)
+            return false;
+    }
+    return true;
+}
+
 BoatPluginChange boat_plugin_classify(
     const BoatPluginVoyage *active, const BoatPluginVoyage *candidate)
 {
@@ -1316,6 +1506,8 @@ BoatPluginChange boat_plugin_classify(
     if ((scene_has_open_route(&active->scene) || scene_has_open_route(&candidate->scene))
         && waterfront_route_digest(&active->scene.traffic)
             != waterfront_route_digest(&candidate->scene.traffic))
+        return BOAT_PLUGIN_RESTART_SESSION;
+    if (!same_services(&active->scene, &candidate->scene))
         return BOAT_PLUGIN_RESTART_SESSION;
     // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;

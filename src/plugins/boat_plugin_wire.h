@@ -8,7 +8,7 @@
 #include "plugins/boat_plugin_decode.h"
 #include "plugins/boat_plugin_revision.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535442u // PSTB: tours and bounded OPEN_PATH traffic.
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535443u // PSTC: PSTB plus empty berths, vessels and services.
 
 typedef struct {
     BoatPluginKind kind;

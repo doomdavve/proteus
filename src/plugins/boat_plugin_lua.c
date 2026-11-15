@@ -249,18 +249,22 @@ static const char *const WORK[] = { "sites", "boat", "notices", NULL };
 static const char *const NOTICES[] = { "delivered", "built", "supplied", "returned", NULL };
 static const char *const WORK_SITE[]
     = { "id", "preset", "cargo", "x", "z", "heading", "hidden", NULL };
-static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
+static const char *const MARINA[]
+    = { "entrance", "berths", "modules", "vessels", "services", NULL };
+static const char *const MARINA_VESSEL[] = { "id", "recipe", "appearance", NULL };
+static const char *const MARINA_SERVICE[]
+    = { "id", "vessel", "berth", "route", "kind", "dock_piece", "start_tick", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const GULLS[] = { "flocks", NULL };
 static const char *const FLOCK[] = { "id", "recipe", "x", "z", "count", "seed", "phase", "radius",
     "height", "rate", "cues", NULL };
 static const char *const CUE[] = { "kind", "start", "stop", "fade", "amplitude", NULL };
-static const char *const VESSEL[]
-    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", "pieces", "loop", NULL };
+static const char *const VESSEL[] = { "id", "retain", "recipe", "route", "speed", "phase", "period",
+    "stops", "pieces", "loop", NULL };
 static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[]
-    = { "id", "recipe", "x", "z", "heading", "mooring", "appearance", NULL };
+    = { "id", "recipe", "x", "z", "heading", "mooring", "appearance", "empty", NULL };
 static const char *const APPEARANCE[]
     = { "length", "beam", "mast_height", "hull", "deck", "trim", "name", NULL };
 static const char *const MODULE[]
@@ -458,6 +462,162 @@ static bool scene_berths(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *
         b->mooring = (unsigned char)m;
         if (!scene_appearance(L, vm, entry, path, b))
             return false;
+        char empty_at[64];
+        int empty = field(L, entry, "empty", path, empty_at);
+        if (empty != LUA_TNIL && empty != LUA_TBOOLEAN)
+            return reject(vm, empty_at, "must be a boolean, not a %s", lua_typename(L, empty));
+        b->empty = lua_toboolean(L, -1);
+        lua_pop(L, 2);
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
+// M4: marina.vessels and marina.services, dense lists of at most BOAT_SCENE_VESSELS/SERVICES.
+// Returns the list's stack index (to pop) or 0 when the key is absent; sets FAILED on error.
+static int dense_list(lua_State *L, Vm *vm, int marina, const char *key, unsigned capacity,
+    const char *noun, char *list_path, lua_Unsigned *length, bool *failed)
+{
+    int type = field(L, marina, key, "scene.marina", list_path);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return 0;
+    }
+    *failed = true;
+    if (type != LUA_TTABLE) {
+        reject(vm, list_path, "must be a table, not a %s", lua_typename(L, type));
+        return 0;
+    }
+    int list = lua_absindex(L, -1);
+    *length = lua_rawlen(L, list);
+    lua_Unsigned entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > *length) {
+            reject(vm, list_path, "must be a list numbered from 1 without gaps");
+            return 0;
+        }
+        ++entries;
+    }
+    if (entries != *length) {
+        reject(vm, list_path, "must be a list numbered from 1 without gaps");
+        return 0;
+    }
+    if (*length > capacity) {
+        reject(vm, list_path, "must list 0 to %u %s, not %llu", capacity, noun,
+            (unsigned long long)*length);
+        return 0;
+    }
+    *failed = false;
+    return list;
+}
+
+static bool scene_vessels(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
+{
+    char at[64];
+    lua_Unsigned length = 0;
+    bool failed = false;
+    int list
+        = dense_list(L, vm, marina, "vessels", BOAT_SCENE_VESSELS, "vessels", at, &length, &failed);
+    if (!list)
+        return !failed;
+    s->services_present = true;
+    s->vessel_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        BoatSceneVessel *v = &s->vessels[i];
+        char path[64], recipe[24];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        if (!only(L, vm, entry, path, MARINA_VESSEL)
+            || !string(L, vm, entry, path, "id", v->id, sizeof(v->id))
+            || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe)))
+            return false;
+        BoatSceneBerthRecipe r;
+        if (!boat_scene_berth_recipe_from_name(recipe, &r)) {
+            char field_at[64];
+            join(field_at, sizeof(field_at), path, "recipe");
+            return reject(vm, field_at, "is not a registered berth recipe");
+        }
+        v->recipe = (unsigned char)r;
+        BoatSceneBerth hull = { .recipe = v->recipe };
+        if (!scene_appearance(L, vm, entry, path, &hull))
+            return false;
+        v->appearance = hull.appearance;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
+static bool whole_number(lua_State *L, Vm *vm, int entry, const char *path, const char *key,
+    double limit, double lowest, double *out)
+{
+    if (!number(L, vm, entry, path, key, out))
+        return false;
+    if (*out != floor(*out) || !(*out >= lowest) || !(*out <= limit)) {
+        char at[64];
+        join(at, sizeof(at), path, key);
+        return reject(vm, at, "must be a whole number from %.0f to %.0f", lowest, limit);
+    }
+    return true;
+}
+
+static bool scene_services(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
+{
+    char at[64];
+    lua_Unsigned length = 0;
+    bool failed = false;
+    int list = dense_list(
+        L, vm, marina, "services", BOAT_SCENE_SERVICES, "services", at, &length, &failed);
+    if (!list)
+        return !failed;
+    s->services_present = true;
+    s->service_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        BoatSceneService *v = &s->services[i];
+        char path[64], kind[24];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        double dock = 1, start = 0;
+        if (!only(L, vm, entry, path, MARINA_SERVICE)
+            || !string(L, vm, entry, path, "id", v->id, sizeof(v->id))
+            || !string(L, vm, entry, path, "vessel", v->vessel, sizeof(v->vessel))
+            || !string(L, vm, entry, path, "berth", v->berth, sizeof(v->berth))
+            || !string(L, vm, entry, path, "route", v->route, sizeof(v->route))
+            || !string(L, vm, entry, path, "kind", kind, sizeof(kind))
+            || !whole_number(L, vm, entry, path, "start_tick", 4294967295.0, 0, &start))
+            return false;
+        BoatServiceKind k;
+        char field_at[64];
+        if (!strcmp(kind, "resident"))
+            k = BOAT_SERVICE_RESIDENT;
+        else if (!strcmp(kind, "visitor"))
+            k = BOAT_SERVICE_VISITOR;
+        else {
+            join(field_at, sizeof(field_at), path, "kind");
+            return reject(vm, field_at, "must be resident or visitor");
+        }
+        // The path piece holding the stay, numbered from 1 like the Lua pieces list.
+        char dock_at[64];
+        int dock_type = field(L, entry, "dock_piece", path, dock_at);
+        lua_pop(L, 1);
+        if (k == BOAT_SERVICE_VISITOR || dock_type != LUA_TNIL) {
+            if (k == BOAT_SERVICE_RESIDENT)
+                return reject(vm, dock_at, "applies only to a visitor");
+            if (!whole_number(L, vm, entry, path, "dock_piece", BOAT_ROUTE_PATH_PIECES, 1, &dock))
+                return false;
+        }
+        v->kind = (unsigned char)k;
+        v->dock_piece = (unsigned)dock - 1;
+        v->start_tick = (uint32_t)start;
         lua_pop(L, 1);
     }
     lua_pop(L, 1);
@@ -1049,7 +1209,8 @@ static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s
         return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
     int marina = lua_absindex(L, -1);
     if (!only(L, vm, marina, at, MARINA) || !scene_entrance(L, vm, marina, s)
-        || !scene_berths(L, vm, marina, s) || !scene_modules(L, vm, marina, s))
+        || !scene_berths(L, vm, marina, s) || !scene_modules(L, vm, marina, s)
+        || !scene_vessels(L, vm, marina, s) || !scene_services(L, vm, marina, s))
         return false;
     lua_pop(L, 1);
     return true;

@@ -7,6 +7,7 @@
 #endif
 #include "core/boat_location.h"
 #include "core/boat_map.h"
+#include "core/boat_room_definition.h"
 #include "core/boat_world.h"
 #include "plugins/boat_plugin.h"
 #include "plugins/boat_plugin_io.h"
@@ -472,6 +473,243 @@ static int open_path_decode(void)
     CHECK(voyage.scene.traffic.actors[0].open_path.loop);
     CHECK(boat_world_resources_init(&world, boat_location_find("outer")));
     CHECK(boat_plugin_check_location(&voyage, world.definition, &world.map, &d) == BOAT_PLUGIN_OK);
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// M4: marina vessels and services decode from Lua, survive the staging wire and the room
+// definition, and reject malformed fields with their paths.
+static const char SERVICE_SOURCE[]
+    = "return {\n"
+      "  voyage = { shelters = {\n"
+      "    { id = \"dock\", name = \"DOCK\", x = -12, z = 60, heading = 0, radius = 60 },\n"
+      "    { id = \"bridge\", name = \"BRIDGE\", x = 650, z = -850, heading = 1.33, radius = 150 },\n"
+      "    { id = \"east_shore\", name = \"EAST SHORE\", x = 3250, z = -2000, heading = 0.86,"
+      " radius = 200 },\n"
+      "    { id = \"langedrag\", name = \"LANGEDRAG\", x = 3600, z = -3370, heading = 1.57,"
+      " radius = 0 } },\n"
+      "    arrival = { x = 3595, z = -3370, radius = 75, max_speed = 6 },\n"
+      "    exposure = { x = 4300, z = -2650, radius = 700, height = 1.6, build = 60 },\n"
+      "    exposed_fraction = 0.8, weather_range = 2500 },\n"
+      "  scene = { version = 3, marina = {\n"
+      "    entrance = { x = 0, z = 170, width = 10 },\n"
+      "    berths = { { id = \"slip\", recipe = \"runabout\", mooring = \"none\", x = 12, z = "
+      "195,\n"
+      "        heading = 1.5707963267948966, empty = true } },\n"
+      "    modules = { { id = \"dock\", kind = \"platform\", x = 12, z = 203, heading = 0,\n"
+      "        length = 6, width = 6, deck_height = .74 } },\n"
+      "    vessels = { { id = \"guest\", recipe = \"runabout\",\n"
+      "        appearance = { name = \"GUEST\", hull = {10, 20, 30} } } },\n"
+      "    services = { { id = \"stay\", vessel = \"guest\", berth = \"slip\", route = \"visit\",\n"
+      "        kind = \"visitor\", dock_piece = 3, start_tick = 120 } } },\n"
+      "    traffic = { vessels = { { id = \"visit\", recipe = \"runabout\", route = \"open\", "
+      "pieces = {\n"
+      "      "
+      "{kind=\"line\",x0=0,z0=170,x1=0,z1=185,ticks=600,dwell=0,max_speed=5,max_acceleration=5},\n"
+      "      {kind=\"arc\",x=10,z=185,radius=10,start_angle=3.141592653589793,"
+      "sweep=-1.5707963267948966,ticks=600,dwell=0,max_speed=5,max_acceleration=7},\n"
+      "      "
+      "{kind=\"line\",x0=10,z0=195,x1=12,z1=195,ticks=240,dwell=240,max_speed=5,max_acceleration=7}"
+      "\n"
+      "    } } } } } }\n";
+
+static const char *service_variant(const char *from, const char *to)
+{
+    static char text[sizeof(SERVICE_SOURCE) + 256];
+    const char *at = strstr(SERVICE_SOURCE, from);
+    if (!at || sizeof(text) < sizeof(SERVICE_SOURCE) + strlen(to))
+        return NULL;
+    size_t head = (size_t)(at - SERVICE_SOURCE);
+    memcpy(text, SERVICE_SOURCE, head);
+    strcpy(text + head, to);
+    strcat(text, at + strlen(from));
+    return text;
+}
+
+static int marina_service_decode(void)
+{
+    static BoatPluginDecoded decoded, back;
+    static unsigned char wire[32768];
+    BoatPluginDiagnostic d;
+    BoatPluginStatus status = boat_plugin_lua_voyage(SERVICE_SOURCE, strlen(SERVICE_SOURCE),
+        "@main.lua", &boat_plugin_default_limits, &decoded.voyage, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("service decode", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    const BoatSceneDefinition *scene = &decoded.voyage.scene;
+    CHECK(scene->services_present && scene->vessel_count == 1 && scene->service_count == 1);
+    CHECK(scene->berths[0].empty && !strcmp(scene->vessels[0].id, "guest"));
+    CHECK(scene->vessels[0].appearance.hull.b == 30 && scene->vessels[0].appearance.hull.a == 255);
+    CHECK(!strcmp(scene->vessels[0].appearance.name, "GUEST"));
+    CHECK(!strcmp(scene->services[0].route, "visit") && scene->services[0].kind == 1);
+    CHECK(scene->services[0].dock_piece == 2 && scene->services[0].start_tick == 120);
+    BoatSceneDiagnostic sd;
+    if (!boat_scene_validate(scene, &sd))
+        printf("scene: %s %s\n", sd.field, sd.message);
+    CHECK(boat_scene_validate(scene, &sd));
+
+    // Staging wire (PSTC) round trip keeps the scene digest.
+    CHECK(boat_plugin_parse_manifest(MANIFEST, strlen(MANIFEST), NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    decoded.kind = BOAT_PLUGIN_KIND_VOYAGE;
+    memcpy(decoded.manifest, MANIFEST, sizeof(MANIFEST));
+    decoded.manifest_size = strlen(MANIFEST);
+    memcpy(decoded.source, SERVICE_SOURCE, sizeof(SERVICE_SOURCE));
+    decoded.source_size = strlen(SERVICE_SOURCE);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    CHECK(boat_scene_digest(&back.voyage.scene) == boat_scene_digest(scene));
+    CHECK(back.voyage.scene.services[0].start_tick == 120 && back.voyage.scene.berths[0].empty);
+    wire[0] = 'P'; // Old PSTB content is refused by version.
+    wire[3] = 'B';
+    CHECK(!boat_plugin_wire_decode(wire, encoded, &back, &d));
+
+    // Room definition v6 round trip.
+    static BoatRoomDefinition room, room_back;
+    room = (BoatRoomDefinition) { .version = BOAT_ROOM_VERSION,
+        .mode = BOAT_ROOM_MODE_FREE,
+        .location = (unsigned char)boat_location_find("outer")->id,
+        .has_scene = true,
+        .scene = *scene };
+    strcpy(room.id, "t");
+    strcpy(room.name, "T");
+    BoatRoomDiagnostic rd;
+    if (!boat_room_definition_validate(&room, &rd))
+        printf("room: %s %s\n", rd.field, rd.message);
+    CHECK(boat_room_definition_validate(&room, &rd));
+    static uint8_t room_bytes[BOAT_ROOM_BYTES_MAX];
+    size_t room_size = boat_room_definition_encode(&room, room_bytes, sizeof(room_bytes));
+    CHECK(room_size > 0);
+    CHECK(boat_room_definition_decode(room_bytes, room_size, &room_back, &rd));
+    CHECK(boat_scene_digest(&room_back.scene) == boat_scene_digest(scene));
+    CHECK(room_back.scene.services[0].dock_piece == 2);
+    CHECK(!boat_room_definition_decode(room_bytes, room_size - 1, &room_back, &rd));
+
+    // Malformed fields name their path.
+    static const struct {
+        const char *from, *to, *field;
+    } bad[] = { { "kind = \"visitor\"", "kind = \"guest\"", "kind" },
+        { "dock_piece = 3", "dock_piece = 9", "dock_piece" },
+        { "dock_piece = 3", "dock_piece = 2.5", "dock_piece" },
+        { "start_tick = 120", "start_tick = -1", "start_tick" },
+        { "start_tick = 120", "start_tick = 120, extra = 1", "services[1]" },
+        { "heading = 1.5707963267948966, empty = true", "heading = 1.5707963267948966, empty = 1",
+            "empty" },
+        { "recipe = \"runabout\",\n        appearance", "recipe = \"barge\",\n        appearance",
+            "vessels[1].recipe" },
+        { "vessel = \"guest\"", "vessel = 4", "vessel" } };
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        const char *source = service_variant(bad[i].from, bad[i].to);
+        CHECK(source);
+        static BoatPluginVoyageData voyage;
+        status = boat_plugin_lua_voyage(
+            source, strlen(source), "@main.lua", &boat_plugin_default_limits, &voyage, &d);
+        if (status != BOAT_PLUGIN_SCHEMA || !strstr(d.field, bad[i].field))
+            printf("case %u: %s [%s] %s\n", i, boat_plugin_status_name(status), d.field, d.message);
+        CHECK(status == BOAT_PLUGIN_SCHEMA && strstr(d.field, bad[i].field));
+    }
+    // A resident takes no dock_piece.
+    const char *resident = service_variant("kind = \"visitor\"", "kind = \"resident\"");
+    static BoatPluginVoyageData voyage;
+    CHECK(resident
+        && boat_plugin_lua_voyage(
+               resident, strlen(resident), "@main.lua", &boat_plugin_default_limits, &voyage, &d)
+            == BOAT_PLUGIN_SCHEMA);
+    return 0;
+}
+
+// M4: the location survey accepts a docking service and refuses overlapping services, with the
+// vessel's own hull and berth the only exemptions.
+static int marina_service_survey(void)
+{
+    static BoatPluginVoyageData voyage;
+    BoatPluginDiagnostic d;
+    BoatWorldResources world;
+    CHECK(boat_world_resources_init(&world, boat_location_find("outer")));
+    static BoatPluginVoyage staged;
+    BoatPluginStatus status = boat_plugin_lua_voyage(SERVICE_SOURCE, strlen(SERVICE_SOURCE),
+        "@main.lua", &boat_plugin_default_limits, &voyage, &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    static BoatPluginFiles files;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    status = load(files.manifest, SERVICE_SOURCE, strlen(SERVICE_SOURCE), NULL, &staged, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("service load", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("service survey", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+
+    // A second visitor docks at a second slot along the same path shifted +10 m in x.
+    BoatSceneDefinition scene = staged.scene;
+    scene.berths[1] = scene.berths[0];
+    strcpy(scene.berths[1].id, "slip2");
+    scene.berths[1].x = 22;
+    scene.berth_count = 2;
+    scene.vessels[1] = scene.vessels[0];
+    strcpy(scene.vessels[1].id, "guest2");
+    scene.vessel_count = 2;
+    scene.traffic.actors[1] = scene.traffic.actors[0];
+    strcpy(scene.traffic.actors[1].id, "visit2");
+    scene.traffic.actor_count = 2;
+    BoatRoutePath *shifted = &scene.traffic.actors[1].open_path;
+    for (unsigned i = 0; i < shifted->count; ++i) {
+        if (shifted->pieces[i].kind == BOAT_ROUTE_PATH_LINE) {
+            shifted->pieces[i].shape.line.start_x += 10;
+            shifted->pieces[i].shape.line.end_x += 10;
+        } else
+            shifted->pieces[i].shape.arc.centre_x += 10;
+    }
+    scene.services[1] = scene.services[0];
+    strcpy(scene.services[1].id, "stay2");
+    strcpy(scene.services[1].vessel, "guest2");
+    strcpy(scene.services[1].berth, "slip2");
+    strcpy(scene.services[1].route, "visit2");
+    scene.service_count = 2;
+    BoatSceneDiagnostic sd;
+    CHECK(boat_scene_validate(&scene, &sd));
+    staged.scene = scene;
+    // Staggered by the full path (2,280 ticks) plus margin: legal. Overlapping windows: refused.
+    scene.services[1].start_tick = 120 + 2280 + 240;
+    staged.scene = scene;
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("staggered services", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    scene.services[1].start_tick = 120 + 100;
+    staged.scene = scene;
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    CHECK(status == BOAT_PLUGIN_SCHEMA && strstr(d.field, "traffic.vessels[2]"));
+    scene.services[1].start_tick = 120 + 2280 + 240;
+    // An unrelated path through the first vessel's berth is not exempt: a static hull berth there
+    // is an obstacle, an empty one is open water.
+    // The docked-at pier is exempt only while docking: a second pier on the approach is not.
+    BoatSceneDefinition docked = scene;
+    docked.modules[0].z = 202.4f;
+    staged.scene = docked;
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    if (status != BOAT_PLUGIN_OK)
+        show("close pier", &d);
+    CHECK(status == BOAT_PLUGIN_OK);
+    docked.modules[1] = docked.modules[0];
+    strcpy(docked.modules[1].id, "blocker");
+    docked.modules[1].x = 0;
+    docked.modules[1].z = 178;
+    docked.module_count = 2;
+    staged.scene = docked;
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    CHECK(status == BOAT_PLUGIN_SCHEMA && strstr(d.message, "modules[2]"));
+    scene.berths[1].empty = false;
+    strcpy(scene.berths[1].appearance.name, "FIXED");
+    scene.vessel_count = 1;
+    scene.service_count = 1;
+    scene.berths[1].x = 0;
+    scene.berths[1].z = 178; // On the first path's approach line.
+    staged.scene = scene;
+    status = boat_plugin_check_location(&staged, world.definition, &world.map, &d);
+    CHECK(status == BOAT_PLUGIN_SCHEMA);
     boat_world_resources_destroy(&world);
     return 0;
 }
@@ -2291,6 +2529,8 @@ static const TestCase cases[] = {
     TEST_CASE(scene_traffic),
     TEST_CASE(open_path_decode),
     TEST_CASE(open_leg_wire),
+    TEST_CASE(marina_service_decode),
+    TEST_CASE(marina_service_survey),
     TEST_CASE(free_scene_location),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),

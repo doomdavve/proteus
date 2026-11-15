@@ -2766,7 +2766,8 @@ static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
     }
     draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     for (int i = 0; i < harbor->berth_count; ++i)
-        draw_colored_mesh(scene->harbor_custom[i].vaoId ? scene->harbor_custom[i]
+        if (harbor->visible[i])
+            draw_colored_mesh(scene->harbor_custom[i].vaoId ? scene->harbor_custom[i]
                                                         : scene->harbor_boats[harbor->recipes[i]],
             material, harbor->boats[i], WHITE, false);
     for (int i = 0; i < harbor->line_count; ++i)
@@ -2782,9 +2783,12 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
     // Hulls first and then every light cube, so the cubes form one instanced run.
     for (int i = 0; i < traffic->vessel_count; ++i)
-        draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material,
-            traffic->vessels[i].pose, WHITE, false);
+        if (!traffic->hidden[i])
+            draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material,
+                traffic->vessels[i].pose, WHITE, false);
     for (int i = 0; i < traffic->vessel_count; ++i) {
+        if (traffic->hidden[i])
+            continue;
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
