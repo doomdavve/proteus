@@ -117,7 +117,8 @@ P3.4 adds `boat_plugin_state.independent_budgets` and
 `boat_plugin_session.memory_accounting`: separate entry/callback/migration instruction ceilings,
 rollback/quarantine and full-source history/staging/Undo/eviction accounting. The explicit
 `./build/boat_plugin_bench plugins/shelter-tour` experiment reports 100-sample staging/update
-and failure-path costs; it is outside CTest and has no timing assertion. Native inspection
+and failure-path costs; it is outside CTest and has no timing assertion. `./build/measure_marina_package PACKAGE` (M5 W6, also outside CTest) times a
+marina package's staging and its 180-frame CPU sweep at the #131 camera, for comparing packages. Native inspection
 reports fixed owner reservation, retained source payload and allowed Lua heap separately.
 See [runtime qualification](PLUGIN_API.md#native-runtime-qualification-p34) for commands and limits.
 

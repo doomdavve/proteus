@@ -1,0 +1,268 @@
+# Raw measurement output, 2026-11-15, macOS arm64 (Apple M1 Max), Debug build, commit 3f74d29 plus the W6 example
+# CPU sweeps: ./build/measure_marina_package PACKAGE [--time T] [--camera X,Z,DEG] [--stage-samples N]
+
+## harbor-life.dock-12-15.run1
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=786.372
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=786.444 p95_ms=786.444 max_ms=786.444
+stage_worker_process samples=1 p50_ms=1613.240 p95_ms=1613.240 max_ms=1613.240
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.071 p95_ms=20.412 max_ms=104.782
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.329 p95_ms=20.645 max_ms=38.407
+
+## harbor-life.dock-12-15.run2
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=785.507
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=784.868 p95_ms=784.868 max_ms=784.868
+stage_worker_process samples=1 p50_ms=1611.489 p95_ms=1611.489 max_ms=1611.489
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.089 p95_ms=20.478 max_ms=104.858
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.303 p95_ms=20.737 max_ms=38.853
+
+## harbor-life.dock-12-15.run3
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=784.886
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=784.783 p95_ms=784.783 max_ms=784.783
+stage_worker_process samples=1 p50_ms=1614.213 p95_ms=1614.213 max_ms=1614.213
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.025 p95_ms=20.638 max_ms=105.601
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.459 p95_ms=20.909 max_ms=38.224
+
+## harbor-life.marina-0-3.run1
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=791.945
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=8 p50_ms=786.022 p95_ms=786.933 max_ms=786.933
+stage_worker_process samples=8 p50_ms=1613.283 p95_ms=1616.559 max_ms=1616.559
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.732 p95_ms=14.116 max_ms=98.063
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=54 gulls=8
+render_package samples=180 p50_ms=13.999 p95_ms=14.340 max_ms=32.827
+
+## harbor-life.marina-0-3.run2
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=785.452
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=8 p50_ms=785.078 p95_ms=786.528 max_ms=786.528
+stage_worker_process samples=8 p50_ms=1612.996 p95_ms=1614.887 max_ms=1614.887
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.662 p95_ms=14.020 max_ms=97.337
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=54 gulls=8
+render_package samples=180 p50_ms=14.046 p95_ms=14.300 max_ms=32.259
+
+## harbor-life.marina-0-3.run3
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=787.843
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=8 p50_ms=787.438 p95_ms=787.709 max_ms=787.709
+stage_worker_process samples=8 p50_ms=1613.223 p95_ms=1616.049 max_ms=1616.049
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.607 p95_ms=14.008 max_ms=98.681
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=54 gulls=8
+render_package samples=180 p50_ms=14.017 p95_ms=14.308 max_ms=31.938
+
+## harbor-life.marina-10-13.run1
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=787.847
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=786.287 p95_ms=786.287 max_ms=786.287
+stage_worker_process samples=1 p50_ms=1608.906 p95_ms=1608.906 max_ms=1608.906
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.760 p95_ms=14.087 max_ms=98.666
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=13.994 p95_ms=14.361 max_ms=31.156
+
+## harbor-life.marina-10-13.run2
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=785.667
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=784.154 p95_ms=784.154 max_ms=784.154
+stage_worker_process samples=1 p50_ms=1613.204 p95_ms=1613.204 max_ms=1613.204
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.676 p95_ms=13.862 max_ms=97.033
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=13.972 p95_ms=14.197 max_ms=31.346
+
+## harbor-life.marina-10-13.run3
+package=plugins/harbor-life source_bytes=7700 manifest_bytes=247
+initial_stage_ms=785.523
+lua_cost peak_bytes=39134 instructions=300 entry_instructions=300 fields=249 leaked=0
+stage_in_process samples=1 p50_ms=785.985 p95_ms=785.985 max_ms=785.985
+stage_worker_process samples=1 p50_ms=1606.734 p95_ms=1606.734 max_ms=1606.734
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=12 modules=13 traffic=4 vessels=0 services=0 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.678 p95_ms=13.928 max_ms=100.481
+render package hull_cpu_bytes=162704 hull_builds=3 berths=12 modules=13 vessels=4 wakes=48 gulls=8
+render_package samples=180 p50_ms=13.945 p95_ms=14.194 max_ms=31.820
+
+## marina-integrated-demo.dock-12-15.run1
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=830.676
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=830.109 p95_ms=830.109 max_ms=830.109
+stage_worker_process samples=1 p50_ms=1703.311 p95_ms=1703.311 max_ms=1703.311
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.132 p95_ms=20.629 max_ms=103.808
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.523 p95_ms=21.446 max_ms=38.985
+
+## marina-integrated-demo.dock-12-15.run2
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=831.342
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=830.044 p95_ms=830.044 max_ms=830.044
+stage_worker_process samples=1 p50_ms=1702.171 p95_ms=1702.171 max_ms=1702.171
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.123 p95_ms=20.533 max_ms=104.837
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.597 p95_ms=20.999 max_ms=38.900
+
+## marina-integrated-demo.dock-12-15.run3
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=833.620
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=833.555 p95_ms=833.555 max_ms=833.555
+stage_worker_process samples=1 p50_ms=1706.582 p95_ms=1706.582 max_ms=1706.582
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=0.0,246.0 heading=0.0000 time=12.000..14.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=20.210 p95_ms=20.594 max_ms=104.740
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=20.658 p95_ms=21.039 max_ms=38.176
+
+## marina-integrated-demo.marina-0-3.run1
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=831.577
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=8 p50_ms=831.349 p95_ms=835.749 max_ms=835.749
+stage_worker_process samples=8 p50_ms=1703.962 p95_ms=1706.687 max_ms=1706.687
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.628 p95_ms=13.905 max_ms=98.702
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=54 gulls=8
+render_package samples=180 p50_ms=14.014 p95_ms=14.914 max_ms=31.569
+
+## marina-integrated-demo.marina-0-3.run2
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=833.725
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=8 p50_ms=831.216 p95_ms=833.498 max_ms=833.498
+stage_worker_process samples=8 p50_ms=1705.103 p95_ms=1706.234 max_ms=1706.234
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.449 p95_ms=14.106 max_ms=100.625
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=54 gulls=8
+render_package samples=180 p50_ms=14.227 p95_ms=14.478 max_ms=32.046
+
+## marina-integrated-demo.marina-0-3.run3
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=833.542
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=8 p50_ms=833.556 p95_ms=837.173 max_ms=837.173
+stage_worker_process samples=8 p50_ms=1706.090 p95_ms=1708.329 max_ms=1708.329
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=0.000..2.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.713 p95_ms=13.949 max_ms=99.896
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=54 gulls=8
+render_package samples=180 p50_ms=14.290 p95_ms=14.603 max_ms=32.665
+
+## marina-integrated-demo.marina-10-13.run1
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=826.692
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=856.431 p95_ms=856.431 max_ms=856.431
+stage_worker_process samples=1 p50_ms=1697.514 p95_ms=1697.514 max_ms=1697.514
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.412 p95_ms=13.579 max_ms=97.329
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=13.954 p95_ms=14.435 max_ms=31.709
+
+## marina-integrated-demo.marina-10-13.run2
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=830.392
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=831.266 p95_ms=831.266 max_ms=831.266
+stage_worker_process samples=1 p50_ms=1705.298 p95_ms=1705.298 max_ms=1705.298
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.709 p95_ms=13.971 max_ms=98.220
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=14.188 p95_ms=14.535 max_ms=32.068
+
+## marina-integrated-demo.marina-10-13.run3
+package=plugins/marina-integrated-demo source_bytes=12013 manifest_bytes=327
+initial_stage_ms=837.285
+lua_cost peak_bytes=61321 instructions=4000 entry_instructions=4000 fields=376 leaked=0
+stage_in_process samples=1 p50_ms=833.475 p95_ms=833.475 max_ms=833.475
+stage_worker_process samples=1 p50_ms=1706.006 p95_ms=1706.006 max_ms=1706.006
+host_reserved=907640 retained_revisions=1 retained_source=0 sizeof_host=907640 sizeof_scene=20056
+scene berths=14 modules=15 traffic=6 vessels=2 services=2 flocks=1
+camera=2.0,161.0 heading=1.5708 time=10.000..12.983 frames=180 size=320x200
+render compiled hull_cpu_bytes=2864 hull_builds=0 berths=7 modules=0 vessels=4 wakes=64 gulls=32
+render_compiled samples=180 p50_ms=13.804 p95_ms=14.174 max_ms=100.507
+render package hull_cpu_bytes=269264 hull_builds=5 berths=14 modules=15 vessels=6 wakes=48 gulls=8
+render_package samples=180 p50_ms=14.313 p95_ms=14.646 max_ms=32.111
+
+# Windowed GPU (rolling 1800-frame capture), key figures from each summary.json
+harbor-life marina run1: frame p50/p95/max 16.65/16.78/834 render p50/p95 2.69/3.08 gpu p50/p95 4.06/4.26 sim p50 0.548
+harbor-life marina run2: frame p50/p95/max 16.66/16.89/843 render p50/p95 2.68/3.17 gpu p50/p95 4.03/4.24 sim p50 0.534
+harbor-life marina run3: frame p50/p95/max 16.65/16.91/816 render p50/p95 4.56/5.34 gpu p50/p95 4.37/5.14 sim p50 0.883
+marina-integrated-demo marina run1: frame p50/p95/max 16.65/17.04/832 render p50/p95 2.77/4.65 gpu p50/p95 4.06/4.48 sim p50 0.577
+marina-integrated-demo marina run2: frame p50/p95/max 16.65/17.32/823 render p50/p95 4.23/5.24 gpu p50/p95 4.18/4.83 sim p50 0.845
+marina-integrated-demo marina run3: frame p50/p95/max 16.65/16.87/817 render p50/p95 4.63/5.12 gpu p50/p95 4.34/4.72 sim p50 0.986
+harbor-life dock run1: frame p50/p95/max 16.66/16.81/834 render p50/p95 2.12/2.44 gpu p50/p95 3.29/3.41 sim p50 0.477
+harbor-life dock run2: frame p50/p95/max 16.66/17.08/817 render p50/p95 2.12/3.49 gpu p50/p95 3.29/3.83 sim p50 0.481
+harbor-life dock run3: frame p50/p95/max 16.65/16.98/803 render p50/p95 4.42/4.76 gpu p50/p95 3.55/3.74 sim p50 1.016
+marina-integrated-demo dock run1: frame p50/p95/max 16.65/16.94/880 render p50/p95 2.60/4.58 gpu p50/p95 3.36/4.00 sim p50 0.608
+marina-integrated-demo dock run2: frame p50/p95/max 16.65/16.95/844 render p50/p95 4.24/4.81 gpu p50/p95 3.46/3.68 sim p50 0.990
+marina-integrated-demo dock run3: frame p50/p95/max 16.65/16.88/814 render p50/p95 4.40/5.03 gpu p50/p95 3.46/3.64 sim p50 1.022

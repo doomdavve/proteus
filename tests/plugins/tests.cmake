@@ -124,6 +124,10 @@ target_compile_options(validate_harbor_life PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME harbor_life_qualification COMMAND validate_harbor_life)
 set_tests_properties(harbor_life_qualification PROPERTIES LABELS "cpu;slow"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# M5 W6: a manual measurement tool (not registered with CTest) for the cost of a marina package.
+add_executable(measure_marina_package tests/plugins/measure_marina_package.c)
+target_link_libraries(measure_marina_package PRIVATE proteus_plugins proteus_boat_session)
+target_compile_options(measure_marina_package PRIVATE ${PROTEUS_WARNINGS})
 # M5 W5: harbor-life and harbor-room decode to the scene the single-file packages produced, and
 # the directory, catalog and room paths agree.
 add_executable(validate_marina_shared tests/plugins/validate_marina_shared.c

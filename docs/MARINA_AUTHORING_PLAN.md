@@ -6,10 +6,12 @@ resident/visitor services are complete and merged (M4: #209; contract in the
 integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
 D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
 W1 (manifest `modules`, source image, module IO, wider diagnostic file), W2 (`require` in the VM),
-W3 (carriers), W4 (authoring tools, bundle version 2 and the browser editor) and W5 (the shared
-marina module) are done. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+W3 (carriers), W4 (authoring tools, bundle version 2 and the browser editor), W5 (the shared
+marina module) and W6 (the integrated example, [evidence](evidence/marina-m5/2026-11-15/README.md))
+are done. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
 loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: M5-W6 (integrated example).
+Done when all five marina milestones are closed. Next task: M5-W7 (closing: move the module contract
+into the Plugin API and fix superseded statements).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -40,7 +42,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Complete, merged #209; contract in the Plugin API; browser/Wasm, room and motion review owed |
-| M5 | Package-local Lua modules and integrated marina example | M4 | Planned; [execution package](#m5-execution-package--2026-11-15) |
+| M5 | Package-local Lua modules and integrated marina example | M4 | In progress: W1-W6 done locally; W7 closes; [execution package](#m5-execution-package--2026-11-15) |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
 native owner and plugin integration into explicitly dependent PRs with the same completion
@@ -1096,6 +1098,51 @@ Wasm/browser runs of the module-carrying examples (file lists and Node-free Pyth
 Windows/Linux builds, any windowed, GPU or visual check (the scene digests are equal, so no visual change
 is expected, but no capture was taken), and human acceptance. Console edits of a module package were
 exercised headlessly only.
+
+### M5 W6 result
+
+Implemented 2026-11-15: `plugins/marina-integrated-demo` (an example, not a catalog or release entry,
+like the M3/M4 demos), four modules plus an entry. `eriksberg_marina` is the W5 shared copy (the drift
+check covers it: three packages now); `marina` requires it, deep-copies it (the module result is
+cached for the whole evaluation) and appends two empty guest berths and two floating platforms;
+`guests.routes` holds the two authored paths and `guests.services` the two vessels and services (it
+requires `guests.routes`); `main.lua` assembles the voyage and appends the paths to the marina's
+traffic. The requires nest and one module name is dotted (`modules/guests/*.lua`).
+
+**Design decisions.** The resident and visitor use two new side-to berths on a guest dock at
+`z = 231`, north of the passing craft's loop (`z` 184-198), not slips of the shared marina. A service
+path is forward-only and starts and ends at the berth pose (the resident) or must dock there and leave
+from it (the visitor); the marina's slips have a walkway at the stern, so no tangent-continuous round
+trip ends in one. This is reasoning from the geometry, not a rejected trial. The shared module's data
+is not edited, and harbor-life and harbor-room are unchanged. The timetable is the M4 timetable
+(resident away 5-25 s, visitor 2-21 s moored 14-16 s) with the geometry moved 36 m north; limits used:
+14 of 32 berths, 15 of 64 modules, 6 of 8 traffic vessels, 2 of 4 vessels, 2 of 8 services. Valid visitor
+`start_tick` on a 120-tick grid: 0, 120, 240 and 1440 onwards; 360-1320 cross the racetrack.
+
+**Tests (macOS Debug).** `boat_plugin_session.marina_integrated_apply_undo` (counts, painted names, owner
+at 16 ticks including half-open boundaries and a far tick, a module-only `start_tick` edit refused
+at 360, staged at 120 as a session restart, Apply, Undo, and four failed module edits, each naming
+`modules/marina.lua`, `modules/guests/routes.lua` or `modules/guests/services.lua`, leaving the active
+revision), a real stage-worker block in `boat_plugin_modules`, and
+`boat_plugin_author` `SharedModules.test_integrated_marina_example` (bundle export/import, worker,
+digest change on a module-only edit). `tests/support/boat_test_module_edit.h` edits one module of an
+image in memory. Limit found: a layout or timetable the decoder rejects reports the scene field with
+file `main.lua`, because it sees the assembled scene; only Lua syntax and runtime errors name the
+module file.
+
+**Evidence and costs** ([2026-11-15](evidence/marina-m5/2026-11-15/README.md)): CPU and GPU stills at
+the key moments, plus a measurement against `harbor-life` at the #131 camera/time/options with a
+manual tool, `measure_marina_package` (not in CTest). The #131 absolute numbers (9.2/9.5 ms) are not
+reproduced by this tree on this host (`validate_harbor_life` prints 13.7/14.3 ms), so the baseline is
+harbor-life today. Three runs each: CPU p50 about 0.2 ms (1.5%) above harbor-life, within run spread
+of the compiled reference; GPU 4.0-4.4 ms in both; staging 786 ms to 832 ms in process (+5.8%) and 1,613
+to 1,705 ms through the worker; Lua heap 39 to 61 KB; native owner unchanged. Debug only.
+
+**Not verified.** Browser/Wasm, a room end to end, Windows/Linux, a Release build, a watched motion
+review of the windowed run (it ran 3,607 ticks, 12 times, exit 0, unwatched), human acceptance.
+**Finding for the owner of M2 lettering:** in-game GPU stills at high resolution show the painted names
+legible but mirrored from both sides, byte-identically for harbor-life, while `harbor_review` reads
+correctly; not caused by W6 and not isolated.
 
 ## Verification and handoff
 
