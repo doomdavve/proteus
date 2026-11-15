@@ -1,10 +1,11 @@
 # Authoring plugins with an external agent
 
-Status, 2026-11-15: **drafted, untested.** This is the proposed replacement for the in-game agent
+Status, 2026-11-15: **tried; the tool loop works, the human play check is owed.** This is the proposed replacement for the in-game agent
 of [P6](PLUGIN_PLAN.md#p6--external-agent-authoring-instead-of-an-in-game-agent). It adds no game
-code: a coding agent such as Claude Code drives the P4 tools that already exist. Nothing here has
-been run end to end with an agent; the [trial](#trial) says what to check and how the outcome is
-recorded. [The plugin API](PLUGIN_API.md) owns every command and schema named below.
+code: a coding agent such as Claude Code drives the P4 tools that already exist. Three Claude Code sessions have
+run it (see the [trial](#trial)): the agent found the contract unaided, staged and undid a change
+with correct pins, and reported a gap instead of inventing a field. No human has played the
+applied change, so nothing is accepted. [The plugin API](PLUGIN_API.md) owns every command and schema named below.
 
 ## Setup
 
@@ -81,10 +82,11 @@ Let `A="python3 tools/plugin_author.py"`.
 5. **Inspect the running game.** `$A live-inspect --bridge DIR` returns the revision, epoch,
    digest, held candidate and the objective, HUD and timer state.
 6. **Stage.** `$A live-stage DRAFT --bridge DIR --base-revision R --base-epoch E --expect-bundle ID`
-   with the values from step 5. The response says whether the change was renamed in, unchanged,
-   held for a migration or restart, or rejected, with the diagnostic file, line and field.
+   with the values from step 5. The response says whether the change was applied live (a moved mark is), renamed in,
+   unchanged, held for a migration or restart, or rejected, with the diagnostic file, line and field.
 7. **Apply or back out.** `live-apply` (F7) commits a held candidate; `live-undo` (F6) holds the
-   previous revision; `live-discard` drops a held or running candidate. A `stale` status means the
+   previous revision; `live-discard` drops a held or running candidate. `live-apply` is only for a held candidate (`held_revision` above 0); a live change is already
+   active after the stage, and Undo of a live change applies at once. A `stale` status means the
    game moved since the inspect: re-inspect and retry, never force.
 8. **Console.** `live-console --line '/status'` submits a player's console line through the game's
    command layer. Edits report `pending`; read the outcome with `live-inspect`.
@@ -114,11 +116,29 @@ history are the record. A browser can use bundle import/export instead of the br
 
 ## Trial
 
-Session 2 (2026-11-15) edited the watched directory: polling applied the move before staging, so
-item 3 was not exercised; undo restored the original digest. The loop above now uses a working
-copy for that reason.
+**Results, 2026-11-15, native Debug on macOS, Claude Code, `langedrag`.** All figures are the
+agent's own report of its commands; none was independently checked and no one played the result.
 
-Done when the user has run these against one agent session and recorded the outcome here:
+- Session 1 (add a fifth shelter): the agent found the contract unaided, validated a scratch copy,
+  quoted `voyage.shelters: must list 2 to 4 shelters, not 5`, named the C limit as the work item and
+  staged nothing. Item 5 passed; the request was impossible because `langedrag` is at the cap.
+- Session 2 (move a shelter, editing the watched directory): polling applied the edit before the
+  agent staged it, so `live-stage` reported `unchanged`; a guessed `--held-revision` returned
+  `stale`; undo restored digest `e8509272172cb7c4`. This produced the working-copy rule above.
+- Session 3 (move `bridge` from (650, -850) to (620, -820), working copy): `validate`, `preview` and
+  `capture` returned ok; `live-inspect` showed R1, epoch 0; `live-stage` with pins (1, 0, bundle)
+  returned outcome `applied` ("R2 ACTIVE, live"), digest `aa419f3d6700b4de`, epoch 1;
+  `live-apply` was correctly skipped (`held_revision` 0); `live-undo` with pins (2, 1) applied
+  at once and a final `live-inspect` showed R1, digest `e8509272172cb7c4`, epoch 2. The watched
+  directory stayed untouched. Before it, a game with no bridge session (see Setup) made
+  `live-inspect` report `input_error`; the agent stopped and asked.
+- Friction: a still cannot show a 30-40 m mark move; auto-applied saves in the watched directory;
+  one bridge directory serves one game. Not tried: a change that is held (migration or restart),
+  a stale pin from a concurrent edit, and the poll delay was not measured.
+- Owed from the user: play R2 (the moved shelter) and judge it, then run Undo in the window.
+
+The checks below say what a trial covers. Items 1-5 passed across the sessions above; item 6 is
+the friction list.
 
 1. From a copy of `langedrag`, ask for a small change (for example a second objective or a moved
    mark; the [quick start](#quick-start) has a prompt). Record whether the agent finds the contract unaided or needed hints.
