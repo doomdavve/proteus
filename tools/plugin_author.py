@@ -941,7 +941,8 @@ def main():
     parser.add_argument("--camera-distance", type=float)
     parser.add_argument("--camera-height", type=float)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--example", help="init: the example (or a directory) to start from")
+    parser.add_argument("--from", dest="source", metavar="PLUGIN",
+                        help="init (required): the shipped package name or plugin directory to copy")
     args = parser.parse_args()
     if args.operation == "capabilities":
         print(json.dumps(capabilities(), sort_keys=True))

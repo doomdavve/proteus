@@ -458,7 +458,10 @@ class AgentWorkspace(unittest.TestCase):
                              cwd=self.directory)
         return run.returncode, json.loads(run.stdout)
 
-    def init(self, *options):
+    def init(self, *options, source="langedrag"):
+        """init with `--from langedrag` unless options name a source or source is None."""
+        if source and "--from" not in options:
+            options = ("--from", source, *options)
         return self.tool("init", str(self.directory), "--bridge", str(self.mailbox), *options)
 
     def serve(self):
@@ -475,7 +478,7 @@ class AgentWorkspace(unittest.TestCase):
 
     def test_init_scaffold(self):
         code, result = self.init()
-        self.assertEqual((code, result["status"], result["example"]), (0, "ok", "langedrag"))
+        self.assertEqual((code, result["status"], result["source"]), (0, "ok", "langedrag"))
         files = sorted(p.name for p in self.directory.iterdir())
         self.assertEqual(files, [".claude", ".wv.json", "AGENTS.md", "CLAUDE.md", "main.lua",
                                  "plugin.json", "reference", "wv"])
@@ -501,16 +504,20 @@ class AgentWorkspace(unittest.TestCase):
         self.assertIn("not empty", result["message"])
         self.assertEqual([p.name for p in self.directory.iterdir()], ["keep.txt"])
         shutil.rmtree(self.directory)
-        code, result = self.init("--example", "nope")
+        code, result = self.init("--from", "nope")
         self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertFalse(self.directory.exists())
+        code, result = self.init(source=None)
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertIn("requires --from", result["message"])
         self.assertFalse(self.directory.exists())
         code, result = self.tool("status", str(self.scratch.name))
         self.assertEqual((code, result["status"]), (1, "input_error"))
         self.assertIn("not a workspace", result["message"])
 
     def test_init_from_directory(self):
-        code, result = self.init("--example", str(ROOT / "plugins/shelter-tour"))
-        self.assertEqual((code, result["example"]), (0, "shelter-tour"))
+        code, result = self.init("--from", str(ROOT / "plugins/shelter-tour"))
+        self.assertEqual((code, result["source"]), (0, "shelter-tour"))
 
     def test_check_without_game(self):
         self.init()
@@ -817,7 +824,8 @@ class Packaged(unittest.TestCase):
             self.assertEqual((code, result["status"]), (0, "ok"), result)
             # An agent workspace made by the packaged tools runs its checks through them.
             workspace = Path(scratch) / "workspace"
-            code, result = tool("init", str(workspace), "--bridge", str(Path(scratch) / "bridge"))
+            code, result = tool("init", str(workspace), "--from", data["examples"][0], "--bridge",
+                              str(Path(scratch) / "bridge"))
             self.assertEqual((code, result["status"]), (0, "ok"), result)
             run = subprocess.run([str(workspace / "wv"), "check"], cwd=scratch,
                                  capture_output=True, timeout=60)

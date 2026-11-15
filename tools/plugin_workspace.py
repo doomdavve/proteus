@@ -269,14 +269,16 @@ def resolve(author, name):
     return path if path.is_absolute() else base / path
 
 
-def example_directory(author, source):
-    if Path(source).is_dir():
-        return Path(source)
+def source_directory(author, source):
     names = {}
     for example in author.LAYOUT["examples"]:
         names[Path(example).name] = resolve(author, example)
+    if not source:
+        raise ValueError(f"init requires --from PLUGIN: one of {sorted(names)} or a directory")
+    if Path(source).is_dir():
+        return Path(source)
     if source not in names:
-        raise ValueError(f"no example {source!r}; choose one of {sorted(names)} or a directory")
+        raise ValueError(f"no package {source!r}; choose one of {sorted(names)} or a directory")
     return names[source]
 
 
@@ -293,7 +295,7 @@ def init(author, directory, args):
     if directory.exists() and any(directory.iterdir()):
         raise ValueError(f"{directory} exists and is not empty")
     bridge = Path(args.bridge or Path.home() / ".wake-velocity-bridge").expanduser().resolve()
-    source = example_directory(author, args.example or "langedrag")
+    source = source_directory(author, args.source)
     manifest, entry, modules = author.read_package(source)
     author.write_package(directory, manifest, entry, modules)
     reference = resolve(author, author.LAYOUT["api_document"])
@@ -315,7 +317,7 @@ def init(author, directory, args):
         json.dumps({"permissions": {"allow": allowed, "deny": [read_rule(bridge)]}}, indent=2)
         + "\n", encoding="utf-8")
     return {"protocol": 1, "operation": "init", "status": "ok", "directory": str(directory),
-            "bridge": str(bridge), "example": source.name,
+            "bridge": str(bridge), "source": source.name,
             "next": [f"cd {directory} && ./wv play    (the game, with the live bridge)",
                      f"cd {directory} && claude        (the agent, in a second terminal)"]}
 
