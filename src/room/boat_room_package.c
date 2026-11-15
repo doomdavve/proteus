@@ -246,7 +246,12 @@ static bool load_directory(const char *directory, BoatLocationId location,
     }
     if (status != BOAT_PLUGIN_OK) {
         char text[220];
-        snprintf(text, sizeof(text), "%s: %s", diagnostic.field, diagnostic.message);
+        // A failure inside a module names its file (modules/<name>.lua:LINE) first.
+        if (!strncmp(diagnostic.file, "modules/", 8))
+            snprintf(text, sizeof(text), "%s:%d: %s", diagnostic.file, diagnostic.line,
+                diagnostic.message);
+        else
+            snprintf(text, sizeof(text), "%s: %s", diagnostic.field, diagnostic.message);
         reason(error, size, text);
         return false;
     }

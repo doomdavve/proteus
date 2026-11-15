@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import struct
 import subprocess
 import sys
@@ -428,6 +429,207 @@ class Workspace(unittest.TestCase):
         self.assertEqual(json.loads(stale.stdout)["status"], "input_error")
 
 
+FIXTURE = ROOT / "tests/support/fixtures/plugins/modules-route"
+GOLDEN = ROOT / "tests/support/fixtures/plugin_image_golden.hex"
+
+
+class Modules(unittest.TestCase):
+    """M5 W4: packages with modules through snapshot, drafts, version 2 bundles and the worker."""
+
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(self.scratch.cleanup)
+        self.directory = Path(self.scratch.name) / "package"
+        shutil.copytree(FIXTURE, self.directory)
+
+    def tool(self, *args, content=None):
+        return subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), *args],
+                              input=content, capture_output=True, timeout=30)
+
+    def test_golden_image(self):
+        # The same three files and bytes the C packer and web/plugin_author.js are held to.
+        files = [("main.lua", b"return {}\n"), ("marina", "return 'G\u00f6teborg'\n".encode()),
+                 ("marina.berths", b"return {}\n")]
+        image = author.pack_image(files)
+        self.assertEqual(image.hex(), GOLDEN.read_text().strip())
+        self.assertEqual(author.unpack_image(image), files)
+        for bad in (image[:-1], image + b"\0", b"x" + image[1:], image[:5] + b"\x04" + image[6:],
+                    image[:5] + b"\x00" + image[6:]):
+            with self.assertRaises(ValueError):
+                author.unpack_image(bad)
+        with self.assertRaises(ValueError):
+            author.pack_image([("main.lua", b""), ("main.lua", b"")])
+
+    def test_snapshot_carries_modules(self):
+        payload = author.snapshot(self.directory)
+        manifest, entry, modules = author.split_snapshot(payload)
+        self.assertEqual(list(modules), ["route", "route.arrival"])
+        self.assertEqual(modules["route.arrival"],
+                         (self.directory / "modules/route/arrival.lua").read_bytes())
+        size = struct.unpack(">I", payload[4:8])[0]
+        self.assertTrue(author.image_is(payload[len(payload) - size:]))
+        # A module-only edit is a different snapshot, so a different pin.
+        (self.directory / "modules/route.lua").write_bytes(b"return 1\n")
+        self.assertNotEqual(author.snapshot(self.directory), payload)
+        # A package without modules is unchanged: the raw entry bytes.
+        plain = Path(self.scratch.name) / "plain"
+        shutil.copytree(ROOT / "plugins/langedrag", plain)
+        raw = author.snapshot(plain)
+        self.assertEqual(raw[len(raw) - (plain / "main.lua").stat().st_size:],
+                         (plain / "main.lua").read_bytes())
+
+    def test_worker_validates_modules(self):
+        job = author.ValidationJob(WORKER, author.snapshot(self.directory), 0, 0)
+        try:
+            job.process.wait(timeout=10)  # Failure deadline, not simulated time.
+            self.assertEqual(job.poll(1)["status"], "ok")
+        finally:
+            job.close()
+        (self.directory / "modules/route.lua").write_bytes(b"local x = = 1\n")
+        job = author.ValidationJob(WORKER, author.snapshot(self.directory), 0, 0)
+        try:
+            job.process.wait(timeout=10)
+            self.assertNotEqual(job.poll(1)["status"], "ok")
+            self.assertIn("modules/route.lua", json.dumps(job.result))
+        finally:
+            job.close()
+
+    def test_read_refusals(self):
+        (self.directory / "modules/route.lua").unlink()
+        with self.assertRaisesRegex(ValueError, "modules/route.lua: missing"):
+            author.snapshot(self.directory)
+        (self.directory / "modules/route.lua").write_bytes(b"x" * 70000)
+        with self.assertRaisesRegex(ValueError, "modules/route.lua is larger than"):
+            author.snapshot(self.directory)
+        (self.directory / "modules/route.lua").write_bytes(b"return 1\n")
+        if os.name != "nt":
+            (self.directory / "modules/route").rename(self.directory / "modules/real")
+            (self.directory / "modules/route").symlink_to(self.directory / "modules/real")
+            with self.assertRaisesRegex(ValueError, "symbolic links"):
+                author.snapshot(self.directory)
+
+    def test_shared_budget_and_limits(self):
+        manifest = (self.directory / "plugin.json").read_bytes().decode()
+        entry = b"-- entry\n"
+        edge = 65536 - 6 - (1 + 8 + 4 + len(entry)) - (1 + 5 + 4) - (1 + 13 + 4)
+        ok = {"route": b"x" * edge, "route.arrival": b""}
+        self.assertEqual(len(author.package_source(manifest, entry, ok)), 65536)
+        ok["route"] += b"x"
+        with self.assertRaisesRegex(ValueError, "modules/route/arrival.lua is larger than the 0 bytes"):
+            author.package_source(manifest, entry, ok)
+        with self.assertRaisesRegex(ValueError, "route.arrival.*missing"):
+            author.package_source(manifest, entry, {"route": b""})
+        with self.assertRaisesRegex(ValueError, "does not declare"):
+            author.package_source(manifest, entry, {"route": b"", "route.arrival": b"", "x": b""})
+        for names, message in ((["a"] * 2, "repeats modules"), (["Bad"], "dot-separated"),
+                               (["main"], "must not be"), (["a.b.c.d"], "dot-separated"),
+                               ([f"m{i}" for i in range(9)], "at most 8"),
+                               (["a" * 33], "dot-separated"), ("x", "array")):
+            with self.assertRaisesRegex(ValueError, message):
+                author.declared_modules(json.dumps({"modules": names}))
+        self.assertEqual(len(author.declared_modules(
+            json.dumps({"modules": [f"m{i}" for i in range(8)]}))), 8)
+
+    def test_bundle_round_trip(self):
+        bundle = author.export_bundle(self.directory)
+        self.assertEqual(sorted(bundle), ["format", "manifest", "modules", "source", "version"])
+        self.assertEqual(bundle["version"], 2)
+        self.assertEqual(list(bundle["modules"]), ["route", "route.arrival"])
+        text = json.dumps(bundle)
+        target = Path(self.scratch.name) / "imported"
+        author.import_bundle(text, target)
+        for path in ("plugin.json", "main.lua", "modules/route.lua", "modules/route/arrival.lua"):
+            self.assertEqual((target / path).read_bytes(), (self.directory / path).read_bytes())
+        self.assertEqual(author.snapshot(target), author.snapshot(self.directory))
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            author.import_bundle(text, target)
+        # The command line: export, then import.
+        exported = self.tool("export", str(self.directory))
+        self.assertEqual(exported.returncode, 0, exported.stderr)
+        other = Path(self.scratch.name) / "cli"
+        run = self.tool("import", str(other), content=exported.stdout)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(author.snapshot(other), author.snapshot(self.directory))
+        # A package without modules still exports with an empty modules object.
+        plain = author.export_bundle(ROOT / "plugins/langedrag")
+        self.assertEqual(plain["modules"], {})
+        self.assertEqual(author.capabilities()["browser"]["bundle_version"], 2)
+
+    def test_bundle_refusals(self):
+        bundle = author.export_bundle(self.directory)
+        def refuse(data, message):
+            with self.assertRaisesRegex(ValueError, message):
+                author.bundle_package(json.dumps(data))
+        refuse({**bundle, "version": 1}, "version 1 bundles are not supported; re-export")
+        refuse({k: v for k, v in bundle.items() if k != "modules"} | {"version": 1},
+               "version 1 bundles are not supported")
+        refuse({**bundle, "version": 3}, "Expected a Wake Velocity version 2")
+        refuse({k: v for k, v in bundle.items() if k != "modules"}, "Expected a Wake Velocity")
+        refuse({**bundle, "extra": 1}, "Expected a Wake Velocity")
+        refuse({**bundle, "modules": {"route": "x"}}, "route.arrival.*missing")
+        refuse({**bundle, "modules": {**bundle["modules"], "other": ""}}, "does not declare")
+        refuse({**bundle, "modules": []}, "Expected source text")
+        refuse({**bundle, "modules": {**bundle["modules"], "route": 1}}, "Expected source text")
+        refuse({**bundle, "manifest": bundle["manifest"].replace('"modules"', '"modules": [], "x"')},
+               "Expected|does not declare")
+        refuse({**bundle, "modules": {**bundle["modules"], "route": "x" * 70000}}, "larger than")
+        with self.assertRaisesRegex(ValueError, "200 KB"):
+            author.bundle_package(" " * 200001)
+        # A bundle that lists its modules in another order imports in the manifest's order.
+        reordered = {**bundle, "modules": dict(reversed(list(bundle["modules"].items())))}
+        _, _, modules = author.bundle_package(json.dumps(reordered))
+        self.assertEqual(list(modules), ["route", "route.arrival"])
+
+    def test_workspace_modules(self):
+        before = author.workspace_read(self.directory)
+        self.assertIn("modules/route/arrival.lua", before["files"])
+        edit = (before["files"]["modules/route/arrival.lua"] + "-- edited\n").encode()
+        after = author.workspace_write(self.directory, "modules/route/arrival.lua", edit,
+                                       before["bundle_id"])
+        self.assertEqual((self.directory / "modules/route/arrival.lua").read_bytes(), edit)
+        self.assertEqual(after["changed_file"], "modules/route/arrival.lua")
+        self.assertNotEqual(after["bundle_id"], before["bundle_id"])
+        self.assertEqual(list(self.directory.rglob(".plugin-draft-*")), [])
+        for filename in ("modules/undeclared.lua", "modules/../main.lua", "modules/route.lua/x"):
+            with self.assertRaises(ValueError):
+                author.workspace_write(self.directory, filename, b"x", after["bundle_id"])
+        # A manifest that declares a module with no file is refused before anything changes.
+        manifest = json.loads(after["files"]["plugin.json"])
+        manifest["modules"].append("absent")
+        with self.assertRaisesRegex(ValueError, "modules/absent.lua: missing"):
+            author.workspace_write(self.directory, "plugin.json",
+                                   json.dumps(manifest).encode(), after["bundle_id"])
+        # An existing file is declared by editing plugin.json; oversize totals are refused.
+        (self.directory / "modules/extra.lua").write_bytes(b"return {}\n")
+        manifest["modules"] = ["route", "route.arrival", "extra"]
+        declared = author.workspace_write(self.directory, "plugin.json",
+                                          json.dumps(manifest).encode(), after["bundle_id"])
+        self.assertIn("modules/extra.lua", declared["files"])
+        for size, message in ((70000, "exceeds"), (65400, "larger than")):
+            with self.assertRaisesRegex(ValueError, message):
+                author.workspace_write(self.directory, "modules/extra.lua", b"x" * size,
+                                       declared["bundle_id"])
+        run = self.tool("workspace-write", str(self.directory), "--file", "modules/extra.lua",
+                        "--expect-bundle", declared["bundle_id"], content=b"return 2\n")
+        self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_capture_writes_modules(self):
+        captured = {}
+        real = author.write_package
+
+        def spy(directory, *rest):
+            real(directory, *rest)
+            captured["files"] = sorted(str(p.relative_to(directory))
+                                       for p in Path(directory).rglob("*.lua"))
+
+        with patch.object(author, "write_package", spy), \
+                patch.object(author.subprocess, "Popen", side_effect=OSError("no game")):
+            with self.assertRaises(OSError):
+                author.CaptureJob("game", author.snapshot(self.directory), 0, 0)
+        self.assertEqual(captured["files"], ["main.lua", "modules/route.lua",
+                                             "modules/route/arrival.lua"])
+
+
 class Packaged(unittest.TestCase):
     """A release layout from package_plugin_tools, driven from outside the checkout."""
 
@@ -458,6 +660,14 @@ class Packaged(unittest.TestCase):
             for path in data["examples"] + [data["anchors"], data["api_document"]]:
                 self.assertTrue(Path(path).exists(), path)
             self.assertEqual(tool("anchors")[1], author.anchors())
+            # The shared marina travels as each example's own module copy; _shared is no package.
+            installed = package / "assets/plugins"
+            for name in ("harbor-life", "harbor-room"):
+                self.assertEqual((installed / name / "modules/eriksberg_marina.lua").read_bytes(),
+                                 (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes())
+            self.assertFalse((installed / "_shared").exists())
+            self.assertEqual(sorted(p.name for p in installed.iterdir() if p.name.startswith("_")), [])
+            self.assertFalse(any(Path(example).name.startswith("_") for example in data["examples"]))
             for example in data["examples"]:
                 # A loaded Linux runner can exceed the product's 5 s default during the
                 # harbour-life traffic sweep; this check is about the relocated package.
@@ -479,6 +689,134 @@ class Packaged(unittest.TestCase):
                                   "capabilities"], capture_output=True, text=True, timeout=30)
             self.assertNotEqual(run.returncode, 0)
             self.assertIn("unsupported plugin tools layout", run.stderr)
+
+
+class SharedModules(unittest.TestCase):
+    """M5 W5: sync-shared, and harbor-life and harbor-room as self-contained module packages."""
+
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(self.scratch.cleanup)
+        self.plugins = Path(self.scratch.name) / "plugins"
+        (self.plugins / "_shared").mkdir(parents=True)
+        (self.plugins / "_shared/marina.lua").write_bytes(b"return { a = 1 }\n")
+        for name, modules in (("one", '["marina"]'), ("two", '["marina", "local"]'), ("bare", "[]")):
+            package = self.plugins / name
+            (package / "modules").mkdir(parents=True)
+            (package / "plugin.json").write_text('{"modules": %s}' % modules)
+            (package / "main.lua").write_bytes(b"return {}\n")
+        (self.plugins / "two/modules/local.lua").write_bytes(b"return 1\n")
+        (self.plugins / "two/modules/marina.lua").write_bytes(b"return { a = 2 }\n")
+
+    def tool(self, *args):
+        run = subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), *args],
+                             capture_output=True, timeout=30)
+        return run.returncode, json.loads(run.stdout)
+
+    def test_sync_shared(self):
+        self.assertIn("sync-shared", author.capabilities()["operations"])
+        # --check reports every drifted or missing copy, names them and writes nothing.
+        code, result = self.tool("sync-shared", str(self.plugins), "--check")
+        self.assertEqual(code, 1)
+        self.assertEqual((result["status"], result["checked"], result["changed"]), ("drift", 2, []))
+        self.assertEqual(result["drifted"], ["one/modules/marina.lua", "two/modules/marina.lua"])
+        self.assertFalse((self.plugins / "one/modules/marina.lua").exists())
+        self.assertEqual((self.plugins / "two/modules/marina.lua").read_bytes(), b"return { a = 2 }\n")
+        # Without --check the copies are created or rewritten; unshared modules stay.
+        code, result = self.tool("sync-shared", str(self.plugins))
+        self.assertEqual((code, result["status"], result["changed"]), (0, "ok", result["drifted"]))
+        for name in ("one", "two"):
+            self.assertEqual((self.plugins / name / "modules/marina.lua").read_bytes(),
+                             b"return { a = 1 }\n")
+        self.assertEqual((self.plugins / "two/modules/local.lua").read_bytes(), b"return 1\n")
+        self.assertFalse((self.plugins / "bare/modules/marina.lua").exists())
+        code, result = self.tool("sync-shared", str(self.plugins), "--check")
+        self.assertEqual((code, result["status"], result["drifted"]), (0, "ok", []))
+        # _shared is never a package: a stray manifest there does not make it a sync target.
+        (self.plugins / "_shared/plugin.json").write_text('{"modules": ["marina"]}')
+        self.assertEqual(self.tool("sync-shared", str(self.plugins), "--check")[1]["checked"], 2)
+        # An undeclared file with a shared name is a copy too.
+        (self.plugins / "bare/modules/marina.lua").write_bytes(b"x")
+        self.assertEqual(self.tool("sync-shared", str(self.plugins), "--check")[1]["drifted"],
+                         ["bare/modules/marina.lua"])
+        code, result = self.tool("sync-shared", str(self.plugins / "missing"))
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+
+    def test_shipped_copies_are_in_sync(self):
+        code, result = self.tool("sync-shared", "--check")
+        self.assertEqual((code, result["status"], result["drifted"]), (0, "ok", []), result)
+        self.assertGreaterEqual(result["checked"], 2)
+
+    def test_marina_packages_bundle_and_round_trip(self):
+        shared = (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes()
+        for name in ("harbor-life", "harbor-room"):
+            source = ROOT / "plugins" / name
+            self.assertEqual(json.loads((source / "plugin.json").read_text())["modules"],
+                             ["eriksberg_marina"])
+            self.assertEqual((source / "modules/eriksberg_marina.lua").read_bytes(), shared)
+            bundle = author.export_bundle(source)
+            self.assertEqual(bundle["version"], 2)
+            self.assertEqual(bundle["modules"], {"eriksberg_marina": shared.decode("utf-8")})
+            target = Path(self.scratch.name) / name
+            author.import_bundle(json.dumps(bundle), target)
+            self.assertEqual(author.snapshot(target), author.snapshot(source))
+            self.assertEqual((target / "modules/eriksberg_marina.lua").read_bytes(), shared)
+            # The entry is small; the scene is not in it.
+            self.assertNotIn(b"berths", (target / "main.lua").read_bytes())
+            code, result = self.worker_check(target)
+            self.assertEqual((code, result["status"]), (0, "ok"), result)
+            _, original = self.worker_check(source)
+            self.assertEqual(result["gameplay_digest"], original["gameplay_digest"])
+
+    def test_integrated_marina_example(self):
+        """M5 W6: four modules (one a shared copy, two nested), exported, imported and staged."""
+        source = ROOT / "plugins/marina-integrated-demo"
+        manifest = json.loads((source / "plugin.json").read_text())
+        self.assertEqual(manifest["modules"],
+                         ["eriksberg_marina", "marina", "guests.routes", "guests.services"])
+        for name in manifest["modules"]:
+            self.assertTrue((source / author.module_file(name)).is_file(), name)
+        self.assertEqual((source / "modules/eriksberg_marina.lua").read_bytes(),
+                         (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes())
+        bundle = author.export_bundle(source)
+        self.assertEqual(bundle["version"], 2)
+        self.assertEqual(sorted(bundle["modules"]), sorted(manifest["modules"]))
+        target = Path(self.scratch.name) / "integrated"
+        author.import_bundle(json.dumps(bundle), target)
+        self.assertEqual(author.snapshot(target), author.snapshot(source))
+        self.assertTrue((target / "modules/guests/services.lua").is_file())
+        code, result = self.worker_check(target)
+        self.assertEqual((code, result["status"]), (0, "ok"), result)
+        self.assertEqual(result["scene"]["berths"], 14)
+        self.assertEqual(result["scene"]["modules"], 15)
+        self.assertEqual(result["scene"]["vessels"], 6)
+        _, original = self.worker_check(source)
+        self.assertEqual(result["scene"]["digest"], original["scene"]["digest"])
+        # A module-only edit changes the package's identity and its scene; a broken module is
+        # reported with its file.
+        edited = Path(self.scratch.name) / "edited"
+        author.import_bundle(json.dumps(bundle), edited)
+        services = edited / "modules/guests/services.lua"
+        services.write_text(services.read_text().replace("start_tick = 240", "start_tick = 120"))
+        self.assertNotEqual(author.snapshot(edited), author.snapshot(source))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"]), (0, "ok"), result)
+        self.assertNotEqual(result["scene"]["digest"], original["scene"]["digest"])
+        services.write_text(services.read_text().replace("start_tick = 120", "start_tick = 360"))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"]), (1, "schema"), result)
+        self.assertIn("crosses scene.traffic.vessels", result["message"])
+        routes = edited / "modules/guests/routes.lua"
+        routes.write_text(routes.read_text().replace("local z = 231", "local z = = 231"))
+        code, result = self.worker_check(edited)
+        self.assertEqual((code, result["status"], result["file"]),
+                         (1, "syntax", "modules/guests/routes.lua"), result)
+
+    def worker_check(self, directory):
+        run = subprocess.run([WORKER], input=author.snapshot(directory), capture_output=True,
+                             timeout=20)
+        self.assertIn(run.returncode, (0, 1), run.stderr)
+        return run.returncode, json.loads(run.stdout)
 
 
 class Worker(unittest.TestCase):
@@ -507,7 +845,8 @@ class Worker(unittest.TestCase):
         self.assertEqual(self.run_worker(payload)[1]["status"], "runtime")
 
     def test_examples_and_job(self):
-        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour", "marina-route-demo", "marina-berth-demo"):
+        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour", "marina-route-demo", "marina-berth-demo",
+                     "marina-integrated-demo"):
             payload = author.snapshot(ROOT / "plugins" / name)
             code, result = self.run_worker(payload)
             self.assertEqual(code, 0, result)
@@ -564,7 +903,9 @@ class Worker(unittest.TestCase):
         self.assertEqual(data["api"], 1)
         for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour"):
             manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
-            self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
+            # "modules" is optional; harbor-life declares one (M5 W5).
+            self.assertEqual(set(manifest) - {"modules"},
+                             set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
         marina = data["schemas"]["scene"]["properties"]["marina"]["properties"]
         self.assertEqual(marina["berths"]["maxItems"], 32)

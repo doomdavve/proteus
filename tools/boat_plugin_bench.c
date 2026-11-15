@@ -1,4 +1,5 @@
 // Explicit performance experiment, outside CTest: no sleeps or timing-based assertions.
+#include "plugins/boat_plugin_image.h"
 #include "wake_velocity/wake_velocity_plugin.h"
 
 #include <stdio.h>
@@ -43,6 +44,10 @@ int main(int argc, char **argv)
     BoatPluginDiagnostic d;
     if (boat_plugin_read(argv[1], NULL, &files, &d) != BOAT_PLUGIN_OK)
         return 1;
+    if (boat_plugin_image_is(files.source, files.source_size)) {
+        fprintf(stderr, "Benchmark rewrites the entry text; it needs a package without modules.\n");
+        return 2;
+    }
     if (files.source_size > BOAT_PLUGIN_SOURCE_MAX - 128) {
         fprintf(stderr, "Benchmark needs 128 bytes of source headroom for generated variants.\n");
         return 2;

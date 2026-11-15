@@ -133,6 +133,8 @@ int boat_plugin_query_worker_streams(FILE *input, FILE *output)
     if (boat_plugin_parse_manifest(f->manifest, f->manifest_size, NULL, &manifest, &d)
         != BOAT_PLUGIN_OK)
         goto done;
+    if (boat_plugin_check_source(&manifest, f->source, f->source_size, &d) != BOAT_PLUGIN_OK)
+        goto done;
     boat_plugin_lua_query(f->source, f->source_size, manifest.entry, expression,
         &boat_plugin_default_limits, text, BOAT_PLUGIN_QUERY_REPLY_MAX, &d);
 done:
@@ -168,7 +170,8 @@ int boat_plugin_stage_worker_streams(FILE *input, FILE *output)
         goto done;
     BoatPluginBundle bundle = boat_plugin_bundle(f);
     BoatPluginManifest m;
-    if (boat_plugin_parse_manifest(f->manifest, f->manifest_size, NULL, &m, &d) != BOAT_PLUGIN_OK)
+    if (boat_plugin_parse_manifest(f->manifest, f->manifest_size, NULL, &m, &d) != BOAT_PLUGIN_OK
+        || boat_plugin_check_source(&m, f->source, f->source_size, &d) != BOAT_PLUGIN_OK)
         goto done;
     BoatPluginKind kind = boat_plugin_kind_parse(m.kind);
     if (kind == BOAT_PLUGIN_KIND_NONE) {

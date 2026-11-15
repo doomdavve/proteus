@@ -7,6 +7,7 @@
 #include "plugins/boat_plugin_load.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "support/boat_test_flat_package.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -43,6 +44,7 @@ int main(void)
     BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage original;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &original, &d) == BOAT_PLUGIN_OK);

@@ -3,9 +3,11 @@
 // (web/plugin_author.js). Workers run in process through the private stream entry points, and
 // every deadline uses supplied virtual time.
 #include "core/boat_world.h"
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_io.h"
 #include "plugins/boat_plugin_stage.h"
 #include "plugins/boat_plugin_stage_backend.h"
+#include "support/boat_test_module_package.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -230,6 +232,33 @@ int main(void)
     model_mode = MODEL_RUN;
     job = query(&files, "def.voyage.shelters[1].name", 0);
     CHECK(job && answered(job, text, sizeof(text), &d) == 1 && text[0]);
+    boat_plugin_stage_close(job);
+    CHECK(model_live() == 0);
+
+    // M5 W3: the (manifest, source, size) triple carries a source image through the page model
+    // unchanged (framing is by length, never by text): a launch receipt, a stage and a query.
+    static BoatPluginFiles image;
+    static BoatPluginHost image_host;
+    char directory[700];
+    CHECK(boat_test_module_package("plugins/shelter-tour", BOAT_PLUGIN_STAGE_WEB_TEST_DIR,
+        "tour-modules", directory, sizeof(directory)));
+    CHECK(boat_plugin_read(directory, NULL, &image, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_image_is(image.source, image.source_size));
+    image_host = (BoatPluginHost) {
+        .location = resources.definition, .map = &resources.map, .kind = BOAT_PLUGIN_KIND_VOYAGE
+    };
+    job = boat_plugin_stage_start(NULL, &image_host, &image, 0);
+    CHECK(job && completed(job, &image_host) == 1 && image_host.depth == 1);
+    const BoatPluginRevision *got = boat_plugin_host_active(&image_host);
+    CHECK(got->source_size == image.source_size
+        && !memcmp(got->source, image.source, image.source_size));
+    boat_plugin_stage_close(job);
+    job = boat_plugin_stage_start(NULL, &image_host, &image, 0);
+    CHECK(job && completed(job, &image_host) == 1 && image_host.change == BOAT_PLUGIN_UNCHANGED);
+    boat_plugin_stage_close(job);
+    job = query(&image, "def.voyage.shelters[1].name", 0);
+    d = (BoatPluginDiagnostic) { 0 };
+    CHECK(job && answered(job, text, sizeof(text), &d) == 1 && strstr(text, "DOCK"));
     boat_plugin_stage_close(job);
     CHECK(model_live() == 0);
 

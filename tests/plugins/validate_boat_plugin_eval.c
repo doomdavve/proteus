@@ -1,4 +1,5 @@
 #include "plugins/boat_plugin_eval.h"
+#include "plugins/boat_plugin_image.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -270,9 +271,57 @@ static int capacities(void)
     return 0;
 }
 
+// M5 W3: the request carries a source image (it starts with a NUL byte) like any source: the
+// codec does not read it as text, a worker evaluates it, and the reply matches native evaluation.
+static int image_source(void)
+{
+    static const char ENTRY[] = "local m = require('m'); return {"
+                                "init=function(c) return {n=m.base},{} end,"
+                                "update=function(c,s) s.n=m.step(s.n); return s,{} end}";
+    static const char MODULE[] = "return { base = 40, step = function(n) return n + 2 end }";
+    BoatPluginImageFile files[2]
+        = { { "main.lua", 8, ENTRY, sizeof(ENTRY) - 1 }, { "m", 1, MODULE, sizeof(MODULE) - 1 } };
+    setup();
+    CHECK(boat_plugin_image_pack(
+        files, 2, request.source, sizeof(request.source), &request.source_size));
+    CHECK(boat_plugin_image_is(request.source, request.source_size) && request.source[0] == 0);
+    BoatPluginObjective actual = { 0 }, native = request.objective;
+    BoatPluginDiagnostic d, local;
+    CHECK(!run(&actual, &d) && d.status == BOAT_PLUGIN_OK);
+    CHECK(decoded.source_size == request.source_size
+        && !memcmp(decoded.source, request.source, request.source_size));
+    CHECK(boat_plugin_objective_step(&native, request.source, request.source_size,
+              BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &local)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_objective_digest(&actual) == boat_plugin_objective_digest(&native));
+    request.objective = actual;
+    request.transition = BOAT_PLUGIN_OBJECTIVE_UPDATE;
+    request.tick = 12;
+    CHECK(!run(&actual, &d) && d.status == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_objective_step(&native, request.source, request.source_size,
+              BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0, NULL, &local)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_objective_digest(&actual) == boat_plugin_objective_digest(&native));
+    // A module's runtime error comes back as a matched reply naming the module file.
+    static const char BAD[] = "return { base = 1, step = function(n) error('boom') end }";
+    files[1].data = BAD;
+    files[1].size = sizeof(BAD) - 1;
+    CHECK(boat_plugin_image_pack(
+        files, 2, request.source, sizeof(request.source), &request.source_size));
+    request.objective = actual;
+    request.tick = 24;
+    BoatPluginObjective kept = actual;
+    size_t n = boat_plugin_eval_encode_request(&request, input, sizeof(input));
+    size_t m = n ? boat_plugin_eval_execute(input, n, reply, BOAT_PLUGIN_EVAL_REPLY_MAX) : 0;
+    CHECK(m && boat_plugin_eval_result(&request, reply, m, &kept, &d));
+    CHECK(d.status == BOAT_PLUGIN_RUNTIME && !strcmp(d.file, "modules/m.lua"));
+    return 0;
+}
+
 int main(void)
 {
-    if (parity() || framing() || maximum_state() || failure() || protected_output() || capacities())
+    if (parity() || framing() || maximum_state() || failure() || protected_output() || capacities()
+        || image_source())
         return 1;
     puts("boat_plugin_eval=ok");
     return 0;

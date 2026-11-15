@@ -94,7 +94,9 @@ repeats.
 The [route demo](../plugins/marina-route-demo/README.md) provides a platform approach, two turns,
 a pause and departure with retained ferry/bridge services. It maintains stand-off clearance and
 binds no berth. The [berth demo](../plugins/marina-berth-demo/README.md) adds a resident round
-trip and a visitor stay through services (contract in the [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). Depth remains
+trip and a visitor stay through services (contract in the [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). The
+[integrated demo](../plugins/marina-integrated-demo/README.md) runs the same services on the shared
+Eriksberg marina from local modules. Depth remains
 unverified. Reactive avoidance and physical traffic wakes are outside this contract.
 
 ## Player contacts

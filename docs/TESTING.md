@@ -78,7 +78,7 @@ for actual verification and remaining human/platform limits.
 
 P4.9 `boat_plugin_eval` checks the bounded objective worker protocol against the native
 transaction engine: canonical state, lossless wide integers, exact framing, capacities,
-protected fields and stale/malformed replies. `web_plugin_author` includes virtual-time
+protected fields and stale/malformed replies. `web_plugin_author` includes the module bundle (version 2) and source-image checks, among them the golden image vector shared with `boat_plugin_modules` and `test_plugin_author.py`, and virtual-time
 objective transport reuse, cancellation, late watchdog/result and failure checks. The optional
 three-engine `check_web_plugin_author.py` also runs `check_web_plugin_objective.py` for browser
 init/update/timers, simulation gating, recovery events, migration/Undo/cancel/restart, failure,
@@ -117,7 +117,8 @@ P3.4 adds `boat_plugin_state.independent_budgets` and
 `boat_plugin_session.memory_accounting`: separate entry/callback/migration instruction ceilings,
 rollback/quarantine and full-source history/staging/Undo/eviction accounting. The explicit
 `./build/boat_plugin_bench plugins/shelter-tour` experiment reports 100-sample staging/update
-and failure-path costs; it is outside CTest and has no timing assertion. Native inspection
+and failure-path costs; it is outside CTest and has no timing assertion. `./build/measure_marina_package PACKAGE` (M5 W6, also outside CTest) times a
+marina package's staging and its 180-frame CPU sweep at the #131 camera, for comparing packages. Native inspection
 reports fixed owner reservation, retained source payload and allowed Lua heap separately.
 See [runtime qualification](PLUGIN_API.md#native-runtime-qualification-p34) for commands and limits.
 
@@ -1320,7 +1321,7 @@ contract with scene and free/course imports plus room-kind rejection. `tools/pac
 runs `tools/check_web_wasm.py` on every packaged site: the game Wasm must lack Lua parser/VM
 strings, with `plugin_stage.wasm` as the positive control. The opt-in
 `python3 tests/web/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
-(also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import,
+(also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import (including a modules package),
 capability rejection, scene/free/course staging and launch, repeated worker validations, launch,
 live rename and syntax failure, held water Apply/Undo, stale output, cancellation, navigation
 mid-validation, repeated source restore/revalidation and storage denial. On Chromium it also

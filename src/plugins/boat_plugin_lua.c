@@ -1,6 +1,7 @@
 #include "plugins/boat_plugin_lua.h"
 
 #include "core/boat_clock.h"
+#include "plugins/boat_plugin_image.h"
 
 #include "lauxlib.h"
 #include "lua.h"
@@ -25,9 +26,25 @@ typedef struct {
     BoatPluginCourseData *course;
     BoatPluginMatchData *match;
     BoatPluginDiagnostic *diagnostic;
+    // Package modules (an image source with declared modules): views into the caller's bytes.
+    // File 0 is the entry. require is installed only when MODULES is set.
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned file_count;
+    bool modules;
+    int loading[BOAT_PLUGIN_MODULES_MAX]; // File indexes of the modules being run, outermost first.
+    unsigned depth;
+    BoatPluginStatus load_status; // A module that failed to load: SYNTAX or MEMORY, else OK.
 } Vm;
 
 static unsigned lua_states;
+static char module_cache; // Registry key of the per-VM module cache.
+
+static int require_module(lua_State *L);
+
+static void text_chunk(char *out, size_t capacity, const char *path)
+{
+    snprintf(out, capacity, "=%s", path);
+}
 
 unsigned boat_plugin_lua_states(void) { return lua_states; }
 
@@ -60,9 +77,11 @@ static void count(lua_State *L, lua_Debug *debug)
     if (vm->instructions > vm->budget) {
         vm->exhausted = true;
         lua_sethook(L, count, LUA_MASKCOUNT, 1); // Any further instruction fails as well.
-        // Raised from the hook, the error carries the running line itself.
+        // The running function's own position, not its caller's (luaL_error would prefix that).
         lua_getinfo(L, "Sl", debug);
-        luaL_error(L, "%s:%d: instruction budget exhausted", debug->short_src, debug->currentline);
+        lua_pushfstring(
+            L, "%s:%d: instruction budget exhausted", debug->short_src, debug->currentline);
+        lua_error(L);
     }
 }
 
@@ -102,6 +121,94 @@ static void prune(lua_State *L, int index, const char *const *names)
     }
 }
 
+// package-local require (Marina M5). The image's modules are the only thing it can load; names
+// are checked against the manifest grammar and looked up among the declared modules, so no file
+// is ever opened. Each module runs once per VM, in the same globals as the entry, and its result
+// is cached in a registry table that Lua code cannot name. A module that returns nothing (or nil)
+// is cached as true, like Lua's own require. Nesting is bounded by the declared count.
+
+static const char *shown(const char *name, size_t size, char *out, size_t capacity)
+{
+    size_t n = 0;
+    for (size_t i = 0; i < size && n + 1 < capacity && n < 32; ++i)
+        out[n++] = (unsigned char)name[i] >= 32 && (unsigned char)name[i] < 127 ? name[i] : '?';
+    out[n] = 0;
+    return out;
+}
+
+static int require_failure(lua_State *L, const char *format, ...)
+{
+    char message[200];
+    va_list arguments;
+    va_start(arguments, format);
+    vsnprintf(message, sizeof(message), format, arguments);
+    va_end(arguments);
+    luaL_where(L, 1); // The Lua function that called require: "CHUNK:LINE: ".
+    lua_pushstring(L, message);
+    lua_concat(L, 2);
+    return lua_error(L);
+}
+
+static int require_module(lua_State *L)
+{
+    void *context;
+    lua_getallocf(L, &context);
+    Vm *vm = context;
+    size_t size = 0;
+    const char *name = lua_type(L, 1) == LUA_TSTRING ? lua_tolstring(L, 1, &size) : NULL;
+    char text[40];
+    if (!name)
+        return require_failure(L, "module name (a %s value) is invalid", luaL_typename(L, 1));
+    if (strlen(name) != size || !boat_plugin_module_name_valid(name))
+        return require_failure(L, "module name \"%s\" is invalid", shown(name, size, text, 40));
+    const BoatPluginImageFile *file
+        = boat_plugin_image_find(vm->files + 1, vm->file_count - 1, name);
+    if (!file)
+        return require_failure(L, "module '%s' is not declared in the manifest", name);
+    int index = (int)(file - vm->files);
+    lua_rawgetp(L, LUA_REGISTRYINDEX, &module_cache);
+    int cache = lua_gettop(L);
+    if (lua_getfield(L, cache, name) != LUA_TNIL)
+        return 1;
+    lua_pop(L, 1);
+    for (unsigned i = 0; i < vm->depth; ++i) {
+        if (vm->loading[i] != index)
+            continue;
+        char chain[160];
+        size_t n = 0;
+        for (unsigned j = i; j <= vm->depth; ++j) {
+            const BoatPluginImageFile *step = &vm->files[j < vm->depth ? vm->loading[j] : index];
+            n += (size_t)snprintf(chain + n, sizeof(chain) - n, "%s%.*s", j > i ? " -> " : "",
+                (int)step->name_size, step->name);
+            if (n >= sizeof(chain)) {
+                n = sizeof(chain) - 1;
+                break;
+            }
+        }
+        return require_failure(L, "module cycle: %s", chain);
+    }
+    if (vm->depth >= BOAT_PLUGIN_MODULES_MAX)
+        return require_failure(L, "modules are nested too deeply");
+    char path[BOAT_PLUGIN_MODULE_NAME_MAX + 16], chunk[BOAT_PLUGIN_MODULE_NAME_MAX + 20];
+    boat_plugin_module_path(name, path, sizeof(path));
+    text_chunk(chunk, sizeof(chunk), path);
+    int status = luaL_loadbufferx(L, file->data, file->size, chunk, "t");
+    if (status != LUA_OK) {
+        vm->load_status = status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX;
+        return lua_error(L); // The message already names the module path and line.
+    }
+    vm->loading[vm->depth++] = index;
+    lua_call(L, 0, 1);
+    --vm->depth;
+    if (lua_isnil(L, -1)) {
+        lua_pop(L, 1);
+        lua_pushboolean(L, 1);
+    }
+    lua_pushvalue(L, -1);
+    lua_setfield(L, cache, name);
+    return 1;
+}
+
 static int setup(lua_State *L)
 {
     luaL_requiref(L, LUA_GNAME, luaopen_base, 1);
@@ -112,6 +219,14 @@ static int setup(lua_State *L)
     prune(L, -2, TABLE);
     prune(L, -3, STRING); // Also the strings' metatable __index.
     prune(L, -4, GLOBALS);
+    void *context;
+    lua_getallocf(L, &context);
+    if (((Vm *)context)->modules) {
+        lua_newtable(L); // The module cache, reachable only through the registry.
+        lua_rawsetp(L, LUA_REGISTRYINDEX, &module_cache);
+        lua_pushcfunction(L, require_module);
+        lua_setglobal(L, "require");
+    }
     return 0;
 }
 
@@ -1425,15 +1540,23 @@ static int decode(lua_State *L)
     return 0;
 }
 
-// A Lua error message, "CHUNK:LINE: text" when it has a position.
+// A Lua error message, "CHUNK:LINE: text" when it has a position. An error raised inside a package
+// module carries "modules/PATH:LINE:" and names that module as the file instead of the entry.
 static void failure(
     BoatPluginDiagnostic *d, BoatPluginStatus status, const char *chunk, const char *message)
 {
     d->status = status;
     d->line = 0;
     d->field[0] = 0;
-    text(d->file, sizeof(d->file), "%s", chunk);
     size_t n = strlen(chunk);
+    if (message && !strncmp(message, "modules/", 8)) {
+        const char *colon = strchr(message, ':');
+        if (colon && (size_t)(colon - message) < sizeof(d->file)) {
+            chunk = message;
+            n = (size_t)(colon - message);
+        }
+    }
+    text(d->file, sizeof(d->file), "%.*s", (int)n, chunk);
     if (message && !strncmp(message, chunk, n) && message[n] == ':') {
         const char *p = message + n + 1;
         int line = 0;
@@ -1679,10 +1802,44 @@ static int decode_course(lua_State *L)
     return 0;
 }
 
+// Split SOURCE into the entry text and, for an image that declares modules, the modules require
+// serves. Raw entry text has no modules (and no require). A malformed image is a syntax failure.
+static bool open_source(Vm *vm, const char *source, size_t size, const char *chunk,
+    const char **entry, size_t *entry_size)
+{
+    *entry = source;
+    *entry_size = size;
+    vm->modules = false;
+    vm->file_count = 0;
+    if (!boat_plugin_image_is(source, size))
+        return true;
+    if (!boat_plugin_image_unpack(source, size, vm->files, &vm->file_count)) {
+        failure(vm->diagnostic, BOAT_PLUGIN_SYNTAX, chunk, "malformed package source image");
+        return false;
+    }
+    *entry = vm->files[0].data;
+    *entry_size = vm->files[0].size;
+    vm->modules = vm->file_count > 1;
+    return true;
+}
+
+// The status of a failed protected call, given what the VM saw.
+static BoatPluginStatus failed_status(const Vm *vm, int status)
+{
+    return vm->exhausted                    ? BOAT_PLUGIN_BUDGET
+        : vm->load_status != BOAT_PLUGIN_OK ? vm->load_status
+        : status == LUA_ERRMEM              ? BOAT_PLUGIN_MEMORY
+                                            : BOAT_PLUGIN_RUNTIME;
+}
+
 static BoatPluginStatus run(
     lua_State *L, Vm *vm, const char *source, size_t size, const char *chunk)
 {
     BoatPluginDiagnostic *d = vm->diagnostic;
+    const char *entry;
+    size_t entry_size;
+    if (!open_source(vm, source, size, chunk, &entry, &entry_size))
+        return d->status;
     lua_pushcfunction(L, setup);
     if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
         failure(d, BOAT_PLUGIN_MEMORY, chunk, "not enough memory to open the libraries");
@@ -1691,7 +1848,7 @@ static BoatPluginStatus run(
     char name[24];
     text(name, sizeof(name), "=%s", chunk);
     lua_pushcfunction(L, handler);
-    int status = luaL_loadbufferx(L, source, size, name, "t");
+    int status = luaL_loadbufferx(L, entry, entry_size, name, "t");
     if (status != LUA_OK) {
         failure(d, status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX, chunk,
             lua_tostring(L, -1));
@@ -1701,11 +1858,7 @@ static BoatPluginStatus run(
     status = lua_pcall(L, 0, 1, -2);
     lua_sethook(L, NULL, 0, 0);
     if (status != LUA_OK) {
-        failure(d,
-            vm->exhausted              ? BOAT_PLUGIN_BUDGET
-                : status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
-                                       : BOAT_PLUGIN_RUNTIME,
-            chunk, lua_tostring(L, -1));
+        failure(d, failed_status(vm, status), chunk, lua_tostring(L, -1));
         return d->status;
     }
     int result = lua_gettop(L);
@@ -2019,6 +2172,10 @@ BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const ch
     Vm vm = {
         .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
     };
+    const char *entry;
+    size_t entry_size;
+    if (!open_source(&vm, source, size, "main.lua", &entry, &entry_size))
+        return diagnostic->status;
     lua_State *L = lua_newstate(allocate, &vm);
     if (!L) {
         failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
@@ -2029,7 +2186,7 @@ BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const ch
     lua_pushcfunction(L, setup);
     int lua_status = lua_pcall(L, 0, 0, 0);
     if (lua_status == LUA_OK)
-        lua_status = luaL_loadbufferx(L, source, size, "=main.lua", "t");
+        lua_status = luaL_loadbufferx(L, entry, entry_size, "=main.lua", "t");
     if (lua_status != LUA_OK)
         failure(diagnostic, lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX,
             "main.lua", lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
@@ -2038,11 +2195,7 @@ BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const ch
         lua_status = lua_pcall(L, 0, 1, 0);
         lua_sethook(L, NULL, 0, 0);
         if (lua_status != LUA_OK)
-            failure(diagnostic,
-                vm.exhausted                   ? BOAT_PLUGIN_BUDGET
-                    : lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
-                                               : BOAT_PLUGIN_RUNTIME,
-                "main.lua",
+            failure(diagnostic, failed_status(&vm, lua_status), "main.lua",
                 lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
         else {
             lua_setglobal(L, "def");
@@ -2060,11 +2213,7 @@ BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const ch
                 lua_status = lua_pcall(L, 0, 1, 0);
                 lua_sethook(L, NULL, 0, 0);
                 if (lua_status != LUA_OK)
-                    failure(diagnostic,
-                        vm.exhausted                   ? BOAT_PLUGIN_BUDGET
-                            : lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
-                                                       : BOAT_PLUGIN_RUNTIME,
-                        "console",
+                    failure(diagnostic, failed_status(&vm, lua_status), "console",
                         lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
                 else {
                     Render render = { .out = out, .capacity = capacity };
@@ -2092,6 +2241,10 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
     Vm vm = {
         .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
     };
+    const char *entry;
+    size_t entry_size;
+    if (!open_source(&vm, source, size, "main.lua", &entry, &entry_size))
+        return diagnostic->status;
     lua_State *L = lua_newstate(allocate, &vm);
     int status = LUA_ERRMEM;
     uint64_t entry_instructions = 0;
@@ -2101,7 +2254,7 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
         lua_pushcfunction(L, setup);
         status = lua_pcall(L, 0, 0, 0);
         if (status == LUA_OK)
-            status = luaL_loadbufferx(L, source, size, "=main.lua", "t");
+            status = luaL_loadbufferx(L, entry, entry_size, "=main.lua", "t");
         if (status != LUA_OK)
             failure(diagnostic, status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX,
                 "main.lua",
@@ -2124,11 +2277,7 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
             }
             lua_sethook(L, NULL, 0, 0);
             if (status != LUA_OK)
-                failure(diagnostic,
-                    vm.exhausted               ? BOAT_PLUGIN_BUDGET
-                        : status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
-                                               : BOAT_PLUGIN_RUNTIME,
-                    "main.lua",
+                failure(diagnostic, failed_status(&vm, status), "main.lua",
                     lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string Lua error");
         }
         lua_close(L);

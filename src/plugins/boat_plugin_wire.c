@@ -631,6 +631,11 @@ bool boat_plugin_wire_decode(const unsigned char *bytes, size_t size, BoatPlugin
             w.at += decoded->source_size;
         }
     }
+    if (w.ok
+        && boat_plugin_check_source(
+               &decoded->parsed, decoded->source, decoded->source_size, diagnostic)
+            != BOAT_PLUGIN_OK)
+        w.ok = false;
     if (w.ok)
         payload(&w, decoded);
     if (!w.ok || w.at != w.size) {
