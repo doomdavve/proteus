@@ -1,3 +1,4 @@
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_state.h"
 #include "support/boat_test_cases.h"
 
@@ -481,6 +482,64 @@ static int independent_budgets(void)
     return 0;
 }
 
+// Marina M5 W2: every callback transition runs in a fresh VM that reloads the image, so a module's
+// functions are available to init/update/migrate, loaded lazily or at the top, and a failure in a
+// module names it.
+static BoatPluginStatus step_image(BoatPluginObjective *o, const char *entry, const char *module,
+    BoatPluginTransition action, int64_t tick)
+{
+    static char image[BOAT_PLUGIN_SOURCE_MAX];
+    BoatPluginImageFile files[2]
+        = { { "main.lua", 8, entry, strlen(entry) }, { "m", 1, module, strlen(module) } };
+    size_t size;
+    if (!boat_plugin_image_pack(files, 2, image, sizeof(image), &size))
+        return BOAT_PLUGIN_MANIFEST;
+    BoatPluginStatus status
+        = boat_plugin_objective_step(o, image, size, action, tick, NULL, 0, NULL, &diagnostic);
+    if (diagnostic.cost.leaked_bytes) {
+        fprintf(stderr, "leaked Lua bytes: %zu\n", diagnostic.cost.leaked_bytes);
+        return BOAT_PLUGIN_MEMORY;
+    }
+    return status;
+}
+
+static int module_callbacks(void)
+{
+    const char *module = "local m = { calls = 0 }\n"
+                         "function m.inc(n) m.calls = m.calls + 1; return n + 1 end\n"
+                         "function m.fail() error('module failure') end\n"
+                         "return m";
+    const char *entry
+        = "local top = require('m')\n"
+          "return {\n"
+          " init = function(c) return {n=top.inc(0)}, {} end,\n"
+          " update = function(c,s)\n"
+          "  assert(require('m') == top and top.calls == 0, 'fresh module per evaluation')\n"
+          "  if s.n >= 7 then require('m').fail() end\n"
+          "  s.n = top.inc(s.n); return s, {} end,\n"
+          " migrate = function(c,s) s.n = require('m').inc(s.n); return s,{} end }";
+    BoatPluginObjective o = fresh();
+    CHECK(step_image(&o, entry, module, BOAT_PLUGIN_OBJECTIVE_INIT, 0) == BOAT_PLUGIN_OK);
+    CHECK(step_image(&o, entry, module, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12) == BOAT_PLUGIN_OK);
+    CHECK(step_image(&o, entry, module, BOAT_PLUGIN_OBJECTIVE_MIGRATE, 12) == BOAT_PLUGIN_OK);
+    // The call counter restarts in every evaluation: the assert above holds on each step.
+    for (int64_t tick = 24; tick <= 60; tick += 12)
+        CHECK(step_image(&o, entry, module, BOAT_PLUGIN_OBJECTIVE_UPDATE, tick) == BOAT_PLUGIN_OK);
+    CHECK(step_image(&o, entry, module, BOAT_PLUGIN_OBJECTIVE_UPDATE, 72) == BOAT_PLUGIN_RUNTIME);
+    CHECK(!strcmp(diagnostic.file, "modules/m.lua") && diagnostic.line == 3);
+    CHECK(strstr(diagnostic.message, "module failure") && o.quarantined);
+    // A module that spends the callback allowance reports itself.
+    const char *spin = "return { inc = function(n) while true do end end }";
+    const char *spinner = "local m = require('m')\n"
+                          "return { init = function(c) return {}, {} end,\n"
+                          " update = function(c,s) m.inc(1); return s, {} end }";
+    o = fresh();
+    CHECK(step_image(&o, spinner, spin, BOAT_PLUGIN_OBJECTIVE_INIT, 0) == BOAT_PLUGIN_OK);
+    CHECK(step_image(&o, spinner, spin, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12) == BOAT_PLUGIN_BUDGET);
+    CHECK(!strcmp(diagnostic.file, "modules/m.lua") && diagnostic.line == 1);
+    return 0;
+}
+
 // S1c: work.enable records a build intent only under the host's work grant. Its fields are
 // exact, one batch names a site once, and HUD/timer IDs live in separate namespaces.
 static int work_commands(void)
@@ -574,6 +633,7 @@ static const TestCase cases[] = {
     TEST_CASE(work_commands),
     TEST_CASE(supply_commands),
     TEST_CASE(independent_budgets),
+    TEST_CASE(module_callbacks),
     TEST_CASE(schema_timer_retirement),
     TEST_CASE(timer_capabilities),
     TEST_CASE(timers_delivery),

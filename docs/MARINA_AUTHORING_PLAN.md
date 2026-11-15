@@ -5,10 +5,10 @@ resident/visitor services are complete and merged (M4: #209; contract in the
 [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). M5 (package-local modules and an
 integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
 D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
-W1 (manifest `modules`, source image, module IO, wider diagnostic file) is done; evaluators still
-refuse an image until W2. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+W1 (manifest `modules`, source image, module IO, wider diagnostic file) and W2 (`require` in the VM)
+are done; carriers are unchanged until W3. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
 loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: M5-W2 (`require` in the VM).
+Done when all five marina milestones are closed. Next task: M5-W3 (carriers).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -909,6 +909,30 @@ directory, symlinked file, symlinked and non-directory `modules` or intermediate
 file, oversize total, exact budget, undeclared files ignored, entry mimicking the magic) pass. Not
 verified: the Windows read branch, Wasm/browser (bundle format is W4), and any carrier that stores an
 image (W3).
+
+### M5 W2 result
+
+Implemented 2026-11-15: the Lua evaluators (voyage, free, course, race, match, query and the
+transition/objective runner, so callbacks too) accept raw entry text unchanged or an image. An
+image is unpacked and validated (malformed is `BOAT_PLUGIN_SYNTAX`, "malformed package source
+image"); `require` is installed only when it carries modules, as a native function closing over
+the caller's image bytes with a registry-held cache and a loading stack in the per-VM state.
+Semantics: valid declared name only, chunk name `modules/<path>.lua`, same globals as the entry, a
+nil/no result caches `true`, cycles fail as `module cycle: a -> b -> a`, nesting at most 8. Failures
+in a module name its file and line (`failure()` takes `modules/...:LINE:` from the message; a
+module syntax error stays `BOAT_PLUGIN_SYNTAX`). The instruction-budget error is now raised without
+`luaL_error`'s caller prefix, which had named the calling function's line for budget exhaustion
+inside a called function. Limits: an `error(msg, 0)` in a module has no position and reports the
+entry's file.
+
+Verified on macOS Debug: `boat_plugin.require_modules` (nested, cached identity, shared and unused
+modules, nil/non-table results, no `package`, two evaluations isolated, cycles, missing, 13
+invalid names, syntax and runtime errors in modules with file and line), `require_budgets`
+(top-level and later-called spin, budget summed across modules, heap), `require_scene` (a scene
+from a module equals the inline scene), the malformed-image rejection `image_refused`, and
+`boat_plugin_state.module_callbacks` (callbacks reload modules; errors and budget name the module).
+Not verified: carriers storing an image (W3), the browser/Wasm VM, and any shipped plugin using
+modules (W5).
 
 ## Verification and handoff
 

@@ -49,7 +49,7 @@ rejected. Strings are non-empty printable ASCII.
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
 | `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c), and one with [marks](#marks-p5a) requests `["free.define", "objective.hud"]` (optionally with `"scene.define"` between them). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
-| `modules` (M5 W1, optional) | Up to 8 package-local module names, none by default. A name is 1-3 dot-separated segments of `[a-z][a-z0-9_]*`, at most 32 bytes; `a` is the file `modules/a.lua` and `a.b` is `modules/a/b.lua`. Names are unique and never `main`. `boat_plugin_read` packs the entry and modules into one source image sharing the 64 KiB source limit; `require` over it is not available yet (W2) and evaluators refuse an image. |
+| `modules` (M5 W1, optional) | Up to 8 package-local module names, none by default. A name is 1-3 dot-separated segments of `[a-z][a-z0-9_]*`, at most 32 bytes; `a` is the file `modules/a.lua` and `a.b` is `modules/a/b.lua`. Names are unique and never `main`. `boat_plugin_read` packs the entry and modules into one source image sharing the 64 KiB source limit; the evaluators accept an image and give it `require` ([below](#require-m5-w2)). |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
 package's.
@@ -465,13 +465,31 @@ are copied into native storage.
 The environment keeps these globals, and everything else is removed:
 
 - Base: `assert error ipairs next pairs rawequal rawget rawlen select tonumber tostring type
-  _G _VERSION`. There is no `load`, `loadfile`, `dofile`, `require`, `print`, `pcall`,
+  _G _VERSION`. There is no `load`, `loadfile`, `dofile`, `print`, `pcall`,
   `xpcall`, `setmetatable`, `getmetatable`, `rawset`, `collectgarbage` or `warn`.
 - `string`: `byte char format len lower rep reverse sub upper`. Method calls such as `s:sub(1)`
   work. There are no patterns (`find match gmatch gsub`), whose backtracking the instruction
   hook cannot bound, and no `dump`.
 - `table`: `concat insert pack remove sort unpack`. There is no `move`, whose loop runs in C
   outside the hook.
+- `require` exists only for a package that declares modules (next section); otherwise it is
+  absent like the rest.
+
+### require (M5 W2)
+
+For a source image, `require(name)` is a native function over the image's declared modules and
+nothing else: it opens no file and there is no `package` table. The name must be a string in the
+module grammar (else `module name "x" is invalid`) and declared in the manifest (else `module 'x'
+is not declared in the manifest`; the entry is not a module). The first call compiles
+`modules/<path>.lua` under that chunk name, runs it once in the same globals as the entry, and
+caches its single result in a table Lua code cannot reach; later calls, from any module or
+callback, return the same value (the same table identity). A module that returns nothing or `nil`
+yields `true`. A cycle fails as `module cycle: a -> b -> a`; nesting is bounded by the declared
+count (at most 8). The cache, like the Lua state, belongs to one evaluation, so evaluations and
+callback transitions never share module tables. Instructions and heap are the evaluation's, summed
+across entry and modules, and a module's functions called later spend the same budgets. An error
+or syntax error raised in a module reports `modules/<path>.lua` and its line as the diagnostic's
+file and line. A raw entry (no modules) has no `require`. The full authoring contract lands with W7.
 - `math`: every function except `random` and `randomseed`.
 - `io`, `os`, `debug`, `package`, `coroutine` and `utf8` do not exist.
 

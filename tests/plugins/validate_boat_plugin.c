@@ -2146,7 +2146,7 @@ static int plugin_image(void)
     return 0;
 }
 
-// An evaluator handed an image (a package with modules) refuses it by name in W1.
+// A malformed image is a syntax failure naming the entry; it never reaches the Lua compiler.
 static int image_refused(void)
 {
     static const char ENTRY[] = "return {}";
@@ -2154,12 +2154,204 @@ static int image_refused(void)
     char image[128];
     size_t size;
     CHECK(boat_plugin_image_pack(&file, 1, image, sizeof(image), &size));
-    BoatPluginBundle bundle = { MANIFEST, strlen(MANIFEST), image, size };
     BoatPluginVoyage voyage;
     BoatPluginDiagnostic d;
-    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_SYNTAX);
-    CHECK(!strcmp(d.file, "main.lua") && strstr(d.message, "source image"));
+    for (size_t cut = 1; cut < size; cut += 3) {
+        BoatPluginBundle bundle = { MANIFEST, strlen(MANIFEST), image, cut };
+        if (cut < 5)
+            continue; // Shorter than the magic: raw text, which Lua rejects as a syntax error too.
+        CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_SYNTAX);
+        CHECK(!strcmp(d.file, "main.lua") && strstr(d.message, "malformed"));
+        CHECK(d.cost.leaked_bytes == 0);
+    }
+    return 0;
+}
+
+// Marina M5 W2: require serves the image's declared modules, and nothing else.
+typedef struct {
+    const char *name, *text;
+} TestModule;
+
+// Load the reference voyage with PREFIX (Lua statements on the entry's first line) in front of
+// its return, packed with MODULES as a source image.
+static BoatPluginStatus load_modules(const char *prefix, const TestModule *modules, unsigned count,
+    const BoatPluginLimits *limits, BoatPluginVoyage *out, BoatPluginDiagnostic *d)
+{
+    static char image[BOAT_PLUGIN_SOURCE_MAX];
+    char head[256];
+    snprintf(head, sizeof(head), "%sreturn {", prefix);
+    const char *entry = variant("return {", head);
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1]
+        = { { "main.lua", 8, entry, strlen(entry) } };
+    for (unsigned i = 0; i < count; ++i)
+        files[1 + i] = (BoatPluginImageFile) { modules[i].name, strlen(modules[i].name),
+            modules[i].text, strlen(modules[i].text) };
+    size_t size;
+    if (!boat_plugin_image_pack(files, count + 1, image, sizeof(image), &size))
+        return BOAT_PLUGIN_MANIFEST;
+    return load(MANIFEST, image, size, limits, out, d);
+}
+
+static int modules_expect(const char *label, const char *prefix, const TestModule *modules,
+    unsigned count, BoatPluginStatus status, const char *file, int line, const char *message)
+{
+    BoatPluginVoyage out;
+    BoatPluginDiagnostic d;
+    BoatPluginStatus got = load_modules(prefix, modules, count, NULL, &out, &d);
+    show(label, &d);
+    CHECK(got == status && d.status == status);
+    CHECK(!file || !strcmp(d.file, file));
+    CHECK(line < 0 || d.line == line);
+    CHECK(!message || strstr(d.message, message));
     CHECK(d.cost.leaked_bytes == 0);
+    return 0;
+}
+
+static int require_modules(void)
+{
+    // Nested, cached and shared: one table per module within an evaluation.
+    const TestModule chain[] = {
+        { "c", "return { n = 0 }" },
+        { "b", "local c = require('c'); c.n = c.n + 1; return { c = c }" },
+        { "a",
+            "local b, c = require('b'), require('c'); assert(b.c == c and c.n == 1)\n"
+            "return { b = b }" },
+        { "m.x", "return function() return 7 end" },
+    };
+    CHECK(!modules_expect("chain",
+        "local a, b, c = require('a'), require('b'), require('c'); "
+        "assert(a.b == b and b.c == c and require('c') == c and c.n == 1 and "
+        "require('m.x')() == 7); ",
+        chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // A module that returns nothing or nil is cached as true; any other value is returned as is.
+    const TestModule kinds[] = { { "none", "local x = 1" }, { "nope", "return nil" },
+        { "str", "return 'text'" }, { "num", "return 4.5" }, { "flag", "return false" } };
+    CHECK(!modules_expect("kinds",
+        "assert(require('none') == true and require('nope') == true and require('str') == 'text' "
+        "and require('num') == 4.5 and require('flag') == false); ",
+        kinds, 5, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // Declared but never required, and an image that carries no modules at all.
+    CHECK(!modules_expect("unused", "", chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    CHECK(!modules_expect(
+        "no modules", "assert(require == nil); ", NULL, 0, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    CHECK(
+        !modules_expect("no package", "assert(package == nil and load == nil and dofile == nil); ",
+            chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // Raw entry text still has no require.
+    BoatPluginVoyage voyage;
+    BoatPluginDiagnostic d;
+    CHECK(load_source(variant("return {", "assert(require == nil) return {"), &voyage, &d)
+        == BOAT_PLUGIN_OK);
+
+    // Two evaluations of the same image share nothing.
+    const TestModule state[] = { { "t", "return { x = nil }" } };
+    for (int run = 0; run < 2; ++run)
+        CHECK(!modules_expect("isolated",
+            "local t = require('t'); assert(t.x == nil and require('t') == t); t.x = 1; ", state, 1,
+            BOAT_PLUGIN_OK, NULL, -1, NULL));
+
+    // Cycles, including a module that requires itself.
+    const TestModule cycle[] = { { "a", "require('b')" }, { "b", "require('a')" } };
+    CHECK(!modules_expect("cycle", "require('a'); ", cycle, 2, BOAT_PLUGIN_RUNTIME, "modules/b.lua",
+        1, "module cycle: a -> b -> a"));
+    const TestModule self[] = { { "a", "\nrequire('a')" } };
+    CHECK(!modules_expect("self", "require('a'); ", self, 1, BOAT_PLUGIN_RUNTIME, "modules/a.lua",
+        2, "module cycle: a -> a"));
+
+    // Undeclared names, including the entry's own file name, and invalid names.
+    CHECK(!modules_expect("missing", "require('zzz'); ", chain, 4, BOAT_PLUGIN_RUNTIME, "main.lua",
+        -1, "module 'zzz' is not declared in the manifest"));
+    CHECK(!modules_expect("entry name", "require('main.lua'); ", chain, 4, BOAT_PLUGIN_RUNTIME,
+        "main.lua", -1, "not declared"));
+    static const char *const invalid[] = { "'../a'", "'A'", "'/etc/passwd'", "''", "'a..b'",
+        "'a.b.c.d'", "'a/b'", "'a\\0b'", "'modules/a.lua'", "5", "nil", "{}", "'a.b.c.d.e'" };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        char prefix[64];
+        snprintf(prefix, sizeof(prefix), "require(%s); ", invalid[i]);
+        CHECK(!modules_expect(
+            invalid[i], prefix, chain, 4, BOAT_PLUGIN_RUNTIME, "main.lua", -1, "is invalid"));
+    }
+
+    // Errors name the module and its line.
+    const TestModule syntax[] = { { "a", "local a = 1\nreturn )" } };
+    CHECK(!modules_expect(
+        "syntax", "require('a'); ", syntax, 1, BOAT_PLUGIN_SYNTAX, "modules/a.lua", 2, NULL));
+    const TestModule nested_syntax[] = { { "m.b", "x = = 1" }, { "m", "return require('m.b')" } };
+    CHECK(!modules_expect("nested syntax", "require('m'); ", nested_syntax, 2, BOAT_PLUGIN_SYNTAX,
+        "modules/m/b.lua", 1, NULL));
+    const TestModule fails[] = { { "a", "local x = nil\n\nreturn x.y" } };
+    CHECK(!modules_expect(
+        "runtime", "require('a'); ", fails, 1, BOAT_PLUGIN_RUNTIME, "modules/a.lua", 3, NULL));
+    const TestModule later[] = { { "a", "return function()\n  error('late')\nend" } };
+    CHECK(!modules_expect("late error", "require('a')(); ", later, 1, BOAT_PLUGIN_RUNTIME,
+        "modules/a.lua", 2, "late"));
+    return 0;
+}
+
+// Instructions and heap are per evaluation, so they add up across modules and apply to module
+// functions the entry calls later.
+static int require_budgets(void)
+{
+    const TestModule spin[] = { { "a", "while true do end" } };
+    CHECK(!modules_expect("top-level spin", "require('a'); ", spin, 1, BOAT_PLUGIN_BUDGET,
+        "modules/a.lua", 1, "budget"));
+    const TestModule later[] = { { "a", "return function()\n  while true do end\nend" } };
+    CHECK(!modules_expect("function spin", "require('a')(); ", later, 1, BOAT_PLUGIN_BUDGET,
+        "modules/a.lua", 2, "budget"));
+    // Each module alone is within budget; together they are not.
+    const TestModule half[] = {
+        { "a", "local n = 0; for i = 1, 300000 do n = n + i end" },
+        { "b", "local n = 0; for i = 1, 300000 do n = n + i end" },
+    };
+    CHECK(!modules_expect("one half", "require('a'); ", half, 2, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    CHECK(!modules_expect("both halves", "require('a'); require('b'); ", half, 2,
+        BOAT_PLUGIN_BUDGET, "modules/b.lua", 1, "budget"));
+    // Heap: allocating in a module counts against the same limit as the entry.
+    const TestModule heap[] = { { "a", "local t = {}; for i = 1, 400000 do t[i] = i end" } };
+    BoatPluginVoyage out;
+    BoatPluginDiagnostic d;
+    CHECK(load_modules("require('a'); ", heap, 1, NULL, &out, &d) == BOAT_PLUGIN_MEMORY);
+    CHECK(d.cost.leaked_bytes == 0 && d.cost.peak_bytes <= boat_plugin_default_limits.memory_bytes);
+    BoatPluginLimits tight = boat_plugin_default_limits;
+    tight.memory_bytes = 64 * 1024;
+    const TestModule small[] = { { "a", "return string.rep('x', 70000)" } };
+    CHECK(load_modules("require('a'); ", small, 1, &tight, &out, &d) == BOAT_PLUGIN_MEMORY);
+    CHECK(d.cost.leaked_bytes == 0);
+    return 0;
+}
+
+// A scene defined in a module decodes to the same data as the same scene written inline.
+static int require_scene(void)
+{
+    static const char scene_manifest[]
+        = "{\"id\": \"test.voyage\", \"name\": \"Test\", "
+          "\"api\": 1, \"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
+          "\"outer\", \"capabilities\": [\"voyage.define\", \"scene.define\"], "
+          "\"state_version\": 1}";
+    static const char SCENE[]
+        = "{ version = 3, marina = { entrance = { x = 0, z = 170, width = 10 },\n"
+          "  berths = { { id = 'slip', recipe = 'runabout', mooring = 'none', x = 12, z = 195,\n"
+          "    heading = 1.5707963267948966, empty = true } } } }";
+    char inline_entry[2048], module_text[2048];
+    snprintf(inline_entry, sizeof(inline_entry), "return { scene = %s,", SCENE);
+    snprintf(module_text, sizeof(module_text), "return %s", SCENE);
+    const char *inline_source = variant("return {", inline_entry);
+    BoatPluginVoyage inline_voyage, module_voyage;
+    BoatPluginDiagnostic d;
+    CHECK(load(scene_manifest, inline_source, strlen(inline_source), NULL, &inline_voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(inline_voyage.has_scene && boat_scene_has_content(&inline_voyage.scene));
+    const char *entry = variant("return {",
+        "local scene = require('scene.eriksberg'); return { "
+        "scene = scene,");
+    BoatPluginImageFile files[2] = { { "main.lua", 8, entry, strlen(entry) },
+        { "scene.eriksberg", 15, module_text, strlen(module_text) } };
+    static char image[BOAT_PLUGIN_SOURCE_MAX];
+    size_t size;
+    CHECK(boat_plugin_image_pack(files, 2, image, sizeof(image), &size));
+    CHECK(load(scene_manifest, image, size, NULL, &module_voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(module_voyage.has_scene && module_voyage.scene_digest == inline_voyage.scene_digest);
+    CHECK(!same_route(&module_voyage.route, &inline_voyage.route));
     return 0;
 }
 
@@ -2889,6 +3081,9 @@ static const TestCase cases[] = {
     TEST_CASE(manifest_modules),
     TEST_CASE(plugin_image),
     TEST_CASE(image_refused),
+    TEST_CASE(require_modules),
+    TEST_CASE(require_budgets),
+    TEST_CASE(require_scene),
     TEST_CASE(navigable_water),
     TEST_CASE(tours),
     TEST_CASE(work_sites),
