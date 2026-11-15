@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "checkpoint": "Reviewed R2b design and synthetic scalar algebra audit; no wake candidate implemented",
+  "base_revision": "47337abb9e9dd682d203f70d9b814bc6fe322749",
+  "audit_command": [
+    "python3",
+    "tools/wake_divergence_design.py",
+    "--output",
+    "build-release/wake-r2b/algebra-retained"
+  ],
+  "build_command": [
+    "cmake",
+    "--build",
+    "build",
+    "-j",
+    "8"
+  ],
+  "ctest_command": [
+    "caffeinate",
+    "-diu",
+    "ctest",
+    "--preset",
+    "full"
+  ],
+  "sources": {
+    "tools/wake_divergence_design.py": "e6d9e70766459786f75d3cc370d02813287f63dfff1a58df71ceaa79e19d6127",
+    "docs/WAKE_R2B_DESIGN.md": "14b2718847efcd497a09cc1aef5892008806196752cc368fa2b12dbf72dc47cf",
+    "docs/WAKE_RESEARCH_PLAN.md": "9be2c550bdaa347b3f667cb479d10698aec4644d27a5c522bd497f16a87a8e56",
+    "docs/README.md": "23dca055cd4124cef534b132a580753e2bbf26b980bfbd5ce619b917fc23becb",
+    "docs/TESTING.md": "0236932495f51885b09a667f564e9f9c8a14cc3059eb19bef45b541331e85fc0",
+    "docs/evidence/wakes/r2b/README.md": "b8081c0114a673e7cc7b7374fab11290949613924b0465c90179ac957b1abe03"
+  },
+  "artifacts": {
+    "docs/evidence/wakes/r2b/algebra.json": {
+      "path": "/private/tmp/proteus-wake-research/docs/evidence/wakes/r2b/algebra.json",
+      "sha256": "fa2fcb71ee241176d062f6cb813f13a26d70051318022d3f159de08a24d0c62b",
+      "bytes": 1813
+    },
+    "docs/evidence/wakes/r2b/maps.csv": {
+      "path": "/private/tmp/proteus-wake-research/docs/evidence/wakes/r2b/maps.csv",
+      "sha256": "4e628d2b24a3663b43266b2a290b3606797273e0bf5a99403527e2060732753c",
+      "bytes": 3728
+    },
+    "docs/evidence/wakes/r2b/transport.csv": {
+      "path": "/private/tmp/proteus-wake-research/docs/evidence/wakes/r2b/transport.csv",
+      "sha256": "c1ab01538b4ca57b560a4c3f19a871119d2fb4deea27fbcb221c69d312079221",
+      "bytes": 8821
+    },
+    "docs/evidence/wakes/r2b/folds.csv": {
+      "path": "/private/tmp/proteus-wake-research/docs/evidence/wakes/r2b/folds.csv",
+      "sha256": "af912a2296fe7601432d0645c4858eb29c23b173b8e0f6d7564a10445e4e9fd6",
+      "bytes": 603
+    },
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/build.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/build.log",
+      "sha256": "061c41ca5802e63417bf325c011325482354aaf9d3522ad2e15501a9675ca7db",
+      "bytes": 5855
+    },
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/ctest.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/ctest.log",
+      "sha256": "b878ab732372579f0e7d1ce8edd3e8649eaec1b3abbdbf1d139dfe1c9dd6d820",
+      "bytes": 91140
+    },
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/algebra-retained.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/algebra-retained.log",
+      "sha256": "fa2fcb71ee241176d062f6cb813f13a26d70051318022d3f159de08a24d0c62b",
+      "bytes": 1813
+    }
+  },
+  "verification": {
+    "algebra": "passed; Python double synthetic reference, no production parity claim",
+    "ctest_passed": 618,
+    "gpu_labelled": 36,
+    "ctest_seconds": 101.89,
+    "build": "Debug full build passed without project warnings",
+    "audiovisual": "unchanged; no new demo or acceptance claim"
+  },
+  "review": "Astra reviewed derivations, audit code/report/hashes and equal-circle-chord curvature identity; no blocker after propagation-direction and hard-gate qualifications",
+  "next": "Private immutable descriptor/capture ledger and one p=1 baseline-cadence CPU experiment; no C joins or production integration selected",
+  "unavailable": [
+    "production equivalence except the analytic K=0 identity",
+    "coverage/encounters",
+    "CPU/GPU/frame performance",
+    "production metadata sizes and network/shader integration",
+    "capture/reset/restore/expiry/slot-reuse lifecycle implementation",
+    "production float quantization and metadata allocation"
+  ]
+}

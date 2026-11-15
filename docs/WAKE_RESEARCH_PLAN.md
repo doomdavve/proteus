@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: R0 reviewed; R1 verified; R2a completed as a rejection checkpoint.
-Current step: no geometry selected; retain baseline and R2a evidence.
+Status, 2026-11-15: R2a rejected; R2b historical transport design reviewed.
+Current step: retain baseline; one private outward-dilation experiment proposed.
 Open: HDR tails/variation, human review, browser/slower-GPU and unavailable counters.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: R2b historical weighting/divergence design review; no joins/integration/promotion selected.
+Next: private descriptor/capture ledger and p=1 CPU screen; no production geometry selected.
 
 ## Scope and existing work
 
@@ -150,7 +150,9 @@ including CPU pose/query work and server cost if physical sources are authoritat
 
 ## R2 — Turning geometry experiments
 
-**Status:** R2a CPU-only screen complete; all alternatives rejected.
+**Status:** R2a CPU-only screen complete; all alternatives rejected. R2b design reviewed;
+[the transport proposal](WAKE_R2B_DESIGN.md) and [algebra evidence](evidence/wakes/r2b/README.md)
+define the next private experiment. No new evaluator is implemented.
 [R2a evidence](evidence/wakes/r2/README.md) owns candidate definitions, numerical results,
 matched diagnostic motion, CPU costs, raw artifact locations and limitations.
 No production geometry or shader change is selected. GPU/gameplay adaptation is conditional on
@@ -454,3 +456,39 @@ or coupling unrelated fronts? Derive this for a pair of historical spans before 
 This is not C authorization or permission to spend additional performance/memory/network budget.
 The ±6 m inner-corridor ambiguity, finite grid/color clipping, R0/R1 HDR tails, human review
 and wider platform/authority-counter gaps remain explicit limits.
+
+### R2b historical weighting/divergence design — 2026-11-15
+
+Completed the requested design investigation with Astra's pre-design and final review.
+[The proposal](WAKE_R2B_DESIGN.md) derives the true curved normal-ray fold, including
+emission-age tilt, and a narrower globally invertible Cartesian outward dilation. Preserve
+each original finite source and its endpoints/phase/gates; do not normalize neighboring weights.
+Freeze predecessor-derived divergence in the successor only, retaining startup asymmetry.
+No existing record can acquire future geometry without abandoning historical immutability.
+
+Supervisor decision: retain one proposed private signed-density (`p=1`) experiment, baseline
+cadence/lifetime/strength, provisional epsilon .25 and a declared hard turn-domain gate. This
+transports the original integrated contribution and deliberately attenuates widened outer
+fronts. The normal coordinate stays in the historical frame, but shear changes physical crest
+orientation and adds tangential drift. Inner-side identity is per-record, not a bound on arbitrary
+summed-field focus. Exact derivatives, support growth, metadata/restore constraints and
+baseline-relative rejection gates are documented. No C join or production implementation is selected.
+
+Algebra evidence uses synthetic signed reference functions, not the production wave profile:
+3,780 scalar cases, 420 Cartesian and 216 phase-map parameter configurations; exact sampled
+collinear/inner identity and signed cancellation; determinant discrepancy 2.42e-10 and phase
+chain discrepancy 6.35e-10. Three-step scalar FD residuals decrease to 9.14e-6; fine moment
+quadrature residual is 6.54e-7. The regional counterexample raises a baseline bound of 1.2
+to 1.21569 even though individual inner-side fields are unchanged. Capture/lifecycle behavior
+and actual geometry benefits/costs remain untested. Astra reviewed the code/report and confirmed
+the equation/invariant reasoning after correcting the initial propagation-normal wording.
+
+Debug build is project-warning-clean; the full CTest preset passed **618/618**, including
+36 GPU-labelled cases, in 101.89 s. Those tests cover unchanged production; no candidate GPU,
+frame-cost or gameplay acceptance is inferred. No audiovisual behavior changed.
+
+Next: define a private immutable descriptor/capture ledger, then test only the proposed
+`p=1` transform against straight endpoints, source-off coverage, full-domain concentration,
+near-threshold captures, frozen history, signed crossings and existing resource screens.
+Metadata/quantization, shader/compatibility/authority costs, R0/R1 HDR tails, human and wider
+platform review remain open. R3 waits for a selected geometry. Nothing is pushed or promoted.

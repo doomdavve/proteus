@@ -1537,3 +1537,19 @@ mkdir -p build-release/wake-r2/angular-frames
 derivatives at capsule/angular and central envelope seams, signed nonadjacent same-emitter
 fronts and immutable historical records through later source motion/gaps/restart. It does not
 assert a performance threshold or excuse a candidate's field-screen failure.
+
+## Wake divergence design audits (R2b)
+
+[The R2b proposal](WAKE_R2B_DESIGN.md) is supported by a standalone, standard-library Python
+algebra audit. It is not a wake evaluator, source/capture implementation, benchmark or CTest.
+
+```sh
+python3 tools/wake_divergence_design.py --output build-release/wake-r2b/algebra-new
+```
+
+Use a fresh output directory. `report.json`, `maps.csv`, `transport.csv` and `folds.csv` retain
+synthetic scalar identity/derivative, map/determinant, independent-grid moment and curved-focus
+audits with script checksums. The report includes a synthetic regional concentration
+counterexample. It takes time as a mathematical input and has no wall-clock pass condition.
+The signed synthetic profile is not the production crest/trough; no gameplay, C-float/GPU
+parity, capture/reset/restore or performance qualification is implied.
