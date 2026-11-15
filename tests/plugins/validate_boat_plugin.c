@@ -386,9 +386,9 @@ static int scene_traffic(void)
         CHECK(!strcmp(d.field, cases[i].field));
     }
     // A non-retained authored copy of the compiled river actor is a real schedule conflict.
-    const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
+    const char *conflict
+        = harbor_variant("route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+            "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
@@ -806,22 +806,88 @@ static int open_leg_wire(void)
 
 // M3 prerequisite: free packages with a marina or traffic scene run the same structural map,
 // berth, module and traffic checks as voyages, but keep the voyage-only shelter rules.
+// The free_scene_location cases share one fixture: the harbor-life package, its voyage, a free
+// copy of that package and the outer map. Each case runs in its own process, so each builds it.
+static int free_location_open(BoatPluginFiles *files, BoatPluginVoyage *voyage,
+    BoatPluginFree *free_package, BoatWorldResources *world, const BoatWorldDefinition **outer)
+{
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(files));
+    BoatPluginBundle bundle = boat_plugin_bundle(files);
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, voyage, &d) == BOAT_PLUGIN_OK);
+    *outer = boat_location_find("outer");
+    CHECK(boat_world_resources_init(world, *outer));
+    *free_package = (BoatPluginFree) {
+        .manifest = voyage->manifest, .has_scene = true, .scene = voyage->scene
+    };
+    strcpy(free_package->manifest.kind, "free");
+    return 0;
+}
+
+// An open two-piece path on open water that crosses no compiled traffic.
+static WaterfrontRouteDefinition internal_open_path(void)
+{
+    WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
+    WaterfrontRouteActor *path = &internal_path.actors[0];
+    strcpy(path->id, "internal_open_path");
+    path->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    path->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    path->retain = 0xff;
+    path->period = 5;
+    path->open_path.count = 2;
+    BoatRouteLeg line = { .start_x = 0,
+        .start_z = -100,
+        .end_x = 0,
+        .end_z = -110,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
+    path->open_path.pieces[0].shape.line = line;
+    path->open_path.pieces[0].dwell_ticks = 120;
+    line.start_z = -110;
+    line.end_z = -120;
+    path->open_path.pieces[1].shape.line = line;
+    return internal_path;
+}
+
+// BASE's path turned into a two-arc loop.
+static WaterfrontRouteDefinition loop_open_path(const WaterfrontRouteDefinition *base)
+{
+    WaterfrontRouteDefinition loop_path = *base;
+    WaterfrontRouteActor *loop_actor = &loop_path.actors[0];
+    loop_actor->period = 10;
+    loop_actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    BoatRouteArc loop_arc = { .centre_x = 0,
+        .centre_z = -110,
+        .radius = 4,
+        .start_angle = 0,
+        .sweep = BOAT_TWO_PI * .5,
+        .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 5,
+        .max_acceleration = 10 };
+    loop_actor->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[0].shape.arc = loop_arc;
+    loop_arc.start_angle = BOAT_TWO_PI * .5;
+    loop_actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[1].shape.arc = loop_arc;
+    return loop_path;
+}
+
+// Valid scenes, and the internal-only open shapes against the static survey.
 static int free_scene_location(void)
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
-    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
-    CHECK(boat_test_flatten_package(&files));
-    BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
-    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    BoatPluginFree free;
     BoatWorldResources world;
-    const BoatWorldDefinition *outer = boat_location_find("outer");
-    CHECK(boat_world_resources_init(&world, outer));
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
 
     // The valid authored scene passes unchanged for both a voyage and a free package.
-    BoatPluginFree free = { .manifest = voyage.manifest, .has_scene = true, .scene = voyage.scene };
-    strcpy(free.manifest.kind, "free");
     CHECK(boat_plugin_check_location(&voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
@@ -859,27 +925,7 @@ static int free_scene_location(void)
         boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
 
-    WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
-    WaterfrontRouteActor *path = &internal_path.actors[0];
-    strcpy(path->id, "internal_open_path");
-    path->shape = WATERFRONT_ROUTE_OPEN_PATH;
-    path->recipe = WATERFRONT_CRAFT_RUNABOUT;
-    path->retain = 0xff;
-    path->period = 5;
-    path->open_path.count = 2;
-    BoatRouteLeg line = { .start_x = 0,
-        .start_z = -100,
-        .end_x = 0,
-        .end_z = -110,
-        .duration_ticks = 240,
-        .tick_seconds = BOAT_TICK_SECONDS,
-        .max_speed = 20,
-        .max_acceleration = 100 };
-    path->open_path.pieces[0].shape.line = line;
-    path->open_path.pieces[0].dwell_ticks = 120;
-    line.start_z = -110;
-    line.end_z = -120;
-    path->open_path.pieces[1].shape.line = line;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
     CHECK(waterfront_route_validate(&internal_path, &route));
     internal_free.scene.traffic = internal_path;
     internal_voyage.scene.traffic = internal_path;
@@ -887,32 +933,29 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
-    WaterfrontRouteDefinition loop_path = internal_path;
-    WaterfrontRouteActor *loop_actor = &loop_path.actors[0];
-    loop_actor->period = 10;
-    loop_actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
-    BoatRouteArc loop_arc = { .centre_x = 0,
-        .centre_z = -110,
-        .radius = 4,
-        .start_angle = 0,
-        .sweep = BOAT_TWO_PI * .5,
-        .duration_ticks = 600,
-        .tick_seconds = BOAT_TICK_SECONDS,
-        .max_speed = 5,
-        .max_acceleration = 10 };
-    loop_actor->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
-    loop_actor->open_path.pieces[0].shape.arc = loop_arc;
-    loop_arc.start_angle = BOAT_TWO_PI * .5;
-    loop_actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
-    loop_actor->open_path.pieces[1].shape.arc = loop_arc;
+    WaterfrontRouteDefinition loop_path = loop_open_path(&internal_path);
     internal_free.scene.traffic = loop_path;
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// FREE with two crossing timetables over one corridor: a looping visitor and a four-point
+// service. The caller's timetable and phase variations start from this state.
+static int crossing_package(const BoatPluginFree *free_package, BoatPluginFree *out)
+{
+    WaterfrontRouteDiagnostic route;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
+    CHECK(waterfront_route_validate(&internal_path, &route));
+    BoatPluginFree internal_free = *free_package;
+    internal_free.scene.traffic = loop_open_path(&internal_path);
 
     // Same intersecting corridors, different timetables: the native POINTS repeat
     // is exact at 120 Hz, unlike the legacy angular/distance-wrap evaluators.
-    BoatPluginFree crossing = internal_free;
-    crossing.scene.traffic.actor_count = 2;
-    WaterfrontRouteActor *visitor = &crossing.scene.traffic.actors[0];
+    BoatPluginFree *crossing = out;
+    *crossing = internal_free;
+    crossing->scene.traffic.actor_count = 2;
+    WaterfrontRouteActor *visitor = &crossing->scene.traffic.actors[0];
     visitor->period = 20;
     for (unsigned i = 0; i < 2; ++i) {
         visitor->open_path.pieces[i].shape.arc.centre_x = -50;
@@ -921,7 +964,7 @@ static int free_scene_location(void)
         visitor->open_path.pieces[i].shape.arc.max_speed = 10;
         visitor->open_path.pieces[i].shape.arc.duration_ticks = 1200;
     }
-    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
+    WaterfrontRouteActor *service = &crossing->scene.traffic.actors[1];
     *service = (WaterfrontRouteActor) { .shape = WATERFRONT_ROUTE_POINTS,
         .recipe = WATERFRONT_CRAFT_RUNABOUT,
         .retain = 0xff,
@@ -929,8 +972,25 @@ static int free_scene_location(void)
         .point_count = 4,
         .points = { { 40, -160, 3 }, { 40, -140, 3 }, { 60, -140, 3 }, { 60, -160, 3 } } };
     strcpy(service->id, "crossing_service");
-    CHECK(waterfront_route_validate(&crossing.scene.traffic, &route));
+    CHECK(waterfront_route_validate(&crossing->scene.traffic, &route));
     service->phase = 10;
+    return 0;
+}
+
+// Loop timetables that must repeat exactly: equivalent phases pass, others are named.
+static int free_location_crossings(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteActor *visitor = &crossing.scene.traffic.actors[0];
+    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     // Equivalent phases put the legacy period wrap on the opposite side of
     // the origin while the authored loop also closes at the final sample.
@@ -947,6 +1007,24 @@ static int free_scene_location(void)
     service->period = 20.001;
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "unsupported exact-tick"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// The traffic work budget, speed bounds and the legacy angular wrap.
+static int free_location_speed_bounds(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteDiagnostic route;
+    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
     service->period = 20 + BOAT_TICK_SECONDS;
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "work budget"));
@@ -982,6 +1060,23 @@ static int free_scene_location(void)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "unsupported exact-tick"));
 
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// A finite crossing: the moving segment and the terminal pose against the service corridor.
+static int free_location_finite_crossing(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteDiagnostic route;
     BoatPluginFree finite_crossing = crossing;
     WaterfrontRouteActor *finite_service = &finite_crossing.scene.traffic.actors[1];
     for (unsigned i = 0; i < 4; ++i) {
@@ -1015,6 +1110,25 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&finite_crossing, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "terminal pose"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// Berth and contact envelopes, traffic conflicts, land and the sample budget.
+static int free_location_contacts(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    WaterfrontRouteDiagnostic route;
+    BoatPluginFree internal_free = free;
+    BoatPluginVoyage internal_voyage = voyage;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
+    CHECK(waterfront_route_validate(&internal_path, &route));
 
     WaterfrontRouteDefinition berth_path = internal_path;
     berth_path.actors[0].open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 13,
@@ -1122,6 +1236,20 @@ static int free_scene_location(void)
         boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "three-minute")
         && !strstr(d.message, "internal"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// Free scenes on the basin or without a map, bad berths and traffic conflicts.
+static int free_location_diagnostics(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
 
     // A free scene without marina or traffic keeps the old path, even on the unmapped basin.
     const BoatWorldDefinition *basin = boat_location_find("basin");
@@ -1157,9 +1285,9 @@ static int free_scene_location(void)
     voyage.scene.berths[0] = saved;
 
     // Invalid free traffic is caught by the same retained-timetable conflict check.
-    const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
+    const char *conflict
+        = harbor_variant("route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+            "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     BoatPluginVoyage traffic;
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &traffic, &d) == BOAT_PLUGIN_OK);
@@ -3104,6 +3232,11 @@ static const TestCase cases[] = {
     TEST_CASE(marina_service_decode),
     TEST_CASE(marina_service_survey),
     TEST_CASE(free_scene_location),
+    TEST_CASE(free_location_crossings),
+    TEST_CASE(free_location_speed_bounds),
+    TEST_CASE(free_location_finite_crossing),
+    TEST_CASE(free_location_contacts),
+    TEST_CASE(free_location_diagnostics),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),
     TEST_CASE(last_good_survives),
