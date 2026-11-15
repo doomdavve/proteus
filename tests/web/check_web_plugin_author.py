@@ -139,13 +139,41 @@ def main():
             exported = args.output / 'voyage.wake-plugin.json'
             download.value.save_as(exported)
             data = json.loads(exported.read_text())
-            assert data == {'format': 'wake-velocity-plugin', 'version': 1, **original}
+            assert data == {'format': 'wake-velocity-plugin', 'version': 2, **original, 'modules': {}}
             page.fill('#plugin-source', '')
             page.set_input_files('#plugin-import', exported)
             page.wait_for_function("document.getElementById('plugin-status').textContent.includes('Imported draft')")
             assert page.input_value('#plugin-source') == original['source']
             assert 'Voyage staged' in stage()
             checks.append('bundle export/import')
+            # M5 W4: a package with modules imports as a version 2 bundle, stages through the
+            # worker (the source image), and exports the same bundle; a version 1 file is refused.
+            fixture = root / 'tests/support/fixtures/plugins/modules-route'
+            module_bundle = {'format': 'wake-velocity-plugin', 'version': 2,
+                'manifest': (fixture / 'plugin.json').read_text(),
+                'source': (fixture / 'main.lua').read_text(),
+                'modules': {'route': (fixture / 'modules/route.lua').read_text(),
+                            'route.arrival': (fixture / 'modules/route/arrival.lua').read_text()}}
+            module_file = args.output / 'modules.wake-plugin.json'
+            module_file.write_text(json.dumps(module_bundle))
+            page.set_input_files('#plugin-import', module_file)
+            page.wait_for_function("document.getElementById('plugin-status').textContent.includes('Imported draft')")
+            assert page.locator('#plugin-module option').count() == 2
+            assert 'Voyage staged' in stage()
+            with page.expect_download() as download:
+                page.click('#plugin-export')
+            module_export = args.output / 'modules-export.wake-plugin.json'
+            download.value.save_as(module_export)
+            assert json.loads(module_export.read_text()) == module_bundle
+            v1_file = args.output / 'v1.wake-plugin.json'
+            v1_file.write_text(json.dumps({'format': 'wake-velocity-plugin', 'version': 1,
+                                           **original}))
+            page.set_input_files('#plugin-import', v1_file)
+            page.wait_for_function("document.getElementById('plugin-status').textContent.includes('version 1 bundles are not supported')")
+            page.set_input_files('#plugin-import', exported)  # Back to the module-free draft.
+            page.wait_for_function("document.getElementById('plugin-status').textContent.includes('Imported draft')")
+            assert page.locator('#plugin-module option').count() == 0
+            checks.append('M5 W4 module bundle import/stage/export and version 1 refusal')
             for example in ('river-sprint',):
                 manifest = (root / 'plugins' / example / 'plugin.json').read_text()
                 source = (root / 'plugins' / example / 'main.lua').read_text()

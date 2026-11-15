@@ -54,7 +54,7 @@ def main():
     worker_name = f"plugin_worker-{hashlib.sha256(worker).hexdigest()[:16]}.js"
     (site / worker_name).write_bytes(worker)
     files["plugin_worker.js"] = worker_name
-    example = json.dumps({"format": "wake-velocity-plugin", "version": 1,
+    example = json.dumps({"format": "wake-velocity-plugin", "version": 2, "modules": {},
         "manifest": (root / "plugins/langedrag/plugin.json").read_text(),
         "source": (root / "plugins/langedrag/main.lua").read_text()}, sort_keys=True).encode()
     example_name = f"plugin_example-{hashlib.sha256(example).hexdigest()[:16]}.json"

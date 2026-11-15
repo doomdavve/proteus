@@ -193,6 +193,33 @@ static int check_source_rules(const BoatPluginFiles *good)
     return 0;
 }
 
+// The browser (web/plugin_author.js) and the Python tools pack the same image; the three agree on
+// one byte string, kept in tests/support/fixtures/plugin_image_golden.hex (the Node and Python
+// tests pack the same three files and compare). The test runs from the source root.
+static int golden_image(void)
+{
+    BoatPluginImageFile files[3] = { { "main.lua", 8, "return {}\n", 10 },
+        { "marina", 6,
+            "return 'G\xc3\xb6"
+            "teborg'\n",
+            19 },
+        { "marina.berths", 13, "return {}\n", 10 } };
+    char image[256], hex[1024];
+    size_t size;
+    CHECK(boat_plugin_image_pack(files, 3, image, sizeof(image), &size));
+    for (size_t i = 0; i < size; ++i)
+        snprintf(hex + 2 * i, sizeof(hex) - 2 * i, "%02x", (unsigned char)image[i]);
+    FILE *golden = fopen("tests/support/fixtures/plugin_image_golden.hex", "rb");
+    CHECK(golden);
+    char expected[1024] = "";
+    size_t got = fread(expected, 1, sizeof(expected) - 1, golden);
+    fclose(golden);
+    while (got && (expected[got - 1] == '\n' || expected[got - 1] == '\r'))
+        expected[--got] = 0;
+    CHECK(!strcmp(hex, expected));
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
@@ -200,6 +227,7 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--plugin-query-worker"))
         return boat_plugin_query_worker();
     worker_path = argv[0];
+    CHECK(!golden_image());
     static char tour[BOAT_PLUGIN_SOURCE_MAX], route[BOAT_PLUGIN_SOURCE_MAX];
     size_t tour_size, route_size;
     CHECK(!slurp("plugins/shelter-tour/main.lua", tour, sizeof(tour) - 1, &tour_size));

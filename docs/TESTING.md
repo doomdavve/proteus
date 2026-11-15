@@ -78,7 +78,7 @@ for actual verification and remaining human/platform limits.
 
 P4.9 `boat_plugin_eval` checks the bounded objective worker protocol against the native
 transaction engine: canonical state, lossless wide integers, exact framing, capacities,
-protected fields and stale/malformed replies. `web_plugin_author` includes virtual-time
+protected fields and stale/malformed replies. `web_plugin_author` includes the module bundle (version 2) and source-image checks, among them the golden image vector shared with `boat_plugin_modules` and `test_plugin_author.py`, and virtual-time
 objective transport reuse, cancellation, late watchdog/result and failure checks. The optional
 three-engine `check_web_plugin_author.py` also runs `check_web_plugin_objective.py` for browser
 init/update/timers, simulation gating, recovery events, migration/Undo/cancel/restart, failure,
@@ -1320,7 +1320,7 @@ contract with scene and free/course imports plus room-kind rejection. `tools/pac
 runs `tools/check_web_wasm.py` on every packaged site: the game Wasm must lack Lua parser/VM
 strings, with `plugin_stage.wasm` as the positive control. The opt-in
 `python3 tests/web/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
-(also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import,
+(also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import (including a modules package),
 capability rejection, scene/free/course staging and launch, repeated worker validations, launch,
 live rename and syntax failure, held water Apply/Undo, stale output, cancellation, navigation
 mid-validation, repeated source restore/revalidation and storage denial. On Chromium it also

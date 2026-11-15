@@ -5,10 +5,10 @@ resident/visitor services are complete and merged (M4: #209; contract in the
 [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). M5 (package-local modules and an
 integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
 D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
-W1 (manifest `modules`, source image, module IO, wider diagnostic file), W2 (`require` in the VM) and
-W3 (carriers) are done; the bundle JSON and authoring tools are W4. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+W1 (manifest `modules`, source image, module IO, wider diagnostic file), W2 (`require` in the VM),
+W3 (carriers) and W4 (authoring tools, bundle version 2 and the browser editor) are done. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
 loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: M5-W4 (authoring tools).
+Done when all five marina milestones are closed. Next task: M5-W5 (shared marina).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -988,6 +988,49 @@ image with the same entry name and module order; export must unpack it), the bro
 (`console_save` passes the image as `source` today), the `wake_web_plugin_*` import path. Not run:
 Windows read/save branches, Wasm, a nested-module `/save` (single-level only is tested), the
 `F5` live reload of a module edit in a windowed game.
+
+### M5 W4 result
+
+Implemented 2026-11-15. A package with modules now travels end to end through the authoring tools
+and the browser; the native side (W3) is unchanged except for one new golden check.
+
+**Bundle `wake-velocity-plugin` version 2** is `{format, version: 2, manifest, source, modules}`;
+`source` is the entry text and `modules` an object of name to text (`{}` without modules; the key is
+required, so the key set is exact). Version 1 is rejected everywhere (browser decode, saved draft,
+`plugin_author.py import`) with "version 1 bundles are not supported; re-export" (D3). Names must equal
+the manifest's `modules` list; the package uses the manifest's order whatever the object's order.
+Limits mirror `boat_plugin_read` (entry, modules and framing share 64 KiB, 8 modules, name grammar,
+file named in each message); the native worker stays the authority.
+
+**Python.** `plugin_author.py`: `pack_image`/`unpack_image`, `snapshot` (the manifest plus the entry or
+image), `workspace-read/-write` (module files as `modules/<path>.lua`; a manifest naming a missing
+module file is refused before writing), `export` (version 2), new `import DIRECTORY < bundle`, capture
+writes modules into its temporary package, `capabilities` reports `bundle_version: 2`.
+`plugin_schema.py` already had `modules` (W1); `package_plugin_tools.py` copies whole example
+directories, so module directories ship unchanged; `package_web.py` writes the example as version 2.
+
+**Browser.** `web/plugin_author.js` packs the W1 image byte-for-byte, builds it in the manifest's order
+for the worker, unpacks the image `console_save` passes to `Module.boatPluginExport`, writes
+`/plugins/browser/modules/...` (clearing stale modules first) and restores saved drafts, refusing a
+stale version 1 save with the message instead of throwing. Editor: a **Module** selector with one text
+area, an add box and **Add module**/**Remove module**, which rewrite the manifest's `modules` array;
+a hand edit that disagrees is reported by name at stage/export. No C change was needed: the Wasm side
+passes (manifest, source) bytes untouched.
+
+**Agreement across implementations** is one golden vector,
+`tests/support/fixtures/plugin_image_golden.hex`: the C packer (`boat_plugin_modules`), `plugin_author.py`
+(`test_plugin_author.py`, class `Modules`) and `plugin_author.js` (`web_plugin_author`) each pack the same three
+files (entry, `marina` with a non-ASCII character, `marina.berths`) and compare to it.
+
+**Verification (macOS Debug, native + Node).** New Python `Modules` cases (golden, snapshot, real worker
+with a module syntax error naming the file, read refusals, budget edge, name rules, bundle round trip
+through the CLI, bundle refusals, workspace module writes, capture package), Node cases (golden,
+frame/unpack, version 1 and malformed bundles, limits and messages, writePackage over a stub file
+system, restore, and the editor wiring over a stub DOM). Not verified: any Chrome/Wasm run (no Emscripten
+here; `check_web_plugin_author.py` gained a module import/stage/export step and a version 1 refusal
+that were only compiled, not run), the real DOM and CSS of the module controls, Windows. Limits kept:
+the in-game PC console still refuses a package with modules (`HAS MODULES`), accepted for M5;
+`workspace-write` cannot create a module file, only edit existing declared ones.
 
 ## Verification and handoff
 

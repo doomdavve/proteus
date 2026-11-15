@@ -1152,7 +1152,7 @@ SAVED ~/drafts/my-harbor
 | `/apply`, `/discard`, `/undo` | The F7/F6 transactions, named |
 | `/restart` | Restart the session |
 | `/capability NAME` | Add `scene.define` to this session's manifest copy (voyages only) |
-| `/save DIR` | Write `plugin.json`, `main.lua` and any `modules/` files; refuses a non-empty directory that is not this session's package |
+| `/save DIR` | Write `plugin.json`, `main.lua` and any `modules/` files (in the browser, a version 2 bundle download); refuses a non-empty directory that is not this session's package |
 | `/clear` | Clear the scrollback |
 
 The first edit moves a runtime session to authoring using the catalog revision's embedded source.
@@ -1643,10 +1643,14 @@ and objective commands plus callback/context/state descriptions and native-only 
 It describes data values; Lua functions are not JSON values. Geometry, duplicate JSON keys,
 resource ownership and cross-field rules still require native validation.
 
-`workspace-read DIRECTORY` returns the two UTF-8 draft files and their `bundle_id` using
-that same framed snapshot hash. `workspace-write DIRECTORY --file main.lua --expect-bundle HEX`
-reads replacement UTF-8 bytes from stdin (bounded to 64 KiB; `plugin.json` is bounded to 4 KiB).
-Only those two file names are accepted. For example, with a selected local draft directory:
+`workspace-read DIRECTORY` returns the UTF-8 draft files (`plugin.json`, `main.lua` and, under
+their package-relative names such as `modules/route/arrival.lua`, each declared module) and their
+`bundle_id` using that same framed snapshot hash. `workspace-write DIRECTORY --file main.lua
+--expect-bundle HEX` reads replacement UTF-8 bytes from stdin (bounded to 64 KiB; `plugin.json` is
+bounded to 4 KiB). Only `plugin.json`, `main.lua` and declared module files are accepted. A module
+is added by creating its file and then writing a `plugin.json` that declares it (a manifest naming
+a missing module file, or exceeding the shared budget, is refused before anything changes); it is
+removed by writing a manifest without it. For example, with a selected local draft directory:
 
 ```sh
 python3 tools/plugin_author.py workspace-read plugins/langedrag
@@ -1671,7 +1675,8 @@ check can race, and the two files are not a single atomic transaction. Serialize
 reread after external edits. This CLI is the workspace operation surface; an authenticated
 local transport and live inspect/stage/apply/undo bridge remain future work.
 
-Validation snapshots `plugin.json` (4 KiB) and `main.lua` (64 KiB) from regular local files.
+Validation snapshots `plugin.json` (4 KiB), `main.lua` and the declared modules (together 64 KiB
+as a source image) from regular local files, with no links in any path component.
 Links and special files are rejected; the native manifest parser remains authoritative.
 A snapshot captures the bytes actually read, not an atomic filesystem transaction spanning
 two editor saves. It is never reread during validation. Every job is identified by SHA-256
@@ -1909,7 +1914,7 @@ recovery acceptance remains open.
 
 In a built/served browser client, add `?author` to the URL (for example,
 `http://localhost:8000/?author`), then expand **PLUGIN VOYAGE** below the launcher. Load the example
-or import a `*.wake-plugin.json` source bundle, edit `plugin.json`/`main.lua`, then select
+or import a `*.wake-plugin.json` source bundle, edit `plugin.json`, `main.lua` and any modules, then select
 **Stage / reload**. **Play staged voyage** enters the package's solo session directly. The browser
 accepts the `voyage`, `free` and `course` kinds with their normal grants, optionally followed by
 `scene.define`; an imported scene is validated and returned by the worker, with the traffic sweep
@@ -1921,7 +1926,20 @@ route/water restarts, and **Undo / discard** for the existing native revision po
 UI staging is in flight cancels that request first. **Export draft** downloads the editor's current
 source, including invalid drafts; exporting is not validation or permission to apply.
 
-The editor caps a bundle manifest at 4096 bytes and its source at 65536 bytes. A stage result may
+Modules (see Carriers (M5 W3) for how a package's source image travels) have a **Module** selector under
+`main.lua`: it lists the editor's modules, one text area edits the chosen `modules/<path>.lua`, and
+**Add module** (a name typed in the box) and **Remove module** create or delete one and rewrite the
+`modules` array in `plugin.json` (reformatted JSON). `plugin.json` fixes the names and their order;
+if you edit its `modules` array by hand, staging and export report any module the editor lacks text
+for, or holds without a declaration, naming the file. Staging writes `plugin.json`, `main.lua` and
+`modules/...` into `/plugins/browser`, removing the modules of an earlier staging first.
+
+The editor caps a bundle manifest at 4096 bytes and its source at 65536 bytes; with modules,
+the entry, all modules and the source image's framing (6 header bytes, then 1 + name + 4 bytes per
+file) share the 65536 bytes, at most 8 modules, as `boat_plugin_read` counts them, and the
+messages name the file ("modules/route.lua is larger than the N bytes left of the 65536-byte
+source budget ..."). The worker and the Wasm side hold the source as the native side does: the
+entry text without modules, a source image with them, so the native worker stays the authority. A stage result may
 be up to 163,840 bytes, matching the Wasm host read buffer and covering a full source plus
 the maximum scene and diagnostics (80,124 bytes before diagnostics in the M2 fixture). All imported Lua evaluation happens in Web Workers; the game rechecks
 decoded data and never evaluates that source at startup, staging completion, Apply, Undo or a tick.
@@ -1935,12 +1953,27 @@ Native authors can create the same source bundle with:
 python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
 ```
 
-The JSON wrapper has exactly `format: "wake-velocity-plugin"`, `version: 1`, `manifest` and
-`source` strings. Text is UTF-8, with at most 4096 and 65536 encoded bytes respectively;
-imports also cap the complete wrapper at 200000 bytes. The embedded manifest retains strict
-native JSON/duplicate-key rules. There are no paths or additional package files in a bundle.
-The schema operation describes this wrapper too. Native export checks source sizes/encoding,
-not Lua validity. Browser import loads a draft; staging must validate it before use.
+The JSON wrapper has exactly `format: "wake-velocity-plugin"`, `version: 2`, `manifest` and
+`source` strings, and `modules`, an object of module name to text (`{}` for a package without
+modules; the key is required). `source` is the entry (`main.lua`) text. The names in `modules` are
+exactly the manifest's `modules` list; their order in the object does not matter and a package
+always uses the manifest's order. Text is UTF-8; the manifest is at most 4096 encoded bytes and
+the entry, modules and image framing share 65536 (see the editor limits above); imports also cap
+the complete wrapper at 200000 bytes. The embedded manifest retains strict native JSON/duplicate-key
+rules. There are no paths in a bundle: a module's file is derived from its name. Version 1
+bundles (no `modules` key) are not supported: import reports "version 1 bundles are not supported;
+re-export", in the browser, in `plugin_author.py import` and for a stale saved draft. The schema
+operation describes this wrapper too. Native export checks source sizes/encoding and the
+modules' shared budget, not Lua validity. Browser import loads a draft; staging must validate it
+before use. `plugin_author.py import DIRECTORY < bundle` is the inverse of `export`: it writes the
+package into a directory that does not exist yet.
+
+The browser builds the source image itself (`packImage` in `web/plugin_author.js`) and unpacks the
+image the Wasm side holds for `/save` and export. The layout in `src/plugins/boat_plugin_image.h`,
+`tools/plugin_author.py` and the web code are held to the same bytes by one golden vector,
+`tests/support/fixtures/plugin_image_golden.hex`, asserted by the native, Python and Node tests.
+The PC console still refuses a package with modules (`HAS MODULES`); the console's `/save`
+in the browser downloads the version 2 bundle.
 
 Successful staging saves source in host-owned localStorage where permitted. Storage denial
 or invalid saved source is visible and nonfatal; export remains available. A new page/session
