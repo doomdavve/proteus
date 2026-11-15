@@ -92,8 +92,9 @@ serviced vessels have no visual wake yet. Services are one-shot: windows are hal
 repeats.
 
 The [route demo](../plugins/marina-route-demo/README.md) provides a platform approach, two turns,
-a pause and departure with retained ferry/bridge services. It maintains stand-off clearance;
-berth occupancy, reservations, ropes/handoffs and snug docking belong to M4. Depth remains
+a pause and departure with retained ferry/bridge services. It maintains stand-off clearance and
+binds no berth. The [berth demo](../plugins/marina-berth-demo/README.md) adds a resident round
+trip and a visitor stay through services (contract in the [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). Depth remains
 unverified. Reactive avoidance and physical traffic wakes are outside this contract.
 
 ## Player contacts

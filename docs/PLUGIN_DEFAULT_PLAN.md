@@ -229,7 +229,7 @@ Read first: `apps/wake_velocity/wake_velocity_plugin.[ch]`, `apps/wake_velocity/
    revision 1's source available and make the transition one-way rather than a launch-time mode.
    In `apps/wake_velocity/wake_velocity.c`, replace the `plugin_path` gates with separate "plugin active" and
    "authoring" conditions. The F5–F7 help line, `wake_plugin_draw` and the browser control calls
-   depend on authoring only. Static storage and the 1 MiB owner assertion stay.
+   depend on authoring only. Static storage and the owner assertion (1.25 MiB since Marina M4) stay.
 2. **Add the generator and catalog.**
    - New `src/plugins/boat_plugin_catalog_gen.c` links `proteus_plugins` and takes package directories. For
      each it evaluates the source, runs the same checks as staging (map, scene and the full traffic

@@ -51,7 +51,7 @@ terminal hold. Times 7.5, 13 and 16.5 show the middle of the two turns and the d
 This is a route and clearance example with a platform approach, not a berth-occupancy schedule.
 At dwell the hull remains about four metres from the platform edge because the conservative
 swept-envelope checks still apply. It does not make contact or moor; there are no passengers
-or automatic ropes. Named berths and vessel handoffs belong to M4. Depth is not surveyed.
+or automatic ropes. Named berths and vessel handoffs are in the [berth demo](../marina-berth-demo/README.md). Depth is not surveyed.
 
 The [API](../../docs/PLUGIN_API.md#location-life-scene-contract-l11l43) owns the route fields,
 join/motion bounds and conservative schedule-proof limits. Route edits require held Apply
