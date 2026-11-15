@@ -32,6 +32,11 @@ tools/agent_trial.sh play           # terminal 1: the game on that draft, with t
 claude                              # terminal 2: the agent, started in the repository root
 ```
 
+Before starting the agent, check that `ls ~/.wake-velocity-bridge` lists `session`. The game writes
+it at launch and deletes it on exit, so a second game on the same bridge directory, or an older one
+closing later, leaves a running game with no bridge; the agent then reports `input_error`. Quit every
+game and start one.
+
 `setup` refuses to overwrite an existing draft; pass another path to either command to use one
 (`tools/agent_trial.sh setup ~/wake-agent-trial/two`). The bridge directory is
 `~/.wake-velocity-bridge`, or `$WAKE_BRIDGE`. The scripted offline checks were run on 2026-11-15;
