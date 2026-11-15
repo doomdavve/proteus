@@ -1,14 +1,13 @@
 # Marina authoring expansion
 
-Status, 2026-11-15: M1 structures, M2 appearance and M3 authored routes are complete; M4 (vessels and
-one-shot resident/visitor services) is implemented and its contract moved to the spec, pending PR.
-Supported: several open/loop routes (open paths for services), tangent line/arc pieces, pairwise
-bounded clearance. Contract: [Plugin API](PLUGIN_API.md#marina-vessel-services-m4),
-[traffic](HARBOR_TRAFFIC.md), [protocol v16](MULTIPLAYER_PROTOCOL.md).
-Open: M5 local modules; M4 leftovers (parked visitor, serviced-vessel wakes, repeat, loop-path
-services, browser/Wasm and room runs, watched motion review); human acceptance remains separate.
-Done when all five marina milestones are closed; M4's implementation gate is met locally.
-Next task: M4 PR on approval and the owed checks, then M5 (branch `feat/marina-m4`).
+Status, 2026-11-15: M1 structures, M2 appearance, M3 authored routes and M4 vessels with one-shot
+resident/visitor services are complete and merged (M4: #209; contract in the
+[Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). M5 (package-local modules and an
+integrated example) is planned below ([execution package](#m5-execution-package--2026-11-15));
+nothing of it is implemented. Branch `feat/marina-m5`, local until a PR is approved.
+Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat, loop-path services, browser/Wasm
+and room runs, watched motion review) and the M5 decisions D1-D5; human acceptance stays separate.
+Done when all five marina milestones are closed. Next task: answer D1-D5, then M5-W1.
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -38,8 +37,8 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
 | M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Complete; C1–C4 closed, evidence and limits below |
-| M4 | Separate berths/vessels and resident/visitor schedules | M3 | Implemented locally (O1–O5); contract in the Plugin API; browser/Wasm, room and motion review owed |
-| M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
+| M4 | Separate berths/vessels and resident/visitor schedules | M3 | Complete, merged #209; contract in the Plugin API; browser/Wasm, room and motion review owed |
+| M5 | Package-local Lua modules and integrated marina example | M4 | Planned; [execution package](#m5-execution-package--2026-11-15) |
 
 Use one separate worktree and PR per step. If a step exceeds a reviewable change, split its
 native owner and plugin integration into explicitly dependent PRs with the same completion
@@ -820,6 +819,75 @@ Acceptance:
 - Run the combined larger marina with customized hulls, readable painted names, a resident
   round trip and a visitor's complete stay. Record frame/memory/staging costs against #131
   at the same camera/time/options; inspect CPU/GPU frames and windowed motion separately.
+
+### M5 execution package — 2026-11-15
+
+Planning only; written from a read of the code, nothing is built or measured yet.
+
+**What exists.** A package is two files: `plugin.json` (4 KiB) and one entry (`main.lua`, 64 KiB
+`BOAT_PLUGIN_SOURCE_MAX`). `boat_plugin_io.c` reads them (regular file, `O_NOFOLLOW`), and every later
+stage carries one `(source, source_size)` pair: the eval request (`PEQ1`, 128 KiB), the stage worker,
+`BoatPluginRevision` (ten retained revisions inside the 1.25 MiB native owner budget), the build-time
+catalog generator, room package/objective/record sources, the browser worker and the bundle JSON
+(`wake-velocity-plugin` version 1, `{manifest, source}`). The sandbox removes `require`; each execution
+builds a fresh Lua VM, so isolation between instances and revisions already holds. `harbor-room`'s
+scene is a hand copy of `harbor-life`'s ("copied until M5").
+`BoatPluginDiagnostic.file` is 16 bytes.
+
+**Decisions to confirm (recommendation first).**
+
+- D1, what a module is: a file named by the manifest. `"modules": ["marina", "marina.berths"]`,
+  at most 8 entries, names are dot-separated `[a-z][a-z0-9_]*` segments (at most 3, 32 bytes) and resolve to
+  `modules/<a>/<b>.lua`. No directory walking, so native, catalog and browser see the same bounded
+  list, and an undeclared `require` fails by name. Alternative: discover `modules/` by directory.
+- D2, size: the entry and all modules share the existing 64 KiB. They are packed into one
+  length-prefixed *source image* held in the existing `source` buffers, so the eval request, revision,
+  wire, record and owner budget keep their sizes and the carriers change little. Alternative: raise the
+  total, which needs an owner-budget re-measure like M4's 1 MiB to 1.25 MiB.
+- D3, bundle format: `wake-velocity-plugin` version 2 adds `modules` (name to text); version 1 is
+  rejected with a clear message, as the plan's no-compatibility rule allows. Alternative: also accept
+  version 1 as a bundle with no modules.
+- D4, shared marina source: `plugins/_shared/eriksberg_marina.lua` is the source; each of
+  `harbor-life` and `harbor-room` carries a checked-in copy under `modules/`, kept equal by a CTest
+  drift check and `tools/plugin_author.py sync-shared`. Alternative: copy at CMake/package time, which
+  leaves the checkout packages incomplete.
+- D5, deferrals: M5 does not add a package-to-package import, a `package` table, `load`/`dofile`,
+  module hot-reload outside the existing Apply/Undo, or any module access to files. The M4 leftovers
+  (parked visitor, serviced-vessel wakes, repeat, loop-path services) stay deferred.
+
+**Steps (one commit each; one branch and PR).**
+
+- W1, bundle and IO. Manifest `modules`, source-image pack/unpack, `boat_plugin_read` reads declared
+  modules under the same regular-file/no-symlink rule, bounded by count and total bytes. Widen the
+  diagnostic's file field for `modules/<name>.lua`. Tests: traversal and absolute names, symlink,
+  missing and undeclared files, oversize, duplicate names, a module name that collides with the entry.
+- W2, `require` in the VM. A native `require(name)` over the image, with a per-VM cache, a loading set
+  for cycle detection, the sandbox environment for each module, chunk names `modules/<name>.lua` and
+  returned value checked as the module result. Budgets stay per VM, so instructions and heap are
+  cumulative across modules. Tests: nested and cached imports, a table shared inside one evaluation but
+  never across two, cycles, missing, budget exhaustion inside a module, errors reporting the module and
+  line.
+- W3, carriers. Confirm each one carries the image: eval worker, stage job, host revision and
+  restart classification (a module-only edit changes identity and is classified like an entry edit),
+  catalog generator, room package/objective/record, native `--plugin`. Tests: module-only edit with
+  Apply, Undo and a failed stage leaving the active revision, native worker and catalog round trips,
+  record replay with modules.
+- W4, authoring tools. `plugin_author.py` export/import/check/draft with `modules`, `plugin_schema.py`,
+  the browser bundle (`plugin_author.js`, `/plugins/browser/`), its import/export, and Web Worker
+  evaluation. The Wasm build is not available locally; native `web_*` Node tests cover the JS, and
+  the Wasm run stays owed.
+- W5, shared marina. Move the Eriksberg scene into the shared module, update both packages and the drift
+  check, README and anchors; `harbor-life` and `harbor-room` must decode to the same scene as before.
+- W6, integrated example. The larger marina with customized hulls and painted names, a resident round
+  trip and a visitor's complete stay, as one package using modules. Measure frame, memory and staging
+  against #131 at the same camera, time and options; CPU/GPU stills and a windowed run separately.
+- W7, closing. Move the module contract into `docs/PLUGIN_API.md`, fix superseded statements
+  (the sandbox's "no `require`", the one-source bundle format, "copied until M5"), update
+  `docs/README.md` and this plan, and list or drop leftovers.
+
+**Deferred and open.** From the Open loops board, nothing here depends on or closes another track.
+The M4 leftovers above remain open; so do the browser/Wasm and room runs, which need Emscripten and a
+room and which W3 and W4 touch.
 
 ## Verification and handoff
 

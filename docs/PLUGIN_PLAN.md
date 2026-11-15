@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Marina M3 routes, bounded clearance and C1–C4 qualification/closure are complete; next marina task: [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**Marina M3 routes, bounded clearance and C1–C4 qualification/closure are complete; M4 vessels and services merged (#209); next marina task: [M5 modules](MARINA_AUTHORING_PLAN.md#m5-execution-package--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
