@@ -10,6 +10,7 @@
 #include "core/boat_room_definition.h"
 #include "core/boat_world.h"
 #include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_io.h"
 #include "plugins/boat_plugin_load.h"
 #include "plugins/boat_plugin_lua.h"
@@ -483,7 +484,8 @@ static const char SERVICE_SOURCE[]
     = "return {\n"
       "  voyage = { shelters = {\n"
       "    { id = \"dock\", name = \"DOCK\", x = -12, z = 60, heading = 0, radius = 60 },\n"
-      "    { id = \"bridge\", name = \"BRIDGE\", x = 650, z = -850, heading = 1.33, radius = 150 },\n"
+      "    { id = \"bridge\", name = \"BRIDGE\", x = 650, z = -850, heading = 1.33, radius = 150 "
+      "},\n"
       "    { id = \"east_shore\", name = \"EAST SHORE\", x = 3250, z = -2000, heading = 0.86,"
       " radius = 200 },\n"
       "    { id = \"langedrag\", name = \"LANGEDRAG\", x = 3600, z = -3370, heading = 1.57,"
@@ -1814,7 +1816,352 @@ static int package_files(void)
     large[BOAT_PLUGIN_SOURCE_MAX] = 0;
     return read_status(package("exact", MANIFEST, large), BOAT_PLUGIN_OK, "");
 }
+
+static void make_directory(const char *path)
+{
+    if (mkdir(path, 0755) != 0)
+        exit(1);
+}
+
+// A module package: plugin.json declaring MODULES plus main.lua; module files are added by hand.
+static const char *module_package(char *copy, const char *name, const char *modules)
+{
+    char manifest[1024];
+    snprintf(manifest, sizeof(manifest),
+        "{\"id\": \"test.voyage\", \"name\": \"Test\", \"api\": 1, \"kind\": \"voyage\", "
+        "\"entry\": \"main.lua\", \"location\": \"outer\", \"capabilities\": "
+        "[\"voyage.define\"], \"state_version\": 1, \"modules\": %s}",
+        modules);
+    snprintf(copy, 512, "%s", package(name, manifest, "return {}\n"));
+    return copy;
+}
+
+static int add_file(const char *directory, const char *relative, const char *text, size_t size)
+{
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s", directory, relative);
+    return write_file(path, text, size);
+}
+
+// Remove a scratch package tree this test built (two levels, files and links only).
+static void clear_modules(const char *directory)
+{
+    char path[700];
+    static const char *const files[] = { "modules/marina.lua", "modules/marina/berths.lua",
+        "modules/marina/dir", "modules/a.lua", "modules/b.lua", "modules/marina", "modules" };
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); ++i) {
+        snprintf(path, sizeof(path), "%s/%s", directory, files[i]);
+        if (unlink(path) != 0)
+            rmdir(path);
+    }
+}
+
+static int read_modules(
+    const char *directory, BoatPluginStatus status, const char *file, const char *message)
+{
+    BoatPluginFiles *files = malloc(sizeof(*files));
+    CHECK(files);
+    BoatPluginDiagnostic d;
+    BoatPluginStatus got = boat_plugin_read(directory, NULL, files, &d);
+    show(directory, &d);
+    free(files);
+    CHECK(got == status);
+    CHECK(got == BOAT_PLUGIN_OK || !strcmp(d.file, file));
+    CHECK(got == BOAT_PLUGIN_OK || !message || strstr(d.message, message));
+    return 0;
+}
+
+static int package_modules(void)
+{
+    char path[700], other[700];
+    // A valid package with a flat and a nested module reads as a source image.
+    char good_[512];
+    const char *good = module_package(good_, "modules_good", "[\"marina\", \"marina.berths\"]");
+    clear_modules(good);
+    make_directory((snprintf(path, sizeof(path), "%s/modules", good), path));
+    make_directory((snprintf(path, sizeof(path), "%s/modules/marina", good), path));
+    CHECK(!add_file(good, "modules/marina.lua", "return 1", 8));
+    CHECK(!add_file(good, "modules/marina/berths.lua", "return 2\n", 9));
+    BoatPluginFiles *files = malloc(sizeof(*files));
+    CHECK(files);
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read(good, NULL, files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginImageFile views[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count = 0;
+    CHECK(boat_plugin_image_is(files->source, files->source_size));
+    CHECK(boat_plugin_image_unpack(files->source, files->source_size, views, &count) && count == 3);
+    CHECK(views[0].size == 10 && !memcmp(views[0].data, "return {}\n", 10));
+    const BoatPluginImageFile *berths = boat_plugin_image_find(views, count, "marina.berths");
+    CHECK(berths && berths->size == 9 && !memcmp(berths->data, "return 2\n", 9));
+    const BoatPluginImageFile *marina = boat_plugin_image_find(views, count, "marina");
+    CHECK(marina && marina->size == 8 && !memcmp(marina->data, "return 1", 8));
+    free(files);
+    // An empty module file is a valid module.
+    CHECK(!add_file(good, "modules/marina.lua", "", 0));
+    if (read_modules(good, BOAT_PLUGIN_OK, "", NULL))
+        return 1;
+    // Missing: named by file.
+    unlink((snprintf(path, sizeof(path), "%s/modules/marina/berths.lua", good), path));
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "cannot be opened"))
+        return 1;
+    // A directory where the file belongs.
+    make_directory(path);
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "regular file"))
+        return 1;
+    rmdir(path);
+    // A symbolic link to a valid module file.
+    CHECK(!add_file(good, "modules/a.lua", "return 3", 8));
+    snprintf(other, sizeof(other), "%s/modules/a.lua", good);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "symbolic link"))
+        return 1;
+    unlink(path);
+    clear_modules(good);
+    // A symbolic `modules` directory, and a symbolic intermediate directory, are refused.
+    char linked_[512];
+    const char *linked = module_package(linked_, "modules_linked", "[\"marina\"]");
+    clear_modules(linked);
+    snprintf(other, sizeof(other), "%s/modules", good);
+    make_directory(other);
+    CHECK(!add_file(good, "modules/marina.lua", "return 1", 8));
+    snprintf(path, sizeof(path), "%s/modules", linked);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(linked, BOAT_PLUGIN_IO, "modules/marina.lua", "symbolic link"))
+        return 1;
+    unlink(path);
+    char nested_[512];
+    const char *nested = module_package(nested_, "modules_nested", "[\"marina.berths\"]");
+    clear_modules(nested);
+    snprintf(path, sizeof(path), "%s/modules", nested);
+    make_directory(path);
+    snprintf(other, sizeof(other), "%s/modules/marina", good);
+    make_directory(other);
+    CHECK(!add_file(good, "modules/marina/berths.lua", "return 2", 8));
+    snprintf(path, sizeof(path), "%s/modules/marina", nested);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(nested, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "symbolic link"))
+        return 1;
+    clear_modules(nested);
+    // `modules` that is a plain file, not a directory.
+    CHECK(!add_file(nested, "modules", "x", 1));
+    if (read_modules(nested, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "cannot be opened"))
+        return 1;
+    clear_modules(nested);
+    clear_modules(good);
+    // Sizes: the entry and the modules share one source budget, framing included.
+    char sized_[512];
+    const char *sized = module_package(sized_, "modules_sized", "[\"a\", \"b\"]");
+    clear_modules(sized);
+    snprintf(path, sizeof(path), "%s/modules", sized);
+    make_directory(path);
+    static char block[BOAT_PLUGIN_SOURCE_MAX + 2];
+    memset(block, '-', sizeof(block));
+    CHECK(!add_file(sized, "modules/a.lua", block, BOAT_PLUGIN_SOURCE_MAX + 1)); // Alone too big.
+    CHECK(!add_file(sized, "modules/b.lua", "x", 1));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/a.lua", "source budget"))
+        return 1;
+    // Total oversize: each file fits alone, the sum does not.
+    CHECK(!add_file(sized, "modules/a.lua", block, 40000));
+    CHECK(!add_file(sized, "modules/b.lua", block, 40000));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/b.lua", "source budget"))
+        return 1;
+    // Exactly the budget: header 6, entry (1+8+4+10), a (1+1+4), b (1+1+4) leave room for the rest.
+    size_t rest = BOAT_PLUGIN_SOURCE_MAX - (6 + 23 + 6 + 6);
+    CHECK(!add_file(sized, "modules/a.lua", block, rest - 1));
+    CHECK(!add_file(sized, "modules/b.lua", block, 1));
+    if (read_modules(sized, BOAT_PLUGIN_OK, "", NULL))
+        return 1;
+    CHECK(!add_file(sized, "modules/a.lua", block, rest));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/b.lua", "source budget"))
+        return 1;
+    clear_modules(sized);
+    // No modules declared: the source stays the raw entry bytes, and undeclared files are ignored.
+    char plain_[512];
+    const char *plain = module_package(plain_, "modules_none", "[]");
+    clear_modules(plain);
+    snprintf(path, sizeof(path), "%s/modules", plain);
+    make_directory(path);
+    CHECK(!add_file(plain, "modules/a.lua", "return 3", 8));
+    files = malloc(sizeof(*files));
+    CHECK(files && boat_plugin_read(plain, NULL, files, &d) == BOAT_PLUGIN_OK);
+    CHECK(files->source_size == 10 && !memcmp(files->source, "return {}\n", 10)
+        && !boat_plugin_image_is(files->source, files->source_size));
+    free(files);
+    clear_modules(plain);
+    // An entry that mimics the image magic is not Lua text.
+    const char *spoof = package("modules_spoof", MANIFEST, NULL);
+    CHECK(!add_file(spoof, "main.lua", "\0PMI\1\1x", 7));
+    return read_modules(spoof, BOAT_PLUGIN_SYNTAX, "main.lua", "not Lua text");
+}
 #endif
+
+// M5 W1: the optional "modules" member.
+static int manifest_modules(void)
+{
+    static const char HEAD[]
+        = "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"voyage\", "
+          "\"entry\": \"main.lua\", \"location\": \"outer\", \"capabilities\": "
+          "[\"voyage.define\"], \"state_version\": 1";
+    BoatPluginManifest m;
+    BoatPluginDiagnostic d;
+    char json[1024];
+    // Absent: none. An empty array is valid too.
+    snprintf(json, sizeof(json), "%s}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 0);
+    snprintf(json, sizeof(json), "%s, \"modules\": []}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 0);
+    snprintf(json, sizeof(json), "%s, \"modules\": [\"marina\", \"marina.berths\", \"a.b_2.c3\"]}",
+        HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 3 && !strcmp(m.modules[0], "marina")
+        && !strcmp(m.modules[1], "marina.berths") && !strcmp(m.modules[2], "a.b_2.c3"));
+    // Eight is the most.
+    snprintf(json, sizeof(json),
+        "%s, \"modules\": [\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\",\"h\"]}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 8);
+    static const struct {
+        const char *modules, *field;
+    } bad[] = {
+        { "[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\",\"h\",\"i\"]", "modules" },
+        { "\"marina\"", "modules" },
+        { "{\"a\": 1}", "modules" },
+        { "[1]", "modules[1]" },
+        { "[[\"a\"]]", "modules[1]" },
+        { "[\"a\", \"\"]", "modules[2]" },
+        { "[\"A\"]", "modules[1]" },
+        { "[\"1a\"]", "modules[1]" },
+        { "[\"a-b\"]", "modules[1]" },
+        { "[\"a..b\"]", "modules[1]" },
+        { "[\".a\"]", "modules[1]" },
+        { "[\"a.\"]", "modules[1]" },
+        { "[\"a.b.c.d\"]", "modules[1]" },
+        { "[\"../evil\"]", "modules[1]" },
+        { "[\"a/b\"]", "modules[1]" },
+        { "[\"a\\\\b\"]", "modules[1]" },
+        { "[\"/etc/passwd\"]", "modules[1]" },
+        { "[\"a:b\"]", "modules[1]" },
+        { "[\"abcdefghijklmnopqrstuvwxyz0123456\"]", "modules[1]" }, // 33 bytes
+        { "[\"a\", \"b\", \"a\"]", "modules[3]" },
+        { "[\"main\"]", "modules[1]" },
+    };
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        snprintf(json, sizeof(json), "%s, \"modules\": %s}", HEAD, bad[i].modules);
+        BoatPluginStatus got = boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d);
+        if (got != BOAT_PLUGIN_MANIFEST || strcmp(d.field, bad[i].field)
+            || strcmp(d.file, "plugin.json")) {
+            fprintf(stderr, "modules case %zu: %s %s\n", i, d.field, d.message);
+            return 1;
+        }
+    }
+    // 32 bytes is allowed (three segments), and a duplicate key is refused like any other.
+    snprintf(json, sizeof(json), "%s, \"modules\": [\"abcdefghij.klmnopqrstu.vwxyz012\"]}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK);
+    snprintf(json, sizeof(json), "%s, \"modules\": [], \"modules\": []}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_MANIFEST);
+    // Names map to files without walking directories.
+    char path[64];
+    CHECK(boat_plugin_module_path("marina", path, sizeof(path))
+        && !strcmp(path, "modules/marina.lua"));
+    CHECK(boat_plugin_module_path("marina.berths", path, sizeof(path))
+        && !strcmp(path, "modules/marina/berths.lua"));
+    CHECK(!boat_plugin_module_path("../x", path, sizeof(path)));
+    CHECK(!boat_plugin_module_path("marina.berths", path, 10));
+    return 0;
+}
+
+// M5 W1: the source image round trip and its refusals.
+static int plugin_image(void)
+{
+    static const char ENTRY[] = "return {}\n", A[] = "return 1", B[] = "";
+    BoatPluginImageFile files[3] = {
+        { "main.lua", 8, ENTRY, sizeof(ENTRY) - 1 },
+        { "marina", 6, A, sizeof(A) - 1 },
+        { "marina.berths", 13, B, 0 },
+    };
+    char image[256];
+    size_t size = 0;
+    CHECK(
+        boat_plugin_image_size(files, 3) == 6 + (1 + 8 + 4 + 10) + (1 + 6 + 4 + 8) + (1 + 13 + 4));
+    CHECK(boat_plugin_image_pack(files, 3, image, sizeof(image), &size));
+    CHECK(size == boat_plugin_image_size(files, 3) && boat_plugin_image_is(image, size));
+    // The documented byte layout, little-endian.
+    CHECK(!memcmp(image, "\0PMI\1\3\10main.lua\12\0\0\0return {}\n", 6 + 1 + 8 + 4 + 10));
+    BoatPluginImageFile out[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count = 0;
+    CHECK(boat_plugin_image_unpack(image, size, out, &count) && count == 3);
+    for (unsigned i = 0; i < 3; ++i)
+        CHECK(out[i].name_size == files[i].name_size
+            && !memcmp(out[i].name, files[i].name, out[i].name_size) && out[i].size == files[i].size
+            && (!out[i].size || !memcmp(out[i].data, files[i].data, out[i].size)));
+    const BoatPluginImageFile *found = boat_plugin_image_find(out, count, "marina");
+    CHECK(found && found->size == sizeof(A) - 1 && !boat_plugin_image_find(out, count, "nope"));
+    // Raw entry text is not an image; a short capacity refuses to pack.
+    CHECK(!boat_plugin_image_is(ENTRY, sizeof(ENTRY) - 1) && !boat_plugin_image_is("", 0));
+    CHECK(!boat_plugin_image_pack(files, 3, image, size - 1, &size));
+    // Every truncation and every corruption of one header byte is rejected or still canonical.
+    CHECK(boat_plugin_image_pack(files, 3, image, sizeof(image), &size));
+    for (size_t cut = 0; cut < size; ++cut)
+        CHECK(!boat_plugin_image_unpack(image, cut, out, &count));
+    char bad[256];
+    memcpy(bad, image, size);
+    bad[size] = 0; // Trailing byte.
+    CHECK(!boat_plugin_image_unpack(bad, size + 1, out, &count));
+    memcpy(bad, image, size);
+    bad[4] = 2; // Unknown version.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[5] = 0; // No files.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    bad[5] = 10; // Too many.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[5] = 2; // Count disagrees with the bytes: trailing data.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6] = 0; // Empty entry name.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6 + 1 + 8] = (char)0xff; // Entry length beyond the image.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6 + 1 + 8 + 4 + 10 + 1] = 'M'; // Module name "Marina" breaks the grammar.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    // Duplicates and bad names do not pack either.
+    BoatPluginImageFile dup[2] = { files[0], files[0] };
+    CHECK(boat_plugin_image_size(dup, 2) == 0);
+    BoatPluginImageFile none = { "", 0, "", 0 };
+    CHECK(boat_plugin_image_size(&none, 1) == 0 && boat_plugin_image_size(files, 0) == 0);
+    // The whole image, framing included, fits the shared budget exactly or not at all.
+    static char big[BOAT_PLUGIN_SOURCE_MAX + 1], packed[BOAT_PLUGIN_SOURCE_MAX + 64];
+    memset(big, '-', sizeof(big));
+    BoatPluginImageFile one = { "main.lua", 8, big, BOAT_PLUGIN_SOURCE_MAX - (6 + 1 + 8 + 4) };
+    CHECK(boat_plugin_image_pack(&one, 1, packed, sizeof(packed), &size)
+        && size == BOAT_PLUGIN_SOURCE_MAX);
+    CHECK(boat_plugin_image_unpack(packed, size, out, &count) && count == 1);
+    ++one.size;
+    CHECK(boat_plugin_image_size(&one, 1) == 0);
+    return 0;
+}
+
+// An evaluator handed an image (a package with modules) refuses it by name in W1.
+static int image_refused(void)
+{
+    static const char ENTRY[] = "return {}";
+    BoatPluginImageFile file = { "main.lua", 8, ENTRY, sizeof(ENTRY) - 1 };
+    char image[128];
+    size_t size;
+    CHECK(boat_plugin_image_pack(&file, 1, image, sizeof(image), &size));
+    BoatPluginBundle bundle = { MANIFEST, strlen(MANIFEST), image, size };
+    BoatPluginVoyage voyage;
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_SYNTAX);
+    CHECK(!strcmp(d.file, "main.lua") && strstr(d.message, "source image"));
+    CHECK(d.cost.leaked_bytes == 0);
+    return 0;
+}
 
 // The decoded shelters and arrival are open water of the outer map with room for the hull, and
 // the start shelter is the location's spawn (as validate_boat_voyage requires of the route).
@@ -2537,7 +2884,11 @@ static const TestCase cases[] = {
     TEST_CASE(last_good_survives),
 #ifndef _WIN32
     TEST_CASE(package_files),
+    TEST_CASE(package_modules),
 #endif
+    TEST_CASE(manifest_modules),
+    TEST_CASE(plugin_image),
+    TEST_CASE(image_refused),
     TEST_CASE(navigable_water),
     TEST_CASE(tours),
     TEST_CASE(work_sites),

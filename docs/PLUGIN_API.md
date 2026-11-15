@@ -49,6 +49,7 @@ rejected. Strings are non-empty printable ASCII.
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
 | `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c), and one with [marks](#marks-p5a) requests `["free.define", "objective.hud"]` (optionally with `"scene.define"` between them). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
+| `modules` (M5 W1, optional) | Up to 8 package-local module names, none by default. A name is 1-3 dot-separated segments of `[a-z][a-z0-9_]*`, at most 32 bytes; `a` is the file `modules/a.lua` and `a.b` is `modules/a/b.lua`. Names are unique and never `main`. `boat_plugin_read` packs the entry and modules into one source image sharing the 64 KiB source limit; `require` over it is not available yet (W2) and evaluators refuse an image. |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
 package's.
@@ -1188,7 +1189,11 @@ if (boat_plugin_read("plugins/langedrag", NULL, files, &d) == BOAT_PLUGIN_OK) {
 - `boat_plugin_read` opens `plugin.json`, checks it, then opens its entry. On POSIX each file
   is opened with `O_NOFOLLOW` and must `fstat` as a regular file; on Windows reparse points and
   directories are refused. Reads stop at the limit, so an oversized file is detected by one
-  extra byte, not a size query.
+  extra byte, not a size query. Declared modules (M5 W1) are read the same way, each directory
+  component opened without following a link, and packed after the entry into a length-prefixed
+  source image (`boat_plugin_image.h`) only when modules are declared; otherwise the source stays
+  the raw entry bytes. `BoatPluginDiagnostic.file` is 64 bytes so `modules/marina/berths.lua`
+  fits; its serialised form is length-prefixed, so wire layouts are unchanged.
 - `boat_plugin_route_digest` is FNV-1a over every route field with field names, float bits
   least significant byte first, and shelter names. The reference digest is `e8509272172cb7c4`,
   the same for the fixture route and on Wasm.

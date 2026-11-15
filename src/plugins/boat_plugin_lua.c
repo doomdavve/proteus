@@ -1,6 +1,7 @@
 #include "plugins/boat_plugin_lua.h"
 
 #include "core/boat_clock.h"
+#include "plugins/boat_plugin_image.h"
 
 #include "lauxlib.h"
 #include "lua.h"
@@ -1679,10 +1680,23 @@ static int decode_course(lua_State *L)
     return 0;
 }
 
+// W1: evaluators take raw entry text. A source image (a package with modules) is refused by
+// name until the VM resolves require (W2), rather than handed to the Lua compiler.
+static bool refuse_image(
+    BoatPluginDiagnostic *d, const char *source, size_t size, const char *chunk)
+{
+    if (!boat_plugin_image_is(source, size))
+        return false;
+    failure(d, BOAT_PLUGIN_SYNTAX, chunk, "is a package source image; modules are not supported");
+    return true;
+}
+
 static BoatPluginStatus run(
     lua_State *L, Vm *vm, const char *source, size_t size, const char *chunk)
 {
     BoatPluginDiagnostic *d = vm->diagnostic;
+    if (refuse_image(d, source, size, chunk))
+        return d->status;
     lua_pushcfunction(L, setup);
     if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
         failure(d, BOAT_PLUGIN_MEMORY, chunk, "not enough memory to open the libraries");
@@ -2016,6 +2030,8 @@ BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const ch
     limits = limits ? limits : &boat_plugin_default_limits;
     *diagnostic = (BoatPluginDiagnostic) { 0 };
     out[0] = 0;
+    if (refuse_image(diagnostic, source, size, chunk))
+        return diagnostic->status;
     Vm vm = {
         .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
     };
@@ -2089,6 +2105,8 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
     const BoatPluginLimits *limits, uint64_t callback_budget, int (*callback)(lua_State *),
     void *context, BoatPluginDiagnostic *diagnostic)
 {
+    if (refuse_image(diagnostic, source, size, "main.lua"))
+        return diagnostic->status;
     Vm vm = {
         .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
     };

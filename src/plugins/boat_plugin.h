@@ -12,6 +12,7 @@
 #include "core/boat_race.h"
 #include "core/boat_scene_definition.h"
 #include "core/boat_voyage.h"
+#include "plugins/boat_plugin_image.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -76,7 +77,9 @@ typedef struct {
 
 typedef struct {
     BoatPluginStatus status;
-    char file[16]; // "plugin.json" or the entry's name; empty when not about one file.
+    // "plugin.json", the entry's name or a module's file ("modules/marina/berths.lua"); empty when
+    // not about one file.
+    char file[64];
     int line; // Source line, or 0 when unknown (always 0 for schema errors).
     char field[64]; // Path of the offending value, e.g. "voyage.shelters[3].heading".
     char message[160];
@@ -86,12 +89,15 @@ typedef struct {
 typedef struct {
     const char *manifest;
     size_t manifest_size;
-    const char *source; // The manifest's entry file.
+    const char *source; // The entry text, or the source image (boat_plugin_image.h) with modules.
     size_t source_size;
 } BoatPluginBundle;
 
 typedef struct {
     char id[64], name[64], kind[16], entry[16], location[16];
+    // M5: declared module names (boat_plugin_image.h), in manifest order; none by default.
+    char modules[BOAT_PLUGIN_MODULES_MAX][BOAT_PLUGIN_MODULE_NAME_MAX + 1];
+    unsigned module_count;
     unsigned api, state_version;
     bool scene; // Explicit scene.define capability (voyages only).
     bool objective; // Explicit objective.hud capability (voyages only).

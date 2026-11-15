@@ -82,6 +82,8 @@ static const BoatPluginLimits *bounded(const BoatPluginLimits *limits)
 static const char *const MANIFEST_KEYS[]
     = { "id", "name", "api", "kind", "entry", "location", "capabilities", "state_version" };
 #define MANIFEST_KEY_COUNT (sizeof(MANIFEST_KEYS) / sizeof(MANIFEST_KEYS[0]))
+// Optional members; absent means none.
+static const char MANIFEST_MODULES[] = "modules";
 
 static bool identifier(const char *id)
 {
@@ -122,6 +124,7 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         bool known = false;
         for (size_t k = 0; k < MANIFEST_KEY_COUNT; ++k)
             known |= !strcmp(key, MANIFEST_KEYS[k]);
+        known |= !strcmp(key, MANIFEST_MODULES);
         if (!known)
             return diagnose(d, BOAT_PLUGIN_MANIFEST, file, key, "is not a known field");
         if (boat_json_member(json, tokens, count, 0, key) == -2)
@@ -223,6 +226,33 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         || (!m.objective && state != BOAT_PLUGIN_STATE_VERSION))
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be an integer in 1..65535");
+    int modules = boat_json_member(json, tokens, count, 0, MANIFEST_MODULES);
+    if (modules >= 0) {
+        const jsmntok_t *list = &tokens[modules];
+        if (list->type != JSMN_ARRAY || list->size > BOAT_PLUGIN_MODULES_MAX)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, MANIFEST_MODULES,
+                "must be an array of at most %d module names", BOAT_PLUGIN_MODULES_MAX);
+        for (int i = 0; i < list->size; ++i) {
+            char path[32];
+            snprintf(path, sizeof(path), "modules[%d]", i + 1);
+            char *name = m.modules[i];
+            if (tokens[modules + i + 1].type != JSMN_STRING
+                || !boat_json_text(json, &tokens[modules + i + 1], name, sizeof(m.modules[i]))
+                || !boat_plugin_module_name_valid(name))
+                return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
+                    "must be 1-3 dot-separated names of a-z, 0-9 and '_', each starting with a "
+                    "letter, in at most %d bytes",
+                    BOAT_PLUGIN_MODULE_NAME_MAX);
+            if (!strcmp(name, "main"))
+                return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
+                    "must not be \"main\", the entry's own name");
+            for (int j = 0; j < i; ++j)
+                if (!strcmp(m.modules[j], name))
+                    return diagnose(
+                        d, BOAT_PLUGIN_MANIFEST, file, path, "repeats modules[%d]", j + 1);
+            m.module_count = (unsigned)i + 1;
+        }
+    }
     m.api = (unsigned)api;
     m.state_version = (unsigned)state;
     *out = m;

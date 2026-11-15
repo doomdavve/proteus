@@ -73,6 +73,8 @@ def schema():
                    "rules": record({**{k: number(v, 432000, "120 Hz ticks", True)
                                         for k, v in rule_lows.items()},
                                     "min_players": number(1, 4, integer=True)})})
+    module_name = {"type": "string", "maxLength": 32,
+                   "pattern": r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,2}$", "not": {"const": "main"}}
     manifest = record({"id": text(63, r"^[a-z][a-z0-9._-]*$"), "name": text(63),
                        "api": {"const": 1},
                        "kind": {"enum": ["voyage", "free", "course", "race", "match"]},
@@ -90,6 +92,9 @@ def schema():
                             ["race.define"], ["race.define", "scene.define"],
                             ["match.define"], ["match.define", "scene.define"]]},
                        "state_version": number(1, 65535, integer=True)})
+    # M5 W1: optional list of package-local module names (modules/a/b.lua for "a.b").
+    manifest["properties"]["modules"] = {"type": "array", "maxItems": 8, "uniqueItems": True,
+                                         "items": module_name}
     manifest["allOf"] = [
         {"if": {"properties": {"kind": {"const": "race"}}},
          "then": {"properties": {"location": {"const": "outer"},

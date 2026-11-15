@@ -34,7 +34,7 @@ endif()
 add_library(proteus_plugin_data STATIC boat_plugin.c boat_plugin.h
   boat_plugin_decode.h boat_plugin_revision.h boat_plugin_race.c
   boat_plugin_objective.h boat_plugin_objective_codec.c boat_plugin_wire.c
-  boat_plugin_wire.h)
+  boat_plugin_image.c boat_plugin_image.h boat_plugin_wire.h)
 target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
 target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
 

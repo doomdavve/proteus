@@ -3,11 +3,12 @@
 Status, 2026-11-15: M1 structures, M2 appearance, M3 authored routes and M4 vessels with one-shot
 resident/visitor services are complete and merged (M4: #209; contract in the
 [Plugin API](PLUGIN_API.md#marina-vessel-services-m4)). M5 (package-local modules and an
-integrated example) is planned below ([execution package](#m5-execution-package--2026-11-15));
-nothing of it is implemented. Branch `feat/marina-m5`, local until a PR is approved.
-Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat, loop-path services, browser/Wasm
-and room runs, watched motion review) and the M5 decisions D1-D5; human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: answer D1-D5, then M5-W1.
+integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
+D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
+W1 (manifest `modules`, source image, module IO, wider diagnostic file) is done; evaluators still
+refuse an image until W2. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
+Done when all five marina milestones are closed. Next task: M5-W2 (`require` in the VM).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -888,6 +889,26 @@ scene is a hand copy of `harbor-life`'s ("copied until M5").
 **Deferred and open.** From the Open loops board, nothing here depends on or closes another track.
 The M4 leftovers above remain open; so do the browser/Wasm and room runs, which need Emscripten and a
 room and which W3 and W4 touch.
+
+### M5 W1 result
+
+Implemented 2026-11-15: manifest `modules` (at most 8; dot-separated `[a-z][a-z0-9_]*` names, at most
+3 segments and 32 bytes, unique, never `main`), `src/plugins/boat_plugin_image.[ch]` (a versioned
+little-endian source image: magic `\0PMI` + version 1, a file count, then per file a one-byte name length,
+the name, a u32 length and the bytes, entry first, whole image at most 64 KiB), module reads in
+`boat_plugin_read` (each directory component opened without following links on POSIX; the Windows branch
+checks reparse points per component and is not compiled here), and `BoatPluginDiagnostic.file` widened
+from 16 to 64 bytes (wire forms are length-prefixed, so layouts and versions are unchanged). A package
+without modules keeps the raw entry bytes as its source; an image is produced only when modules are
+declared, and the Lua evaluators refuse an image by name until W2. `tools/plugin_schema.py` gained the
+optional `modules` property.
+
+Verified on macOS Debug: new cases `boat_plugin.manifest_modules`, `boat_plugin.plugin_image`,
+`boat_plugin.image_refused` and `boat_plugin.package_modules` (valid flat and nested modules, missing,
+directory, symlinked file, symlinked and non-directory `modules` or intermediate directory, oversize
+file, oversize total, exact budget, undeclared files ignored, entry mimicking the magic) pass. Not
+verified: the Windows read branch, Wasm/browser (bundle format is W4), and any carrier that stores an
+image (W3).
 
 ## Verification and handoff
 
