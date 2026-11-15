@@ -2,6 +2,8 @@
 
 #include "platform/boat_file.h"
 #include "plugins/boat_plugin_catalog.h"
+#include "plugins/boat_plugin_io.h"
+#include "plugins/boat_plugin_load.h"
 #include "render/boat_cargo_view.h"
 #include "render/boat_presentation.h"
 #include "render/boat_ui.h"
@@ -17,32 +19,66 @@
 #include <string.h>
 #include <time.h>
 
-// Borrowed by the session for as long as the program runs.
-static BoatPluginRevision revision;
+static BoatWorkSession *authority(WakeWork *work);
+
+bool wake_work_probe_directory(const char *directory)
+{
+    static BoatPluginFiles files;
+    static BoatPluginFree free_package;
+    BoatPluginDiagnostic d;
+    BoatPluginManifest manifest;
+    if (boat_plugin_read(directory, NULL, &files, &d) != BOAT_PLUGIN_OK
+        || boat_plugin_parse_manifest(files.manifest, files.manifest_size, NULL, &manifest, &d)
+            != BOAT_PLUGIN_OK
+        || boat_plugin_kind_parse(manifest.kind) != BOAT_PLUGIN_KIND_FREE)
+        return false;
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    return boat_plugin_load_free(&bundle, NULL, &free_package, &d) == BOAT_PLUGIN_OK
+        && free_package.has_scene && free_package.scene.work_present;
+}
+
+bool wake_work_probe_catalog(const char *id)
+{
+    static BoatPluginRevision scanned;
+    BoatPluginDiagnostic d = { 0 };
+    const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find(id);
+    return entry && boat_plugin_kind_parse(entry->kind) == BOAT_PLUGIN_KIND_FREE
+        && boat_plugin_catalog_decode(entry, &scanned, &d) && scanned.free.has_scene
+        && scanned.free.scene.work_present;
+}
+
+// The session's package: its scene, work sites and (with an objective) job come from REVISION,
+// which the caller's plugin host keeps alive until the next commit rebinds it.
+static void bind_revision(BoatWorkSession *s, const BoatPluginRevision *revision)
+{
+    s->world.scene = &revision->free.scene;
+    s->revision = revision->free.manifest.objective ? revision : NULL;
+    s->site_count = revision->free.scene.work_count;
+    memcpy(s->sites, revision->free.scene.work, sizeof(s->sites));
+}
 
 bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources *resources,
-    const BoatWorldDefinition *location, char *diagnostic, size_t capacity)
+    const BoatPluginRevision *revision, char *diagnostic, size_t capacity)
 {
-    const BoatPluginCatalogEntry *entry = boat_plugin_catalog_work_default(location->name);
-    BoatPluginDiagnostic d = { 0 };
-    if (!entry || boat_plugin_kind_parse(entry->kind) != BOAT_PLUGIN_KIND_FREE
-        || strcmp(entry->location, location->name)
-        || !boat_plugin_catalog_decode(entry, &revision, &d) || !revision.free.has_scene
-        || !revision.free.scene.work_present) {
-        snprintf(diagnostic, capacity, "No bundled work package for %s.", location->name);
+    if (revision->manifest.kind[0] == 0 || strcmp(revision->manifest.kind, "free")
+        || !revision->free.has_scene || !revision->free.scene.work_present) {
+        snprintf(diagnostic, capacity, "%s has no work sites.", revision->manifest.id);
         return false;
     }
     *work = (WakeWork) { .open = true, .lighting_cycle = true };
     BoatWorkSession *s = &work->session;
     s->resources = resources;
     s->writer = "wake_velocity";
-    s->world.scene = &revision.free.scene;
-    s->revision = revision.free.manifest.objective ? &revision : NULL;
-    s->site_count = revision.free.scene.work_count;
-    memcpy(s->sites, revision.free.scene.work, sizeof(s->sites));
+    bind_revision(s, revision);
     boat_work_session_reset(s);
     wake_work_sync(work, game);
     return true;
+}
+
+void wake_work_use(WakeWork *work, const BoatPluginRevision *revision)
+{
+    bind_revision(&work->session, revision);
+    bind_revision(authority(work), revision);
 }
 
 // The session host management changes: the authority's once started, else the host's own.

@@ -171,10 +171,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location outer --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
-  add_test(NAME wake_velocity_work_gpu_screenshot COMMAND wake_velocity --location outer --work
-    --gpu --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth-gpu.png)
+  add_test(NAME wake_velocity_work_gpu_screenshot COMMAND wake_velocity --location outer
+    --package proteus.outer-work --gpu --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth-gpu.png)
   add_test(NAME wake_velocity_work_delivered_gpu_screenshot COMMAND wake_velocity --location outer
-    --work --gpu --time 14 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered-gpu.png)
+    --package proteus.outer-work --gpu --time 14 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered-gpu.png)
   set_tests_properties(wake_velocity_work_gpu_screenshot wake_velocity_work_delivered_gpu_screenshot
     PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_basin_gpu_screenshot COMMAND wake_velocity --time 0

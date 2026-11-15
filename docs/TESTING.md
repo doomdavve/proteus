@@ -9,8 +9,8 @@ data directory; each fails on the program's exit code (`--expect resumed|rejecte
 (`--scene-check`) requires a session reset to keep the package's scene, with its custom notice. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
 resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
 
-`wake_velocity_work_*` (SV1f) render `--work` through the CPU view (`render`, slow lane): the scripted berth
-at 3 s, the scripted landing delivery at 14 s, and a refusal of `--work --package`. `wake_velocity_work_gpu_screenshot` and
+`wake_velocity_work_*` (SV1f) render the working-harbour package (`--package proteus.outer-work`, and `--plugin plugins/outer-work` in `wake_velocity_work_plugin_cpu_screenshot`) through the CPU view (`render`, slow lane): the scripted berth
+at 3 s, the scripted landing delivery at 14 s, and a refusal of `--plugin` with `--package`. `wake_velocity_work_gpu_screenshot` and
 `wake_velocity_work_delivered_gpu_screenshot` are their GPU-lane twins. `wake_velocity_work_save_write` then
 `wake_velocity_work_save_resume` (SV1g, slow lane) save a scripted delivery to `build/work-save-tests` and resume it
 with a far camera that shows the built quay; both run through `cmake/run_expect.cmake`, which requires exit code 0 and an output

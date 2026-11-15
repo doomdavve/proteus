@@ -181,8 +181,8 @@ foreach(place_package
   set_tests_properties(wake_velocity_title_start.${place} PROPERTIES TIMEOUT 60
     PASS_REGULAR_EXPRESSION "Plugin ${package}:")
 endforeach()
-# WORKING HARBOUR starts through --work instead of --package. Unlike --package, --work prints no
-# package banner, so the exit status and the screenshot are the check.
+# WORKING HARBOUR starts through its package (proteus.outer-work); a working harbour is run by
+# --package or --plugin like any other package. The exit status and the screenshot are the check.
 add_test(NAME wake_velocity_title_start.outer-working-harbour
   COMMAND wake_velocity --title-start outer-working-harbour --renderer cpu
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/title_start_outer-working-harbour.png --time 0.1
@@ -323,11 +323,16 @@ set_tests_properties(boat_lighting_hour_screenshot boat_lighting_hour_precedence
   boat_lighting_hour_precedence_reference_matches boat_lighting_hour_rejected
   PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # SV1f: the working-harbour session in the game, from the scripted drive: the berth, and the
-# landing delivery (idle for 10 s, then the delivery script). --work refuses incompatible options.
+# landing delivery (idle for 10 s, then the delivery script). a working harbour refuses incompatible options.
 add_test(NAME wake_velocity_work_cpu_screenshot COMMAND wake_velocity --renderer cpu
-  --location outer --work --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth.png)
+  --location outer --package proteus.outer-work --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth.png)
+# SA1: the same session from a plugin directory (`--plugin`), as an agent workspace runs it.
+add_test(NAME wake_velocity_work_plugin_cpu_screenshot COMMAND wake_velocity --renderer cpu
+  --plugin plugins/outer-work --time 14
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-plugin-delivered.png
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME wake_velocity_work_delivered_cpu_screenshot COMMAND wake_velocity --renderer cpu
-  --location outer --work --time 14
+  --location outer --package proteus.outer-work --time 14
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered.png)
 # SV1g: a scripted delivery is saved to a build-tree file by one run and resumed by the next,
 # which must say so (and exit 0); nothing touches the user's data directory.
@@ -335,16 +340,17 @@ set(WORK_SAVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/work-save-tests)
 file(MAKE_DIRECTORY ${WORK_SAVE_DIR})
 add_test(NAME wake_velocity_work_save_write COMMAND ${CMAKE_COMMAND} "-DREGEX=Wrote save .*work.sav"
   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake -- $<TARGET_FILE:wake_velocity>
-  --renderer cpu --location outer --work --time 14 --save ${WORK_SAVE_DIR}/work.sav --save-now)
+  --renderer cpu --location outer --package proteus.outer-work --time 14 --save ${WORK_SAVE_DIR}/work.sav --save-now)
 add_test(NAME wake_velocity_work_save_resume COMMAND ${CMAKE_COMMAND}
   "-DREGEX=Resumed save .*work.sav at tick" -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake
-  -- $<TARGET_FILE:wake_velocity> --renderer cpu --location outer --work
+  -- $<TARGET_FILE:wake_velocity> --renderer cpu --location outer --package proteus.outer-work
   --save ${WORK_SAVE_DIR}/work.sav --camera-distance 30 --camera-height 20
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-resumed.png)
 set_tests_properties(wake_velocity_work_save_write PROPERTIES FIXTURES_SETUP work_save)
 set_tests_properties(wake_velocity_work_save_resume PROPERTIES FIXTURES_REQUIRED work_save)
 add_test(NAME wake_velocity_work_refuses_package COMMAND wake_velocity --renderer cpu
-  --location outer --work --package outer-work --time 0
+  --location outer --plugin ${CMAKE_CURRENT_SOURCE_DIR}/plugins/outer-work
+  --package proteus.outer-work --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-refused.png)
 set_tests_properties(wake_velocity_work_refuses_package PROPERTIES WILL_FAIL TRUE)
 # Fast developer CLI validation: each case rejects before a window or capture starts.
@@ -354,18 +360,18 @@ add_test(NAME wake_velocity_time_scale_missing_rejected COMMAND wake_velocity --
 add_test(NAME wake_velocity_time_scale_multiplayer_rejected
   COMMAND wake_velocity --host free --time-scale 2)
 add_test(NAME wake_velocity_work_review_pose_name_rejected
-  COMMAND wake_velocity --work --work-review-pose pirouette)
+  COMMAND wake_velocity --package proteus.outer-work --work-review-pose pirouette)
 add_test(NAME wake_velocity_work_review_pose_without_work_rejected
   COMMAND wake_velocity --renderer cpu --work-review-pose swing
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/work-review-unused.png --time 0)
 add_test(NAME wake_velocity_work_review_pose_unbounded_rejected
-  COMMAND wake_velocity --renderer cpu --location outer --work --work-review-pose swing)
+  COMMAND wake_velocity --renderer cpu --location outer --package proteus.outer-work --work-review-pose swing)
 add_test(NAME wake_velocity_work_clock_report_missing_arg_rejected
   COMMAND wake_velocity --work-clock-report)
 add_test(NAME wake_velocity_work_clock_report_empty_rejected
   COMMAND wake_velocity --work-clock-report "")
 add_test(NAME wake_velocity_work_clock_report_without_frames_rejected
-  COMMAND wake_velocity --work --work-clock-report ${CMAKE_CURRENT_BINARY_DIR}/work-clock.csv)
+  COMMAND wake_velocity --package proteus.outer-work --work-clock-report ${CMAKE_CURRENT_BINARY_DIR}/work-clock.csv)
 set_tests_properties(
   wake_velocity_time_scale_nan_rejected
   wake_velocity_time_scale_unsupported_rejected

@@ -71,7 +71,7 @@ static BoatPluginStatus read_package(WakePlugin *plugin, uint64_t *key)
     return status;
 }
 
-const BoatWorldDefinition *wake_plugin_location(const char *directory)
+static const BoatWorldDefinition *package_location(const char *directory, bool work)
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
@@ -90,14 +90,34 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
             "--plugin accepts voyage, free and course packages; race and match run in rooms.\n");
         return NULL;
     }
-    if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective) {
+    if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective && !work) {
         fprintf(stderr,
-            "--plugin %s: a free package's objective runs in cargo_sandbox (work sites) or a "
-            "room (marks).\n",
+            "--plugin %s: a free package's objective runs in a working harbour (work sites) or "
+            "a room (marks).\n",
             directory);
         return NULL;
     }
     return boat_location_find(manifest.location);
+}
+
+const BoatWorldDefinition *wake_plugin_location(const char *directory)
+{
+    return package_location(directory, false);
+}
+
+const BoatWorldDefinition *wake_plugin_location_work(const char *directory)
+{
+    return package_location(directory, true);
+}
+
+// A free package with work sites is a working harbour: the game runs its work session, and
+// every changed revision restarts that session (SA0.1).
+static bool work_package(const WakePlugin *plugin)
+{
+    if (plugin->host.kind != BOAT_PLUGIN_KIND_FREE || !plugin->host.depth)
+        return false;
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    return active->free.has_scene && active->free.scene.work_present;
 }
 
 // A callback receipt is private to its request and complete committed input. No imported
@@ -424,8 +444,9 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     default:
         session->voyage_route = route; // The caller's restart begins it.
         report(plugin, "applied", false,
-            scene_restart ? "SESSION RESTARTED WITH THE NEW MARINA LAYOUT"
-                          : "SESSION RESTARTED WITH THE NEW WATER",
+            work_package(plugin)  ? "WORK SESSION RESTARTED WITH THE NEW PACKAGE"
+                : scene_restart ? "SESSION RESTARTED WITH THE NEW MARINA LAYOUT"
+                                : "SESSION RESTARTED WITH THE NEW WATER",
             "R%u %s", revision->number, how);
         return true;
     }
@@ -448,6 +469,10 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
         return false;
     }
     if (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)
+        return commit(plugin, session);
+    // A working harbour has no state worth holding for: a changed site, job or load restarts
+    // the cargo session at once, so an agent's stage is visible without a second command.
+    if (change == BOAT_PLUGIN_RESTART_SESSION && work_package(plugin))
         return commit(plugin, session);
     if (change == BOAT_PLUGIN_LIVE) {
         if (wake_plugin_live_ready(plugin, session))

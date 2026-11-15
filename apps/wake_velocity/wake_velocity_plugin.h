@@ -76,6 +76,9 @@ _Static_assert(sizeof(WakePlugin) <= (5u << 18), "plugin native owner exceeds 1.
 
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
 const BoatWorldDefinition *wake_plugin_location(const char *directory);
+// The same, also accepting a free package whose objective is a working harbour's job (the caller
+// has checked that it declares work sites).
+const BoatWorldDefinition *wake_plugin_location_work(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);

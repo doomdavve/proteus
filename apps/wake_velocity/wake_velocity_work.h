@@ -42,10 +42,18 @@ typedef struct {
     BoatCamera camera;
 } WakeWorkProjection;
 
-// Start the location's bundled work package over GAME, which borrows RESOURCES. False (with
-// DIAGNOSTIC filled) when the location has no work package.
+// Whether the package in DIRECTORY (a plugin directory), or the bundled catalog package ID, is a
+// working harbour: a free package with work sites. A work package is run by `--plugin` or
+// `--package` like any other; nothing else names the mode.
+bool wake_work_probe_directory(const char *directory);
+bool wake_work_probe_catalog(const char *id);
+// Start REVISION (a free package with work sites, which the caller's plugin host keeps alive)
+// over GAME, which borrows RESOURCES. False (with DIAGNOSTIC filled) when it has no work sites.
 bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources *resources,
-    const BoatWorldDefinition *location, char *diagnostic, size_t capacity);
+    const BoatPluginRevision *revision, char *diagnostic, size_t capacity);
+// Bind the session to a newly committed REVISION. Call before wake_work_reset, which restarts
+// the cargo session (and its local authority) on it.
+void wake_work_use(WakeWork *work, const BoatPluginRevision *revision);
 // Choose and read the save: EXPLICIT_PATH, else DATA_DIR, else (when DEFAULT_DIR) the game's data
 // directory. A usable save replaces the fresh session; one that cannot be used is set aside as
 // NAME.rejected. FRESH ignores any save. Returns 0 (none), 1 (resumed) or 2 (set aside). Call

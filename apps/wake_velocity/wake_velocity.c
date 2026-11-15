@@ -152,7 +152,6 @@ static void usage(void)
     cli_usage_line(stdout, "--title", "Open the title screen explicitly");
     cli_usage_line(
         stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
-    cli_usage_line(stdout, "--work", "Run the location's working-harbour package (outer)");
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
@@ -170,10 +169,10 @@ static void usage(void)
     cli_usage_line(
         stdout, "--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
     cli_usage_line(stdout, "--mouse-steering", "Start with captured mouse steering");
-    cli_usage_line(stdout, "--plugin DIR", "Solo voyage from a Lua plugin");
+    cli_usage_line(stdout, "--plugin DIR", "Solo voyage or working harbour from a Lua plugin");
     cli_usage_line(stdout, "", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
     cli_usage_line(
-        stdout, "--package ID", "Bundled solo package (title content row selects outer)");
+        stdout, "--package ID", "Bundled solo package or working harbour (title content row)");
     cli_usage_line(stdout, "--waves", "Gentle crossing waves and a floating hull");
 
     cli_usage_section(stdout, "WATER AND WAKES");
@@ -654,7 +653,7 @@ static int study(int argc, char **argv)
     const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
     const char *package_id = NULL; // --package: a bundled catalog entry in runtime mode.
     const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
-    bool work_mode = false; // --work: the location's working-harbour session (SV1f).
+    bool work_mode = false; // The package has work sites: the working-harbour session (SV1f).
     const char *save_path = NULL; // --save: the work session's file (default: the data directory).
     bool fresh_work = false, save_now = false; // --new ignores a save; --save-now (tests).
     const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
@@ -790,8 +789,6 @@ static int study(int argc, char **argv)
             package_id = argv[++i];
         } else if (strcmp(argv[i], "--plugin-bridge") == 0 && i + 1 < argc) {
             bridge_path = argv[++i];
-        } else if (strcmp(argv[i], "--work") == 0) {
-            work_mode = true;
         } else if (strcmp(argv[i], "--save") == 0 && i + 1 < argc) {
             save_path = argv[++i];
         } else if (strcmp(argv[i], "--new") == 0) {
@@ -884,6 +881,14 @@ static int study(int argc, char **argv)
             goto invalid;
         }
     }
+    // A working harbour is a package like any other: a free package with work sites, named by
+    // --plugin DIR or --package ID, runs the work session.
+    if (plugin_path && package_id) {
+        fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
+        goto invalid;
+    }
+    work_mode = plugin_path ? wake_work_probe_directory(plugin_path)
+                            : package_id && wake_work_probe_catalog(package_id);
     if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
         || (!replay_path && time > 60))
         goto invalid;
@@ -982,12 +987,13 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if ((work_clock_report || work_review_pose_name) && !work_mode) {
-        fprintf(stderr, "--work-clock-report and --work-review-pose belong to --work.\n");
+        fprintf(stderr,
+            "--work-clock-report and --work-review-pose belong to a working-harbour package.\n");
         goto invalid;
     }
     if (work_clock_report && (!frame_limit || screenshot || performance_report)) {
         fprintf(stderr,
-            "--work-clock-report needs --work and --frames, with no --screenshot or "
+            "--work-clock-report needs a working-harbour package and --frames, with no --screenshot or "
             "--performance-report.\n");
         goto invalid;
     }
@@ -996,7 +1002,7 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if ((save_path || fresh_work || save_now) && !work_mode) {
-        fprintf(stderr, "--save, --new and --save-now belong to --work.\n");
+        fprintf(stderr, "--save, --new and --save-now belong to a working-harbour package.\n");
         goto invalid;
     }
     if (save_now && (!(save_path || data_dir) || screenshot || frame_limit || demo)) {
@@ -1004,16 +1010,11 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if (work_mode
-        && (plugin_path || package_id || connect_to || host_mode || course || replay_path
-            || ghost_path || wake_objects || player_wake_set || current || crossing_wake || waves
-            || start_set || skin_set || bridge_path)) {
+        && (connect_to || host_mode || course || replay_path || ghost_path || wake_objects
+            || player_wake_set || current || crossing_wake || waves || start_set || skin_set)) {
         fprintf(stderr,
-            "--work runs the location's working-harbour package; it cannot be combined with "
-            "package, room, course, replay, wake, water, start, skin or bridge options.\n");
-        goto invalid;
-    }
-    if (plugin_path && package_id) {
-        fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
+            "A working-harbour package runs its own session; it cannot be combined with "
+            "room, course, replay, wake, water, start or skin options.\n");
         goto invalid;
     }
     if (package_id && connect_to) {
@@ -1028,7 +1029,8 @@ static int study(int argc, char **argv)
                 "course, replay or ghost.\n");
             goto invalid;
         }
-        const BoatWorldDefinition *named = wake_plugin_location(plugin_path);
+        const BoatWorldDefinition *named
+            = work_mode ? wake_plugin_location_work(plugin_path) : wake_plugin_location(plugin_path);
         if (!named)
             return 1;
         if (location_set && named != location) {
@@ -1040,8 +1042,9 @@ static int study(int argc, char **argv)
     // Every solo session starts from a build-time catalog entry. Explicit --package IDs must
     // name this location's kind. The browser builds the same catalog into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
-    if (!plugin_path && !connect_to && !work_mode) {
-        BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
+    if (!plugin_path && !connect_to && !(work_mode && !package_id)) {
+        BoatPluginKind kind = work_mode               ? BOAT_PLUGIN_KIND_FREE
+            : course              ? BOAT_PLUGIN_KIND_COURSE
             : location->id == BOAT_LOCATION_OUTER ? BOAT_PLUGIN_KIND_VOYAGE
                                                   : BOAT_PLUGIN_KIND_FREE;
         catalog = package_id ? boat_plugin_catalog_find(package_id)
@@ -1214,8 +1217,8 @@ static int study(int argc, char **argv)
     }
     static WakeWork work;
     if (work_mode
-        && !wake_work_open(
-            &work, &session, &worlds[location->id], location, study_failure, sizeof(study_failure)))
+        && !wake_work_open(&work, &session, &worlds[location->id],
+            boat_plugin_host_active(&plugin.host), study_failure, sizeof(study_failure)))
         goto cleanup;
     if (work_mode) {
         // The session clock keeps running and saving; only presentation yields to an explicit
@@ -2076,6 +2079,8 @@ static int study(int argc, char **argv)
                 boat_replay_runs_reset(&session.runs);
             }
             work_frame_sent = true;
+            if (work_mode && plugin_restart && plugin_active)
+                wake_work_use(&work, boat_plugin_host_active(&plugin.host));
             if (work_mode && !wake_work_reset(&work, &session, GetTime())) {
                 // D10: back to the title; the leave-time save below still runs.
                 snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
@@ -2804,7 +2809,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 {
     char *arguments[32] = { "wake_velocity" };
     int count = 1;
-    // WORKING HARBOUR runs its own --work session, which refuses the free-ride options.
+    // WORKING HARBOUR runs its package's work session, which refuses the free-ride options.
     bool working_harbour = settings->location == BOAT_LOCATION_OUTER
         && settings->outer_content == BOAT_TITLE_OUTER_WORKING_HARBOUR;
     if (working_harbour) {
@@ -2817,7 +2822,8 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
         }
         arguments[count++] = "--location";
         arguments[count++] = "outer";
-        arguments[count++] = "--work";
+        arguments[count++] = "--package";
+        arguments[count++] = (char *)boat_title_outer_package(BOAT_TITLE_OUTER_WORKING_HARBOUR);
         if (settings->work_new)
             arguments[count++] = "--new";
         if (settings->data_dir) {
