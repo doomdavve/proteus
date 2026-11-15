@@ -28,12 +28,12 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**All five marina milestones are complete (M4 merged #209; M5 modules and the integrated example are local, PR pending); the module contract is in the [Plugin API](PLUGIN_API.md#package-modules-m5) and the open items are in the [marina plan](MARINA_AUTHORING_PLAN.md#closing-leftovers--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**All five marina milestones are complete (M4 merged #209; M5 modules and the integrated example merged #211); the module contract is in the [Plugin API](PLUGIN_API.md#package-modules-m5) and the open items are in the [marina plan](MARINA_AUTHORING_PLAN.md#closing-leftovers--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
-objectives and revisions (P5a–P5f, merged), P5g headless session recording/reconstruction
-(locally implemented), and the next task, P5h four-player/impairment/browser qualification.
+objectives and revisions, headless session recording/reconstruction and the four-player/
+impairment/browser qualification (P5a–P5i, done 2026-11-14; follow-ups are Open loops rows).
 Round-boundary revisions use protocol v14. Client objective commands remain deferred. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
 are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
@@ -48,7 +48,8 @@ scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
 twelve-berth/two-row package, M2 boat appearance and M3 routes/clearance (#201); M3 agent visual
-evidence, native/browser/Wasm qualification and closure are complete; M4 occupancy is next. The
+evidence, native/browser/Wasm qualification and closure are complete, as are M4 vessel services
+and M5 package-local modules (done 2026-11-15). The
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
 sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are
