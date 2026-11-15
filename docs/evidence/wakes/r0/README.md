@@ -2,8 +2,10 @@
 
 Owner: [wake research plan](../../../WAKE_RESEARCH_PLAN.md). Research baseline only; the
 production wake source, surface, shaders, physics, capacity and protocol are unchanged.
-Current: native CPU/GPU baseline, paired media, visible demo and full verification complete;
-budget/criteria agreement and human review remain open.
+Current: native baseline verified and reviewed by the user on 2026-11-15; local continuation
+is authorized. Behavioral/performance screens remain provisional, with existing graphics gates
+unchanged. [The plan](../../../WAKE_RESEARCH_PLAN.md#r0-user-review-and-continuation--2026-11-15)
+records the outer HDR cost concern and the decision to continue.
 
 ## Method and interpretation
 

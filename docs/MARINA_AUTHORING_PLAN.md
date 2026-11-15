@@ -5,7 +5,7 @@ one-shot resident/visitor services) is implemented and its contract moved to the
 Supported: several open/loop routes (open paths for services), tangent line/arc pieces, pairwise
 bounded clearance. Contract: [Plugin API](PLUGIN_API.md#marina-vessel-services-m4),
 [traffic](HARBOR_TRAFFIC.md), [protocol v16](MULTIPLAYER_PROTOCOL.md).
-Open: M5 local modules; M4 leftovers (parked visitor, serviced-vessel wakes, repeat, loop-path
+Open: M5 local modules; M4 leftovers (parked visitor, physical serviced-vessel wakes, repeat, loop-path
 services, browser/Wasm and room runs, watched motion review); human acceptance remains separate.
 Done when all five marina milestones are closed; M4's implementation gate is met locally.
 Next task: M4 PR on approval and the owed checks, then M5 (branch `feat/marina-m4`).
@@ -762,7 +762,9 @@ a service vessel uses its own hull, may touch only its berth's pier during docki
 empty berths are open water. Cases `marina_service_decode` and `marina_service_survey`; the full
 run passed 573/573. The JSON schema tool lists the new fields. Not yet done: the example package,
 CPU/GPU frames, browser/Wasm and room end-to-end runs, and a loop-path service.
-Limits: a serviced vessel has no visual wake yet.
+Historical M4 limit: a serviced vessel had no visual wake. Local R1 of the
+[wake research](WAKE_RESEARCH_PLAN.md#r1-design-and-source-policy--2026-11-15) now adds cosmetic
+service trails; physical waves remain a separate budgeted decision.
 
 O4 status, 2026-11-15 (macOS Debug, local): `plugins/marina-berth-demo` has two empty berths, a
 resident round trip (5–25 s) and a visitor stay (2–21 s, moored 14–16 s). CPU and GPU stills
@@ -1710,7 +1712,9 @@ a service vessel uses its own hull, may touch only its berth's pier during docki
 empty berths are open water. Cases `marina_service_decode` and `marina_service_survey`; the full
 run passed 573/573. The JSON schema tool lists the new fields. Not yet done: the example package,
 CPU/GPU frames, browser/Wasm and room end-to-end runs, and a loop-path service.
-Limits: a serviced vessel has no visual wake yet.
+Historical M4 limit: a serviced vessel had no visual wake. Local R1 of the
+[wake research](WAKE_RESEARCH_PLAN.md#r1-design-and-source-policy--2026-11-15) now adds cosmetic
+service trails; physical waves remain a separate budgeted decision.
 
 O4 status, 2026-11-15 (macOS Debug, local): `plugins/marina-berth-demo` has two empty berths, a
 resident round trip (5–25 s) and a visitor stay (2–21 s, moored 14–16 s). CPU and GPU stills

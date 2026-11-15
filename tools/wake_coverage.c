@@ -32,7 +32,8 @@ int main(int argc, char **argv)
     FILE *out = fopen(argv[2], "w");
     if (!out)
         return 1;
-    fputs("tick,service,vessel,owner,present,speed,x,z,traffic_hidden,scene_trail_quads,physical_"
+    fputs("tick,service,vessel,owner,present,speed,x,z,traffic_hidden,scene_trail_quads,vessel_"
+          "trail_quads,physical_"
           "pool_present\n",
         out);
     unsigned moving = 0, missing = 0;
@@ -51,13 +52,14 @@ int main(int argc, char **argv)
                 if (service >= 0 && present && (unsigned)service == hull.service)
                     hidden = traffic.hidden[r];
             }
-            fprintf(out, "%u,%u,%s,%d,%d,%.9g,%.9g,%.9g,%d,%d,%d\n", tick,
+            fprintf(out, "%u,%u,%s,%d,%d,%.9g,%.9g,%.9g,%d,%d,%d,%d\n", tick,
                 present ? hull.service : 0, voyage.scene.vessels[v].id,
                 present ? (int)hull.owner : -1, present, (double)speed, (double)hull.position.x,
-                (double)hull.position.z, hidden, traffic.wake_count, water.traffic_objects != NULL);
+                (double)hull.position.z, hidden, traffic.wake_count, traffic.service_wake_count[v],
+                water.traffic_objects != NULL);
             if (present && speed > .1f) {
                 ++moving;
-                if (hidden == 1 && traffic.wake_count == 0 && !water.traffic_objects)
+                if (hidden == 1 && traffic.service_wake_count[v] == 0 && !water.traffic_objects)
                     ++missing;
             }
         }

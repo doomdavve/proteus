@@ -138,7 +138,7 @@ int main(void)
         // exclusion exactly while the vessel is present.
         WaterfrontTrafficFrame traffic;
         waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, t, &traffic);
-        CHECK(traffic.vessel_count == 1 && traffic.hidden[0] && traffic.wake_count == 0);
+        CHECK(traffic.vessel_count == 1 && traffic.hidden[0]);
         if (present) {
             Vector2 sim = { -hull.position.x, hull.position.z };
             CHECK(traffic_hits(scene, t, sim));
@@ -150,6 +150,85 @@ int main(void)
             CHECK(waterfront_traffic_camera_clear_scene(scene, (Vector3) { -12, 1, 195 }, t, .3f));
         }
     }
+
+    // History is emitted by the service hull, not the hidden traffic actor, and survives
+    // docking and visitor disappearance before expiring after the finite 5.6-second window.
+    WaterfrontTrafficFrame trails, repeat;
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 0, &trails);
+    CHECK(trails.wake_count == 0);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 4, &trails);
+    CHECK(trails.wake_count > 0 && trails.wake_count == trails.service_wake_count[0]);
+    CHECK(trails.wake_count <= WATERFRONT_TRAFFIC_WAKE_SEGMENTS * 2);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, after, &trails);
+    CHECK(trails.service_wake_count[0] > 0);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, gone, &trails);
+    CHECK(trails.service_wake_count[0] > 0);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, gone + 5.7, &trails);
+    CHECK(trails.wake_count == 0);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 4, &trails);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 4, &repeat);
+    CHECK(trails.wake_count == repeat.wake_count);
+    for (int i = 0; i < trails.wake_count; ++i) {
+        CHECK(trails.wakes[i].pose.position.x == repeat.wakes[i].pose.position.x);
+        CHECK(trails.wakes[i].pose.position.z == repeat.wakes[i].pose.position.z);
+        CHECK(trails.wakes[i].pose.rotation.y == repeat.wakes[i].pose.rotation.y);
+        CHECK(trails.wakes[i].pose.scale.z == repeat.wakes[i].pose.scale.z);
+    }
+
+    // Every historical interval intersecting even a one-tick dwell is rejected. The long
+    // dock dwell also emits nothing once all earlier travelling history has expired.
+    BoatSceneDefinition stopped = *scene;
+    stopped.traffic.actors[0].open_path.pieces[0].dwell_ticks = 1;
+    waterfront_traffic_evaluate_scene(&stopped, (BoatWater) { 0 }, 6.3, &trails);
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 6.3, &repeat);
+    CHECK(trails.wake_count < repeat.wake_count);
+    stopped.traffic.actors[0].open_path.pieces[2].dwell_ticks = 1200;
+    waterfront_traffic_evaluate_scene(&stopped, (BoatWater) { 0 }, after + 6, &trails);
+    CHECK(trails.wake_count == 0);
+
+    // Four service vessels plus four ordinary actors fit the unchanged shared quad pool.
+    BoatSceneDefinition maximum = *scene;
+    maximum.vessel_count = maximum.service_count = 4;
+    maximum.berth_count = 5;
+    maximum.traffic.actor_count = 8;
+    for (unsigned i = 1; i < 4; ++i) {
+        maximum.vessels[i] = scene->vessels[0];
+        maximum.services[i] = scene->services[0];
+        maximum.berths[i + 1] = scene->berths[1];
+        maximum.traffic.actors[i] = scene->traffic.actors[0];
+        snprintf(maximum.vessels[i].id, BOAT_SCENE_TEXT, "guest%u", i);
+        snprintf(maximum.services[i].id, BOAT_SCENE_TEXT, "stay%u", i);
+        snprintf(maximum.services[i].vessel, BOAT_SCENE_TEXT, "guest%u", i);
+        snprintf(maximum.services[i].route, BOAT_SCENE_TEXT, "visit%u", i);
+        snprintf(maximum.services[i].berth, BOAT_SCENE_TEXT, "slip%u", i);
+        snprintf(maximum.berths[i + 1].id, BOAT_SCENE_TEXT, "slip%u", i);
+        snprintf(maximum.traffic.actors[i].id, BOAT_SCENE_TEXT, "visit%u", i);
+    }
+    for (unsigned i = 4; i < 8; ++i) {
+        maximum.traffic.actors[i] = scene->traffic.actors[0];
+        snprintf(maximum.traffic.actors[i].id, BOAT_SCENE_TEXT, "ordinary%u", i);
+    }
+    CHECK(boat_scene_validate(&maximum, &d));
+    waterfront_traffic_evaluate_scene(&maximum, (BoatWater) { 0 }, 4, &trails);
+    CHECK(trails.wake_count <= WATERFRONT_TRAFFIC_WAKE_CAPACITY);
+    WaterfrontRouteDefinition ordinary = maximum.traffic;
+    ordinary.actor_count = 4;
+    for (unsigned i = 0; i < 4; ++i)
+        ordinary.actors[i] = maximum.traffic.actors[i + 4];
+    waterfront_traffic_evaluate_routes(&ordinary, (BoatWater) { 0 }, 4, &repeat);
+    CHECK(trails.wake_count == 4 * trails.service_wake_count[0] + repeat.wake_count);
+    for (unsigned i = 0; i < 4; ++i)
+        CHECK(trails.service_wake_count[i] > 0 && trails.hidden[i]);
+    for (int i = 0; i < trails.wake_count; ++i)
+        CHECK(isfinite(trails.wakes[i].pose.position.x) && isfinite(trails.wakes[i].pose.scale.z));
+
+    // Stern geometry uses the vessel's appearance, even if its path actor uses another recipe.
+    BoatSceneDefinition wider = *scene;
+    wider.vessels[0].appearance.beam = 3;
+    waterfront_traffic_evaluate_scene(scene, (BoatWater) { 0 }, 4, &trails);
+    waterfront_traffic_evaluate_scene(&wider, (BoatWater) { 0 }, 4, &repeat);
+    CHECK(trails.wake_count == repeat.wake_count && trails.wake_count > 0);
+    CHECK(trails.wakes[0].pose.position.x != repeat.wakes[0].pose.position.x);
 
     // The handoff does not move the hull: the last travelling tick sits within a few millimetres
     // of the berth pose that the moored tick reports exactly.

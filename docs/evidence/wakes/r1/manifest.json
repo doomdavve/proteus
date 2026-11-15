@@ -1,0 +1,475 @@
+{
+  "schema": 1,
+  "base_revision": "f35111f6b71eb99649c9223c2a2c5a12136c30c4",
+  "candidate": "base revision plus retained candidate.patch; exact executables retained separately",
+  "platform": "Apple M1 Max, macOS 26.6.2, AppleClang 21, native Release measurements / Debug full suite",
+  "artifact_root": "/private/tmp/proteus-wake-research/build-release/wake-r1",
+  "sources": {
+    "docs/MARINA_AUTHORING_PLAN.md": "68a16ee931d17d8aae7fe1f82d52b8607d79a49fa4518cd7453a0ed0bc153e0f",
+    "docs/PLUGIN_API.md": "43b2c2cc065a56a2264b66b5d37e0e4c425de4e372c1adb1d3d4d31d68d890e1",
+    "docs/README.md": "939582e81c8833d764d1083c41dcbc48e2b7476f24b8199e119b60a12563e44e",
+    "docs/TESTING.md": "55a499cb90a6b9e071b3157025e6cba0778c5950cc53e87544ababe6f9058858",
+    "docs/WAKE_RESEARCH_PLAN.md": "259da698e577132ecf585b161ed80c2d586a8b140ff183d318036a62e5dd3c4a",
+    "docs/evidence/wakes/r0/README.md": "e898b478fa4901e45af7a6b7ea129b028b0c3121928312af8943ba904d2695bf",
+    "plugins/marina-berth-demo/README.md": "e3a01d828654f66d0818e64c75fbc68593e72f7eedf228179313244f55b0e77f",
+    "src/core/boat_service.h": "0ace31458ba7f0b7d6128dc77c5f9d0b86c4f20939f2f57398702a993c418a6b",
+    "src/core/waterfront_service.h": "881eb2230ef30ed477f1f5c8bd7a8c5746b0822b19cdd30853365c97c50f1e36",
+    "src/core/waterfront_traffic.c": "e3549768cf167faf1d96bf3c29a60b20055fd9145b717469087783771c2c4d83",
+    "src/core/waterfront_traffic.h": "614922d61c5f0eea9f545beeb4a4ee7b0f437a29d76ef11cbfc3539661f92e8b",
+    "tests/core/validate_waterfront_service.c": "530ceb7598f37cd5cc2d0d8947a0b065086320f546c87fa17dfff0f43c2f4f2a",
+    "tools/wake_coverage.c": "b7fd65f0adc849c8015233f4e31adadb014745d21e2ca01c64b19f42756d0f7a"
+  },
+  "artifacts": {
+    "banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/banner.png",
+      "sha256": "836395f0ca77105446cb018fc8ae4c39d0514a94c15a5abf43274fbc97907dd5"
+    },
+    "build-debug.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/build-debug.log",
+      "sha256": "daec8c5eba2e9cf78da48b42138b69dea618833ca692f9910d260239f9d79794"
+    },
+    "build-release.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/build-release.log",
+      "sha256": "bac30562395f9cd44b504990151f481f22fb7eb0f0fb24951e21fd107be1e86f"
+    },
+    "candidate.patch": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/candidate.patch",
+      "sha256": "6dad74cf324810e13bddc2d878934cb004780eb58ddb595c73ccadae861ba40f"
+    },
+    "chase-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/chase-contact.png",
+      "sha256": "b240631e7093187054d0929a9c1de6bf4e7f17420cb446066baee1fb48b13748"
+    },
+    "comparison.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/comparison.json",
+      "sha256": "288bfa6218be07ab7b26af5efe51e05cdce6d701c7b1e96e133f5a52bfa07e17"
+    },
+    "comparison.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/comparison.log",
+      "sha256": "6da777ea5d253ca863f321d8308fd861404c836ca10aa3237ba3cff7cb65998b"
+    },
+    "coverage.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/coverage.csv",
+      "sha256": "f33751d297231f39183372e1d57236ce0cd391c194252e378d1146ac7a82c79e"
+    },
+    "ctest-final.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/ctest-final.log",
+      "sha256": "3ca2938c0ca3cee07be1411e43f68d49c28be777f52dd0ce1c10870ee55305cb"
+    },
+    "ctest-initial.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/ctest-initial.log",
+      "sha256": "12dccad24ea28d50c3038314c0880831d431a8e1e0173f75add84e3ad4e29492"
+    },
+    "expiry-after-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-after-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "expiry-after-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-after-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "expiry-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-after.csv",
+      "sha256": "ff5dc785f8f8ceb39bb39df2ea3f7e9f3e49b7c9a029b1645e120bbdff2ba0ca"
+    },
+    "expiry-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-after.json",
+      "sha256": "44c6ffc9a30f9f1f1a7f65b558ecf5e130267cf717bf7df9325563f83ca51ca6"
+    },
+    "expiry-before-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-before-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "expiry-before-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-before-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "expiry-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-before.csv",
+      "sha256": "10003ee06ba1630a1d8bced1e4cd9ae3a25ea5dfa9f369336101f25024e8f943"
+    },
+    "expiry-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-before.json",
+      "sha256": "44c6ffc9a30f9f1f1a7f65b558ecf5e130267cf717bf7df9325563f83ca51ca6"
+    },
+    "expiry-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/expiry-contact.png",
+      "sha256": "436190a40b483b587c50a9d29f07510801c8dcece00eecb0f1f0b1c81231e237"
+    },
+    "media-after/manifest.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/manifest.json",
+      "sha256": "29ac94fe9cc139127eaa2630444301c8cac82ad96223eb371962e348b8c5255a"
+    },
+    "media-after/service-chase-baseline-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-baseline-banner.png",
+      "sha256": "9156530ad8288e855d24d44f84e56118e0922663a824fa97dc834348f7c2e2be"
+    },
+    "media-after/service-chase-baseline-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-baseline-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-after/service-chase-baseline.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-baseline.csv",
+      "sha256": "035985b939d0db271a2a5c5f5c0da5b0f9ace8ab8336a5d4d966888df6cb4268"
+    },
+    "media-after/service-chase-baseline.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-baseline.json",
+      "sha256": "f0d7e57f158b3dbe94e9f2bf022a85671cf0a300984426dd6c4e26676ebb519b"
+    },
+    "media-after/service-chase-diagnostic-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-diagnostic-banner.png",
+      "sha256": "9156530ad8288e855d24d44f84e56118e0922663a824fa97dc834348f7c2e2be"
+    },
+    "media-after/service-chase-diagnostic-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-diagnostic-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-after/service-chase-diagnostic.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-diagnostic.csv",
+      "sha256": "306af4e5f38a58f8dbde1f5b1697314ed703dc751b8bf4702fdd97f9285031db"
+    },
+    "media-after/service-chase-diagnostic.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-diagnostic.json",
+      "sha256": "7f7eb8077979e1125b0534ddaa087b65da1d6ad56961c36860b7eab8ebad7095"
+    },
+    "media-after/service-chase-field-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-field-paired.mp4",
+      "sha256": "e9a34d70fef74451adf47c7103b7b944e9ed085f4014e1a5888700eaaa47e7da"
+    },
+    "media-after/service-chase-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-chase-paired.mp4",
+      "sha256": "421acf5ba79297892d5180f2bc8b6b45c68232236e500296e599558060a0ab0c"
+    },
+    "media-after/service-overhead-baseline-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-baseline-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "media-after/service-overhead-baseline-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-baseline-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-after/service-overhead-baseline.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-baseline.csv",
+      "sha256": "bbe6dc436a77ac7cef1b0ec68b35f9b8d790ad5800eedbc29279bb31479f6469"
+    },
+    "media-after/service-overhead-baseline.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-baseline.json",
+      "sha256": "d2c9f3bf767da242b6f01867896139368414dae7a5d21e1a3c2340758e6375c4"
+    },
+    "media-after/service-overhead-diagnostic-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-diagnostic-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "media-after/service-overhead-diagnostic-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-diagnostic-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-after/service-overhead-diagnostic.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-diagnostic.csv",
+      "sha256": "f66325637f0f4ae45edd47239a643474c0359afd000f7ede90d82212f1fa47e2"
+    },
+    "media-after/service-overhead-diagnostic.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-diagnostic.json",
+      "sha256": "4970d9ba038328396beb440feceeb153c49dab51fc4760efc5e42fc10ce30be8"
+    },
+    "media-after/service-overhead-field-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-field-paired.mp4",
+      "sha256": "e9a34d70fef74451adf47c7103b7b944e9ed085f4014e1a5888700eaaa47e7da"
+    },
+    "media-after/service-overhead-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-after/service-overhead-paired.mp4",
+      "sha256": "f81b3407f0294c2a18fa014ec04d6259f9206175f48f245f533aab5d4306f506"
+    },
+    "media-before-ready/manifest.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/manifest.json",
+      "sha256": "807021c00eb2b7edb4d324424a4c7483409aa9a31b0cb0845dc9a16dde26d957"
+    },
+    "media-before-ready/service-chase-baseline-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-baseline-banner.png",
+      "sha256": "9156530ad8288e855d24d44f84e56118e0922663a824fa97dc834348f7c2e2be"
+    },
+    "media-before-ready/service-chase-baseline-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-baseline-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-before-ready/service-chase-baseline.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-baseline.csv",
+      "sha256": "a534c48c457f9232d609a1bc176d2c0a4903640a59188429a2a86a0435afaac1"
+    },
+    "media-before-ready/service-chase-baseline.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-baseline.json",
+      "sha256": "f0d7e57f158b3dbe94e9f2bf022a85671cf0a300984426dd6c4e26676ebb519b"
+    },
+    "media-before-ready/service-chase-diagnostic-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-diagnostic-banner.png",
+      "sha256": "9156530ad8288e855d24d44f84e56118e0922663a824fa97dc834348f7c2e2be"
+    },
+    "media-before-ready/service-chase-diagnostic-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-diagnostic-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-before-ready/service-chase-diagnostic.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-diagnostic.csv",
+      "sha256": "79206395f209c4911f8584d29777e2a0315a8ab07f0807242655284b79cfa533"
+    },
+    "media-before-ready/service-chase-diagnostic.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-diagnostic.json",
+      "sha256": "7f7eb8077979e1125b0534ddaa087b65da1d6ad56961c36860b7eab8ebad7095"
+    },
+    "media-before-ready/service-chase-field-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-field-paired.mp4",
+      "sha256": "e9a34d70fef74451adf47c7103b7b944e9ed085f4014e1a5888700eaaa47e7da"
+    },
+    "media-before-ready/service-chase-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-chase-paired.mp4",
+      "sha256": "28bffe8e8929546014204de4aca8c7b754ae221fd8614b1efd501a25ae13f4ac"
+    },
+    "media-before-ready/service-overhead-baseline-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-baseline-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "media-before-ready/service-overhead-baseline-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-baseline-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-before-ready/service-overhead-baseline.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-baseline.csv",
+      "sha256": "f873f5a67c7e0513c6b7c2a00f509c833bf83568fdf0bfeeaaabf737cac1fe31"
+    },
+    "media-before-ready/service-overhead-baseline.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-baseline.json",
+      "sha256": "d2c9f3bf767da242b6f01867896139368414dae7a5d21e1a3c2340758e6375c4"
+    },
+    "media-before-ready/service-overhead-diagnostic-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-diagnostic-banner.png",
+      "sha256": "ebca1c559a7c2befe66996e8106b82f288cc20b5bdadebe16f63634249d8556b"
+    },
+    "media-before-ready/service-overhead-diagnostic-field-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-diagnostic-field-banner.png",
+      "sha256": "0af1de384d6b749c7219d8ee30de4c98b23637d42d1987a09b017a5b1adb4987"
+    },
+    "media-before-ready/service-overhead-diagnostic.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-diagnostic.csv",
+      "sha256": "366f62db0932c66382f4caa71bebef3da84b560fd8c14c9b5cf04dce4996d9d6"
+    },
+    "media-before-ready/service-overhead-diagnostic.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-diagnostic.json",
+      "sha256": "4970d9ba038328396beb440feceeb153c49dab51fc4760efc5e42fc10ce30be8"
+    },
+    "media-before-ready/service-overhead-field-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-field-paired.mp4",
+      "sha256": "e9a34d70fef74451adf47c7103b7b944e9ed085f4014e1a5888700eaaa47e7da"
+    },
+    "media-before-ready/service-overhead-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/media-before-ready/service-overhead-paired.mp4",
+      "sha256": "76b566690b7edfeae5279c89bccf8d05248dc2e8858527c38c7fe5e6358e8343"
+    },
+    "overhead-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/overhead-contact.png",
+      "sha256": "15bd496042841864610ee5d0eec85967d5f502fb1d9e0d53fefa2c60332c7eb8"
+    },
+    "run_comparison.py": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/run_comparison.py",
+      "sha256": "4d9990d250189a246ad49587626b6b21786088f2c8ae2424f921659ede67ca36"
+    },
+    "service-chase-before-after.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/service-chase-before-after.mp4",
+      "sha256": "5d02638f622f6379b53436b899edeefec910cbec2f2614d4ff0af0736d584b4c"
+    },
+    "service-expiry-before-after.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/service-expiry-before-after.mp4",
+      "sha256": "381f8f473901eacb2c29934c358017d25b9ff454117eca534d59f307570019a4"
+    },
+    "service-heavy/main.lua": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/service-heavy/main.lua",
+      "sha256": "1f622a688c4bb0f7f573c58920690341f618e4c5d04f9851884841f532040333"
+    },
+    "service-heavy/plugin.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/service-heavy/plugin.json",
+      "sha256": "96b6c9f2aa40eb127a7a18f4f77e740527b4fd749eecabadbfe3ef9fa11d9c9f"
+    },
+    "service-overhead-before-after.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/service-overhead-before-after.mp4",
+      "sha256": "09f608e4b98e29554e8d0fa8e3b68e475aa335c51fd311e55df587eb50bb60b6"
+    },
+    "timing-hdr-0-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-0-after.csv",
+      "sha256": "ceedd928af3bf83867e808181738099058bb1a98e9d42776c576eb4998bf9ba6"
+    },
+    "timing-hdr-0-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-0-after.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-hdr-0-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-0-before.csv",
+      "sha256": "dcfb0e7568ac77987565305369afdbc999b16696288579f9f3083255931e3a14"
+    },
+    "timing-hdr-0-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-0-before.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-hdr-1-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-1-after.csv",
+      "sha256": "00bb912332ce9577612e41f711269cabf86683421592d75cd9220390dd5a8d47"
+    },
+    "timing-hdr-1-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-1-after.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-hdr-1-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-1-before.csv",
+      "sha256": "ad77aacb10df9791084dc5a6973c0e1ac749785dd067a426a668ab110b0f1320"
+    },
+    "timing-hdr-1-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-1-before.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-hdr-2-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-2-after.csv",
+      "sha256": "936a46a0dc14c82b88c65fef426409694cbce5c705a07e4f057de3e3acf0c605"
+    },
+    "timing-hdr-2-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-2-after.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-hdr-2-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-2-before.csv",
+      "sha256": "85f2a2568d11d250e21e686f96457af12be034b7ef3bb5e648b0b909e6bc8973"
+    },
+    "timing-hdr-2-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-hdr-2-before.json",
+      "sha256": "b4c6fa6f969961553515d7f2626443f4aec0b252a905cda4cefff3326715fb96"
+    },
+    "timing-low-0-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-0-after.csv",
+      "sha256": "b6f5aa0071ceb6ef24eb1fa97b0eb1063db1ae4c8e6956b8a8abd44ef1f9e383"
+    },
+    "timing-low-0-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-0-after.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "timing-low-0-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-0-before.csv",
+      "sha256": "8aad772271f2f1f6d8686009877cca4df23a6291da3d475bc38930bf008c8850"
+    },
+    "timing-low-0-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-0-before.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "timing-low-1-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-1-after.csv",
+      "sha256": "a1c1e27f864da9c914e508705f8cdcca20df2f84d0cb028309758bd88141d759"
+    },
+    "timing-low-1-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-1-after.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "timing-low-1-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-1-before.csv",
+      "sha256": "b0e767616d2a6188be9066f3b7d08474f90a562075a14d6b9e8ef891fb14b54a"
+    },
+    "timing-low-1-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-1-before.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "timing-low-2-after.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-2-after.csv",
+      "sha256": "63113ea16372de8047da0a34dfceef86ab81e223583986474b755839a556657d"
+    },
+    "timing-low-2-after.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-2-after.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "timing-low-2-before.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-2-before.csv",
+      "sha256": "94ae2beb9d425080d1adc89a0e7ab05612770e9fca004d18a1c78fd6ca9eb70a"
+    },
+    "timing-low-2-before.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/timing-low-2-before.json",
+      "sha256": "bb104d6c438b7f67421b2957f9ee2d11586f803d1f49f12d43ff57533b63ac89"
+    },
+    "visible.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/visible.csv",
+      "sha256": "eebfac6767a0cfe6e89062056890fdd73d36e5b2df4441bdbb08ad9d8abd5474"
+    },
+    "visible.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/visible.json",
+      "sha256": "b96ee6a7bef55076faab31fcb45c3c06cc9a6256cc04e2d30393103a27d1d42e"
+    },
+    "visible.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/visible.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "wake_research-after": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/wake_research-after",
+      "sha256": "d415ba5586ba0d2b2b4b5a84b35dff8b173f1f7efae7c3e369f14720e9ca81c1"
+    },
+    "wake_research-before": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r1/wake_research-before",
+      "sha256": "dc6f0f767d6e986dec4167ac06e60f75c9b2a072ecb77bdef9f59b1dd8483cfe"
+    }
+  },
+  "verification": {
+    "full_ctest_passed": 617,
+    "gpu_labelled": 36,
+    "full_seconds": 102.19,
+    "visible_ticks": 9600,
+    "visible_seconds": 80,
+    "timing_runs": 12,
+    "before_after_movies": 3,
+    "physical_png_pairs_identical": 300,
+    "hull_encounter_table_identical_to_r0": true
+  },
+  "limits": [
+    "provisional comparison screens, no shipping graphics gate qualification",
+    "HDR tail regressions and variability need investigation before R4 promotion",
+    "cosmetic only, no dynamic scenery wetness input",
+    "initial eligible-span maturation delay",
+    "per-emitter cost and isolated CPU render preparation unavailable",
+    "no browser/slower-GPU or human appearance/handling acceptance"
+  ],
+  "expiry_command": [
+    "BINARY",
+    "--output",
+    "PREFIX",
+    "--clip",
+    "FOLDER",
+    "--clip-start",
+    "19",
+    "--path",
+    "circle",
+    "--emitters",
+    "4",
+    "--gpu",
+    "--location",
+    "outer",
+    "--scene",
+    "plugins/marina-berth-demo",
+    "--off",
+    "--overhead"
+  ],
+  "visible_command": [
+    "caffeinate",
+    "-diu",
+    "./build-release/wake-r1/wake_research-after",
+    "--output",
+    "build-release/wake-r1/visible",
+    "--path",
+    "circle",
+    "--emitters",
+    "4",
+    "--location",
+    "outer",
+    "--scene",
+    "plugins/marina-berth-demo",
+    "--off",
+    "--overhead",
+    "--visible"
+  ],
+  "archive": {
+    "path": "/private/tmp/proteus-wake-research/build-release/wake-r1-review.tar.gz",
+    "sha256": "943ca47042f3a1ab1401c89206998fb16bedd7d6c072b8c1feea5613d4207fe1",
+    "bytes": 76766845
+  },
+  "frame_checksums": "Complete frame paths/checksums are retained in archive wake-r1/artifact-manifest.json and the media manifests."
+}

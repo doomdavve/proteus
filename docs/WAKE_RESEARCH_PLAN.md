@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: R0 native baseline and automated verification complete locally.
-Current step: R0 review and agreement on behavioral/performance screening criteria.
-Open: budget agreement, human review, browser/slower-GPU and unavailable counters.
+Status, 2026-11-15: R0 reviewed; R1 cosmetic candidate implemented and measured locally.
+Current step: R1 verified locally; review bundle retained for human review.
+Open: HDR tails/variation, human review, browser/slower-GPU and unavailable counters.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: agree R0 criteria before R1 coverage / R2 geometry candidates; no PR promotion.
+Next: R2 geometry design after R1 verification; performance acceptance stays open; no PR promotion.
 
 ## Scope and existing work
 
@@ -101,7 +101,7 @@ clips plus a common straight/turn/crossing regression reel.
 
 ## R0 — Baseline and measurement harness
 
-**Status:** implemented and natively verified; budget/criteria agreement pending. [R0 evidence bundle](evidence/wakes/r0/README.md)
+**Status:** baseline reviewed; user authorized continuation with provisional screens. [R0 evidence bundle](evidence/wakes/r0/README.md)
 owns commands, fixtures, source coverage, raw artifact locations, measurements and limits.
 Audit every moving-hull class and location/scene, naming the source,
 visual-only versus physical behavior, thresholds, and omissions. Include player/remote boats,
@@ -135,7 +135,8 @@ replace them. Record unresolved platform measurements.
 
 ## R1 — Consistent moving-hull coverage
 
-**Status:** not started; depends on R0. Establish a per-hull wake policy and test a shared
+**Status:** cosmetic-first candidate implemented, measured and natively verified locally.
+[R1 evidence](evidence/wakes/r1/README.md) owns the policy, paired motion, cost and limits. Establish a per-hull wake policy and test a shared
 emission adapter for missing classes, using actual stern motion, speed, dimensions and wetness.
 Decide explicitly which displacement boats need physical waves and which need cosmetic trails.
 Avoid duplicate wakes when an actor switches between traffic and serviced harbour ownership.
@@ -317,3 +318,70 @@ the new scene contract. Astra reviewed the native metrics and narrow scene fix w
 issue. Agent-run capture/sequence inspection and playback are recorded separately from human
 input/audio review and acceptance. R0 now awaits criteria/budget agreement, rather than graphics
 access. Platform/authority counters and human acceptance remain explicit open items.
+
+### R0 user review and continuation — 2026-11-15
+
+The user reviewed the R0 evidence as looking okay and the numbers as approximately okay,
+flagged the outer HDR row as expensive, and explicitly requested continuation with possible
+optimization later. This authorizes R1 research locally; it does not accept a new wake recipe,
+raise the gameplay graphics ceilings, or authorize a push/PR. Use R0's behavioral tolerances
+and CPU/whole-fixture GPU screens provisionally for comparisons. These are research screens,
+not a newly agreed final shipping budget. Outer HDR's synchronous enclosing p95 is 8.378 ms;
+its GPU p95 is 7.421 ms versus the wake-off interaction control's 2.425 ms. The difference is
+not isolated wake cost. Retain this concern in R4 and profile before promotion if needed.
+
+Completed task: user review of the baseline and permission to continue. Next: R1 source policy
+and candidate. Browser/slower-GPU measurements, unavailable authority counters and final
+mechanics/performance/player acceptance remain open. No additional tests are claimed here.
+
+### R1 design and source policy — 2026-11-15
+
+The user selected “Cosmetic trails first; preserve current physics.” Astra reviewed the
+minimal policy before implementation: preserve the four player slots, compiled opt-in traffic
+pool and special ferry; replace only missing serviced-vessel visual trails. Authored ordinary
+traffic and upstream scenery remain cosmetic. Physical promotion of authored/service hulls
+is deferred until it has its own source/authority/resource proposal. This resolves visible
+coverage, not physical moving-hull coverage. Working-harbour's D3 player stays independent.
+
+The candidate uses historical service hulls (resolved vessel dimensions) and a shared ribbon
+append helper. Eight samples/spans per side cover 5.6 seconds; speed/center translation above
+0.3 m/s gate emission. Historical travelling ownership, matching service identity and explicit
+dwell-interval rejection prevent joins across docking/stops, absent windows or different visits.
+Old trails survive current docking/disappearance. Negative history is rejected. Scenery routes
+are validated afloat; no dynamic wetness or arbitrary map-dry filtering is claimed by this API.
+Astra's recommendation to keep these limitations explicit is adopted.
+
+The fixed 288-quad traffic frame remains the allocation bound; four per-vessel counters add
+16 bytes to its CPU snapshot. No physical record/pool, GPU field, upload format, network or
+authority change is introduced. Focused checks exercise historical expiry, one-tick dwells,
+resolved beam, deterministic seeks and all four service slots with four ordinary actors.
+Matched motion/performance evidence and full verification follow below.
+
+### R1 measurement and retention decision — 2026-11-15
+
+Completed candidate: cosmetic historical service trails, unchanged physical sources. Twelve
+alternating native Release GPU runs retain 60 measured simulated seconds per run, plus matched
+chase/overview and late-arrival/expiry reels. Three hundred before/after physical diagnostic
+frames and the 27-case hull-encounter CSV match R0 exactly. All 351 post-maturation moving
+observations in the shipped scene have attributed trails; 16 early observations have no full
+eligible span yet. The initial span delay and lack of dynamic scenery wetness are explicit limits.
+
+Low fixture enclosing p95 increases .593 ms; HDR .387 ms, with broad HDR repetition spreads
+and >10% HDR submission/p99 regressions. Astra reviewed design, code and final measurements
+and found no blocking correctness/interpretation issue. The supervisor retains the cosmetic
+candidate for local review. Performance acceptance is **open**: investigate HDR variability
+and tails before R4 promotion; the user allowed optimization later. This fixture does not
+qualify the existing graphics ceilings or establish isolated per-emitter/CPU preparation cost.
+
+Completed task: R1 implementation, source policy, matched media/performance and review. Next:
+R2 propagation/overlap design with Astra before geometry changes.
+No physical serviced-vessel promotion, lifetime change, push or PR is authorized by this step.
+Browser/slower-GPU, missing authority counters and final human appearance/handling remain open.
+
+R1 final verification: Debug/Release builds were project-warning-clean. After correcting the
+capacity assertion, the final `ctest --preset full` passed **617/617**, including all 36 GPU
+cases, in 102.19 seconds. The 80-second / 9,600-tick visible scripted service demo completed.
+All three labeled before/after movies decode fully with 100 frames each; temporal CPU-field
+and GPU-scene samples were inspected. Changed local link targets and `git diff --check` pass.
+The [R1 bundle](evidence/wakes/r1/README.md) retains raw timing/capture provenance and limits.
+This is automated/agent verification, not human appearance acceptance or a shipping-budget pass.

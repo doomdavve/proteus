@@ -85,6 +85,98 @@ static Vector3 wake_point(int index, double time, float age, int side, bool phys
     return wake_point_routes(NULL, index, time, age, side, physical);
 }
 
+// The same unit-plane recipe serves ordinary traffic and historical service hulls.
+static void append_wake(BoatWater water, double time, WaterfrontTrafficFrame *frame, Vector3 a,
+    Vector3 b, float width, float fade, float patch_width, float patch_length)
+{
+    if (frame->wake_count >= WATERFRONT_TRAFFIC_WAKE_CAPACITY)
+        return;
+    Vector3 direction = Vector3Subtract(b, a);
+    float length = Vector3Length(direction);
+    if (!(length > 1e-5f) || !isfinite(length))
+        return;
+    Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
+    Transform3D pose
+        = boat_water_pose(water, time, center, atan2f(-direction.x, -direction.z), length, width);
+    pose.position.y += .035f;
+    pose.scale = (Vector3) { width * patch_width, 1, length * patch_length };
+    frame->wakes[frame->wake_count++] = (WaterfrontTrafficWake) { .pose = pose,
+        .color = { (unsigned char)Lerp(45, 188, fade), (unsigned char)Lerp(79, 207, fade),
+            (unsigned char)Lerp(104, 202, fade), 255 } };
+}
+
+// A segment may cross a continuous piece join, but never any dwell, however short.
+static bool service_interval(
+    const BoatSceneDefinition *scene, unsigned service, double earlier, double later)
+{
+    const BoatSceneService *s = &scene->services[service];
+    int route = boat_scene_find_route(scene, s->route);
+    if (route < 0 || earlier < 0)
+        return false;
+    const BoatRoutePath *path = &scene->traffic.actors[route].open_path;
+    uint64_t first = waterfront_service_tick(earlier), last = waterfront_service_tick(later);
+    if (path->loop || first < s->start_tick)
+        return false;
+    first -= s->start_tick;
+    last -= s->start_tick;
+    uint64_t at = 0;
+    for (unsigned i = 0; i < path->count; ++i) {
+        const BoatRoutePathPiece *p = &path->pieces[i];
+        at += p->kind == BOAT_ROUTE_PATH_LINE ? p->shape.line.duration_ticks
+                                              : p->shape.arc.duration_ticks;
+        if (p->dwell_ticks && first < at + p->dwell_ticks && last >= at)
+            return false;
+        at += p->dwell_ticks;
+    }
+    return last < at;
+}
+
+static Vector3 service_wake_point(const WaterfrontServiceHull *hull, float age, int side)
+{
+    Vector3 forward = { -sinf(hull->heading), 0, -cosf(hull->heading) };
+    Vector3 right = { -forward.z, 0, forward.x };
+    return Vector3Add(
+        Vector3Subtract(hull->position, Vector3Scale(forward, hull->spec.length * .54f)),
+        Vector3Scale(right, side * (hull->spec.beam * .42f + age * .38f)));
+}
+
+static void service_wakes(
+    const BoatSceneDefinition *scene, BoatWater water, double time, WaterfrontTrafficFrame *frame)
+{
+    _Static_assert(BOAT_SCENE_VESSELS == WATERFRONT_SERVICE_WAKE_VESSELS,
+        "service trail counters must cover the vessel slots");
+    if (!scene || !scene->services_present || !isfinite(time))
+        return;
+    // Routes are location-validated afloat; kinematic service hulls have no dynamic dry state.
+    // Sample each historical hull once and reuse it on both sides. History survives docking
+    // and disappearance; only the historical emission endpoints need to be travelling.
+    for (unsigned v = 0; v < scene->vessel_count && v < BOAT_SCENE_VESSELS; ++v) {
+        WaterfrontServiceHull samples[WATERFRONT_TRAFFIC_WAKE_SEGMENTS + 1] = { 0 };
+        bool eligible[WATERFRONT_TRAFFIC_WAKE_SEGMENTS + 1] = { false };
+        for (unsigned j = 0; j <= WATERFRONT_TRAFFIC_WAKE_SEGMENTS; ++j) {
+            double t = time - j * .7;
+            eligible[j] = t >= 0 && waterfront_service_hull(scene, v, t, &samples[j])
+                && samples[j].owner == BOAT_OWNER_TRAVELLING
+                && Vector3Length(samples[j].velocity) > .3f;
+        }
+        int before = frame->wake_count;
+        for (unsigned j = 0; j < WATERFRONT_TRAFFIC_WAKE_SEGMENTS; ++j) {
+            WaterfrontServiceHull *a = &samples[j], *b = &samples[j + 1];
+            if (!eligible[j] || !eligible[j + 1] || a->service != b->service
+                || !service_interval(scene, a->service, time - (j + 1) * .7, time - j * .7)
+                || Vector3Distance(a->position, b->position) <= .3f * .7f)
+                continue;
+            float strength = fminf(Vector3Length(a->velocity), Vector3Length(b->velocity)) / 3;
+            float width = (a->spec.mast_height > 0 ? .4f : .62f) * fminf(strength, 1);
+            float fade = (1 - (j + .5f) / WATERFRONT_TRAFFIC_WAKE_SEGMENTS) * fminf(strength, 1);
+            for (int side = -1; side <= 1; side += 2)
+                append_wake(water, time, frame, service_wake_point(a, j * .7f, side),
+                    service_wake_point(b, (j + 1) * .7f, side), width, fade, 1, 1);
+        }
+        frame->service_wake_count[v] = frame->wake_count - before;
+    }
+}
+
 static bool track_wakes(BoatWakeObjects *wakes, double time)
 {
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
@@ -171,27 +263,15 @@ static void evaluate_impl(const WaterfrontRouteDefinition *routes, const bool *s
                                    : wake_point(i, time, age, side, physical);
                 Vector3 b = routes ? wake_point_routes(routes, i, time, age + step, side, physical)
                                    : wake_point(i, time, age + step, side, physical);
-                Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
-                float length = Vector3Distance(a, b);
-                Vector3 direction = Vector3Subtract(b, a);
-                float yaw = atan2f(-direction.x, -direction.z);
                 float width = physical ? .65f + .035f * age
                     : upstream         ? (spec.mast_height > 0 ? .4f : .62f) * fminf(strength, 1)
                     : i == 3           ? .48f
                                        : .22f;
-                Transform3D pose = boat_water_pose(water, time, center, yaw, length, width);
-                pose.position.y += .035f;
-                pose.scale = (Vector3) { width, 1, length };
-                if (physical) {
-                    float variation = sinf((float)remainder(time - age, 16) * 2.3f + i * 1.7f);
-                    pose.scale.x *= .65f + .35f * variation * variation;
-                    pose.scale.z *= .65f; // Broken patches instead of solid lines across the river.
-                }
+                float variation
+                    = physical ? sinf((float)remainder(time - age, 16) * 2.3f + i * 1.7f) : 0;
                 float fade = (1 - (j + .5f) / segments) * (i == 2 ? .65f : 1);
-                frame->wakes[frame->wake_count++] = (WaterfrontTrafficWake) { .pose = pose,
-                    .color
-                    = { (unsigned char)Lerp(45, 188, fade), (unsigned char)Lerp(79, 207, fade),
-                        (unsigned char)Lerp(104, 202, fade), 255 } };
+                append_wake(water, time, frame, a, b, width, fade,
+                    physical ? .65f + .35f * variation * variation : 1, physical ? .65f : 1);
             }
     }
     bool bridge = routes ? waterfront_route_has_bridge(routes) : water.upstream;
@@ -252,6 +332,7 @@ void waterfront_traffic_evaluate_scene(
         any |= serviced[i] = waterfront_service_for_route(scene, i) >= 0;
     evaluate_impl(scene && scene->traffic_present ? &scene->traffic : NULL, any ? serviced : NULL,
         water, time, frame);
+    service_wakes(scene, water, time, frame);
 }
 
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)

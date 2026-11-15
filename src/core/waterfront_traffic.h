@@ -12,6 +12,7 @@
 #define WATERFRONT_TRAFFIC_WAKE_SEGMENTS 8
 #define WATERFRONT_TRAFFIC_WAKES (WATERFRONT_TRAFFIC_VESSELS * WATERFRONT_TRAFFIC_WAKE_SEGMENTS * 2)
 #define WATERFRONT_TRAFFIC_WAKE_CAPACITY (WATERFRONT_TRAFFIC_ALL * 16 * 2 + 32)
+#define WATERFRONT_SERVICE_WAKE_VESSELS 4
 #define WATERFRONT_TRAFFIC_LIGHTS 3
 #define WATERFRONT_TRAFFIC_RECIPE_SLOTS 8 // Registered craft recipes; slots follow the defaults.
 #define WATERFRONT_TRAFFIC_MESH_SLOTS (WATERFRONT_TRAFFIC_ALL + WATERFRONT_TRAFFIC_RECIPE_SLOTS)
@@ -45,6 +46,7 @@ typedef struct {
     bool lift; // Upstream: Hisingsbron's lift span, at LIFT_POSE (waterfront_upstream.h).
     Transform3D lift_pose;
     int wake_count;
+    int service_wake_count[WATERFRONT_SERVICE_WAKE_VESSELS]; // Per-vessel cosmetic attribution.
     WaterfrontTrafficWake wakes[WATERFRONT_TRAFFIC_WAKE_CAPACITY];
     // L3.1: borrowed accepted route definition that produced this snapshot; NULL is compiled.
     const struct WaterfrontRouteDefinition *routes;
@@ -76,7 +78,8 @@ void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTraffic
 void waterfront_traffic_evaluate_routes(const struct WaterfrontRouteDefinition *routes,
     BoatWater water, double time, WaterfrontTrafficFrame *frame);
 // M4: as evaluate_routes for SCENE, but actors whose route a service uses are hidden: the harbor
-// frame draws that vessel, so it is not drawn, lit or given a wake twice.
+// frame draws that vessel. Historical serviced hulls supply cosmetic trails exactly once;
+// these persist for up to 5.6 seconds after emission and never add physical waves.
 void waterfront_traffic_evaluate_scene(const struct BoatSceneDefinition *scene, BoatWater water,
     double time, WaterfrontTrafficFrame *frame);
 int waterfront_traffic_actor_count(const struct WaterfrontRouteDefinition *routes);
