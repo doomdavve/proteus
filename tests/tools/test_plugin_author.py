@@ -433,6 +433,146 @@ FIXTURE = ROOT / "tests/support/fixtures/plugins/modules-route"
 GOLDEN = ROOT / "tests/support/fixtures/plugin_image_golden.hex"
 
 
+class AgentWorkspace(unittest.TestCase):
+    """`init` scaffolds an agent workspace; `./wv` pins every live request from the game."""
+
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.mailbox = Path(tempfile.mkdtemp(dir=self.scratch.name))  # Private, mode 0700.
+        self.server = None
+        self.directory = Path(self.scratch.name) / "ws"
+
+    def tearDown(self):
+        if self.server:
+            (self.mailbox / "stop").write_text("")
+            self.server.wait(timeout=30)
+        self.scratch.cleanup()
+
+    def tool(self, *args, directory=None):
+        run = subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), *args],
+                             capture_output=True, timeout=60, cwd=directory)
+        return run.returncode, json.loads(run.stdout)
+
+    def wv(self, *args):
+        run = subprocess.run([str(self.directory / "wv"), *args], capture_output=True, timeout=60,
+                             cwd=self.directory)
+        return run.returncode, json.loads(run.stdout)
+
+    def init(self, *options):
+        return self.tool("init", str(self.directory), "--bridge", str(self.mailbox), *options)
+
+    def serve(self):
+        if not BRIDGE_SERVER:
+            self.skipTest("needs --bridge-server")
+        self.server = subprocess.Popen([BRIDGE_SERVER, "--serve", str(self.mailbox)], cwd=ROOT,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        while not (self.mailbox / "session").exists():
+            self.assertIsNone(self.server.poll())
+
+    def edit(self, old, new):
+        path = self.directory / "main.lua"
+        path.write_bytes(path.read_bytes().replace(old, new))
+
+    def test_init_scaffold(self):
+        code, result = self.init()
+        self.assertEqual((code, result["status"], result["example"]), (0, "ok", "langedrag"))
+        files = sorted(p.name for p in self.directory.iterdir())
+        self.assertEqual(files, [".claude", ".wv.json", "AGENTS.md", "CLAUDE.md", "main.lua",
+                                 "plugin.json", "reference", "wv"])
+        self.assertTrue(os.access(self.directory / "wv", os.X_OK))
+        self.assertEqual((self.directory / "reference/PLUGIN_API.md").read_bytes(),
+                         (ROOT / "docs/PLUGIN_API.md").read_bytes())
+        self.assertEqual((self.directory / "CLAUDE.md").read_text(), "@AGENTS.md\n")
+        self.assertIn(str(self.mailbox.resolve()), (self.directory / "AGENTS.md").read_text())
+        settings = json.loads((self.directory / ".claude/settings.json").read_text())
+        self.assertIn("Bash(./wv stage:*)", settings["permissions"]["allow"])
+        self.assertNotIn("Bash(./wv play:*)", settings["permissions"]["allow"])
+        self.assertTrue(any(str(self.mailbox.resolve()).lstrip("/") in rule
+                            for rule in settings["permissions"]["deny"]))
+        # The scaffold is a plugin the unchanged tools read: extra files are not part of it.
+        self.assertEqual(author.snapshot(self.directory),
+                         author.snapshot(ROOT / "plugins/langedrag"))
+
+    def test_init_refusals(self):
+        self.directory.mkdir()
+        (self.directory / "keep.txt").write_text("mine")
+        code, result = self.init()
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertIn("not empty", result["message"])
+        self.assertEqual([p.name for p in self.directory.iterdir()], ["keep.txt"])
+        shutil.rmtree(self.directory)
+        code, result = self.init("--example", "nope")
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertFalse(self.directory.exists())
+        code, result = self.tool("status", str(self.scratch.name))
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertIn("not a workspace", result["message"])
+
+    def test_init_from_directory(self):
+        code, result = self.init("--example", str(ROOT / "plugins/shelter-tour"))
+        self.assertEqual((code, result["example"]), (0, "shelter-tour"))
+
+    def test_check_without_game(self):
+        self.init()
+        code, result = self.wv("check")
+        self.assertEqual((code, result["status"], result["steps"]), (0, "ok",
+                                                                      ["validate", "preview"]))
+        self.assertEqual(result["gameplay_digest"], "e8509272172cb7c4")
+        self.edit(b"max_speed = 6", b"max_speed = 'six'")
+        code, result = self.wv("check")
+        self.assertNotEqual(code, 0)
+        self.assertEqual(result["diagnostic_field"], "voyage.arrival.max_speed")
+        self.assertEqual(result["operation"], "validate")
+
+    def test_no_game(self):
+        self.init()
+        for command in ("status", "stage", "undo"):
+            code, result = self.wv(command)
+            self.assertEqual((code, result["status"]), (1, "no_game"), command)
+            self.assertIn("./wv play", result["message"])
+
+    def test_pinned_stage_undo_and_held_apply(self):
+        self.init()
+        self.serve()
+        code, result = self.wv("status")
+        self.assertEqual((code, result["revision"], result["epoch"]), (0, 1, 0))
+        self.edit(b'name = "BRIDGE"', b'name = "ALVSBORG"')
+        code, result = self.wv("stage")
+        self.assertEqual((code, result["outcome"], result["revision"]), (0, "applied", 2))
+        self.assertIn("./wv undo", result["next"])
+        code, result = self.wv("apply")  # A live change holds nothing; no guessed pin.
+        self.assertEqual((code, result["status"], result["revision"]), (1, "conflict", 2))
+        code, result = self.wv("undo")
+        self.assertEqual((code, result["revision"], result["epoch"]), (0, 1, 2))
+        self.assertEqual(result["digest"], "e8509272172cb7c4")
+        # A water change is held; apply then takes its revision from the game.
+        self.edit(b"height = 1.6", b"height = 1.2")
+        code, result = self.wv("stage")
+        self.assertEqual((code, result["outcome"], result["held_change"]),
+                         (0, "held", "restart_session"))
+        self.assertIn("./wv apply", result["next"])
+        code, result = self.wv("apply")
+        self.assertEqual((code, result["outcome"], result["revision"]), (0, "applied", 3))
+        code, result = self.wv("console", "--line", "/capabilities")
+        self.assertEqual((code, result["status"]), (0, "ok"))
+        self.assertIn("voyage.define", result["output"])
+
+    def test_rejected_candidate_is_not_staged(self):
+        self.init()
+        self.serve()
+        self.edit(b"max_speed = 6", b"max_speed = 'six'")
+        code, result = self.wv("stage")
+        self.assertEqual((code, result["operation"]), (1, "validate"))
+        self.assertEqual(self.wv("status")[1]["revision"], 1)
+
+    def test_play_refuses_a_second_game(self):
+        self.init()
+        self.serve()
+        code, result = self.wv("play")
+        self.assertEqual((code, result["status"]), (1, "busy"))
+        self.assertIn(str(self.server.pid), result["message"])
+
+
 class Modules(unittest.TestCase):
     """M5 W4: packages with modules through snapshot, drafts, version 2 bundles and the worker."""
 
@@ -675,6 +815,13 @@ class Packaged(unittest.TestCase):
                 self.assertEqual((code, result["status"]), (0, "ok"), result)
             code, result = tool("preview", data["examples"][2], "--ticks", "12")
             self.assertEqual((code, result["status"]), (0, "ok"), result)
+            # An agent workspace made by the packaged tools runs its checks through them.
+            workspace = Path(scratch) / "workspace"
+            code, result = tool("init", str(workspace), "--bridge", str(Path(scratch) / "bridge"))
+            self.assertEqual((code, result["status"]), (0, "ok"), result)
+            run = subprocess.run([str(workspace / "wv"), "check"], cwd=scratch,
+                                 capture_output=True, timeout=60)
+            self.assertEqual((run.returncode, json.loads(run.stdout)["status"]), (0, "ok"))
             if GAME:
                 frame = Path(scratch) / "frame.png"
                 code, result = tool("capture", data["examples"][0], "--time", "0",

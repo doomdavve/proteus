@@ -241,6 +241,7 @@ static void usage(void)
     cli_usage_line(
         stdout, "--plugin-bridge DIR", "With --plugin, let tools/plugin_author.py live-inspect,");
     cli_usage_line(stdout, "", "stage, apply and undo revisions through the private directory");
+    cli_usage_line(stdout, "", "(saved files are then held until F5 or a tool stages them)");
 
     cli_usage_section(stdout, "MULTIPLAYER");
     cli_usage_line(stdout, "--name TEXT", "Player name");
@@ -1245,8 +1246,10 @@ static int study(int argc, char **argv)
     static WakeBridge bridge;
     if (bridge_path && !wake_bridge_open(&bridge, bridge_path, GetTime()))
         goto cleanup;
-    if (bridge_path)
+    if (bridge_path) {
         wake_bridge_commands(&bridge, &command);
+        wake_plugin_hold_saves(&plugin);
+    }
 #endif
     // An imported course package is still a time trial: use the same start, best-run path and
     // practice latch as the bundled course.

@@ -86,6 +86,9 @@ bool wake_plugin_open_catalog(
 // Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
 // evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session);
+// A live tool bridge is attached: saved files no longer stage on their own, so a tool edits the
+// directory freely and stages by request. F5 and bridge stages still read it.
+void wake_plugin_hold_saves(WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.
 bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
