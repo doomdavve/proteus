@@ -81,3 +81,32 @@ add_test(NAME ferry_cpu_screenshot COMMAND harbor_review --renderer cpu --view f
   --time 40 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/ferry-cpu.png)
 add_test(NAME harbor_cpu_screenshot COMMAND harbor_review --renderer cpu --view marina
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/harbor-marina-cpu.png)
+
+# R0 is an opt-in measurement tool: never gate tests on elapsed timing.
+add_executable(wake_research tools/wake_research.c)
+target_include_directories(wake_research PRIVATE ${raylib_SOURCE_DIR}/src)
+target_link_libraries(wake_research PRIVATE proteus_boat_session proteus_gpu proteus_plugins)
+target_compile_options(wake_research PRIVATE ${PROTEUS_WARNINGS})
+add_dependencies(wake_research proteus_assets)
+add_test(NAME wake_research_contract COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_wake_research.py $<TARGET_FILE:wake_research>
+  $<TARGET_FILE:wake_turn_probes>)
+set_tests_properties(wake_research_contract PROPERTIES LABELS "cpu;slow"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(wake_coverage tools/wake_coverage.c)
+target_link_libraries(wake_coverage PRIVATE proteus_plugins)
+target_compile_options(wake_coverage PRIVATE ${PROTEUS_WARNINGS})
+add_executable(wake_encounters tools/wake_encounters.c)
+target_link_libraries(wake_encounters PRIVATE proteus_boat_session)
+target_compile_options(wake_encounters PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_research_encounters COMMAND wake_encounters
+  ${CMAKE_CURRENT_BINARY_DIR}/wake-research-encounters)
+set_tests_properties(wake_research_encounters PROPERTIES LABELS "cpu;core;slow")
+add_executable(wake_turn_probes tools/wake_turn_probes.c)
+target_link_libraries(wake_turn_probes PRIVATE proteus_boat_core)
+target_compile_options(wake_turn_probes PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_research_coverage COMMAND wake_coverage
+  ${CMAKE_CURRENT_SOURCE_DIR}/plugins/marina-berth-demo
+  ${CMAKE_CURRENT_BINARY_DIR}/wake-research-coverage.csv)
+set_tests_properties(wake_research_coverage PROPERTIES LABELS "cpu;slow"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

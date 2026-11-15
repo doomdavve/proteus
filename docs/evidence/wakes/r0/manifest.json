@@ -1,0 +1,2636 @@
+{
+  "date": "2026-11-15",
+  "status": "R0 implementation reviewed; corrected CPU baseline complete; graphics/media qualification incomplete",
+  "base_revision": "0ba6efde793e43b4baebbc396866a6444751e73f",
+  "worktree": "/private/tmp/proteus-wake-research",
+  "primary_hardware": "Apple M1 Max, 24-core GPU, 64 GB",
+  "os": "macOS 26.6.2",
+  "compiler": "AppleClang 21",
+  "build": "Release native, no AA; Debug for CTest",
+  "sources": {
+    "tools/wake_research.c": "cf183a6f4661c656d2ffbd2b251ea9abb99f00b2887ae3be201675285faea7c7",
+    "tools/wake_research.py": "744ee69a5a9da7b23ed24c97ea1c2ce682ac8210873f413812820b2979c0b18e",
+    "tools/wake_research_media.py": "e69cff33700ee9ff6656ed541a4a21355130437b98cc58833c0d3062e6f6479a",
+    "tools/wake_coverage.c": "8b96c638b7e528211e216f183b72cc1d66e991990623156043608753b034b401",
+    "tools/wake_encounters.c": "ec6eefa7bd8cac02a9594f468ac7af81182f71205ee62cb869d1b3b44ffd9a1a",
+    "tools/wake_turn_probes.c": "06d3797bcdb01c22a9b08754b78c41b639da7e21770c78424d2c65211c3fdf86",
+    "tests/tools/test_wake_research.py": "77016acc1546371cd9d76ea5d5714d21f82071e5f0fade496d80e13842512691",
+    "tests/tools/tests.cmake": "1344efda161421f38c3a39a453851338b4d32d379dcc982484feae4177d2f09a",
+    "src/core/boat_wake_objects.c": "ba84e2f9c6dc587f216e29ba05df7cdd4ece9bb4961b1b316cbc95535031a32b",
+    "src/core/boat_wake_objects.h": "a1dad56b0b5fc048b386a6181c0df42ddd0312f6c7e132073d217e46457df831"
+  },
+  "binary": {
+    "path": "/private/tmp/proteus-wake-research/build-release/wake_research",
+    "sha256": "3663ebadea7fff27a5069675475d602abdd9d630b9ab37330e9daad995a6a503"
+  },
+  "raw_bundle": {
+    "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/r0-review.tar.gz",
+    "sha256": "c786bab0b627fd3d9be7a164694f90159437afd734b5acd4b1ad9bdefd00db39",
+    "bytes": 34685861
+  },
+  "raw_artifacts": [
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/summary.json",
+      "sha256": "aab46f15b746e3d6408c880e80eab2d845e2bf90cc4911d3f5d1c633cf477c07",
+      "bytes": 1054468
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/coverage.csv",
+      "sha256": "1034bf74ebfb155cd14d089105fbca2278dfb74e9d26c963076843e2fbf0c04b",
+      "bytes": 26495
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/coverage.log",
+      "sha256": "8f229c3fb4205463dd08f83d9744927c7b09564c95d21690ab2a9d76bb8e8190",
+      "bytes": 99
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/encounters-field.csv",
+      "sha256": "fd8da1b4d887f2b76179443fc6d2b5bf35a15324afa75a49c2b7e65b4542f7ca",
+      "bytes": 305793
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/encounters-hulls.csv",
+      "sha256": "0feabeff1fe7711f7f2ee3191eabee6556e753183244546c8b8b5b471fc28c4b",
+      "bytes": 3068
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/encounters.log",
+      "sha256": "00ac28b4ea189f33ccae77be2a3d7a3f890487a9c7c5d2b5c5caebff5548c822",
+      "bytes": 100
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/turns.csv",
+      "sha256": "5cf7c67ca782fca33a8d0ed65181fd66bb285ccb6cc1cf06c00f35279d331bcd",
+      "bytes": 1259
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/turns.log",
+      "sha256": "2709805c483096683a09b0475ecc6096fe85f7917636d1050c00c28c68c6b9c0",
+      "bytes": 93
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/coupled.log",
+      "sha256": "fa9afa782df98ddbd8382c58e2c335dd77f3ad958eb8594a1516b1fa6e6b8a21",
+      "bytes": 1570
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-aggregate.csv",
+      "sha256": "6127f179f61e6295a09373caa4e4ed0a98fb136c8db4259e430aec044e16d151",
+      "bytes": 615188
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-aggregate.json",
+      "sha256": "ee99aa36a4e0ad889d3052f94ba2df334b273b3aef4cd3a6dc9ddbd2fc4be255",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-baseline.csv",
+      "sha256": "d50a7d46d4e4f93b988b18bad9bc244ca3da93d95acbf6893c8c4021bf5e8413",
+      "bytes": 631567
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-baseline.json",
+      "sha256": "c8221827f84576be36c35c20f5f29ef77677c67586d7b8b17dac2e4c1a7284da",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-diagnostic.csv",
+      "sha256": "fd5e78f7bb3a3a52816e640cb7d2cd0950615364637e3ff5c39091379a81d0c0",
+      "bytes": 677551
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-diagnostic.json",
+      "sha256": "0357eee46cd12c0ebaa562e00d3919c4bec5328fc6fe54f18582ff3eaa4099d4",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-off.csv",
+      "sha256": "c5bd9d80916c45fb804ffe1109425e441c006683a8ee33e75e78b898b3fba0a8",
+      "bytes": 374530
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-0-off.json",
+      "sha256": "1257054149d1566b06c4dfe15401bc75cb3fbf5a51ddc5e5176d76269a0c9b46",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-diagnostic.csv",
+      "sha256": "29922ad4ba803d2d19fd62ed76b8d5e1c6d704b1318bdc43c07381e9c54de767",
+      "bytes": 678933
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-diagnostic.json",
+      "sha256": "0357eee46cd12c0ebaa562e00d3919c4bec5328fc6fe54f18582ff3eaa4099d4",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-baseline.csv",
+      "sha256": "716de2c2294d7e351fac7cc331c26d9046e07b7056d8cb060545e8a153b8184c",
+      "bytes": 635388
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-baseline.json",
+      "sha256": "c8221827f84576be36c35c20f5f29ef77677c67586d7b8b17dac2e4c1a7284da",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-aggregate.csv",
+      "sha256": "1986cc6d4c26b8cc4239d3b6c70788e01c026e99686cf9e13c5e462fef6ca8c9",
+      "bytes": 612772
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-aggregate.json",
+      "sha256": "ee99aa36a4e0ad889d3052f94ba2df334b273b3aef4cd3a6dc9ddbd2fc4be255",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-off.csv",
+      "sha256": "9b636173caad2376320f7dbba57d3842c45352e42ee2fbbcf1d4b75f1a7dcb38",
+      "bytes": 372419
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-1-off.json",
+      "sha256": "1257054149d1566b06c4dfe15401bc75cb3fbf5a51ddc5e5176d76269a0c9b46",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-aggregate.csv",
+      "sha256": "b2c3a2118bc6d644641db8e4f92b23a8562b7ca091bff24af41268602ec5f615",
+      "bytes": 615396
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-aggregate.json",
+      "sha256": "ee99aa36a4e0ad889d3052f94ba2df334b273b3aef4cd3a6dc9ddbd2fc4be255",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-baseline.csv",
+      "sha256": "69dbe5e8da552b04c2dac747d9b7b4bb1800c70586cef5667224839d4642c325",
+      "bytes": 634320
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-baseline.json",
+      "sha256": "c8221827f84576be36c35c20f5f29ef77677c67586d7b8b17dac2e4c1a7284da",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-diagnostic.csv",
+      "sha256": "a073df81b998445b13a3ebfe7a4cb3723446c5f24ec3c79bfa26a8ad28cb8357",
+      "bytes": 676818
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-diagnostic.json",
+      "sha256": "0357eee46cd12c0ebaa562e00d3919c4bec5328fc6fe54f18582ff3eaa4099d4",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-off.csv",
+      "sha256": "35249ec9b78a46406b43bd7d59b4159d79341d0793ed73dc65f059dc638e6295",
+      "bytes": 373135
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dense-2-off.json",
+      "sha256": "1257054149d1566b06c4dfe15401bc75cb3fbf5a51ddc5e5176d76269a0c9b46",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-aggregate.csv",
+      "sha256": "8766fbcb1437ef16b55ff7bf6e32ac696286afbf53992685abe8795b65bc4152",
+      "bytes": 615572
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-aggregate.json",
+      "sha256": "67d916197847aa7985133daedd72de01a2ca4368c52663f1afc71cfdf1e06f59",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-baseline.csv",
+      "sha256": "3f17c73617a8a27c5199469c4591380d15e49d678996f49d20e843ee48a9a3de",
+      "bytes": 636708
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-baseline.json",
+      "sha256": "fdd8d7a026e06493d8f575295d4b6caa777b2500e54c63c96b594f665c01e2bd",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-diagnostic.csv",
+      "sha256": "d397a37cf554b5af19d45520af481dfeaa0b853847c6fc03275361b068f6edb5",
+      "bytes": 675559
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-diagnostic.json",
+      "sha256": "4f73ee2f384ed530cc1e3aaaec781bd5588055b475009e58c9549cdb4ea793c2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-off.csv",
+      "sha256": "c0084ae339ac1bbe9691f607c03755fe15c3adc0051e28dd1c07a0496180116a",
+      "bytes": 372737
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-0-off.json",
+      "sha256": "4d0793925e718251b6dd55ed3af6c3004a3ef6c96c72218299fade13886576ac",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-diagnostic.csv",
+      "sha256": "68fc814190fe0c818859ab3f97adc05e3446d031803d766381299a4f69bdf962",
+      "bytes": 676579
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-diagnostic.json",
+      "sha256": "4f73ee2f384ed530cc1e3aaaec781bd5588055b475009e58c9549cdb4ea793c2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-baseline.csv",
+      "sha256": "cbf7ae7bcc198f2ed36c9fef00e07d74038ac2dfc25ee67565adbb43e735cfd0",
+      "bytes": 636747
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-baseline.json",
+      "sha256": "fdd8d7a026e06493d8f575295d4b6caa777b2500e54c63c96b594f665c01e2bd",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-aggregate.csv",
+      "sha256": "6a7e2acc7249a2ca71a818bf161531c66bc7983011bf6506c0f06778af4db84a",
+      "bytes": 615518
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-aggregate.json",
+      "sha256": "67d916197847aa7985133daedd72de01a2ca4368c52663f1afc71cfdf1e06f59",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-off.csv",
+      "sha256": "cfd5c9304fabc4216d52638e97616a7c6a40f4a5f82a64a51213570e8525d875",
+      "bytes": 371076
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-1-off.json",
+      "sha256": "4d0793925e718251b6dd55ed3af6c3004a3ef6c96c72218299fade13886576ac",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-aggregate.csv",
+      "sha256": "d129e9cbb44cc6fe26675baa29f86bbb8e2d4dba6dae126b1ede9b0aa8af9a23",
+      "bytes": 614774
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-aggregate.json",
+      "sha256": "67d916197847aa7985133daedd72de01a2ca4368c52663f1afc71cfdf1e06f59",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-baseline.csv",
+      "sha256": "af598410767088e85685705e6a64156928582eca650ee1b38a333e1b79aa676c",
+      "bytes": 633693
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-baseline.json",
+      "sha256": "fdd8d7a026e06493d8f575295d4b6caa777b2500e54c63c96b594f665c01e2bd",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-diagnostic.csv",
+      "sha256": "02f5f3bad11a8f03cebae5e6a3f1f8d11647b1aa27d283d33a321be6749845aa",
+      "bytes": 676804
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-diagnostic.json",
+      "sha256": "4f73ee2f384ed530cc1e3aaaec781bd5588055b475009e58c9549cdb4ea793c2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-off.csv",
+      "sha256": "3ffb1dafd53d87b91f3a5811a0adeb8219dd011557270fe6de5f8af57cdf2c1e",
+      "bytes": 373738
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-1-dispersed-2-off.json",
+      "sha256": "4d0793925e718251b6dd55ed3af6c3004a3ef6c96c72218299fade13886576ac",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-aggregate.csv",
+      "sha256": "430eda084e87aa586b9222c934b86595ec2ece9f7516633299997cf188f0a503",
+      "bytes": 626417
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-aggregate.json",
+      "sha256": "4ffd066609256d6b43a8bab6b90367f0a750e70bc18a523c34cd55a46cf37028",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-baseline.csv",
+      "sha256": "c6cad3bdcbadb8a1861f6ff1c6ee9fc06f34bde4d963b0a8ef4ad10a20b6561f",
+      "bytes": 650412
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-baseline.json",
+      "sha256": "c3f6e8277f1c7a85962f8ad81d81ef3883f6c9b7024fc7c79329a336cec24643",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-diagnostic.csv",
+      "sha256": "1c6ee9658bc1eda6920ae1a6acd083e1a8b36891a17314e2b3c4748450fc0546",
+      "bytes": 699216
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-diagnostic.json",
+      "sha256": "85025e45ded81457f8d6ba1213fdf93ebf3b0994a06d3201168df1d0c519af12",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-off.csv",
+      "sha256": "30ee9cee22fa5ab68bdd574b3b1a5ff250426c497e3669b7a49444b0bf2a5859",
+      "bytes": 380477
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-0-off.json",
+      "sha256": "69f445dd564f713b485c558b56ceaffa230ddae99533148a217f4275e609a299",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-diagnostic.csv",
+      "sha256": "fe5d95e6455c00b4e46ccc9f6c5f63162e683d5bff918bff05cb85c72da2a869",
+      "bytes": 699870
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-diagnostic.json",
+      "sha256": "85025e45ded81457f8d6ba1213fdf93ebf3b0994a06d3201168df1d0c519af12",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-baseline.csv",
+      "sha256": "bf277fbe7b5e9b4e1e90e6c28f8efd674d3ff90f0ea5a626eef9fc19889a7e71",
+      "bytes": 651406
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-baseline.json",
+      "sha256": "c3f6e8277f1c7a85962f8ad81d81ef3883f6c9b7024fc7c79329a336cec24643",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-aggregate.csv",
+      "sha256": "ac5de2c0a2a94afb9dd66ee68250dff5a9939aceb88c74573b1cc7c22cb20ab9",
+      "bytes": 626413
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-aggregate.json",
+      "sha256": "4ffd066609256d6b43a8bab6b90367f0a750e70bc18a523c34cd55a46cf37028",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-off.csv",
+      "sha256": "8743fc24996eecc249f8e314ba643bef9335e1b2607de746310d569b8d8f2a42",
+      "bytes": 379249
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-1-off.json",
+      "sha256": "69f445dd564f713b485c558b56ceaffa230ddae99533148a217f4275e609a299",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-aggregate.csv",
+      "sha256": "d719d769c36348f230bb1561171c05e11b477568ac819fda1eef126c9ae7cf2a",
+      "bytes": 626401
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-aggregate.json",
+      "sha256": "4ffd066609256d6b43a8bab6b90367f0a750e70bc18a523c34cd55a46cf37028",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-baseline.csv",
+      "sha256": "a3a3c080d247a9766433044087beb8461c6b5abd57e1516411cd9c0f84de405d",
+      "bytes": 651222
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-baseline.json",
+      "sha256": "c3f6e8277f1c7a85962f8ad81d81ef3883f6c9b7024fc7c79329a336cec24643",
+      "bytes": 731
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-diagnostic.csv",
+      "sha256": "d776ea1e429bf36e726b967e6ff7cc45138178ca7ea5e84c6f6dd5360d9642de",
+      "bytes": 701192
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-diagnostic.json",
+      "sha256": "85025e45ded81457f8d6ba1213fdf93ebf3b0994a06d3201168df1d0c519af12",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-off.csv",
+      "sha256": "6ac1ee9ae600f36b143865827882fff54bf30897d4447d33dc0d516050f7c323",
+      "bytes": 379630
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dense-2-off.json",
+      "sha256": "69f445dd564f713b485c558b56ceaffa230ddae99533148a217f4275e609a299",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-aggregate.csv",
+      "sha256": "de403dd40e16a76d112001559e919536bf96d2cdb8406f5aed3f548743754788",
+      "bytes": 630726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-aggregate.json",
+      "sha256": "29c6b52aa470ef51265041c4150414de81fd336719fab6ca86854e74bb95d20c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-baseline.csv",
+      "sha256": "9dbc05e31d04a26f6a6b3bc5369cec10149145e145cff529d5be9302097dfdd5",
+      "bytes": 656525
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-baseline.json",
+      "sha256": "f31434338276484c0e2ddc47c7bbe2664e3a418fc0738f4d742299386ba5b340",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-diagnostic.csv",
+      "sha256": "49e64a435c920a13575ada704c81990786b75c8fdfa5f90897478e151ed5f07b",
+      "bytes": 703932
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-diagnostic.json",
+      "sha256": "04d66b425e05de1ba10ca45ecb2a276ca437b2a4835277294eef2facbd898e84",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-off.csv",
+      "sha256": "b80ff68bf7f96995391c036b15e3505dc98b2ec7216a0b2ddd96d4125ee2b395",
+      "bytes": 379645
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-0-off.json",
+      "sha256": "3c7ce3d4711d4fe1d1c21d993228085a5736c2345161d6ae4919f3242fffd95f",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-diagnostic.csv",
+      "sha256": "8039ebca7978e2a766e28984fc21bbe1491fb007f264b9ad3408de62a4bba780",
+      "bytes": 703990
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-diagnostic.json",
+      "sha256": "04d66b425e05de1ba10ca45ecb2a276ca437b2a4835277294eef2facbd898e84",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-baseline.csv",
+      "sha256": "79133de2009cade8a08df94c3db816d19fff47843073d2d77c701cddc72ed828",
+      "bytes": 656233
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-baseline.json",
+      "sha256": "f31434338276484c0e2ddc47c7bbe2664e3a418fc0738f4d742299386ba5b340",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-aggregate.csv",
+      "sha256": "9f914817c423ef383ceed815eb67bc40d01c4364499957524dd130376cb31ad0",
+      "bytes": 631100
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-aggregate.json",
+      "sha256": "29c6b52aa470ef51265041c4150414de81fd336719fab6ca86854e74bb95d20c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-off.csv",
+      "sha256": "44ef25e56de4fcc4232c3583411be9be542fd8d127f29aafd28911046409c317",
+      "bytes": 380802
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-1-off.json",
+      "sha256": "3c7ce3d4711d4fe1d1c21d993228085a5736c2345161d6ae4919f3242fffd95f",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-aggregate.csv",
+      "sha256": "cccfcc4980ca4c3276bcba3468c53bb118eb9d4f3e6067d0dea25d8e3d484db0",
+      "bytes": 631094
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-aggregate.json",
+      "sha256": "29c6b52aa470ef51265041c4150414de81fd336719fab6ca86854e74bb95d20c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-baseline.csv",
+      "sha256": "28551de3fc244c2e333cc698c1a28a94fe318d372e931ed25e0d3b637eec4d38",
+      "bytes": 656605
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-baseline.json",
+      "sha256": "f31434338276484c0e2ddc47c7bbe2664e3a418fc0738f4d742299386ba5b340",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-diagnostic.csv",
+      "sha256": "bd6a357396aef006e1a956d322892a7b6c9befcbf6a3d9efe00ce3f73b6df708",
+      "bytes": 703775
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-diagnostic.json",
+      "sha256": "04d66b425e05de1ba10ca45ecb2a276ca437b2a4835277294eef2facbd898e84",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-off.csv",
+      "sha256": "4bc907a67eb1d5ea017c98f9048f1de3756c83797bcbc7022685026f3d4d6c75",
+      "bytes": 380259
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/straight-4-dispersed-2-off.json",
+      "sha256": "3c7ce3d4711d4fe1d1c21d993228085a5736c2345161d6ae4919f3242fffd95f",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-aggregate.csv",
+      "sha256": "31b6676cd3ebf28e210347088e021a9c939117c36e3ae219fa7be6b0985f3817",
+      "bytes": 622626
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-aggregate.json",
+      "sha256": "fe3bf0d78a0a3c3dd67d9338966df14863f90dc9635481d4aee494de3943319e",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-baseline.csv",
+      "sha256": "ef5973c888949ea43c849aa8af886939a272a65da64c1b5638dffba6ccf22418",
+      "bytes": 635484
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-baseline.json",
+      "sha256": "9f64ae9f218780faf9f82ffe4433fd0885fc0813ea82e28c9619ab6f5f8908d3",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-diagnostic.csv",
+      "sha256": "9dac989220fa3a605e3e34fdca9cde1887a6ff43cc5f2c54e95883f1baf81b9f",
+      "bytes": 687652
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-diagnostic.json",
+      "sha256": "b37a74bd8283e870413f27cccd999fd8e2c91a22a68fe36bce89fc8b6d91c310",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-off.csv",
+      "sha256": "e808fcad69c3cb109b2837e6c6dc7c8d4e34160f3abe2443cb75698d5edab7d5",
+      "bytes": 371816
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-0-off.json",
+      "sha256": "9243d37d4457c1c8270bc3accdc5f157f65de8ff695b4748a38cb431c60fa3ec",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-diagnostic.csv",
+      "sha256": "a032dface0f56b35759f72b82304196f895496faa07eda1155a6b413eae30700",
+      "bytes": 687359
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-diagnostic.json",
+      "sha256": "b37a74bd8283e870413f27cccd999fd8e2c91a22a68fe36bce89fc8b6d91c310",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-baseline.csv",
+      "sha256": "ea9a4afe6c0e869356162da7b23ef7e9aeb3d469797ee0ab0adb1d90fb3b86a1",
+      "bytes": 636115
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-baseline.json",
+      "sha256": "9f64ae9f218780faf9f82ffe4433fd0885fc0813ea82e28c9619ab6f5f8908d3",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-aggregate.csv",
+      "sha256": "9c8b347f8f2914d078392dde4334271c59d10bd8831328353bc343d721c65ac5",
+      "bytes": 622700
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-aggregate.json",
+      "sha256": "fe3bf0d78a0a3c3dd67d9338966df14863f90dc9635481d4aee494de3943319e",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-off.csv",
+      "sha256": "a29772d8805eb82cbfdc863b317bf06b987f03ac7c97f9a22a8cde003b77a035",
+      "bytes": 372455
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-1-off.json",
+      "sha256": "9243d37d4457c1c8270bc3accdc5f157f65de8ff695b4748a38cb431c60fa3ec",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-aggregate.csv",
+      "sha256": "a4a8940cfd4d68f3bf882ce02cb53cd5a0cfd612673398a6de77902010c25429",
+      "bytes": 623956
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-aggregate.json",
+      "sha256": "fe3bf0d78a0a3c3dd67d9338966df14863f90dc9635481d4aee494de3943319e",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-baseline.csv",
+      "sha256": "b6381575fa17b944621e4493c985170f964956d12e2138094038a5c9ea2107d2",
+      "bytes": 635716
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-baseline.json",
+      "sha256": "9f64ae9f218780faf9f82ffe4433fd0885fc0813ea82e28c9619ab6f5f8908d3",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-diagnostic.csv",
+      "sha256": "3b3d17846d45aa529adead6b74f84c659547a40916b9cb8b92914b67c689eac0",
+      "bytes": 688214
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-diagnostic.json",
+      "sha256": "b37a74bd8283e870413f27cccd999fd8e2c91a22a68fe36bce89fc8b6d91c310",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-off.csv",
+      "sha256": "b42606f4b3a1df1315750975c7ba23c911e0ef829ea2085aef976732d8f6d62f",
+      "bytes": 372008
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dense-2-off.json",
+      "sha256": "9243d37d4457c1c8270bc3accdc5f157f65de8ff695b4748a38cb431c60fa3ec",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-aggregate.csv",
+      "sha256": "61ed83f0b424a61e4e0ca17d1db134c77b659a63fe72d9bd43067fc8dcac6f0d",
+      "bytes": 623318
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-aggregate.json",
+      "sha256": "54c17c3957425f352ecb2600931013b598b1cd2938ca97256ddd8ec414265f84",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-baseline.csv",
+      "sha256": "3321961fa3a02f8f72a75e1c34a05662fe1210b2e8de1a2a5b8730697c32572b",
+      "bytes": 636916
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-baseline.json",
+      "sha256": "1e30bc9cabce41c08dca3fb41792314c229bfb362a036bf2e8cc6c2287b58895",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-diagnostic.csv",
+      "sha256": "cad602310c8ee075b220e5350a30735e6453d71e228de87b49973b60a1e28c27",
+      "bytes": 684898
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-diagnostic.json",
+      "sha256": "77e751e688b3f995ff03dc3a418094c092f571755677334130bbaafd66d7a7aa",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-off.csv",
+      "sha256": "a73f4cda9b9b074d021ff240a6a252e51633895bc283fa0f133104aa1c040426",
+      "bytes": 374039
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-0-off.json",
+      "sha256": "3e487657db9e2153c12419552be584c69f27a78e69ef1b8c617454e376c13b47",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-diagnostic.csv",
+      "sha256": "b403353c4f450cb8ee5009224b8421057509ae657752936ad08161586dd810c1",
+      "bytes": 685363
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-diagnostic.json",
+      "sha256": "77e751e688b3f995ff03dc3a418094c092f571755677334130bbaafd66d7a7aa",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-baseline.csv",
+      "sha256": "a14147793a7b2b4fd08a6f03a89c4de884268d9f71305de3d597c68ae7f71493",
+      "bytes": 636841
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-baseline.json",
+      "sha256": "1e30bc9cabce41c08dca3fb41792314c229bfb362a036bf2e8cc6c2287b58895",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-aggregate.csv",
+      "sha256": "c5a82c841ddbb7244cc07535240fb95507d3fefc41c8f53293928752bb8b0c28",
+      "bytes": 623364
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-aggregate.json",
+      "sha256": "54c17c3957425f352ecb2600931013b598b1cd2938ca97256ddd8ec414265f84",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-off.csv",
+      "sha256": "f151fb69599e3180fc5e81ffb570c6ea80d87df3021d67d16653cd5ee59c6862",
+      "bytes": 373843
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-1-off.json",
+      "sha256": "3e487657db9e2153c12419552be584c69f27a78e69ef1b8c617454e376c13b47",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-aggregate.csv",
+      "sha256": "ee2182f72e304ea45f3d69d2f25558d6d6d890ef4d7e8e509e55d4d5285f14cc",
+      "bytes": 623288
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-aggregate.json",
+      "sha256": "54c17c3957425f352ecb2600931013b598b1cd2938ca97256ddd8ec414265f84",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-baseline.csv",
+      "sha256": "70b2bcab2d06457d4b56b50eab556164560604355834fe418c0d2f73f6ae8368",
+      "bytes": 636856
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-baseline.json",
+      "sha256": "1e30bc9cabce41c08dca3fb41792314c229bfb362a036bf2e8cc6c2287b58895",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-diagnostic.csv",
+      "sha256": "904e27bba363580ff61f916c30831af57a66d4ee8284b22c5a5ba4513ba4b0ad",
+      "bytes": 683946
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-diagnostic.json",
+      "sha256": "77e751e688b3f995ff03dc3a418094c092f571755677334130bbaafd66d7a7aa",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-off.csv",
+      "sha256": "6296b9515aaf4bb9194f1998638383725bd1446e390d8938cc8f9f30cf1fc00b",
+      "bytes": 374651
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-1-dispersed-2-off.json",
+      "sha256": "3e487657db9e2153c12419552be584c69f27a78e69ef1b8c617454e376c13b47",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-aggregate.csv",
+      "sha256": "ef5f672f9a26df6b7149fa00109ac91b40ac95cc2315b7d0a604fa2b8fa6c88e",
+      "bytes": 632680
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-aggregate.json",
+      "sha256": "a7c1fc7277779e83210dffdb5eed48176a1927652dfaeb5b3ea3bb917c1111c6",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-baseline.csv",
+      "sha256": "0842d4b909f87125124330f79f011f3c0e360d72129ac8ea15afdf85ed3b5a17",
+      "bytes": 661435
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-baseline.json",
+      "sha256": "97cbac49c9c6f03d8179d81f7d8f11bf1d7bed546c1940568a58be063de64b9d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-diagnostic.csv",
+      "sha256": "91ce80b0556e3d47b6480879da5010bdb3828b91dbc4ca48bae8b0dd492120c1",
+      "bytes": 709467
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-diagnostic.json",
+      "sha256": "813c489a9879e2509663d710758cbc28f03703a7e568537ba0c477e1611cbc70",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-off.csv",
+      "sha256": "b536e8e7e6716d2dd25ddd806bce40123c18e6a42a428bc6cf5bafda7133663b",
+      "bytes": 381146
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-0-off.json",
+      "sha256": "4150ac1d4a73b86fe4408457073e74370a58167a95412315975b556afd8e7e7e",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-diagnostic.csv",
+      "sha256": "20f59cf3c4c46d30e98d71a04fe2211ae7e6970040cb862470d4acabea82219f",
+      "bytes": 709409
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-diagnostic.json",
+      "sha256": "813c489a9879e2509663d710758cbc28f03703a7e568537ba0c477e1611cbc70",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-baseline.csv",
+      "sha256": "ddcd489c2192dfe45f4e10a6dcc4badc4de147cccb933bc5a1513427fe23e8f8",
+      "bytes": 662336
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-baseline.json",
+      "sha256": "97cbac49c9c6f03d8179d81f7d8f11bf1d7bed546c1940568a58be063de64b9d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-aggregate.csv",
+      "sha256": "94242d99caee9efec342e4702fd009776cf33984567ece01941493ad13f3eb60",
+      "bytes": 630766
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-aggregate.json",
+      "sha256": "a7c1fc7277779e83210dffdb5eed48176a1927652dfaeb5b3ea3bb917c1111c6",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-off.csv",
+      "sha256": "65e1b85de9a07b4003c2e033f22147ec517da89e054f8000ae223cea6402406c",
+      "bytes": 381976
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-1-off.json",
+      "sha256": "4150ac1d4a73b86fe4408457073e74370a58167a95412315975b556afd8e7e7e",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-aggregate.csv",
+      "sha256": "531f3f42f7ff4be6e61992cf8e0b93694430264a3d3061c9dd2301a992aad454",
+      "bytes": 632122
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-aggregate.json",
+      "sha256": "a7c1fc7277779e83210dffdb5eed48176a1927652dfaeb5b3ea3bb917c1111c6",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-baseline.csv",
+      "sha256": "ebd5b14acb0ed9382b7b7c2268262f6a04bb153018073ec791bb8645e54e602c",
+      "bytes": 662496
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-baseline.json",
+      "sha256": "97cbac49c9c6f03d8179d81f7d8f11bf1d7bed546c1940568a58be063de64b9d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-diagnostic.csv",
+      "sha256": "705db750cd2cfff9b76ab05598325c47b6962d3c92ec7e845078c7ad2e43c1d2",
+      "bytes": 709840
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-diagnostic.json",
+      "sha256": "813c489a9879e2509663d710758cbc28f03703a7e568537ba0c477e1611cbc70",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-off.csv",
+      "sha256": "6298be7feda6a4838db8bf02cf8da99045e9edada10fd4a3f5c2c669ad9c6ddf",
+      "bytes": 383661
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dense-2-off.json",
+      "sha256": "4150ac1d4a73b86fe4408457073e74370a58167a95412315975b556afd8e7e7e",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-aggregate.csv",
+      "sha256": "0e98f4ff280bbde2374be87e466d8f5dbb278d395ae2201ebd33776353c3322b",
+      "bytes": 634968
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-aggregate.json",
+      "sha256": "fae84091ccaa9828f4fc31214f3754a496b21c74d607369f0a4c849c5dfd7968",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-baseline.csv",
+      "sha256": "cab5a983797b1b3c56a8e7ce343210d58886415a9e90cb025d524d800feb18ca",
+      "bytes": 663654
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-baseline.json",
+      "sha256": "40c4989aaab99d7f818f674a478f57939fdc7c99879b89ea332e8d82c48f683a",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-diagnostic.csv",
+      "sha256": "cd00f527c36fac20102979dc013b303e952d547709b02b03dff75907ac348b99",
+      "bytes": 712060
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-diagnostic.json",
+      "sha256": "a8e95f04dd670fa25d2e739171c62d2952395ff77e1be33b12b6af331f629661",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-off.csv",
+      "sha256": "f4a7ce9b03934ee32a66d00d9683214805481a601737821eff1e2a87d53b36b1",
+      "bytes": 381425
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-0-off.json",
+      "sha256": "0dbfece08dacc9ee796a5b14d60ef1fdba28e10307b9ebeb6d50c093a1946e99",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-diagnostic.csv",
+      "sha256": "5a2d843a316ad6ce4c0ead1178dff43669f81a54630000d70327c381cfe80794",
+      "bytes": 713241
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-diagnostic.json",
+      "sha256": "a8e95f04dd670fa25d2e739171c62d2952395ff77e1be33b12b6af331f629661",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-baseline.csv",
+      "sha256": "c01ac616bb94293dda8c15a02ac51d841f6a57b85675b57eaa8a61f57662c04c",
+      "bytes": 663068
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-baseline.json",
+      "sha256": "40c4989aaab99d7f818f674a478f57939fdc7c99879b89ea332e8d82c48f683a",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-aggregate.csv",
+      "sha256": "1cc343349a29c5a570c249e5f5ae7d2d6483739a2ab0fea7318944d807789cd6",
+      "bytes": 635242
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-aggregate.json",
+      "sha256": "fae84091ccaa9828f4fc31214f3754a496b21c74d607369f0a4c849c5dfd7968",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-off.csv",
+      "sha256": "220e9086648f097456c99c0db1c616166d291af8b266e718fa54347efa059309",
+      "bytes": 383634
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-1-off.json",
+      "sha256": "0dbfece08dacc9ee796a5b14d60ef1fdba28e10307b9ebeb6d50c093a1946e99",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-aggregate.csv",
+      "sha256": "434aed2dd887aede770dce30204e45bd3531872c477ab2cca9e107cab2da67a8",
+      "bytes": 635438
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-aggregate.json",
+      "sha256": "fae84091ccaa9828f4fc31214f3754a496b21c74d607369f0a4c849c5dfd7968",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-baseline.csv",
+      "sha256": "ef3e566244a06f5755adb2a536498aeb95f26d4e3be8b0ce4bc1ea9d4774e94b",
+      "bytes": 661929
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-baseline.json",
+      "sha256": "40c4989aaab99d7f818f674a478f57939fdc7c99879b89ea332e8d82c48f683a",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-diagnostic.csv",
+      "sha256": "ec99bdcb181d0f5e5810c973104dbeb9c77ac61814823f1c4fc0d652742d498a",
+      "bytes": 710147
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-diagnostic.json",
+      "sha256": "a8e95f04dd670fa25d2e739171c62d2952395ff77e1be33b12b6af331f629661",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-off.csv",
+      "sha256": "95cd9254f3188cb02dd78e03184bd67e5296cc5a56bf3ba686e9535a488a1b7f",
+      "bytes": 380883
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/wide-4-dispersed-2-off.json",
+      "sha256": "0dbfece08dacc9ee796a5b14d60ef1fdba28e10307b9ebeb6d50c093a1946e99",
+      "bytes": 722
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-aggregate.csv",
+      "sha256": "9de537da1cd51ccbe5267e06e73773150a88bdea878e4a2224b68bbab59cfea7",
+      "bytes": 683741
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-aggregate.json",
+      "sha256": "c80bb57513eabdbb5a44e263091f1fb7f3b492de1825ee8bbabc29caccc1eb76",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-baseline.csv",
+      "sha256": "c04319ad7b7b499df7a7cfb3450aa5d340052cf4273922c0e75867b2d7e97c6e",
+      "bytes": 700966
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-baseline.json",
+      "sha256": "448879e868cb1a1fef699244547ba4cb93d3d61a1f53a255a20e87fa453fba2c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-diagnostic.csv",
+      "sha256": "e50f478d8956015255dfc8ea3cd3c02382ddac8ff574de4c96a27665a98a467f",
+      "bytes": 750993
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-diagnostic.json",
+      "sha256": "299c9ceb3cab7beeaf89abe2683fa6a29e029920bf147f80f4bb399dd17de687",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-off.csv",
+      "sha256": "bd7cc7442fc58cab512328b1030ae920c3f1f6c3b80ba9447f7bda1796a12700",
+      "bytes": 370991
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-0-off.json",
+      "sha256": "f1d20531928c4d29587398866aa29353f0eb55636afa1e54de8601a6e1c46458",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-diagnostic.csv",
+      "sha256": "f238be33d576b71d2d76791fbfa0cdb55f3ecd7f7b13854fcdca87a6d415ffeb",
+      "bytes": 750604
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-diagnostic.json",
+      "sha256": "299c9ceb3cab7beeaf89abe2683fa6a29e029920bf147f80f4bb399dd17de687",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-baseline.csv",
+      "sha256": "ef1d12c871a23eb574e9681b9ac6624e7de9158492917dd70a5129e2d81b753a",
+      "bytes": 700032
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-baseline.json",
+      "sha256": "448879e868cb1a1fef699244547ba4cb93d3d61a1f53a255a20e87fa453fba2c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-aggregate.csv",
+      "sha256": "fd02d53078ce2eae63b7884c4b37bb1ce756188b88b5744a05ded7233f4530c6",
+      "bytes": 684487
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-aggregate.json",
+      "sha256": "c80bb57513eabdbb5a44e263091f1fb7f3b492de1825ee8bbabc29caccc1eb76",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-off.csv",
+      "sha256": "1d6ff4f121beb4b2596f0b55c757faa5fed4037c7f2a75e70360c012a1a286e9",
+      "bytes": 372490
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-1-off.json",
+      "sha256": "f1d20531928c4d29587398866aa29353f0eb55636afa1e54de8601a6e1c46458",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-aggregate.csv",
+      "sha256": "f865f5aa08fb572f0cf7d5a6caebf52ca381378abe32d11f349b4d5dae7326b5",
+      "bytes": 684409
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-aggregate.json",
+      "sha256": "c80bb57513eabdbb5a44e263091f1fb7f3b492de1825ee8bbabc29caccc1eb76",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-baseline.csv",
+      "sha256": "68c806e37be24219576ed3c60b9f076a06217f43ed022d55bf592cbb6b2dc34d",
+      "bytes": 700104
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-baseline.json",
+      "sha256": "448879e868cb1a1fef699244547ba4cb93d3d61a1f53a255a20e87fa453fba2c",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-diagnostic.csv",
+      "sha256": "14f64d6dcc40552e7c0a8100e944c02ec80d3c92f6c0d54e1f7a624b01395ccc",
+      "bytes": 750948
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-diagnostic.json",
+      "sha256": "299c9ceb3cab7beeaf89abe2683fa6a29e029920bf147f80f4bb399dd17de687",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-off.csv",
+      "sha256": "e9faa9b04a86d60a5cee5a874865f4fdb3222613e1f4de6e9359ac40a8afe57d",
+      "bytes": 369935
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dense-2-off.json",
+      "sha256": "f1d20531928c4d29587398866aa29353f0eb55636afa1e54de8601a6e1c46458",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-aggregate.csv",
+      "sha256": "6dbba7c8f0d0ac1951199721a605cda185b29e6953c2ee1aecdeb14e5fad8bbf",
+      "bytes": 684591
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-aggregate.json",
+      "sha256": "328cc614e7a811181a27ced7c7273e16bf63c58478152c8939d2963418d472fd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-baseline.csv",
+      "sha256": "3160be4d4c0676abb75b0d388a802c8bcb97459a7e685f93922a29398c4d0533",
+      "bytes": 701651
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-baseline.json",
+      "sha256": "516c77b334e3c8a53bdb6b865cbcfc33ed29f72b9870689d63493fac2e9ef6cc",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-diagnostic.csv",
+      "sha256": "ea1d12f5001520ff3dfba16d473fb5ff4f15c664d2ea186fba39b342bd6c5ecd",
+      "bytes": 749917
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-diagnostic.json",
+      "sha256": "b1906cbbf7e62d32da8c81f1a302193fdb740367bbd41f26b0c57fedb6af993d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-off.csv",
+      "sha256": "bdf92b2773dde8b103bf19351a652a8718654bb628253611b4fddf064f709b10",
+      "bytes": 382545
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-0-off.json",
+      "sha256": "b1a3f7e26e8c8f2b5aea87697a3e8af5a42ee903a2062f65835e60ef7e610682",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-diagnostic.csv",
+      "sha256": "bb686705d8e1bfaf093943c57865e8c873cbcfa89ae1bc32d48adbac8b43346c",
+      "bytes": 749128
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-diagnostic.json",
+      "sha256": "b1906cbbf7e62d32da8c81f1a302193fdb740367bbd41f26b0c57fedb6af993d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-baseline.csv",
+      "sha256": "17f8004801c62309fddf1b0a34498bbeabf66513cf739559707ad82eea40dc40",
+      "bytes": 701419
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-baseline.json",
+      "sha256": "516c77b334e3c8a53bdb6b865cbcfc33ed29f72b9870689d63493fac2e9ef6cc",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-aggregate.csv",
+      "sha256": "9bf72ce78a59da0424f55ae550e368bd77f95f9ccd8622bb6c2ced55f05cdd54",
+      "bytes": 684567
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-aggregate.json",
+      "sha256": "328cc614e7a811181a27ced7c7273e16bf63c58478152c8939d2963418d472fd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-off.csv",
+      "sha256": "9a7e2fad7caa2abf2aa24ec6bef61b035485188fef7d794b1baf63c4d8fe5527",
+      "bytes": 372063
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-1-off.json",
+      "sha256": "b1a3f7e26e8c8f2b5aea87697a3e8af5a42ee903a2062f65835e60ef7e610682",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-aggregate.csv",
+      "sha256": "50db71aa74c525e35acec2f7952580a6e4ba12ddbe8b1ffd3231b9836a3a4cfa",
+      "bytes": 684649
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-aggregate.json",
+      "sha256": "328cc614e7a811181a27ced7c7273e16bf63c58478152c8939d2963418d472fd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-baseline.csv",
+      "sha256": "80ebdcc32b8286cb28f9d89066f327b27e0970db7c03cfd7eeb32f22a03608f3",
+      "bytes": 702091
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-baseline.json",
+      "sha256": "516c77b334e3c8a53bdb6b865cbcfc33ed29f72b9870689d63493fac2e9ef6cc",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-diagnostic.csv",
+      "sha256": "9586e33504024a577087dd11c53d2b6f27a5522f854f6418a5c415bf9cfd7077",
+      "bytes": 749184
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-diagnostic.json",
+      "sha256": "b1906cbbf7e62d32da8c81f1a302193fdb740367bbd41f26b0c57fedb6af993d",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-off.csv",
+      "sha256": "6e2c918578394cec88f35d81b81f1f61a7a0a8b019ff82c429a7e2c8b26901fa",
+      "bytes": 372006
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-1-dispersed-2-off.json",
+      "sha256": "b1a3f7e26e8c8f2b5aea87697a3e8af5a42ee903a2062f65835e60ef7e610682",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-aggregate.csv",
+      "sha256": "c262182f1dd77a1cd22ec490cce65a25db6c88f44fb7c028d8bc6180a5e1fda4",
+      "bytes": 683318
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-aggregate.json",
+      "sha256": "29c6a24aec64259ebe310a31d8c346df48665609a7004b98b41cfe274c65e848",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-baseline.csv",
+      "sha256": "feea906b1c541957ec474c69c969b863bf2d9824e3e5980ae6d6e65a948ff568",
+      "bytes": 714606
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-baseline.json",
+      "sha256": "29aa26443c6b1e33c1fe0c6c78b6c2595dcbe9301760c8d42589deba6caea2eb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-diagnostic.csv",
+      "sha256": "72e8ce26aba6cbf6b149858d141166aeb45440ade9cb7356c16797555e6c5e5f",
+      "bytes": 770626
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-diagnostic.json",
+      "sha256": "675071cda0456f348d6304eedb60ec3e87716f78665780170e5be794dea99cb4",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-off.csv",
+      "sha256": "883b7d1a6b15211cbf8e01c6ed0299ed22a7f187287ad14cec1efb9e80366106",
+      "bytes": 384907
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-0-off.json",
+      "sha256": "3e9d493ae42c4a0e57c7afcdcf0c8a6fdacd35b89b197f98277fadab66b23034",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-diagnostic.csv",
+      "sha256": "72631cc17af7f71015c02323bf3eea65fa50f514b7f9c4758d66242fd26fe145",
+      "bytes": 768296
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-diagnostic.json",
+      "sha256": "675071cda0456f348d6304eedb60ec3e87716f78665780170e5be794dea99cb4",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-baseline.csv",
+      "sha256": "bc48cfee1f34cb6ffc2d47c09605ca88173f94b1b58e5a93bd5f554ad7cc148b",
+      "bytes": 714929
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-baseline.json",
+      "sha256": "29aa26443c6b1e33c1fe0c6c78b6c2595dcbe9301760c8d42589deba6caea2eb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-aggregate.csv",
+      "sha256": "0931a3eb10422af68e642d3e85f5f93b9c71df5f01ba63fe9ea93eef5816f07b",
+      "bytes": 683228
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-aggregate.json",
+      "sha256": "29c6a24aec64259ebe310a31d8c346df48665609a7004b98b41cfe274c65e848",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-off.csv",
+      "sha256": "dfb244446205efad5f16bdec447cc75e7c4095ba4417e13e57078bcdf8e0219f",
+      "bytes": 386108
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-1-off.json",
+      "sha256": "3e9d493ae42c4a0e57c7afcdcf0c8a6fdacd35b89b197f98277fadab66b23034",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-aggregate.csv",
+      "sha256": "f33946a57e455cd6df9735687af2d895603c9af1c22c06f2d1e46433b44f0027",
+      "bytes": 683300
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-aggregate.json",
+      "sha256": "29c6a24aec64259ebe310a31d8c346df48665609a7004b98b41cfe274c65e848",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-baseline.csv",
+      "sha256": "86428559d4109cd5ddbd8ade385ff0c8028ddc6a2fbede9beb336750fa9c0464",
+      "bytes": 719855
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-baseline.json",
+      "sha256": "29aa26443c6b1e33c1fe0c6c78b6c2595dcbe9301760c8d42589deba6caea2eb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-diagnostic.csv",
+      "sha256": "9d8bc6160e635cee81ef537109045d08538402c6e4ef769a1e14bb9969f31032",
+      "bytes": 770716
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-diagnostic.json",
+      "sha256": "675071cda0456f348d6304eedb60ec3e87716f78665780170e5be794dea99cb4",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-off.csv",
+      "sha256": "bfa9c5a981221a03c1deb26834b50ea4256afa7507f9c13ebaca76b5041b29ba",
+      "bytes": 384838
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dense-2-off.json",
+      "sha256": "3e9d493ae42c4a0e57c7afcdcf0c8a6fdacd35b89b197f98277fadab66b23034",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-aggregate.csv",
+      "sha256": "7b7982082a512686d1e93cf1caa9e80136f494b5bf110baab620e9a90409d4f3",
+      "bytes": 689525
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-aggregate.json",
+      "sha256": "44bc42e530978d0fb11e0bc3cbe2b7e146c90725ebbcec50021df184f84b6677",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-baseline.csv",
+      "sha256": "38c71fb061a2ae199048b65bbe022d0f3a0ef431dc623e2f4e22921a88145181",
+      "bytes": 721604
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-baseline.json",
+      "sha256": "1424c2dceb81b7c3bdcd626c4358d46e06f77e796f84bee6a62ba44e6d064184",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-diagnostic.csv",
+      "sha256": "73af98bd8f49ecd859794bf4833709b311f9c59d6b85cb25b3eaad321f6e88c6",
+      "bytes": 775227
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-diagnostic.json",
+      "sha256": "d7266dd2f7472f65c82296c186db92a1709cb13b474373d31d7b9ac7cf9f6d93",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-off.csv",
+      "sha256": "f648aa3459a9a3656a8d178ea3d4da9d8e76e403428895c418cf17ecc582b386",
+      "bytes": 383029
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-0-off.json",
+      "sha256": "fbe92cea64d2410806d5ecbf1a685b069bca0e63f62f9b25b1d84a7a49371f6e",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-diagnostic.csv",
+      "sha256": "c563d1f973bce2e93ac45a6379662e0e06eb3cbfa4d2719de6ff5a48adb2b03e",
+      "bytes": 774845
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-diagnostic.json",
+      "sha256": "d7266dd2f7472f65c82296c186db92a1709cb13b474373d31d7b9ac7cf9f6d93",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-baseline.csv",
+      "sha256": "aace573335cb2fb76fac9fab8baf250c251a4ee12b123816a419f4640ab2b77e",
+      "bytes": 721970
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-baseline.json",
+      "sha256": "1424c2dceb81b7c3bdcd626c4358d46e06f77e796f84bee6a62ba44e6d064184",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-aggregate.csv",
+      "sha256": "b0376e8c59cbaecff99919f9617a927d9ab28dc25eec5bcb891b3c4d52ca2747",
+      "bytes": 689367
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-aggregate.json",
+      "sha256": "44bc42e530978d0fb11e0bc3cbe2b7e146c90725ebbcec50021df184f84b6677",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-off.csv",
+      "sha256": "c03802ad924f034a878c5e623482d30fca57e9ed2a73e094b83a72faf2d8d92c",
+      "bytes": 389449
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-1-off.json",
+      "sha256": "fbe92cea64d2410806d5ecbf1a685b069bca0e63f62f9b25b1d84a7a49371f6e",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-aggregate.csv",
+      "sha256": "ce230a1f3138ce4c4e9868f7135f7df35736a157dbf0758eab3bd45e510197d7",
+      "bytes": 689519
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-aggregate.json",
+      "sha256": "44bc42e530978d0fb11e0bc3cbe2b7e146c90725ebbcec50021df184f84b6677",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-baseline.csv",
+      "sha256": "5389da69845b5a80860933df994105571a8761608ef3c9704d2d39588e806171",
+      "bytes": 721180
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-baseline.json",
+      "sha256": "1424c2dceb81b7c3bdcd626c4358d46e06f77e796f84bee6a62ba44e6d064184",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-diagnostic.csv",
+      "sha256": "b1dfbe61ea198ef520592f173c69b9d5d4315c5d440b8eb1bfd1e2fb25610d13",
+      "bytes": 777905
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-diagnostic.json",
+      "sha256": "d7266dd2f7472f65c82296c186db92a1709cb13b474373d31d7b9ac7cf9f6d93",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-off.csv",
+      "sha256": "af07ec18dfa30a8cabe096caa212723a46ee6325325be54dd52898e982ee3120",
+      "bytes": 383065
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/circle-4-dispersed-2-off.json",
+      "sha256": "fbe92cea64d2410806d5ecbf1a685b069bca0e63f62f9b25b1d84a7a49371f6e",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-aggregate.csv",
+      "sha256": "6e2310e7791997656188c36c9cece014ac105fc027adb9a7956144e2d63d6051",
+      "bytes": 681705
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-aggregate.json",
+      "sha256": "9e19165fa8e84426179510592d0e1a16ef86c448eee16d74569f42106b2410bd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-baseline.csv",
+      "sha256": "d5ffa67386603f73b69bdd021611384185d8c09fc14de5ce64e465c38b97d3e1",
+      "bytes": 697678
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-baseline.json",
+      "sha256": "e1a7f39602825efd98d044718099c3731c6029c847c4cb1a980f51d51e146804",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-diagnostic.csv",
+      "sha256": "0967119f1ca7e1d69921c01acda543dbb426b9d868527da076c065a9d488d588",
+      "bytes": 743575
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-diagnostic.json",
+      "sha256": "696676535b750ec57fc92e2cd74f70571916bf2c55011214db272fb2971f1896",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-off.csv",
+      "sha256": "21a1cbe560b4ab6466c63a287a4a414c2cf096a0230fa217ece8f137a00daf2a",
+      "bytes": 372602
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-0-off.json",
+      "sha256": "796f58735acc08a94d2919fc9a81de6c09b7ebde684adc8961e866f2ef1091a5",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-diagnostic.csv",
+      "sha256": "f727a51885b6a6c142a3aba0d27433d44f19cec9fbd47d0a59434da9c5e6b5de",
+      "bytes": 744006
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-diagnostic.json",
+      "sha256": "696676535b750ec57fc92e2cd74f70571916bf2c55011214db272fb2971f1896",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-baseline.csv",
+      "sha256": "2108d3dcfb4ee51d6a85b1984de8ad9d1af0ec2c77e15a3f2e7fcf97845b562e",
+      "bytes": 696701
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-baseline.json",
+      "sha256": "e1a7f39602825efd98d044718099c3731c6029c847c4cb1a980f51d51e146804",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-aggregate.csv",
+      "sha256": "4bd41e21f9530de56280c24cf6c094ab8d139cff0c4474ba27b4d824753f91ef",
+      "bytes": 681693
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-aggregate.json",
+      "sha256": "9e19165fa8e84426179510592d0e1a16ef86c448eee16d74569f42106b2410bd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-off.csv",
+      "sha256": "7f99d7598173aeb742ad99ee492dcc6cf058a58c91b0d32015e2de30b3e1a1bf",
+      "bytes": 372745
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-1-off.json",
+      "sha256": "796f58735acc08a94d2919fc9a81de6c09b7ebde684adc8961e866f2ef1091a5",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-aggregate.csv",
+      "sha256": "cc4f5cdb046ab8718f00465ce7e851d5fe0e6c10aa873a6d7aae117ff9153463",
+      "bytes": 681717
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-aggregate.json",
+      "sha256": "9e19165fa8e84426179510592d0e1a16ef86c448eee16d74569f42106b2410bd",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-baseline.csv",
+      "sha256": "96ca07a1c8315b20822a6ee022e548ce12da57702d580362b9fd894d4bd4352e",
+      "bytes": 696392
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-baseline.json",
+      "sha256": "e1a7f39602825efd98d044718099c3731c6029c847c4cb1a980f51d51e146804",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-diagnostic.csv",
+      "sha256": "65c53766a9d4b45eefe9c05abc7c763f271d45dbe287519fe23cd971ef786495",
+      "bytes": 743395
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-diagnostic.json",
+      "sha256": "696676535b750ec57fc92e2cd74f70571916bf2c55011214db272fb2971f1896",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-off.csv",
+      "sha256": "db0711a8c0b6684e3b96dfb566650ce3cfdcf0f058093ea1de5f4037c9b568a7",
+      "bytes": 373377
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dense-2-off.json",
+      "sha256": "796f58735acc08a94d2919fc9a81de6c09b7ebde684adc8961e866f2ef1091a5",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-aggregate.csv",
+      "sha256": "339e230c2f8c7a3bb98fa92df1a9f26dc9cd6a9a762722a90aefcef32658f28c",
+      "bytes": 681279
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-aggregate.json",
+      "sha256": "63a8b2a39f34571e65e3f546a4831f8cdee850276055edbec5ba828dc91ae30c",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-baseline.csv",
+      "sha256": "2dac25fce8b9eed7a962ce781438463dfdef2a9619d74d84611d6aae71b23599",
+      "bytes": 698131
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-baseline.json",
+      "sha256": "fc0aa1f6c91e6aa6b315e363a10e75252e6563895b41c9cdfcdab2145f969854",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-diagnostic.csv",
+      "sha256": "d18624e99a0092763fecf10eae29227abe8ec7d667b25f5a2246f921e05a8517",
+      "bytes": 744583
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-diagnostic.json",
+      "sha256": "13bed24834b6f26f186d6e05a859e89c7f1f538a2cb6eaf8c0832cfe544040e0",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-off.csv",
+      "sha256": "76f9c0d17a11b2ed4a0c27ecc92e38dd96a1422021622235568a8832b2441651",
+      "bytes": 371773
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-0-off.json",
+      "sha256": "f81191293d2a799bf5b87d0d6c599f3997b48dd54e137085011eac0707d632f3",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-diagnostic.csv",
+      "sha256": "98bf19ab028b6232d35753870b1b50d17964bcd24c706a0e3d5a66b2a721850e",
+      "bytes": 742778
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-diagnostic.json",
+      "sha256": "13bed24834b6f26f186d6e05a859e89c7f1f538a2cb6eaf8c0832cfe544040e0",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-baseline.csv",
+      "sha256": "3be4a9ceb68c6794096d502c9e6bb84e2096f2c0f8564eb67aede5a167645e24",
+      "bytes": 697524
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-baseline.json",
+      "sha256": "fc0aa1f6c91e6aa6b315e363a10e75252e6563895b41c9cdfcdab2145f969854",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-aggregate.csv",
+      "sha256": "99824c66480c32351562ba992888399cd5cd716c4b417f5fb4c8a5f65a9a61dc",
+      "bytes": 681693
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-aggregate.json",
+      "sha256": "63a8b2a39f34571e65e3f546a4831f8cdee850276055edbec5ba828dc91ae30c",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-off.csv",
+      "sha256": "00c2a0be98a624a8a941947da39aa1b48e6e3ac97c0118fa188e85ac32f95ab3",
+      "bytes": 371033
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-1-off.json",
+      "sha256": "f81191293d2a799bf5b87d0d6c599f3997b48dd54e137085011eac0707d632f3",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-aggregate.csv",
+      "sha256": "a09b265760855ad42ad3b0cc9fe30ed6d57d1f9d3631aa6019621fd1f858ea87",
+      "bytes": 680653
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-aggregate.json",
+      "sha256": "63a8b2a39f34571e65e3f546a4831f8cdee850276055edbec5ba828dc91ae30c",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-baseline.csv",
+      "sha256": "2f25988a3d278720b675b524da836cabc3511dca7892fbf2b280a8ec99d1b143",
+      "bytes": 697521
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-baseline.json",
+      "sha256": "fc0aa1f6c91e6aa6b315e363a10e75252e6563895b41c9cdfcdab2145f969854",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-diagnostic.csv",
+      "sha256": "75a279cc00339b50b2a24568306cc062588b266ad1c377b5cdea2044c4881f51",
+      "bytes": 742283
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-diagnostic.json",
+      "sha256": "13bed24834b6f26f186d6e05a859e89c7f1f538a2cb6eaf8c0832cfe544040e0",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-off.csv",
+      "sha256": "09b7e61d7b6392d722777528fad9db6a9a713a96ed16f10aeaf787c9255078a2",
+      "bytes": 371129
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-1-dispersed-2-off.json",
+      "sha256": "f81191293d2a799bf5b87d0d6c599f3997b48dd54e137085011eac0707d632f3",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-aggregate.csv",
+      "sha256": "fb6dd4eb1cb22136f44c7db64abcd749e82eff396b418ef821a76fb33f44caff",
+      "bytes": 692045
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-aggregate.json",
+      "sha256": "c3a7a130a37a630859fb516bbfaa5f86333815c635fe2d0d4c50dc9b0e197e6e",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-baseline.csv",
+      "sha256": "0189d4f88b9703759069ad1c3a1288a03736e0ca194f6782c9ab83ccd64dac4b",
+      "bytes": 728099
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-baseline.json",
+      "sha256": "531e2330217fb5fe261f82fac088a61e91b7ef141587bc42217148e7e2cdc838",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-diagnostic.csv",
+      "sha256": "78d3d114a9632c789e160aebcc73fc895a4fc3f9346e7e9bbed970f88187e9ee",
+      "bytes": 784066
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-diagnostic.json",
+      "sha256": "ab07f2b72b07c972711bac4d02656bd9ed8b3f1f851efef931550427cd11c985",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-off.csv",
+      "sha256": "9627d41728b24f39a8556764b19b181ed455c70a4280188c0d00895b81a1bde2",
+      "bytes": 397690
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-0-off.json",
+      "sha256": "4e68a7c18e2d6472464a9cc3ec7e050e31a1047686ae26f95ea75b39027c3776",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-diagnostic.csv",
+      "sha256": "768799948e93883258dd2aab3279fa1f5eb6962fa8cddb004ef28fb5cc907383",
+      "bytes": 783172
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-diagnostic.json",
+      "sha256": "ab07f2b72b07c972711bac4d02656bd9ed8b3f1f851efef931550427cd11c985",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-baseline.csv",
+      "sha256": "71c8f0722882ca9f100236d7f0a42662df48969ddee7d77b91f4406ada9ec7b8",
+      "bytes": 726326
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-baseline.json",
+      "sha256": "531e2330217fb5fe261f82fac088a61e91b7ef141587bc42217148e7e2cdc838",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-aggregate.csv",
+      "sha256": "c9d5f0d9326d33522f0d05bb15941be6a998bd8ab97b0253fb8f76571674d5ca",
+      "bytes": 691927
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-aggregate.json",
+      "sha256": "c3a7a130a37a630859fb516bbfaa5f86333815c635fe2d0d4c50dc9b0e197e6e",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-off.csv",
+      "sha256": "447adcf2485d47b97146259d08dcf86c1f76c0424549fcc22cf5b546ce55c73c",
+      "bytes": 385789
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-1-off.json",
+      "sha256": "4e68a7c18e2d6472464a9cc3ec7e050e31a1047686ae26f95ea75b39027c3776",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-aggregate.csv",
+      "sha256": "964f03f12f210d84000f8923b05780eb9842b888ed757e268af05de5fa2edd15",
+      "bytes": 691983
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-aggregate.json",
+      "sha256": "c3a7a130a37a630859fb516bbfaa5f86333815c635fe2d0d4c50dc9b0e197e6e",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-baseline.csv",
+      "sha256": "4cfc6c4c95fb242563e00f4a07600df42dccfefc4124c0233418fbf7568437b1",
+      "bytes": 730552
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-baseline.json",
+      "sha256": "531e2330217fb5fe261f82fac088a61e91b7ef141587bc42217148e7e2cdc838",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-diagnostic.csv",
+      "sha256": "a9859f1dfaac5bd08ced575f6dbb169c9f6d26ae614738a0908da75526306906",
+      "bytes": 779503
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-diagnostic.json",
+      "sha256": "ab07f2b72b07c972711bac4d02656bd9ed8b3f1f851efef931550427cd11c985",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-off.csv",
+      "sha256": "78b89cca6772b0b73135db4139fbf1f4954cec2a667016b0af508f04a03708b9",
+      "bytes": 387256
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dense-2-off.json",
+      "sha256": "4e68a7c18e2d6472464a9cc3ec7e050e31a1047686ae26f95ea75b39027c3776",
+      "bytes": 724
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-aggregate.csv",
+      "sha256": "49d467fcc7e7242bde7cb6893cc18aab4018323dc305de4c9ecc52e58f392c31",
+      "bytes": 687351
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-aggregate.json",
+      "sha256": "c722cf90250754bdf53588b3cfbaca5be89a70715d79de1270571ac6faec2c11",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-baseline.csv",
+      "sha256": "027002533360f0f498208a8e1a4b549cb7f0f973bd24958d29b64701d5ec1ea3",
+      "bytes": 724292
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-baseline.json",
+      "sha256": "f2a6b4769a1a3061dc7db74c2f1c3a81cc97dd5fa76a9f088a2121c2fbab492b",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-diagnostic.csv",
+      "sha256": "c1616e271f3be02aa7549c0f3e772ac18e1f654451df372a2e0cf75889894a6b",
+      "bytes": 772416
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-diagnostic.json",
+      "sha256": "0e5fb0fe1e80eca16c0d0a99b22d4db8239615c75908c6ba8e54c2d214f306cd",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-off.csv",
+      "sha256": "de92881ac7ab51b08621ed272ed84313b1eadee77b7b3bc230b1bf333cdc56b8",
+      "bytes": 387132
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-0-off.json",
+      "sha256": "4cb52c4e8069ee1a0acfe73be65b12b8bafe5ed4857ff262cfa5829ae07241a0",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-diagnostic.csv",
+      "sha256": "d267522028c3680e86917563c82806e846496c0bfd90c1b98f865ecfc06e5a62",
+      "bytes": 771237
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-diagnostic.json",
+      "sha256": "0e5fb0fe1e80eca16c0d0a99b22d4db8239615c75908c6ba8e54c2d214f306cd",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-baseline.csv",
+      "sha256": "82fa2c0a15b1d26428c68a8150db127fe62db4bc4721f6ccf4186b0f8b694220",
+      "bytes": 722455
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-baseline.json",
+      "sha256": "f2a6b4769a1a3061dc7db74c2f1c3a81cc97dd5fa76a9f088a2121c2fbab492b",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-aggregate.csv",
+      "sha256": "477b56da0a88a4e14ad5a528c9752f0446bfa3f93d7e126bec556972a8e3a7e1",
+      "bytes": 687025
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-aggregate.json",
+      "sha256": "c722cf90250754bdf53588b3cfbaca5be89a70715d79de1270571ac6faec2c11",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-off.csv",
+      "sha256": "c10dec93b82672aeb9512ae4e83307b2672828dd462e3229463a43ce9d8838f7",
+      "bytes": 387428
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-1-off.json",
+      "sha256": "4cb52c4e8069ee1a0acfe73be65b12b8bafe5ed4857ff262cfa5829ae07241a0",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-aggregate.csv",
+      "sha256": "8fb60f7211f4a8c6c715a8957c4b9cb665c60569ee6eb9a1bb663edd8165df14",
+      "bytes": 687137
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-aggregate.json",
+      "sha256": "c722cf90250754bdf53588b3cfbaca5be89a70715d79de1270571ac6faec2c11",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-baseline.csv",
+      "sha256": "96b469cf999b0a80430ea8288b3989ca367c6f25b6294998d35bfc015b0d9950",
+      "bytes": 721470
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-baseline.json",
+      "sha256": "f2a6b4769a1a3061dc7db74c2f1c3a81cc97dd5fa76a9f088a2121c2fbab492b",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-diagnostic.csv",
+      "sha256": "68d3bc7f20fec1cf762d2bf9e98a41e525dad942bb120a35bbfb23394b415194",
+      "bytes": 770058
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-diagnostic.json",
+      "sha256": "0e5fb0fe1e80eca16c0d0a99b22d4db8239615c75908c6ba8e54c2d214f306cd",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-off.csv",
+      "sha256": "b395630e7917990ba9e9be31795ea622e2aa490acd7ddf342d8c0ff00a30e1d1",
+      "bytes": 402195
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/eight-4-dispersed-2-off.json",
+      "sha256": "4cb52c4e8069ee1a0acfe73be65b12b8bafe5ed4857ff262cfa5829ae07241a0",
+      "bytes": 723
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-aggregate.csv",
+      "sha256": "4217e8053c0a302c8c29c58c071aa8d010b4f5b5e8fbff910f54ffc1c0dc44ac",
+      "bytes": 681337
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-aggregate.json",
+      "sha256": "0c176c09f78e235484df711ca9431c058ef3af9d0550994a3b11707508ca68bb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-baseline.csv",
+      "sha256": "345288c944eb24b649ad9e40832c0bf15aaa9811b51a44ed99a6cd2daf5019e4",
+      "bytes": 698879
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-baseline.json",
+      "sha256": "e4b759b2af18edffdbbd6cfacfa916aba94405c32f4e0cbdde2f94040604d464",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-diagnostic.csv",
+      "sha256": "039eafa52d8745778fbbb058b2b816b39308541324576f7254c6d38c078f5051",
+      "bytes": 749936
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-diagnostic.json",
+      "sha256": "e3f9469e7966d9ff002121828a4c96346b10ddc0ea44034cf3913bd06978f5ae",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-off.csv",
+      "sha256": "7614587ed2ae2abec7f190e81e0a2f3766b143a7ad419c5f8b9d36a26b3bedc9",
+      "bytes": 371218
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-0-off.json",
+      "sha256": "dd6cf151ed92e013260ef27f9f95a483579cb1c4262aca819960a7ffc71833b3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-diagnostic.csv",
+      "sha256": "22b8b38b8fc11b892f1bef8685770c5f705ed1192f40b4a4689563ad9cd79dbc",
+      "bytes": 753924
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-diagnostic.json",
+      "sha256": "e3f9469e7966d9ff002121828a4c96346b10ddc0ea44034cf3913bd06978f5ae",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-baseline.csv",
+      "sha256": "c313e23c57a14c5367ca1575318df51c0a6d58c344ae3916cb84baf7cbf814aa",
+      "bytes": 701201
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-baseline.json",
+      "sha256": "e4b759b2af18edffdbbd6cfacfa916aba94405c32f4e0cbdde2f94040604d464",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-aggregate.csv",
+      "sha256": "ba4e1612cc2d8888d151e7c2fc3d09be6e5e4ee2663fe2ee184d783b00ac6763",
+      "bytes": 681479
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-aggregate.json",
+      "sha256": "0c176c09f78e235484df711ca9431c058ef3af9d0550994a3b11707508ca68bb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-off.csv",
+      "sha256": "dc7a7deb68f32625a97728fd5041433f2b6bfb45c6126b75ea741f1b75abb4f8",
+      "bytes": 373958
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-1-off.json",
+      "sha256": "dd6cf151ed92e013260ef27f9f95a483579cb1c4262aca819960a7ffc71833b3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-aggregate.csv",
+      "sha256": "82373702adcd175152351dc0c6a0b87a52201fc19465987c557a0190b6e78458",
+      "bytes": 681931
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-aggregate.json",
+      "sha256": "0c176c09f78e235484df711ca9431c058ef3af9d0550994a3b11707508ca68bb",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-baseline.csv",
+      "sha256": "ed3041455cab1c9eb252b8ea8d9924971e860c7abdb108cefda04ddcb3aa194a",
+      "bytes": 700935
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-baseline.json",
+      "sha256": "e4b759b2af18edffdbbd6cfacfa916aba94405c32f4e0cbdde2f94040604d464",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-diagnostic.csv",
+      "sha256": "52476919474be98360ce4f0ab175dcc2826977c17fea43c141fcac91e05e580d",
+      "bytes": 750856
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-diagnostic.json",
+      "sha256": "e3f9469e7966d9ff002121828a4c96346b10ddc0ea44034cf3913bd06978f5ae",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-off.csv",
+      "sha256": "8b96f4c11f6836cf34540aeff97046630459e5aaa0a7822823f84e14ee7eb7ff",
+      "bytes": 381483
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dense-2-off.json",
+      "sha256": "dd6cf151ed92e013260ef27f9f95a483579cb1c4262aca819960a7ffc71833b3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-aggregate.csv",
+      "sha256": "fd888c42b506e62b2279cd4895135f1555052d5ee5526e041144b1a8add7c4a3",
+      "bytes": 681895
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-aggregate.json",
+      "sha256": "b767cfa2487e1237e77989c1284234ac7e3ad12f3b9706a53d785ba0c59c4df5",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-baseline.csv",
+      "sha256": "5bd156cf6b9c1bd63bd1b54fd7e962d95360bf590603a433b53e25eb3fa849a3",
+      "bytes": 702700
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-baseline.json",
+      "sha256": "091074eac8ec85b6bd0acc0b5fed53aa173fa92d9c51d25034a34a1e5f2fa9bc",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-diagnostic.csv",
+      "sha256": "602cc452906844f1476bc6951f0ddfb9c7729f6680aa3e28e439ab6e351661ca",
+      "bytes": 749788
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-diagnostic.json",
+      "sha256": "ebaf5e255467eda8c15c692da398cb84da0707afc89e229529beb0fad7d006c7",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-off.csv",
+      "sha256": "4ff727aa014e301fdf9caffaf6f07b03a14d401eed1e9f5a56fcb7e67cacee5c",
+      "bytes": 385884
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-0-off.json",
+      "sha256": "b54a64ce57299588045b7306fe2a8f207542eee4b06d8eb61e3accceb2db2c68",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-diagnostic.csv",
+      "sha256": "61697579418e7dc6b7b09a1655ff6b1e4e9734cc0d8d131b2f73ec0768d226f0",
+      "bytes": 751118
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-diagnostic.json",
+      "sha256": "ebaf5e255467eda8c15c692da398cb84da0707afc89e229529beb0fad7d006c7",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-baseline.csv",
+      "sha256": "d4775ca3c369eb3103bdcb8cffa1d2660351ef8e1166e3c27ce58dec7d852b19",
+      "bytes": 701276
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-baseline.json",
+      "sha256": "091074eac8ec85b6bd0acc0b5fed53aa173fa92d9c51d25034a34a1e5f2fa9bc",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-aggregate.csv",
+      "sha256": "d5bff16fe6c5776c3ccbb2b6e9fa27fa3129cf74cf1088668e6d95dd7fde8582",
+      "bytes": 682183
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-aggregate.json",
+      "sha256": "b767cfa2487e1237e77989c1284234ac7e3ad12f3b9706a53d785ba0c59c4df5",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-off.csv",
+      "sha256": "d444ddaa68289c8fc08f4874bb3a23bbc641b4de74143b792611b41703b89e1e",
+      "bytes": 373153
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-1-off.json",
+      "sha256": "b54a64ce57299588045b7306fe2a8f207542eee4b06d8eb61e3accceb2db2c68",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-aggregate.csv",
+      "sha256": "6f6f126f61622205aa8d4be208d9139353f76b8fe6b491bc3ab3e4f1ea694a93",
+      "bytes": 681779
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-aggregate.json",
+      "sha256": "b767cfa2487e1237e77989c1284234ac7e3ad12f3b9706a53d785ba0c59c4df5",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-baseline.csv",
+      "sha256": "519b3107aaade6584ffe95cb4addf90f51ddf3b22cfa950669431b7fd902b349",
+      "bytes": 700698
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-baseline.json",
+      "sha256": "091074eac8ec85b6bd0acc0b5fed53aa173fa92d9c51d25034a34a1e5f2fa9bc",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-diagnostic.csv",
+      "sha256": "2b8c6a4713a1acdfa302215c0cbd5b7052013fda182732537eb19747d1e8c4c5",
+      "bytes": 753618
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-diagnostic.json",
+      "sha256": "ebaf5e255467eda8c15c692da398cb84da0707afc89e229529beb0fad7d006c7",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-off.csv",
+      "sha256": "1cb7df7b562c71e75c84da86011c748e6d7b2276a0f1c8b6d05e1b67072f9168",
+      "bytes": 374100
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-1-dispersed-2-off.json",
+      "sha256": "b54a64ce57299588045b7306fe2a8f207542eee4b06d8eb61e3accceb2db2c68",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-aggregate.csv",
+      "sha256": "f5f1ab260e33819fdbb9893853e3d3a700002c7ed49d6ba1efba6ffaf3f56ff1",
+      "bytes": 683347
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-aggregate.json",
+      "sha256": "884ffadb2d9944e19048f03929da271f70616dea8321edd6f7f5d00b4731b012",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-baseline.csv",
+      "sha256": "a5991f7a5b88dc1fe767b3410db15cca363c10c0921f547a0fec09505e40eaed",
+      "bytes": 721213
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-baseline.json",
+      "sha256": "15d9d89240e5877cfc1900ea516c699d88d297624b57cdb006d5b7a23a7a7996",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-diagnostic.csv",
+      "sha256": "0a027670dd0759272d0befa727faff8f4853038a1fae47cd3f12e722dfc3d45e",
+      "bytes": 773671
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-diagnostic.json",
+      "sha256": "2fb042bda4e7c9fbd746c7ddd94f574386544f3e8fddcac8900f15e8053933d2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-off.csv",
+      "sha256": "cd80a5acbac2f5e49f187c817466fca586281215f3dfaef4a2b972a132bd49e4",
+      "bytes": 390760
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-0-off.json",
+      "sha256": "159475559de89a9598c00e905095529845e29dea82a7a940a5021e1ba9eb8be3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-diagnostic.csv",
+      "sha256": "b8695f19657041083e1fa908e6a71afb85f2bfb881571c4184e6c99d4f19dc1a",
+      "bytes": 772880
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-diagnostic.json",
+      "sha256": "2fb042bda4e7c9fbd746c7ddd94f574386544f3e8fddcac8900f15e8053933d2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-baseline.csv",
+      "sha256": "bf7d35a907cdb6cd4563e019e5bae9a1fe7294d03f7cd5f1fa54ae014743dfbb",
+      "bytes": 722286
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-baseline.json",
+      "sha256": "15d9d89240e5877cfc1900ea516c699d88d297624b57cdb006d5b7a23a7a7996",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-aggregate.csv",
+      "sha256": "6234adc52242c86c9c6f18ccc20590806b76096bb1b948586039babf2c37481b",
+      "bytes": 683385
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-aggregate.json",
+      "sha256": "884ffadb2d9944e19048f03929da271f70616dea8321edd6f7f5d00b4731b012",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-off.csv",
+      "sha256": "d64415b47da8d99d6573289bf17fc4459329c131fc6ed59bd66583867f887490",
+      "bytes": 382726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-1-off.json",
+      "sha256": "159475559de89a9598c00e905095529845e29dea82a7a940a5021e1ba9eb8be3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-aggregate.csv",
+      "sha256": "944b755db67e4954dd29b4b64e0b353a175d2d957b9573bb4a1427b47522c3f3",
+      "bytes": 683341
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-aggregate.json",
+      "sha256": "884ffadb2d9944e19048f03929da271f70616dea8321edd6f7f5d00b4731b012",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-baseline.csv",
+      "sha256": "d1cabb09efe273cb11f0ef914a0d8b0c25d4eda5979432172c914aa2f51f143c",
+      "bytes": 720684
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-baseline.json",
+      "sha256": "15d9d89240e5877cfc1900ea516c699d88d297624b57cdb006d5b7a23a7a7996",
+      "bytes": 730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-diagnostic.csv",
+      "sha256": "13e596372685a9e2c98386cec106a4cea2e2d860a824414d83099458174bfec8",
+      "bytes": 775494
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-diagnostic.json",
+      "sha256": "2fb042bda4e7c9fbd746c7ddd94f574386544f3e8fddcac8900f15e8053933d2",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-off.csv",
+      "sha256": "2ef3bc2f692411ec4d652e81132ced64e1fda56f70e25db12550667ee94a2c51",
+      "bytes": 383262
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dense-2-off.json",
+      "sha256": "159475559de89a9598c00e905095529845e29dea82a7a940a5021e1ba9eb8be3",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-aggregate.csv",
+      "sha256": "ff34e74a493c8cf0ba94d4bfc9b7949cf5fe2af1653202dad254afe17708ef5c",
+      "bytes": 688657
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-aggregate.json",
+      "sha256": "9337df25053830115f5a5502a8d213122e56ec1f8707d093e04948da70985f85",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-baseline.csv",
+      "sha256": "65a0deb5d0ae3e98cdd6a0b5a060667b8a5cad5c586d3d3052407944744e10fa",
+      "bytes": 725580
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-baseline.json",
+      "sha256": "241571f7ff04ad77e9b2e5357331984e38a7170c71ffcc96c34b03af18306a24",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-diagnostic.csv",
+      "sha256": "bd05614eb42656cb712ffe48d1410300c70bf700bd437cf4bfa4d6a3af31c85b",
+      "bytes": 778871
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-diagnostic.json",
+      "sha256": "74f6dc491f27bb47d142abd5f0f9572723d216372ef99d6f7fa601b44c6c4538",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-off.csv",
+      "sha256": "d656cb69c4a66e02e414195e75948bf439dbe4222b2a0347167cb1138e053366",
+      "bytes": 383334
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-0-off.json",
+      "sha256": "1c5a19b69905f9d6f4d671204d8ba6319e438b621910ff84d9f642c2f07f16a6",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-diagnostic.csv",
+      "sha256": "94a0f2e7fcdd382fcaceaa99d398a37047338c7f736b2db5771f9368c878ccc7",
+      "bytes": 778542
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-diagnostic.json",
+      "sha256": "74f6dc491f27bb47d142abd5f0f9572723d216372ef99d6f7fa601b44c6c4538",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-baseline.csv",
+      "sha256": "9707d374ad5f889759eb4151a614c6f7056b304c02b99279634b496177836857",
+      "bytes": 727700
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-baseline.json",
+      "sha256": "241571f7ff04ad77e9b2e5357331984e38a7170c71ffcc96c34b03af18306a24",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-aggregate.csv",
+      "sha256": "f016c59821c41d0ccbe2a77017a68af98e20e98d69967dc20bf1e741f8057f21",
+      "bytes": 688673
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-aggregate.json",
+      "sha256": "9337df25053830115f5a5502a8d213122e56ec1f8707d093e04948da70985f85",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-off.csv",
+      "sha256": "eff437470f0f291356793a4042bd1d686d20b0d8262908d6cfedaf11141723e7",
+      "bytes": 383492
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-1-off.json",
+      "sha256": "1c5a19b69905f9d6f4d671204d8ba6319e438b621910ff84d9f642c2f07f16a6",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-aggregate.csv",
+      "sha256": "d07ec3c95604b98f9cabbca2641f88d414e021dc3bc8fc4f83a03321bf562dab",
+      "bytes": 688859
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-aggregate.json",
+      "sha256": "9337df25053830115f5a5502a8d213122e56ec1f8707d093e04948da70985f85",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-baseline.csv",
+      "sha256": "dce88a9929e0bab23ecadd5491aa679913c732cddea12bcc29b2bcc2ad972da3",
+      "bytes": 724885
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-baseline.json",
+      "sha256": "241571f7ff04ad77e9b2e5357331984e38a7170c71ffcc96c34b03af18306a24",
+      "bytes": 729
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-diagnostic.csv",
+      "sha256": "034625c96199730a81bc8df77ec310ff289970e15bdbf26873a6620cd749adb0",
+      "bytes": 780730
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-diagnostic.json",
+      "sha256": "74f6dc491f27bb47d142abd5f0f9572723d216372ef99d6f7fa601b44c6c4538",
+      "bytes": 728
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-off.csv",
+      "sha256": "d16671500f664edb9ec7ba30dd623ee44d3ca4c0e2b33bd19ababeab047cc7ec",
+      "bytes": 383124
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/cpu-final/reverse-4-dispersed-2-off.json",
+      "sha256": "1c5a19b69905f9d6f4d671204d8ba6319e438b621910ff84d9f642c2f07f16a6",
+      "bytes": 725
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/manifest.json",
+      "sha256": "7d89dc9c4975bd48e2fb19c5dacd0b6701ba0b95af9217f03724d3ec5e2385dc",
+      "bytes": 53116
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-paired.mp4",
+      "sha256": "2fd13fc265de77da6a629fa49328382203cc1abcf211c8d1e7524fa8281611d1",
+      "bytes": 795497
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-field-paired.mp4",
+      "sha256": "a4eac557f5f149696417aa0910303fbec608ebbfc07e049a2267989dfdeb9761",
+      "bytes": 217468
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-baseline.json",
+      "sha256": "2dae9607c13299bf12d371184746baa0d91f9f462875340972b7712e6cea2796",
+      "bytes": 727
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-baseline.csv",
+      "sha256": "758d064451b9fbd8a5d0a0f4a78819b2d111905015d4ff7b3b10518423c5a6f2",
+      "bytes": 142087
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-diagnostic.json",
+      "sha256": "84bcf8b005a9926065e9f3388d40e68196883e3a1eb98cf6fcfe2d8dc6bfcdf2",
+      "bytes": 726
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r0/media-final/straight-chase-diagnostic.csv",
+      "sha256": "e786329e7e2ea9a532584bf054d6805aeceff2b8358a2590e70dbf9286124095",
+      "bytes": 150304
+    },
+    {
+      "path": "/private/tmp/wake-r0-build.log",
+      "sha256": "aec1874b9dc6babeeaeee4d5f1f69b93ac1ad82dd0e6b5122a99aa48ef00da9a",
+      "bytes": 51513
+    },
+    {
+      "path": "/private/tmp/wake-r0-ctest.log",
+      "sha256": "4f8b89872279bd105a1604a076df910dbff026a2c8d2968cc372d512819a0961",
+      "bytes": 90573
+    },
+    {
+      "path": "/private/tmp/wake-r0-ctest-final.log",
+      "sha256": "ff233f6b524bd7d0caab4283eaf66ffcc7b4687917908a94dd4a70f1dc13afb1",
+      "bytes": 100894
+    },
+    {
+      "path": "/private/tmp/wake-r0-contract.log",
+      "sha256": "642a71a5b7a1fe91b919c5e31cc67648e5eb8b9f0377cf75f5c0cf3815202f8c",
+      "bytes": 231
+    },
+    {
+      "path": "/private/tmp/wake-r0-media.log",
+      "sha256": "6d7c2837a54fb9e0c4c5bda848bcf672a989c61480146a743f917f0b3b5fcda0",
+      "bytes": 1982
+    }
+  ],
+  "cpu": {
+    "runs": 240,
+    "comparisons": 60,
+    "all_neutral": true
+  },
+  "media": [
+    {
+      "scene": "straight",
+      "view": "chase",
+      "paired_pngs_identical": true,
+      "paired_pngs": 200,
+      "outputs": [
+        {
+          "path": "build-release/wake-r0/media-final/straight-chase-paired.mp4",
+          "sha256": "2fd13fc265de77da6a629fa49328382203cc1abcf211c8d1e7524fa8281611d1",
+          "command": [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-baseline-frames/%04d.png",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-diagnostic-frames/%04d.png",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-baseline-banner.png",
+            "-filter_complex",
+            "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v][body]vstack[v]",
+            "-map",
+            "[v]",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-frames:v",
+            "100",
+            "build-release/wake-r0/media-final/straight-chase-paired.mp4"
+          ]
+        },
+        {
+          "path": "build-release/wake-r0/media-final/straight-chase-field-paired.mp4",
+          "sha256": "a4eac557f5f149696417aa0910303fbec608ebbfc07e049a2267989dfdeb9761",
+          "command": [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-baseline-frames/field-%04d.png",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-diagnostic-frames/field-%04d.png",
+            "-framerate",
+            "10",
+            "-i",
+            "build-release/wake-r0/media-final/straight-chase-baseline-field-banner.png",
+            "-filter_complex",
+            "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v][body]vstack[v]",
+            "-map",
+            "[v]",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-frames:v",
+            "100",
+            "build-release/wake-r0/media-final/straight-chase-field-paired.mp4"
+          ]
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "initial_full_suite": "614/614 passed before final probe corrections",
+    "final_full_suite": "581/616 passed; 35 GPU failures, missing monitor/GLFW initialization; all non-GPU cases passed",
+    "build": "Debug and Release research tools built; no project warnings",
+    "limits": [
+      "Corrected GPU matrix unavailable after desktop disappeared",
+      "Remaining paired reels and visible scripted demo unavailable",
+      "Browser/slower GPU unmeasured",
+      "Budget and behavioral criteria require agreement"
+    ]
+  }
+}

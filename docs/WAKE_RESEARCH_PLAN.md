@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: planning complete; no experiments run or candidate selected.
-Current step: R0, establish reproducible demos and current performance.
-Open: moving-hull coverage, turn gaps, affordable persistence and multiplayer limits.
+Status, 2026-11-15: R0 implementation reviewed; corrected CPU baseline complete.
+Current step: R0 graphics/media qualification; macOS currently reports no monitor.
+Open: corrected GPU matrix, remaining reels/visible demo, budget agreement and human checks.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: R0 baseline; keep implementation local on one track branch until PR approval.
+Next: restore graphics access and finish R0 verification; no R1/R2 candidate or PR promotion.
 
 ## Scope and existing work
 
@@ -101,7 +101,9 @@ clips plus a common straight/turn/crossing regression reel.
 
 ## R0 — Baseline and measurement harness
 
-**Status:** not started. Audit every moving-hull class and location/scene, naming the source,
+**Status:** implemented locally; review/exit gates pending. [R0 evidence bundle](evidence/wakes/r0/README.md)
+owns commands, fixtures, source coverage, raw artifact locations, measurements and limits.
+Audit every moving-hull class and location/scene, naming the source,
 visual-only versus physical behavior, thresholds, and omissions. Include player/remote boats,
 original and authored traffic, serviced residents/visitors and the special ferry. Confirm gaps
 in motion with foam and surface displacement distinguishable in diagnostic views.
@@ -258,3 +260,35 @@ recommendations on encounter-based criteria, derivative/front identity, comparab
 same-lifetime references, query cost drivers, behavior-preserving acceleration and independent
 mechanics/performance/player gates. This review produced planning advice, not experimental
 verification. No candidate is selected; later Astra design and evidence gates remain open.
+
+## R0 implementation — 2026-11-15
+
+Added `wake_research` with continuously emitting fixed paths, sustained one/four-emitter pools,
+dense/dispersed query loads, fixed observation probes, wake-off and aggregate-timer controls,
+production GPU rendering/timing, traffic-pool stress and matched motion captures. Added a
+three-repetition matrix/report driver and a separately paced/rendered paired-media driver.
+`wake_coverage` samples the shipped marina plugin through production scene/service evaluators;
+`wake_encounters` retains source-off signed/derivative traces and a 27-case calm-twin hull grid;
+`wake_turn_probes` scores outer separation/inner concentration against matched straight fields.
+Production simulation, source policy, rendering recipes and network layout are unchanged.
+
+The Astra R0 design review required saturation preroll longer than the full lifetime, explicit
+raw-tracker versus integration-reset teleport cases, separate synthetic/actual query costs,
+source-off observations, diagnostic overhead measurement and unavailable counters rather than
+invented zeros. These are incorporated; proposed thresholds remain proposals for agreement.
+The supervising decision is to retain this baseline and review its evidence before R1/R2.
+
+Completed task: baseline harness and source-coverage audit. Next task: complete the R0 evidence
+review and budget/criteria agreement before the first coverage/geometry candidate. Browser,
+slower-GPU/platform, complete network/authority counters and human acceptance remain open.
+Detailed dated verification and review findings belong to the linked evidence bundle.
+
+R0 verification checkpoint: corrected Release CPU matrix completed 240 runs / 60 passing
+neutrality comparisons; the source coverage and 27-case encounter tables are retained. Astra
+reviewed the corrections and found no remaining blocking implementation defect. Straight/chase
+production and height/foam paired reels completed with identical PNGs; other reels and the
+corrected GPU matrix are pending. Debug/Release builds passed. The final full CTest attempt
+passed 581/616; all 35 failures were GPU cases unable to initialize the missing monitor.
+The earlier 614/614 full pass predates final probe corrections and is not final verification.
+The evidence bundle owns commands, raw checksums, numbers and the provisional screening budget.
+R0 stays open until its remaining verification and agreement gates are resolved.
