@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: R0 reviewed; R1 cosmetic candidate implemented and measured locally.
-Current step: R1 verified locally; review bundle retained for human review.
+Status, 2026-11-15: R0 reviewed; R1 verified; R2a completed as a rejection checkpoint.
+Current step: no geometry selected; retain baseline and R2a evidence.
 Open: HDR tails/variation, human review, browser/slower-GPU and unavailable counters.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: R2 geometry design after R1 verification; performance acceptance stays open; no PR promotion.
+Next: R2b historical weighting/divergence design review; no joins/integration/promotion selected.
 
 ## Scope and existing work
 
@@ -150,7 +150,11 @@ including CPU pose/query work and server cost if physical sources are authoritat
 
 ## R2 — Turning geometry experiments
 
-**Status:** not started; depends on R0, can use isolated sources before R1 integration.
+**Status:** R2a CPU-only screen complete; all alternatives rejected.
+[R2a evidence](evidence/wakes/r2/README.md) owns candidate definitions, numerical results,
+matched diagnostic motion, CPU costs, raw artifact locations and limitations.
+No production geometry or shader change is selected. GPU/gameplay adaptation is conditional on
+surviving the derivative, straight-behavior and signed-superposition screens.
 Compare the current recipe against (A) shorter overlapping straight pieces as a control,
 (B) rounded/arc-ended overlapping wavelets, and (C) a bounded local join between adjacent
 pieces if B leaves gaps. Do not select a representation in advance or revive a connected
@@ -385,3 +389,68 @@ All three labeled before/after movies decode fully with 100 frames each; tempora
 and GPU-scene samples were inspected. Changed local link targets and `git diff --check` pass.
 The [R1 bundle](evidence/wakes/r1/README.md) retains raw timing/capture provenance and limits.
 This is automated/agent verification, not human appearance acceptance or a shipping-budget pass.
+
+### R2a design review — 2026-11-15
+
+The user requested continued wake research. Astra recommended an isolated CPU screen before
+production integration: freeze R1 and the physical recipe; compare literal 30-tick spans in
+a private 64-record/emitter pool, an explicitly phase/fade-matched mature-straight control,
+plus equal-density open and 30–45-degree-limited capsule
+wavelets over the unchanged 60-tick records. All retain 16 seconds and the same source strength.
+No amplitude retuning, protocol growth, shader switch or game option is authorized by the screen.
+
+The capsule uses a C1 smooth excess beyond half the historical span, a clamped historical
+tangent coordinate and radial propagation; every spatial, angular-mask and envelope derivative
+contributes to returned gradient/vertical motion. The open cap deliberately exposes possible
+fore/aft faces; the angular variant screens whether a restricted cap avoids them. The literal
+short-span control shifts effective phase by 0.125 seconds and its fade offset: those are
+confounds to measure, not geometry-only improvements. A matching production-baseline contract
+checks records and all returned query components through saturation, dry gaps and reset.
+
+R2a refines whole-field crest coverage at common source/radial spacings .1/.05/.025 m, retains
+inner-focus exclusion only for the offset-front metric, and reports 10/25/50-percent threshold
+sensitivity, longest gaps, expanded-front length, ridge displacement and local-pair samples.
+These diagnostics do not substitute for straight/derivative/encounter criteria. Rounded caps
+cannot reuse the production stamp rectangles if they advance: enclosing support bounds,
+central exclusion, VS/FS/stamp/cache/fallback all require a later reviewed integration.
+
+Supervisor decision: implement the private field screen and retain rejected hypotheses with
+matched physical-height/foam motion and CPU cost. Coupled hull/GPU/frame measurements are
+unavailable until a candidate survives and receives an integration design; do not invent them.
+C adjacency joins remain deferred until demonstrated useful gaps survive B's mechanical screens.
+Existing R1/R0 tail concerns and the other open loops remain deferred to their current owners.
+
+### R2a rejection checkpoint — 2026-11-15
+
+Completed private CPU experiment with production-baseline parity, literal short spans (A0),
+mature-straight phase/fade-aligned short spans (A1), open capsule (B-open) and angular capsule
+(B45). No production source/evaluator, shader, lifetime, capacity, protocol or R1 cosmetic-policy
+change is selected. C joins and R3 lifetime work remain deferred.
+
+A0 changes phase by 15 ticks and has approximately 22% mature straight RMS error. B-open/B45
+fill the measured outer gaps but have roughly 96–132% straight RMS error at 1–8 seconds. A1
+recovers interior straight agreement (~2e-7 normalized RMS), but finite-train endpoint error
+is about 18.4%, and the sampled tight-turn inner-focus peak changes 2.252→4.159 m at 4 s.
+Its representative gap improvement is only .025–.05 m. The supervisor rejects these alternatives
+under the provisional straight criteria, retaining a tested control rather than retuning strength
+or hiding the changes with foam. Astra reviewed design, code and final evidence and supports
+that decision. These findings do not reject every possible shorter-span or rounded-front model.
+
+Verification: Debug full build and Release research target are warning-clean; final full
+CTest passes **618/618**, including 36 GPU-labelled cases, in 112.14 seconds. Production GPU
+checks exercise the unchanged recipe; they are not candidate GPU qualification. Release
+baseline query parity is 5.3312e-7, and derivative/signed/history contracts pass. Retained
+400 turn rows, 100 concentration grids, 25 straight rows and full fixed-probe arrivals;
+288 separate CPU runs retain saturated occupancy, plus 48 paired ten-second CPU diagnostic
+movies. Temporal samples were inspected and four movies completed visible paced playback.
+No coupled hull, production-renderer candidate, browser/slower-GPU, input/audio or player
+acceptance is claimed. CPU costs are private harness costs; unavailable GPU/frame/network
+counters are explicitly unavailable. The source/payload/camera limits belong to the bundle.
+
+Next R2b design question from Astra: can longitudinal support spread with historical front
+divergence while transporting existing finite-source weighting, preserving collinear interior
+and endpoint envelopes, and bounding inner-focus concentration without added cap strength
+or coupling unrelated fronts? Derive this for a pair of historical spans before implementation.
+This is not C authorization or permission to spend additional performance/memory/network budget.
+The ±6 m inner-corridor ambiguity, finite grid/color clipping, R0/R1 HDR tails, human review
+and wider platform/authority-counter gaps remain explicit limits.

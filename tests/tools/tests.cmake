@@ -117,3 +117,10 @@ add_test(NAME wake_research_scene COMMAND wake_research
 set_tests_properties(wake_research_scene PROPERTIES LABELS "cpu;render;slow"
   PASS_REGULAR_EXPRESSION "wake_research_scene=ok"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Isolated R2a field screen: deliberately not linked into a production target.
+add_executable(wake_geometry tools/wake_geometry.c tools/wake_geometry_review.c)
+target_link_libraries(wake_geometry PRIVATE proteus_boat_core)
+target_compile_options(wake_geometry PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_geometry_contract COMMAND wake_geometry --check)
+set_tests_properties(wake_geometry_contract PROPERTIES LABELS "cpu;slow")

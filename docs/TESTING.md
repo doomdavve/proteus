@@ -1492,3 +1492,48 @@ calm-twin outcome table. Neither test gates on wall-clock timing.
 metric limits and the proposed behavioral/performance criteria. The source-path renderer is not
 a coupled hull-driving test; existing `wake_objects_review` cases retain that role. No timing
 figure from these tools establishes human acceptance or the existing graphics budget gates.
+
+## Wake geometry screen (R2a)
+
+`wake_geometry` is a private CPU-only experiment; games, `BoatWater`, shaders, networking and
+authorities never link it. The [R2a evidence](evidence/wakes/r2/README.md) records rejected
+short-span/capsule variants and interpretation limits. A passing contract does not select a
+geometry or qualify GPU cost, gameplay encounters or production budgets.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_geometry -j
+./build-release/wake_geometry --check
+mkdir -p build-release/wake-r2/screen-new
+./build-release/wake_geometry --screen build-release/wake-r2/screen-new
+python3 tools/wake_geometry.py --binary build-release/wake_geometry --output build-release/wake-r2/cpu-new --bench
+python3 tools/wake_geometry.py --binary build-release/wake_geometry --output build-release/wake-r2/media-new --media
+```
+
+Run timing separately from screens, rendering, encoding/playback and tests. The benchmark
+uses three alternating pairs, 20 simulated seconds preroll and 60 measured seconds. Source,
+30-query batch and enclosing timing belong to the private harness, not production physics.
+The actual workspace is shared across modes; logical record requirements differ. The report
+retains occupancy/birth assertions, exact commands, hashes, raw CSV and p50/p95/p99. No test
+gates on elapsed time.
+
+Use fresh output directories. `--paths` restricts either driver (straight, circle, wide, eight,
+reverse, crossing); defaults are three timing paths and six media paths. The media driver
+requires ffmpeg/ffprobe, creates CPU signed-height/foam field pairs, checks 100 frames/movie,
+and preserves integer nearest-neighbor scaling. Wide and detail are diagnostic map views,
+not gameplay/chase cameras. Sources stop at 25 seconds; colors clip at ±2.4 m.
+`--source-root DIRECTORY` records archived sources when using a retained executable.
+
+Direct modes are 0 baseline, 1 literal short spans, 2 open capsule, 3 angular capsule,
+4 mature-straight phase/fade-aligned short control. Example direct runs:
+
+```sh
+./build-release/wake_geometry --bench circle 3 4 dense --output build-release/wake-r2/angular.csv
+mkdir -p build-release/wake-r2/angular-frames
+./build-release/wake_geometry --clip circle 3 --output build-release/wake-r2/angular-frames --detail
+```
+
+`wake_geometry_contract` compares baseline records/query components to production, finite
+derivatives at capsule/angular and central envelope seams, signed nonadjacent same-emitter
+fronts and immutable historical records through later source motion/gaps/restart. It does not
+assert a performance threshold or excuse a candidate's field-screen failure.
