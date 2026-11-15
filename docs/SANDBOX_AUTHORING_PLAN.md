@@ -6,7 +6,7 @@ Status, 2026-11-15: **proposed; nothing implemented.** Goal: the
 the agent edits sites and the job, stages the change into the running game and the user plays
 it. Open items: decisions SA0, steps SA1-SA4. Done when: the user plays a work-site change
 that an agent staged through `./wv` in `wake_velocity --plugin`, and the contract is in the
-specs (SA4). Next task: SA0, the user's decisions.
+specs (SA4). Next task: SA0 items 1 and 3 (the restart rule and first-pass scope); the command line is decided.
 
 This plan owns the authoring loop for work packages. The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) still owns the gameplay and the saves, the
@@ -47,10 +47,7 @@ tools run them is open (SA2).
    state, not tooling, and stay, applying when the running package has work sites. The two
    developer review options (`--work-review-pose`, `--work-clock-report`) are tooling, so they
    leave the command line and are exposed through the plugin interface instead
-   (user, 2026-11-15; see SA1). Still to decide: how the bundled
-   package is chosen without a directory (the title's START and scripted runs). Proposed: the
-   existing catalog selector `--package proteus.outer-work`, with the title passing it; say
-   if you want another spelling. The bridge continues to need a window.
+   (user, 2026-11-15; see SA1). The bundled package is chosen with the existing catalog selector, `--package proteus.outer-work` (decided by the user, 2026-11-15); the title's START and scripted runs pass it. The bridge continues to need a window.
 3. **Scope of the first pass.** Proposed: native, solo `outer-work` and `basin-work` shaped
    packages; screenshots through `--plugin ... --screenshot`, no new capture kind;
    no browser and no room.
