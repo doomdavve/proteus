@@ -135,7 +135,7 @@ whose pad holds the next crate. Carry that one east along the river to the new j
 a crate in the water to its latest starting pad, and R restarts everything.
 The same working harbour also runs inside the game (experimental). On the native build, choose
 SINGLE PLAYER, PLACE GOTHENBURG HARBOUR, CONTENT < WORKING HARBOUR > (or launch
-`./build/wake_velocity --location outer --package proteus.outer-work`). It keeps the game's camera and keys, adds the
+`./build/wake_velocity --package proteus.outer-work`). It keeps the game's camera and keys, adds the
 crane controls, and saves itself automatically: there is no save key, and the menu, losing focus and
 quitting save too. The SAVE row under CONTENT finds your save by itself: < CONTINUE > (the default)
 resumes it, < NEW > starts over after a `START OVER? YES / NO` question (the old save stays as a

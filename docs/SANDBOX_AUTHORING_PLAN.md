@@ -47,7 +47,7 @@ tools run them is open (SA2).
    state, not tooling, and stay, applying when the running package has work sites. The two
    developer review options (`--work-review-pose`, `--work-clock-report`) are tooling, so they
    leave the command line and are exposed through the plugin interface instead
-   (user, 2026-11-15; see SA1). The bundled package is chosen with the existing catalog selector, `--package proteus.outer-work` (decided by the user, 2026-11-15); the title's START and scripted runs pass it. The bridge continues to need a window.
+   (user, 2026-11-15; see SA1). The bundled package is chosen with the existing catalog selector, `--package proteus.outer-work` (decided by the user, 2026-11-15); the title's START and scripted runs pass it. A bundled package names its own location, as a plugin directory does, so `--location` is unnecessary and must agree if given (user, 2026-11-15). The bridge continues to need a window.
 3. **Scope of the first pass.** Proposed: native, solo `outer-work` and `basin-work` shaped
    packages; screenshots through `--plugin ... --screenshot`, no new capture kind;
    no browser and no room.

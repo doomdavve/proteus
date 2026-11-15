@@ -44,20 +44,20 @@ wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PL
 ## Working harbour in the game (a package, native)
 
 ```sh
-./build/wake_velocity --location outer --package proteus.outer-work
-./build/wake_velocity --location outer --package proteus.outer-work --data-dir build/work-profile
-./build/wake_velocity --renderer cpu --location outer --package proteus.outer-work --screenshot build/work.png --time 3
+./build/wake_velocity --package proteus.outer-work
+./build/wake_velocity --package proteus.outer-work --data-dir build/work-profile
+./build/wake_velocity --renderer cpu --package proteus.outer-work --screenshot build/work.png --time 3
 ./build/wake_velocity --plugin plugins/outer-work   # the same package from a directory (authoring)
 ```
 
-A working harbour is a package like any other: a `free` package with `scene.work` sites. `--package ID` runs a bundled one (on `outer`, `proteus.outer-work`) and `--plugin DIR` runs one from a directory, in place
+A working harbour is a package like any other: a `free` package with `scene.work` sites. `--package ID` runs a bundled one (`proteus.outer-work`; a package names its own location, so `--location` is not needed and must agree if given) and `--plugin DIR` runs one from a directory, in place
 of the free-ride boat step, with the game's camera, water and harbour, plus the work sites, crate,
 crane and the package's job rows. It is the SV1f/SV1g step of the
 [save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume). It cannot be combined
 with rooms, `--course`, replays, wake, water, `--start` or `--skin`; `--plugin` and `--plugin-bridge` work
 as for other packages (`--plugin` takes a directory, `--package` a bundled ID, never both). The title offers it as GOTHENBURG HARBOUR, CONTENT `WORKING HARBOUR` (native
 builds), with a SAVE row (CONTINUE, NEW, DELETE; NEW and DELETE ask first). START passes
-`--location outer --package proteus.outer-work` (plus `--new` for NEW), so these options stay the scripted spelling.
+`--package proteus.outer-work` (plus `--new` for NEW), so these options stay the scripted spelling.
 
 The session saves itself: there is no save key and F5 stays the plugin reload key. Plain
 interactive play reads and writes `cargo-<package id>.sav` in the game's data directory

@@ -1039,6 +1039,14 @@ static int study(int argc, char **argv)
         }
         location = named;
     }
+    // A bundled package names its own location, as a plugin directory does. An explicit
+    // --location must agree (checked below).
+    if (package_id && !plugin_path && !connect_to && !location_set) {
+        const BoatPluginCatalogEntry *named = boat_plugin_catalog_find(package_id);
+        const BoatWorldDefinition *found = named ? boat_location_find(named->location) : NULL;
+        if (found)
+            location = found;
+    }
     // Every solo session starts from a build-time catalog entry. Explicit --package IDs must
     // name this location's kind. The browser builds the same catalog into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
@@ -2820,9 +2828,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
             if (slot.present && !slot.available)
                 wake_work_title_set_aside(&slot);
         }
-        arguments[count++] = "--location";
-        arguments[count++] = "outer";
-        arguments[count++] = "--package";
+        arguments[count++] = "--package"; // The package names its location.
         arguments[count++] = (char *)boat_title_outer_package(BOAT_TITLE_OUTER_WORKING_HARBOUR);
         if (settings->work_new)
             arguments[count++] = "--new";
