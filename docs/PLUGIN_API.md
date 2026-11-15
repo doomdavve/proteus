@@ -1137,7 +1137,8 @@ directory.
 
 A small panel at the bottom left shows the active revision and the latest outcome; each
 outcome is also printed to stderr as `Plugin DIR: ...`. Add `--plugin-bridge DIR` to let
-external tools inspect and drive the same transactions ([live tool bridge](#live-tool-bridge-p46)).
+external tools inspect and drive the same transactions ([live tool bridge](#live-tool-bridge-p46));
+the game then holds saved files until F5 or a tool stages them.
 
 | Input | Effect |
 | --- | --- |
@@ -1857,7 +1858,10 @@ python3 tools/plugin_author.py live-discard --bridge ~/.wake-velocity-bridge --b
 ```
 
 `--plugin-bridge DIR` requires `--plugin` and a window (no `--screenshot`); ordinary play
-never opens a bridge. The game creates `DIR` (POSIX mode 0700) or reuses it only when it is a
+never opens a bridge. **While a bridge is attached the game holds saves:** it stops watching the
+package directory, so saved files neither stage nor apply on their own, and the panel shows
+`SAVES HELD (BRIDGE)`. F5 and bridge stages still read the directory, and a tool may edit it
+freely and stage when ready. Without a bridge, saves reload as before. The game creates `DIR` (POSIX mode 0700) or reuses it only when it is a
 directory owned by the user with no group/other permissions, then writes `DIR/session` (mode
 0600) holding a random 128-bit token and session id that change on every launch. Requests must
 carry the token, so a tool needs to be able to read the user's private file, and requests left
@@ -1907,11 +1911,49 @@ Owner fields: `plugin`, active `revision`, `epoch`, gameplay `digest`, `undo_dep
 `bundle_id`; every response echoes `pins`, `request_id` and `session`.
 
 A typical loop is `workspace-read` → `workspace-write --expect-bundle` → `validate`/`preview`/
-`capture` → `live-inspect` → `live-stage` → `live-apply` or `live-undo`. A workspace write is
-itself a save, so with save polling the running game may already stage it; `live-stage` then
-reports the same result or `busy`. Limits: voyage plugins in `wake_velocity` only (no race
+`capture` → `live-inspect` → `live-stage` → `live-apply` or `live-undo`. A bridge holds saves
+(see below), so a workspace write changes nothing in the game until a stage. Limits: voyage plugins in `wake_velocity` only (no race
 trial, browser or room); one client at a time; cancelling a client stops waiting but does not
 retract a request the game has read; a request is answered within a poll plus the staging time.
+
+## Agent workspaces
+
+`plugin_author.py init DIR [--example NAME-or-DIRECTORY] [--bridge DIR]` makes a new, empty-or-absent
+directory that a coding agent can be launched in, so it sees the plugin and nothing else of the
+game. It holds the example's `plugin.json`, `main.lua` and modules (default `langedrag`), and:
+
+| File | Purpose |
+| --- | --- |
+| `wv` | Executable Python 3 wrapper: `./wv COMMAND [OPTIONS]` runs `plugin_author.py COMMAND DIR OPTIONS` from the tools that created it |
+| `.wv.json` | The bridge directory (default `~/.wake-velocity-bridge`) and the tool path |
+| `AGENTS.md`, `CLAUDE.md` | The agent's instructions (`CLAUDE.md` imports `AGENTS.md`) |
+| `.claude/settings.json` | Claude Code permissions: allow the `./wv` commands but not `play`, deny reading the bridge directory so its token stays out of the transcript |
+| `reference/PLUGIN_API.md` | A copy of this document |
+
+The package reader takes only `plugin.json`, `main.lua` and the declared modules, so the extra
+files change nothing about the plugin, its bundle or its digest. The permission rules and the
+instructions are hygiene, not a sandbox: the agent can still run anything the user's session
+allows, and plugin Lua is trusted.
+
+The wrapper's commands are the workspace operations of `plugin_author.py`. Each prints one JSON
+object and exits 0 only when `status` is `ok`; none takes a revision, epoch or held-revision pin,
+because each reads the game's state with `live-inspect` first and pins to it, so a guess cannot
+happen and a game that moved in between answers `stale`.
+
+| Command | Effect |
+| --- | --- |
+| `check [--anchor NAME --output FILE.png]` | `validate` and `preview` of the directory; with `--anchor`, a `capture` (default `.wv/frame.png`). Offline; never touches a game |
+| `stage` | `validate`, then `live-inspect`, then `live-stage` of the directory with the game's revision and epoch and the snapshot's bundle id; `next` says whether the result is live or held |
+| `apply` | `live-apply` with the game's `held_revision`; `conflict` when nothing is held |
+| `undo`, `discard` | `live-undo`, `live-discard` pinned to the inspected state |
+| `status` | The inspected owner fields and the boat/objective position |
+| `console --line TEXT` | `live-console` with the inspected epoch |
+| `schema`, `capabilities`, `anchors` | The offline operations of the same names |
+| `play` | Run the game on this directory with its bridge (for the person, not the agent). `busy` when a live game already holds the bridge's session file; without a session file the commands answer `no_game` |
+
+A rejected candidate is reported by `check` or `stage` with the diagnostic file, line and field and
+nothing is staged. Voyage plugins in `wake_velocity` only, as for the bridge. The wrapper is a Python
+script: Windows runs it as `py wv COMMAND`; that path has not been run.
 
 ## Packaged authoring tools (P4.7)
 

@@ -1769,10 +1769,13 @@ agent can author as powerfully, do not build one in-game now. The PC command lay
 (`apps/wake_velocity/wake_command.[ch]`), the P4 tools and the live tool bridge already give an
 outside agent the same path a player has, with no provider code in the game.
 
-**Deliverable:** [Authoring plugins with an external agent](AGENT_AUTHORING.md): a documented loop
-(read the contract, edit a draft, validate/preview/capture, inspect, stage, apply or undo) and a
-trial that records whether it is enough. No game code. The bridge, pins and staging already make
-stale results impossible to apply and keep model latency out of the tick.
+**Deliverable:** [Authoring plugins with an external agent](AGENT_AUTHORING.md): `plugin_author.py
+init` scaffolds a plugin directory an agent is launched in, with a `./wv` wrapper (check, stage,
+apply, undo, discard, status, console) that pins every live request from the game, and a bridge
+that holds saved files so the agent edits in place and stages when ready ([API](PLUGIN_API.md#agent-workspaces)).
+The only game change is that hold. The bridge, pins and staging already make stale results
+impossible to apply and keep model latency out of the tick. Implemented 2026-11-15 and checked by
+automated tests; a re-run of the trial and a human play check are owed.
 
 **Deferred, not dropped:** an in-game conversation, its provider adapter and streaming UI,
 credential storage, cost limits and offline/provider errors, and agent editing of rooms or the

@@ -191,7 +191,8 @@ game thread and the boat is never moved. Layout edits install live when the hull
 otherwise held until it is. `/save DIR` writes a complete package and refuses a non-empty directory
 that is not this session's package; in the browser the same command downloads a source bundle. See the
 [console contract](PLUGIN_API.md#live-console-and-command-layer-pc) for the command list and limits.
-`--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`.
+`--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`, and
+holds saved plugin files until F5 or a tool stages them ([agent workspaces](PLUGIN_API.md#agent-workspaces)).
 
 ## Courses and recordings
 

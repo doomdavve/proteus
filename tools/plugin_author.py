@@ -39,7 +39,10 @@ V1_MESSAGE = "version 1 bundles are not supported; re-export"
 
 OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
               "import", "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
-              "live-undo", "live-discard", "live-console", "sync-shared"]
+              "live-undo", "live-discard", "live-console", "sync-shared", "init", "check", "status",
+              "stage", "apply", "undo", "discard", "console", "play"]
+WORKSPACE_OPERATIONS = ("init", "check", "status", "stage", "apply", "undo", "discard", "console",
+                        "play")
 LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard", "console")
 RESPONSE_MAX = 32768
 
@@ -938,6 +941,7 @@ def main():
     parser.add_argument("--camera-distance", type=float)
     parser.add_argument("--camera-height", type=float)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--example", help="init: the example (or a directory) to start from")
     args = parser.parse_args()
     if args.operation == "capabilities":
         print(json.dumps(capabilities(), sort_keys=True))
@@ -959,6 +963,11 @@ def main():
         print(json.dumps({"protocol": 1, "operation": "sync-shared", "status": status,
                           **result}, sort_keys=True))
         return 0 if status == "ok" else 1
+    if args.operation in WORKSPACE_OPERATIONS:
+        import plugin_workspace  # Agent workspaces take their pins from the game itself.
+        result = plugin_workspace.run(sys.modules[__name__], args)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result.get("status") == "ok" else 1
     offline_base = args.base_revision or 0  # Correlation only; live pins must be explicit.
     job = None
     try:
