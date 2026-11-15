@@ -454,14 +454,34 @@ int main(int argc, char **argv)
         && again->source_size == files->source_size
         && !memcmp(again->source, files->source, files->source_size));
     plugin->authoring = true;
-    // The console wraps the entry as text, which a module image has no form of: it says so.
+    // The console wraps the entry as text and keeps the modules: an edit stages as an image with
+    // the same module, and a query sees the edit.
     static WakeCommand command;
     wake_command_init(&command, collect, console_clear, console_save, NULL);
-    CHECK(!wake_command_submit(&command, plugin, &session, "def.voyage = nil", 0));
-    CHECK(strstr(console_line, "HAS MODULES") && !plugin->staging);
+    plugin->stage_executable = worker_path;
+    CHECK(!wake_command_submit(
+        &command, plugin, &session, "def.voyage.shelters[1].name = \"PIER\"", 0));
+    CHECK(plugin->staging && !strstr(console_line, "MODULES"));
+    for (unsigned i = 0; plugin->staging && i < 200000000u; ++i) // A failure deadline.
+        wake_plugin_frame(plugin, &session, false, false, false, 0);
+    wake_command_frame(&command, plugin, &session, 0);
+    const BoatPluginRevision *console_active = boat_plugin_host_active(&plugin->host);
+    CHECK(!plugin->staging && plugin->host.numbered == 2);
+    // The revision keeps the package's image (a non-objective revision does not retain the edit's
+    // text); the query below shows the edit.
+    CHECK(boat_plugin_image_is(console_active->source, console_active->source_size));
+    BoatPluginImageFile console_files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned console_count;
+    CHECK(boat_plugin_image_unpack(
+              console_active->source, console_active->source_size, console_files, &console_count)
+        && console_count == 2 && console_files[1].name_size == 4
+        && !memcmp(console_files[1].name, "tour", 4));
     console_line[0] = 0;
     CHECK(!wake_command_submit(&command, plugin, &session, "= def.voyage.shelters[1].name", 0));
-    CHECK(strstr(console_line, "HAS MODULES") && !plugin->query);
+    CHECK(plugin->query && !strstr(console_line, "MODULES"));
+    for (unsigned i = 0; command.query_pending && i < 200000000u; ++i) // A failure deadline.
+        wake_command_frame(&command, plugin, &session, 0);
+    CHECK(!command.query_pending && strstr(console_line, "PIER"));
     free(again);
     boat_session_destroy(&session);
     free(plugin);

@@ -475,6 +475,18 @@ The environment keeps these globals, and everything else is removed:
 - `require` exists only for a package that declares modules (next section); otherwise it is
   absent like the rest.
 
+### Shared source and copies (M5 W5)
+
+A package cannot import another package or a shared directory, so content several packages use
+is a repository source copied into each. `plugins/_shared/<name>.lua` is the source (it has no
+`plugin.json` and is never a package); a package carries a checked-in, byte-identical copy at
+`modules/<name>.lua` and declares it in `modules`. A module whose name exists in `_shared` is such
+a copy and is not edited in place. `python3 tools/plugin_author.py sync-shared` (add `--check` to
+only report) rewrites the copies, and the CTest `plugin_shared` fails with that command when one
+differs. `eriksberg_marina` (the twelve-berth marina scene of `harbor-life` and `harbor-room`) is
+the first; it returns plain scene data, which one evaluation caches, so a package that tweaks it
+copies the table first.
+
 ### require (M5 W2)
 
 For a source image, `require(name)` is a native function over the image's declared modules and
@@ -905,8 +917,8 @@ The example owns its long pontoon, gangway and shore equipment; berths moor to t
 authored pontoon. A berth, entrance or module edit is held for F7 and restarts the session at the
 validated spawn; Undo restores the whole layout. A display-only manifest rename still preserves
 progress. The compiled large pontoon, quay and docked ferry are not drawn when `modules` is
-present. The free `outer` room package `harbor-room` repeats the same layout because there is no
-scene include or composition mechanism.
+present. The free `outer` room package `harbor-room` carries the same layout through the shared
+marina module (see Shared source and copies).
 
 The same poses are the pinned anchors `outer.marina` and `outer.eriksberg` in
 [`tools/plugin_anchors.json`](../tools/plugin_anchors.json), for pinned previews and captures.
@@ -1223,7 +1235,7 @@ if (boat_plugin_read("plugins/langedrag", NULL, files, &d) == BOAT_PLUGIN_OK) {
   classification is the same as for an entry edit (descriptor data decides, plus, for an objective
   voyage, any difference in the source bytes: migrate or restart), and a failed stage leaves the
   active revision untouched with the module's file in the diagnostic. `/save` writes the entry and
-  each module under `modules/`; the PC console's edits and queries refuse a package with modules.
+  each module under `modules/`; the PC console wraps the entry and keeps the modules (M5 W5).
 - `boat_plugin_route_digest` is FNV-1a over every route field with field names, float bits
   least significant byte first, and shelter names. The reference digest is `e8509272172cb7c4`,
   the same for the fixture route and on Wasm.
@@ -1972,8 +1984,8 @@ The browser builds the source image itself (`packImage` in `web/plugin_author.js
 image the Wasm side holds for `/save` and export. The layout in `src/plugins/boat_plugin_image.h`,
 `tools/plugin_author.py` and the web code are held to the same bytes by one golden vector,
 `tests/support/fixtures/plugin_image_golden.hex`, asserted by the native, Python and Node tests.
-The PC console still refuses a package with modules (`HAS MODULES`); the console's `/save`
-in the browser downloads the version 2 bundle.
+The PC console edits and queries a package with modules by wrapping its entry and keeping the
+modules (M5 W5); the console's `/save` in the browser downloads the version 2 bundle.
 
 Successful staging saves source in host-owned localStorage where permitted. Storage denial
 or invalid saved source is visible and nonfatal; export remains available. A new page/session

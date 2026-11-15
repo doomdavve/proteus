@@ -660,6 +660,14 @@ class Packaged(unittest.TestCase):
             for path in data["examples"] + [data["anchors"], data["api_document"]]:
                 self.assertTrue(Path(path).exists(), path)
             self.assertEqual(tool("anchors")[1], author.anchors())
+            # The shared marina travels as each example's own module copy; _shared is no package.
+            installed = package / "assets/plugins"
+            for name in ("harbor-life", "harbor-room"):
+                self.assertEqual((installed / name / "modules/eriksberg_marina.lua").read_bytes(),
+                                 (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes())
+            self.assertFalse((installed / "_shared").exists())
+            self.assertEqual(sorted(p.name for p in installed.iterdir() if p.name.startswith("_")), [])
+            self.assertFalse(any(Path(example).name.startswith("_") for example in data["examples"]))
             for example in data["examples"]:
                 # A loaded Linux runner can exceed the product's 5 s default during the
                 # harbour-life traffic sweep; this check is about the relocated package.
@@ -681,6 +689,90 @@ class Packaged(unittest.TestCase):
                                   "capabilities"], capture_output=True, text=True, timeout=30)
             self.assertNotEqual(run.returncode, 0)
             self.assertIn("unsupported plugin tools layout", run.stderr)
+
+
+class SharedModules(unittest.TestCase):
+    """M5 W5: sync-shared, and harbor-life and harbor-room as self-contained module packages."""
+
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(self.scratch.cleanup)
+        self.plugins = Path(self.scratch.name) / "plugins"
+        (self.plugins / "_shared").mkdir(parents=True)
+        (self.plugins / "_shared/marina.lua").write_bytes(b"return { a = 1 }\n")
+        for name, modules in (("one", '["marina"]'), ("two", '["marina", "local"]'), ("bare", "[]")):
+            package = self.plugins / name
+            (package / "modules").mkdir(parents=True)
+            (package / "plugin.json").write_text('{"modules": %s}' % modules)
+            (package / "main.lua").write_bytes(b"return {}\n")
+        (self.plugins / "two/modules/local.lua").write_bytes(b"return 1\n")
+        (self.plugins / "two/modules/marina.lua").write_bytes(b"return { a = 2 }\n")
+
+    def tool(self, *args):
+        run = subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), *args],
+                             capture_output=True, timeout=30)
+        return run.returncode, json.loads(run.stdout)
+
+    def test_sync_shared(self):
+        self.assertIn("sync-shared", author.capabilities()["operations"])
+        # --check reports every drifted or missing copy, names them and writes nothing.
+        code, result = self.tool("sync-shared", str(self.plugins), "--check")
+        self.assertEqual(code, 1)
+        self.assertEqual((result["status"], result["checked"], result["changed"]), ("drift", 2, []))
+        self.assertEqual(result["drifted"], ["one/modules/marina.lua", "two/modules/marina.lua"])
+        self.assertFalse((self.plugins / "one/modules/marina.lua").exists())
+        self.assertEqual((self.plugins / "two/modules/marina.lua").read_bytes(), b"return { a = 2 }\n")
+        # Without --check the copies are created or rewritten; unshared modules stay.
+        code, result = self.tool("sync-shared", str(self.plugins))
+        self.assertEqual((code, result["status"], result["changed"]), (0, "ok", result["drifted"]))
+        for name in ("one", "two"):
+            self.assertEqual((self.plugins / name / "modules/marina.lua").read_bytes(),
+                             b"return { a = 1 }\n")
+        self.assertEqual((self.plugins / "two/modules/local.lua").read_bytes(), b"return 1\n")
+        self.assertFalse((self.plugins / "bare/modules/marina.lua").exists())
+        code, result = self.tool("sync-shared", str(self.plugins), "--check")
+        self.assertEqual((code, result["status"], result["drifted"]), (0, "ok", []))
+        # _shared is never a package: a stray manifest there does not make it a sync target.
+        (self.plugins / "_shared/plugin.json").write_text('{"modules": ["marina"]}')
+        self.assertEqual(self.tool("sync-shared", str(self.plugins), "--check")[1]["checked"], 2)
+        # An undeclared file with a shared name is a copy too.
+        (self.plugins / "bare/modules/marina.lua").write_bytes(b"x")
+        self.assertEqual(self.tool("sync-shared", str(self.plugins), "--check")[1]["drifted"],
+                         ["bare/modules/marina.lua"])
+        code, result = self.tool("sync-shared", str(self.plugins / "missing"))
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+
+    def test_shipped_copies_are_in_sync(self):
+        code, result = self.tool("sync-shared", "--check")
+        self.assertEqual((code, result["status"], result["drifted"]), (0, "ok", []), result)
+        self.assertGreaterEqual(result["checked"], 2)
+
+    def test_marina_packages_bundle_and_round_trip(self):
+        shared = (ROOT / "plugins/_shared/eriksberg_marina.lua").read_bytes()
+        for name in ("harbor-life", "harbor-room"):
+            source = ROOT / "plugins" / name
+            self.assertEqual(json.loads((source / "plugin.json").read_text())["modules"],
+                             ["eriksberg_marina"])
+            self.assertEqual((source / "modules/eriksberg_marina.lua").read_bytes(), shared)
+            bundle = author.export_bundle(source)
+            self.assertEqual(bundle["version"], 2)
+            self.assertEqual(bundle["modules"], {"eriksberg_marina": shared.decode("utf-8")})
+            target = Path(self.scratch.name) / name
+            author.import_bundle(json.dumps(bundle), target)
+            self.assertEqual(author.snapshot(target), author.snapshot(source))
+            self.assertEqual((target / "modules/eriksberg_marina.lua").read_bytes(), shared)
+            # The entry is small; the scene is not in it.
+            self.assertNotIn(b"berths", (target / "main.lua").read_bytes())
+            code, result = self.worker_check(target)
+            self.assertEqual((code, result["status"]), (0, "ok"), result)
+            _, original = self.worker_check(source)
+            self.assertEqual(result["gameplay_digest"], original["gameplay_digest"])
+
+    def worker_check(self, directory):
+        run = subprocess.run([WORKER], input=author.snapshot(directory), capture_output=True,
+                             timeout=20)
+        self.assertIn(run.returncode, (0, 1), run.stderr)
+        return run.returncode, json.loads(run.stdout)
 
 
 class Worker(unittest.TestCase):
@@ -766,7 +858,9 @@ class Worker(unittest.TestCase):
         self.assertEqual(data["api"], 1)
         for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour"):
             manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
-            self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
+            # "modules" is optional; harbor-life declares one (M5 W5).
+            self.assertEqual(set(manifest) - {"modules"},
+                             set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
         marina = data["schemas"]["scene"]["properties"]["marina"]["properties"]
         self.assertEqual(marina["berths"]["maxItems"], 32)

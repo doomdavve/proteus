@@ -81,10 +81,17 @@ static bool prepare_base(WakeCommand *command, WakePlugin *plugin, bool edit)
         emit(command, "THE ACTIVE PACKAGE HAS NO SOURCE TO EDIT");
         return false;
     }
-    // Console edits and queries wrap the entry as text; a module image has no such form (M5 W3).
+    // A package with modules is a source image: the console wraps its entry and keeps its modules.
     if (boat_plugin_image_is(text, size)) {
-        emit(command, "THIS PACKAGE HAS MODULES; EDIT ITS FILES AND RELOAD");
-        return false;
+        BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+        unsigned count;
+        if (!boat_plugin_image_unpack(text, size, files, &count)
+            || files[0].size > sizeof(command->base)) {
+            emit(command, "THE ACTIVE PACKAGE HAS NO SOURCE TO EDIT");
+            return false;
+        }
+        text = files[0].data;
+        size = files[0].size;
     }
     memcpy(command->base, text, size);
     command->base_size = size;
@@ -93,6 +100,29 @@ static bool prepare_base(WakeCommand *command, WakePlugin *plugin, bool edit)
     command->counts_known[1] = true;
     command->last_revision = 1;
     return true;
+}
+
+// The staged form of WRAPPED, an edited entry: itself for a single-file package, otherwise the
+// active image with that entry in place of its own (the modules are never edited here).
+static size_t stage_form(
+    const WakePlugin *plugin, const char *wrapped, size_t wrapped_size, char *out, size_t capacity)
+{
+    const char *active;
+    size_t active_size = wake_plugin_source(plugin, &active);
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count;
+    if (!boat_plugin_image_is(active, active_size)) {
+        if (wrapped_size > capacity)
+            return 0;
+        memcpy(out, wrapped, wrapped_size);
+        return wrapped_size;
+    }
+    size_t written;
+    if (!boat_plugin_image_unpack(active, active_size, files, &count))
+        return 0;
+    files[0].data = wrapped;
+    files[0].size = wrapped_size;
+    return boat_plugin_image_pack(files, count, out, capacity, &written) ? written : 0;
 }
 
 static bool submit_edit(
@@ -127,9 +157,16 @@ static bool submit_edit(
         emit(command, "SOURCE LIMIT (%d BYTES) REACHED; /undo OR /save", BOAT_PLUGIN_SOURCE_MAX);
         return false;
     }
+    static char staged[BOAT_PLUGIN_SOURCE_MAX];
+    size = stage_form(plugin, source, size, staged, sizeof(staged));
+    if (!size) {
+        --command->chunk_count;
+        emit(command, "SOURCE LIMIT (%d BYTES) REACHED; /undo OR /save", BOAT_PLUGIN_SOURCE_MAX);
+        return false;
+    }
     command->chunk = command->chunk_count;
     command->pending = true;
-    wake_plugin_stage_source(plugin, session, source, size, now);
+    wake_plugin_stage_source(plugin, session, staged, size, now);
     if (!plugin->staging) {
         command->pending = false;
         --command->chunk_count;
@@ -156,7 +193,10 @@ static bool submit_query(
     static char source[BOAT_PLUGIN_SOURCE_MAX];
     size_t size
         = wake_command_source(command, command->base, command->base_size, source, sizeof(source));
-    if (!size || !wake_plugin_query_begin(plugin, source, size, expression, now)) {
+    static char staged[BOAT_PLUGIN_SOURCE_MAX];
+    if (size)
+        size = stage_form(plugin, source, size, staged, sizeof(staged));
+    if (!size || !wake_plugin_query_begin(plugin, staged, size, expression, now)) {
         emit(command, "CANNOT RUN THE ISOLATED QUERY");
         return false;
     }

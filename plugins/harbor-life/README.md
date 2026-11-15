@@ -12,6 +12,17 @@ just north of the slips, with a short feeding interval and alarm climb in the fi
 The free `outer` room package [`harbor-room`](../harbor-room/main.lua) carries the same marina
 layout, traffic and flock.
 
+## Shared marina module
+
+The marina scene lives once, in [`plugins/_shared/eriksberg_marina.lua`](../_shared/eriksberg_marina.lua).
+`main.lua` loads it with `require("eriksberg_marina")`, and the package declares it as
+`"modules": ["eriksberg_marina"]`. Each package is self-contained, so it carries a checked-in copy
+at `modules/eriksberg_marina.lua` (this package and `harbor-room`); a module whose name exists in
+`plugins/_shared` is such a copy and is never edited in place. Edit the shared file, then run
+`python3 tools/plugin_author.py sync-shared` to rewrite the copies. The CTest `plugin_shared`
+fails with that command when a copy has drifted. The module returns plain data and is cached for
+the rest of one evaluation, so a package that changes the scene must copy it first.
+
 ## Layout
 
 Simulation metres use `x = -east`, `z = north`; headings follow the voyage API. Seven hulls
@@ -48,7 +59,7 @@ camera, use the `outer.marina-pass` anchor at `(0, 205)` facing the loop.
 
 ## Edit
 
-Change a berth's `recipe`, `x`, `z`, `heading`, `mooring`, optional `appearance`, the entrance, or remove a berth. The
+Change (in the shared module, then `sync-shared`) a berth's `recipe`, `x`, `z`, `heading`, `mooring`, optional `appearance`, the entrance, or remove a berth. The
 game checks the hull and wave/mooring envelope against the compiled water, other berths, the
 entrance and the spawn/recovery shelters. Depth is not available in the compiled map, so no
 depth claim is made. Live staging holds an obstructing edit rather than moving a hull under the boat.
@@ -146,9 +157,9 @@ native work before Lua can author them:
   sky and wet quay are not reproducible.
 - **People and animals beyond gulls.** The living-city people/cyclist work is not exposed, and
   gulls are the only authorable wildlife recipe. Seals and trams are later native slices.
-- **Shared scene composition.** `harbor-room` duplicates the marina block from this package.
-  There is no include, dependency or composition mechanism, so the two copies must be edited
-  together.
+- **Package-to-package composition.** `harbor-room` and this package share the marina through a
+  package-local module copy (see above). A package cannot import another package or a shared
+  directory at run time; a shared module is copied into each package and checked for drift.
 - **Assets, depth and custom meshes.** Packages cannot import meshes, textures or shaders, and
   the compiled map has no depth query. Site validation reports depth as unverified.
 
@@ -159,6 +170,7 @@ native work before Lua can author them:
 ./build/validate_harbor
 ./build/validate_traffic
 ./build/validate_harbor_life
+./build/validate_marina_shared
 ./build/wake_velocity --renderer cpu --plugin plugins/harbor-life \
   --screenshot build/harbor-life.png --start 2,161,90 --time 3
 ```

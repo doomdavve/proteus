@@ -17,6 +17,7 @@
 #include "room/boat_room_package.h"
 #include "support/boat_test_cases.h"
 #include "support/boat_test_module_package.h"
+#include "support/boat_test_flat_package.h"
 
 #include "support/boat_fixtures.h"
 #include <math.h>
@@ -422,6 +423,7 @@ static int definition_size(void)
     static unsigned char stage_bytes[BOAT_PLUGIN_SOURCE_MAX + 32768u];
     BoatPluginDiagnostic pd;
     CHECK(boat_plugin_read("plugins/harbor-room", NULL, &files, &pd) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     stage.kind = BOAT_PLUGIN_KIND_FREE;
     stage.manifest_size = files.manifest_size;
     memcpy(stage.manifest, files.manifest, files.manifest_size);

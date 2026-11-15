@@ -5,6 +5,7 @@
 // entry moved into one module, "shipped". The copy's manifest declares that module and its
 // main.lua is `return require('shipped')`, so it must evaluate exactly as the original.
 #include "plugins/boat_plugin_io.h"
+#include "support/boat_test_flat_package.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -22,7 +23,8 @@ static inline bool boat_test_module_package(const char *source_directory, const 
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
-    if (boat_plugin_read(source_directory, NULL, &files, &d) != BOAT_PLUGIN_OK)
+    if (boat_plugin_read(source_directory, NULL, &files, &d) != BOAT_PLUGIN_OK
+        || !boat_test_flatten_package(&files))
         return false;
     int n = snprintf(directory, capacity, "%s/%s", scratch, name);
     if (n < 0 || (size_t)n >= capacity)

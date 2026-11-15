@@ -20,6 +20,7 @@
 #include "raymath.h"
 #include "support/boat_fixtures.h"
 #include "support/boat_test_cases.h"
+#include "support/boat_test_flat_package.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -299,7 +300,8 @@ static const char *harbor_variant(const char *from, const char *to)
     static char text[BOAT_PLUGIN_SOURCE_MAX + 1];
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
-    if (boat_plugin_read("plugins/harbor-life", NULL, &files, &d) != BOAT_PLUGIN_OK)
+    if (boat_plugin_read("plugins/harbor-life", NULL, &files, &d) != BOAT_PLUGIN_OK
+        || !boat_test_flatten_package(&files))
         return NULL;
     memcpy(text, files.source, files.source_size);
     text[files.source_size] = 0;
@@ -319,6 +321,7 @@ static int scene_traffic(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
@@ -384,8 +387,8 @@ static int scene_traffic(void)
     }
     // A non-retained authored copy of the compiled river actor is a real schedule conflict.
     const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+        "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+        "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
@@ -420,7 +423,8 @@ static int open_path_decode(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
-    const char *old = "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540";
+    CHECK(boat_test_flatten_package(&files));
+    const char *old = "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540";
     const char *good = "route = \"open\", pieces = {"
                        "{kind=\"line\",x0=0,z0=-100,x1=0,z1=-110,ticks=240,dwell=120,"
                        "max_speed=20,max_acceleration=100},"
@@ -635,6 +639,7 @@ static int marina_service_survey(void)
     CHECK(status == BOAT_PLUGIN_OK);
     static BoatPluginFiles files;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     status = load(files.manifest, SERVICE_SOURCE, strlen(SERVICE_SOURCE), NULL, &staged, &d);
     if (status != BOAT_PLUGIN_OK)
         show("service load", &d);
@@ -806,6 +811,7 @@ static int free_scene_location(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
@@ -1152,8 +1158,8 @@ static int free_scene_location(void)
 
     // Invalid free traffic is caught by the same retained-timetable conflict check.
     const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+        "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+        "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     BoatPluginVoyage traffic;
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &traffic, &d) == BOAT_PLUGIN_OK);
@@ -1178,6 +1184,7 @@ static int scene_appearance(void)
     static unsigned char wire[32768];
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     const char *valid = "{ length = 5.2, beam = 2, hull = { 0, 128, 255 }, deck = { 1, 2, 3 }, "
                         "trim = { 9, 8, 7 }, name = \"SEA-1\" }";
     int size = snprintf(source, sizeof(source),
@@ -1250,6 +1257,7 @@ static int scene_berths(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
@@ -1287,7 +1295,7 @@ static int scene_berths(void)
         bool location;
     } cases[] = {
         { "marina = {", "marina = { pontoons = {},", "scene.marina.pontoons", false },
-        { "      entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
+        { "    entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
         { "id = \"runabout\"", "id = \"sailboat_aft\"", "scene.marina.berths[2].id", false },
         { "recipe = \"runabout\"", "recipe = \"yacht\"", "scene.marina.berths[2].recipe", false },
         { "mooring = \"pontoon\"", "mooring = \"quay\"", "scene.marina.berths[1].mooring", false },

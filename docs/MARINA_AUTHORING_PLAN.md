@@ -6,9 +6,10 @@ resident/visitor services are complete and merged (M4: #209; contract in the
 integrated example) is in progress on `feat/marina-m5`, local until a PR is approved; decisions
 D1-D5 are accepted with the recommended options ([execution package](#m5-execution-package--2026-11-15)).
 W1 (manifest `modules`, source image, module IO, wider diagnostic file), W2 (`require` in the VM),
-W3 (carriers) and W4 (authoring tools, bundle version 2 and the browser editor) are done. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
+W3 (carriers), W4 (authoring tools, bundle version 2 and the browser editor) and W5 (the shared
+marina module) are done. Open: M4 leftovers (parked visitor, serviced-vessel wakes, repeat,
 loop-path services, browser/Wasm and room runs, watched motion review); human acceptance stays separate.
-Done when all five marina milestones are closed. Next task: M5-W5 (shared marina).
+Done when all five marina milestones are closed. Next task: M5-W6 (integrated example).
 The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
@@ -1029,8 +1030,72 @@ frame/unpack, version 1 and malformed bundles, limits and messages, writePackage
 system, restore, and the editor wiring over a stub DOM). Not verified: any Chrome/Wasm run (no Emscripten
 here; `check_web_plugin_author.py` gained a module import/stage/export step and a version 1 refusal
 that were only compiled, not run), the real DOM and CSS of the module controls, Windows. Limits kept:
-the in-game PC console still refuses a package with modules (`HAS MODULES`), accepted for M5;
+the in-game PC console refused a package with modules (`HAS MODULES`; lifted in W5, see its result);
 `workspace-write` cannot create a module file, only edit existing declared ones.
+
+### M5 W5 result
+
+Implemented 2026-11-15. The Eriksberg marina scene lives once, in `plugins/_shared/eriksberg_marina.lua`
+(a module that returns the scene table, with harbor-life's comments). `harbor-life` and `harbor-room`
+each carry a byte-identical copy at `modules/eriksberg_marina.lua`, declare it in `plugin.json`
+`modules`, and `require("eriksberg_marina")` for `scene` (D4). Before the move the two inline scene
+tables were compared and were textually equal (no difference found); the shared file is harbor-life's
+copy. The convention is in [Shared source and copies](PLUGIN_API.md#shared-source-and-copies-m5-w5).
+
+**Equivalence evidence.** The scene, voyage and room digests were recorded from the single-file packages
+(commit f402c87, before any edit) and are asserted as constants by the new `marina_shared`
+(`tests/plugins/validate_marina_shared.c`): scene `0692ebb6e02eca36` (12 berths, 13 modules, 4 vessels,
+1 flock), harbor-life voyage and catalog entry digest `e8509272172cb7c4`, harbor-room catalog entry digest
+`0692ebb6e02eca36` (a free entry's digest is its scene's), harbor-room `boat_room_definition_digest`
+`914a7a169b542df6`. The same test loads harbor-life from its directory (`boat_plugin_read` plus
+`boat_plugin_load_voyage`) and the build-time catalog, and harbor-room through `boat_room_package_load` by
+directory and by catalog id, and requires all four scene digests equal each other and the constants. Every
+existing assertion remains; none was loosened (the tests that edit the packages' text are listed below).
+
+**Test changes the move forced.** Validators that string-edit a shipped package's entry or pair its manifest
+with other source read harbor-life/harbor-room as modules now, so they call the new
+`tests/support/boat_test_flat_package.h` (`boat_test_flatten_package`), which inlines each `require` as an
+immediately called function and drops `modules` from the manifest; the evaluated data is the same. Used in
+`validate_boat_plugin`, `_session`, `_stage`, `validate_scene_site`, `validate_boat_room_package` and
+`boat_test_module_package.h`. Fragments that spanned lines moved two spaces left with the module's
+indentation. `test_plugin_author.test_schema` allows the optional `modules` key. Not flattened (they run the
+real module image): `validate_harbor_life`, `scene_traffic`'s first load, the open-leg wire cases,
+`marina_shared`, the catalog and the room package paths.
+
+**Deviation: the PC console accepts packages with modules.** `wake_command` edits and queries of the
+now-module-carrying harbor-life would otherwise have been refused (`HAS MODULES`, the W3 limit), and
+`wake_command` edits harbor-life. The console now wraps the entry as before and re-packs it with the
+active image's modules (`stage_form`); modules are never edited from the console. `boat_plugin_modules`
+asserts an edit stages and a query sees it, replacing the refusal assertion; `wake_command` cleans the
+saved `modules/` directory it now writes.
+
+**Drift check and `sync-shared`.** `python3 tools/plugin_author.py sync-shared [PLUGINS-DIR] [--check]`
+copies every `_shared/<name>.lua` into each package that declares that module, or already has a file of that
+name under `modules/`; it creates `modules/` as needed and reports `checked`, `drifted` and `changed`;
+`--check` writes nothing and exits 1 on drift. CTest `plugin_shared` (`tests/lint/check_plugin_shared.py`,
+quick) runs the same function over the checkout and fails naming the file and the fix command;
+`plugin_shared_detects` is its self-test (drifted, missing and undeclared copies, an unshared module left
+alone, a `plugin.json` in `_shared`, and `_shared` listed in CMake or `EXAMPLES`). The Python
+`SharedModules` cases cover the command line against a temp tree and the shipped tree.
+
+**`_shared` is not a package.** Every enumeration is an explicit list (`BOAT_PLUGIN_PACKAGES` and the catalog
+list in `src/plugins/CMakeLists.txt`, `EXAMPLES` in `package_plugin_tools.py`, the authoring layout's
+examples, `package_web.py`); none globs `plugins/`. `plugin_shared` fails if any of them names a
+`plugins/_` path, and `sync-shared` itself skips names starting with `_` or `.`. The release package's
+`assets/plugins` gets whole example directories, so `modules/` ships and `_shared` does not
+(`test_relocated_tools` checks both, and validates harbor-life and harbor-room from the relocated layout).
+Catalog regeneration: `src/plugins/CMakeLists.txt` lists each package's `modules/*.lua` (W3), so editing a
+package copy regenerates the catalog and touching `_shared` alone does not (checked by touching each).
+
+**Bundles.** `export` of harbor-life and harbor-room is a version 2 bundle whose `modules` holds the shared
+text; import then snapshot equals the source package and the real worker validates the imported copy with
+the same gameplay digest (`SharedModules.test_marina_packages_bundle_and_round_trip`).
+
+**Verification (macOS Debug).** Full suite `ctest --test-dir build -j 8`: 594 of 594 passed. Not verified:
+Wasm/browser runs of the module-carrying examples (file lists and Node-free Python round trips only), the
+Windows/Linux builds, any windowed, GPU or visual check (the scene digests are equal, so no visual change
+is expected, but no capture was taken), and human acceptance. Console edits of a module package were
+exercised headlessly only.
 
 ## Verification and handoff
 
@@ -1141,8 +1206,8 @@ Remaining limits: no Windows/Linux build or fresh
 interactive browser/device qualification; no human visual/gameplay acceptance, depth proof,
 terrain editing, arbitrary meshes or M2–M5 behavior. Floating assemblies intentionally heave
 without pitch/roll. Camera exclusion is conservative, and fixed decks require land underneath
-rather than supporting arbitrary over-water construction. The two packages still duplicate
-scene data until M5. CPU/GPU captures and scripted window playback are separate from human
+rather than supporting arbitrary over-water construction. The two packages duplicated
+scene data until M5 W5 (now one shared module). CPU/GPU captures and scripted window playback are separate from human
 motion/audio review.
 
 ### macOS Release CI correction — 2026-11-01

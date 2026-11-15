@@ -401,6 +401,8 @@ static void test_live_scene(const char *executable)
     char message[256];
     remove(WAKE_COMMAND_TEST_DIR "/saved/plugin.json");
     remove(WAKE_COMMAND_TEST_DIR "/saved/main.lua");
+    remove(WAKE_COMMAND_TEST_DIR "/saved/modules/eriksberg_marina.lua"); // harbor-life's module.
+    remove(WAKE_COMMAND_TEST_DIR "/saved/modules");
     CHECK(wake_plugin_save(&edited, WAKE_COMMAND_TEST_DIR "/saved", message, sizeof(message)),
         "save failed: %s", message);
     BoatPluginFiles files;

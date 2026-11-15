@@ -2526,8 +2526,8 @@ The package README now separates the authored recipe from the missing native cap
   there is no floating platform/arbitrary mesh; capacity is seven berths/four modules with four
   module kinds; hulls use seven fixed recipes with no per-berth colour/dimension/mast/name;
   berth occupancy has no arrival/departure schedule; traffic routes are presets; gameplay
-  lighting is fixed daylight; people/trams/seals need native actors; and `harbor-room` duplicates
-  the scene because there is no composition/include. The
+  lighting is fixed daylight; people/trams/seals need native actors; and `harbor-room` duplicated
+  the scene (since M5 W5 both carry the shared `eriksberg_marina` module copy). The
   [package README](../plugins/harbor-life/README.md#what-the-scene-api-cannot-express-yet) owns
   the detailed list.
 

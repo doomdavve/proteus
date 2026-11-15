@@ -39,7 +39,7 @@ V1_MESSAGE = "version 1 bundles are not supported; re-export"
 
 OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
               "import", "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
-              "live-undo", "live-discard", "live-console"]
+              "live-undo", "live-discard", "live-console", "sync-shared"]
 LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard", "console")
 RESPONSE_MAX = 32768
 
@@ -78,6 +78,49 @@ def load_layout():
 
 
 LAYOUT = load_layout()
+
+
+SHARED = "_shared"
+
+
+def shared_modules(plugins):
+    """name -> bytes of each module file in PLUGINS/_shared (module names as in manifests).
+    The directory is a source of copies, never a package: it has no plugin.json."""
+    base = Path(plugins) / SHARED
+    if not base.is_dir():
+        raise ValueError(f"{base}: no shared module directory (run from a source checkout)")
+    found = {}
+    for path in sorted(base.rglob("*.lua")):
+        name = ".".join(path.relative_to(base).with_suffix("").parts)
+        if module_valid(name) and name != "main" and not path.is_symlink():
+            found[name] = read_regular(path, SOURCE_MAX)
+    return found
+
+
+def sync_shared(plugins, check=False):
+    """Make every package's copy of a shared module equal to PLUGINS/_shared's. A copy is a
+    module file whose name exists in _shared: declared in plugin.json, or merely present under
+    the package's modules directory. Returns {"checked", "drifted", "changed"} (package-relative
+    paths, sorted); with CHECK nothing is written and "changed" is empty."""
+    plugins = Path(plugins)
+    shared = shared_modules(plugins)
+    checked, drifted = 0, []
+    for package in sorted(p for p in plugins.iterdir()
+                          if p.is_dir() and not p.name.startswith(("_", "."))
+                          and (p / "plugin.json").is_file()):
+        names = set(declared_modules((package / "plugin.json").read_bytes()))
+        names |= {name for name in shared if (package / module_file(name)).exists()}
+        for name in sorted(names & set(shared)):
+            checked += 1
+            target = package / module_file(name)
+            if target.is_symlink():
+                raise ValueError(f"{package.name}/{module_file(name)}: symbolic links are unsupported")
+            if not target.exists() or target.read_bytes() != shared[name]:
+                drifted.append(f"{package.name}/{module_file(name)}")
+                if not check:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(shared[name])
+    return {"checked": checked, "drifted": drifted, "changed": [] if check else drifted}
 
 
 def capabilities():
@@ -888,6 +931,7 @@ def main():
     parser.add_argument("--file", help="plugin.json, main.lua or modules/NAME.lua for workspace-write")
     parser.add_argument("--ticks", type=int, default=360)
     parser.add_argument("--timeout", type=float)
+    parser.add_argument("--check", action="store_true", help="sync-shared: report drift only")
     parser.add_argument("--game", type=Path, default=LAYOUT["game"])
     parser.add_argument("--anchor")
     parser.add_argument("--time", type=float, default=1.0)
@@ -904,6 +948,17 @@ def main():
     if args.operation == "anchors":
         print(json.dumps(anchors(), sort_keys=True))
         return 0
+    if args.operation == "sync-shared":
+        try:
+            result = sync_shared(args.directory or ROOT / "plugins", args.check)
+        except (OSError, ValueError) as error:
+            print(json.dumps({"protocol": 1, "operation": "sync-shared", "status": "input_error",
+                              "message": str(error)}, sort_keys=True))
+            return 1
+        status = "drift" if args.check and result["drifted"] else "ok"
+        print(json.dumps({"protocol": 1, "operation": "sync-shared", "status": status,
+                          **result}, sort_keys=True))
+        return 0 if status == "ok" else 1
     offline_base = args.base_revision or 0  # Correlation only; live pins must be explicit.
     job = None
     try:

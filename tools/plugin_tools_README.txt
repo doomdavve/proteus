@@ -31,5 +31,11 @@ share the 64 KiB source limit. To move a package to or from the browser editor:
 
 Version 1 bundles are not supported; export them again from a current build.
 
+In a source checkout, packages that share a module (harbor-life and harbor-room carry
+modules/eriksberg_marina.lua) keep a byte-identical copy of plugins/_shared/<name>.lua:
+
+  python3 AUTHORING/plugin_author.py sync-shared [PLUGINS-DIRECTORY]          (rewrite the copies)
+  python3 AUTHORING/plugin_author.py sync-shared --check [PLUGINS-DIRECTORY]  (report drift, exit 1)
+
 Plugins run trusted Lua: the helper and the game give it no file, OS or network access, but
 this is not a security sandbox. Only run plugins you trust.

@@ -108,3 +108,13 @@ if(PROTEUS_HARDENED)
   set_tests_properties(boat_server_hardening PROPERTIES LABELS "cpu;quick" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "boat_server: hardened")
 endif()
+# Marina M5 W5: a package's copy of a shared module equals plugins/_shared's, and plugins/_shared is
+# never listed as a package (fix drift with tools/plugin_author.py sync-shared).
+add_test(NAME plugin_shared COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_shared.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(plugin_shared PROPERTIES LABELS "cpu;quick" PASS_REGULAR_EXPRESSION
+  "plugin_shared=ok")
+add_test(NAME plugin_shared_detects COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/lint/check_plugin_shared.py --self-test)
+set_tests_properties(plugin_shared_detects PROPERTIES LABELS "cpu;quick" PASS_REGULAR_EXPRESSION
+  "plugin_shared self-test=ok")

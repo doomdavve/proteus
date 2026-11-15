@@ -16,6 +16,7 @@
 #include "session/boat_session.h"
 #include "support/boat_fixtures.h"
 #include "support/boat_test_cases.h"
+#include "support/boat_test_flat_package.h"
 #include "wake_velocity/wake_velocity_plugin.h"
 
 #include <math.h>
@@ -96,7 +97,8 @@ static BoatPluginBundle harbor_edit(const char *from, const char *to)
 {
     if (!harbor_read) {
         BoatPluginDiagnostic d;
-        if (boat_plugin_read("plugins/harbor-life", NULL, &harbor_files, &d) != BOAT_PLUGIN_OK)
+        if (boat_plugin_read("plugins/harbor-life", NULL, &harbor_files, &d) != BOAT_PLUGIN_OK
+            || !boat_test_flatten_package(&harbor_files))
             exit(1);
         harbor_read = true;
     }

@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "wake_velocity/wake_velocity_plugin.h"
+#include "support/boat_test_flat_package.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -222,7 +223,8 @@ int main(int argc, char **argv)
     // remains an independent control.
     BoatPluginFiles *scene_files = calloc(1, sizeof(*scene_files));
     CHECK(scene_files
-        && boat_plugin_read("plugins/harbor-life", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
+        && boat_plugin_read("plugins/harbor-life", NULL, scene_files, &d) == BOAT_PLUGIN_OK
+        && boat_test_flatten_package(scene_files));
     BoatPluginBundle scene_bundle = boat_plugin_bundle(scene_files);
     static BoatPluginHost scene_host;
     CHECK(boat_plugin_host_start(&scene_host, resources.definition, &resources.map, &scene_bundle));

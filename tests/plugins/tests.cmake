@@ -124,3 +124,13 @@ target_compile_options(validate_harbor_life PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME harbor_life_qualification COMMAND validate_harbor_life)
 set_tests_properties(harbor_life_qualification PROPERTIES LABELS "cpu;slow"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# M5 W5: harbor-life and harbor-room decode to the scene the single-file packages produced, and
+# the directory, catalog and room paths agree.
+add_executable(validate_marina_shared tests/plugins/validate_marina_shared.c
+  src/room/boat_room_package.c)
+target_link_libraries(validate_marina_shared PRIVATE proteus_plugins proteus_plugin_catalog
+  proteus_boat_net)
+target_compile_options(validate_marina_shared PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME marina_shared COMMAND validate_marina_shared)
+set_tests_properties(marina_shared PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION
+  "marina_shared=ok" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

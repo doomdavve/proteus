@@ -4,6 +4,7 @@
   "api": 1,
   "kind": "voyage",
   "entry": "main.lua",
+  "modules": ["eriksberg_marina"],
   "location": "outer",
   "capabilities": ["voyage.define", "scene.define"],
   "state_version": 1
