@@ -1151,8 +1151,9 @@ Nothing below is built. Each item is open unless marked dropped; none is schedul
 Open, product and behaviour:
 
 - M4 leftovers: a parked visitor needs a second resting place; repeating services; services on loop
-  paths; and a weakly tested exemption carried over from the M4 work (its details are not recorded in
-  this plan; locate it before acting on it).
+  paths; and the weakly tested dock exemption in the pairwise survey (`dock_exemption` and `dock_exempt`
+  in `src/plugins/boat_plugin.c`, which let a serviced vessel's route clear its own berth's module while it
+  docks).
 - Visual wakes for serviced vessels: undecided and deferred. The user never answered the deferral
   recommendation.
 - Diagnostics for a module-assembled scene: a decoder rejection names the scene field under `main.lua`,
