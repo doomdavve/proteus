@@ -5,7 +5,7 @@ Status, 2026-11-15: **proposed; nothing implemented.** Goal: the
 (`kind: "free"` with `scene.work`, for example `plugins/outer-work`) as it does on a voyage:
 the agent edits sites and the job, stages the change into the running game and the user plays
 it. Open items: decisions SA0, steps SA1-SA4. Done when: the user plays a work-site change
-that an agent staged through `./wv` in `wake_velocity --work`, and the contract is in the
+that an agent staged through `./wv` in `wake_velocity --plugin`, and the contract is in the
 specs (SA4). Next task: SA0, the user's decisions.
 
 This plan owns the authoring loop for work packages. The
@@ -17,8 +17,8 @@ This plan owns the authoring loop for work packages. The
 
 Read from the code on 2026-11-15, not run:
 
-- `wake_velocity --work` cannot be combined with `--plugin` or `--plugin-bridge`
-  ([command line](COMMAND_LINE.md#working-harbour-in-the-game---work-native)).
+- `--work` is a separate mode, not a plugin run: it cannot be combined with `--plugin` or
+  `--plugin-bridge` ([command line](COMMAND_LINE.md#working-harbour-in-the-game---work-native)).
   `wake_work_open` (`apps/wake_velocity/wake_velocity_work.c`) takes the *compiled-in* catalog
   package for the location, so a package on disk is never read.
 - `wake_velocity --plugin DIR` refuses a free package with work sites; its objective runs only
@@ -40,28 +40,37 @@ tools run them is open (SA2).
    the boat and the clock, and never write the player's WORKING HARBOUR save from an authoring
    run (it uses `--data-dir`, or no autosave). The alternative is to hold every change until
    the next restart, which loses the point of live authoring.
-2. **Command line.** Proposed: `--work` combines with `--plugin DIR` (run that package instead
-   of the bundled one) and with `--plugin-bridge DIR`; the bridge continues to need a window.
-   Plain `--work` is unchanged.
+2. **Command line (decided by the user, 2026-11-15: "`--work` should just be a plugin").** A
+   working harbour is a package like any other: `--plugin DIR` runs a `free` package with
+   `scene.work` as the working-harbour session, and `--work` is removed rather than kept as an
+   alias. The work-only options (`--work-clock-report`, `--work-review-pose`, `--new`) stay
+   and apply when the running package has work sites. Still to decide: how the bundled
+   package is chosen without a directory (the title's START and scripted runs). Proposed: the
+   existing catalog selector `--package proteus.outer-work`, with the title passing it; say
+   if you want another spelling. The bridge continues to need a window.
 3. **Scope of the first pass.** Proposed: native, solo `outer-work` and `basin-work` shaped
-   packages; screenshots through the existing `--work --screenshot`, no new capture kind;
+   packages; screenshots through `--plugin ... --screenshot`, no new capture kind;
    no browser and no room.
 
 ## Steps
 
 One branch (`feat/sandbox-authoring`), one commit per step, one pull request after approval.
 
-- **SA1. The game runs a work package from a directory.** `--work --plugin DIR` loads and
-  watches the package through the existing plugin host and its revisions instead of the
-  compiled catalog entry; a stage, Undo or reload restarts the cargo session per SA0.1 and
+- **SA1. A work package is just a plugin.** `--plugin DIR` (and the catalog selector from
+  SA0.2) accepts a `free` package with work sites and runs the working-harbour session,
+  loading and watching it through the existing plugin host and its revisions instead of the
+  compiled catalog entry; the refusal in `wake_velocity_plugin.c` goes. `--work` is removed
+  and its users move: the title's START, `docs/COMMAND_LINE.md`, `PLAYING.md`, `TESTING.md`,
+  `WEB_BUILD.md`, the sandbox and other plans' commands, `tests/app/tests.cmake` and
+  `tests/render/tests.cmake`. Existing saves and the autosave rules are unchanged. A stage, Undo or reload restarts the cargo session per SA0.1 and
   restages the job's `init`. `--plugin-bridge` works with it (inspect, stage, apply, undo,
   discard, console). Unknown until read: how far `WakeWork`'s static revision and
   `wake_plugin_*` can share one host; if the work session needs its own host, say so and
   size the step then. Tests: a virtual-clock bridge case beside `wake_velocity_bridge`, a
-  restart case in the work-session tests, and an unchanged-behaviour check of plain `--work`.
+  restart case in the work-session tests, and the retargeted `--work` tests and captures (byte-identical frames expected).
 - **SA2. The tools accept work packages.** `capabilities` reports `live.kinds` and the
   workspace kind; `init --from plugins/outer-work` writes instructions about sites, the job
-  and the survey diagnostics instead of voyage shelters; `./wv play` starts `--work`;
+  and the survey diagnostics instead of voyage shelters; `./wv play` starts `--plugin DIR` as for a voyage;
   `./wv check` runs the site survey and the job's `init` probe, or reports why it cannot.
   Tests in `tests/tools/test_plugin_author.py`.
 - **SA3. Trial.** Re-run the [agent trial](AGENT_AUTHORING.md#trial) on a work package:
