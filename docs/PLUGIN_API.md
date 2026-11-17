@@ -1241,6 +1241,7 @@ SAVED ~/drafts/my-harbor
 | `/apply`, `/discard`, `/undo` | The F7/F6 transactions, named |
 | `/restart` | Restart the session |
 | `/capability NAME` | Add `scene.define` to this session's manifest copy (voyages only) |
+| `/work pose NAME`, `/work clock-report FILE` (or `stop`) | Working harbour developer requests: a real cargo pose, a lighting CSV (refused outside a working harbour) |
 | `/save DIR` | Write `plugin.json`, `main.lua` and any `modules/` files (in the browser, a version 2 bundle download); refuses a non-empty directory that is not this session's package |
 | `/clear` | Clear the scrollback |
 

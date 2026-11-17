@@ -66,7 +66,8 @@ when the menu opens, the window loses focus, or you quit or close the window; th
 package resumes it. A small `SAVED` mark appears after milestone and leave writes, and `SAVE FAILED`
 stays until a write succeeds. `--save FILE` uses an explicit file, `--new` ignores any save, and a
 save that cannot be used (damaged, a changed package or physics) is set aside as `NAME.rejected`,
-never deleted. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
+never deleted. A `--plugin DIR` run (authoring) touches no save unless given `--save` or
+`--data-dir`, like the scripted runs below. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
 `--save` or `--data-dir`. `--save-now` (a test fixture, with `--time` and `--save`) runs the
 scripted drive, writes one save and exits.
 
@@ -83,11 +84,19 @@ ignored here; explicit `--daylight` or `--lighting-hour` fixes the render while 
 advancing and saving. The [lighting plan](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the
 full contract.
 
-Two developer-only review options belong to bounded working-harbour runs. `--work-clock-report FILE`
-needs a working-harbour package and `--frames` in a visible native window, rejects `--screenshot` and
-`--performance-report`, and writes one CSV with actual GL sun/mask observations and optional GPU
-times. `--work-review-pose swing|deck|approach` prepares a real cargo-api pose for bounded
-screenshots or frame runs; it adds no normal menu or HUD feature.
+Two developer review requests belong to a working-harbour run and are console lines, not
+options: `/work clock-report FILE` starts one CSV of actual GL sun/mask observations and optional
+GPU times (up to 18,000 frames; `/work clock-report stop`, or leaving the game, writes it), and
+`/work pose swing|deck|approach` prepares a real cargo-api pose, refused with a reason when the
+session cannot reach it. Send them through the live console (F2) or the bridge
+(`plugin_author.py live-console --line TEXT`, `./wv console`); they need a window, so no
+`--screenshot`. They add no normal menu or HUD feature.
+
+A package change (a stage, Undo or reload from the bridge or console, or F5) restarts the cargo
+session at the new definition: the cargo, sites and job start over, a boat that is under way keeps
+its pose and the clock keeps its hour, and a moored boat returns to the berth. A package run with
+`--plugin DIR` is under authoring and never reads or writes the game's default data directory;
+give it `--save` or `--data-dir` to keep its session.
 
 ## Locations and voyages
 

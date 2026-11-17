@@ -112,16 +112,18 @@ bool wake_work_frame(
 
 void wake_work_return_crate(WakeWork *work) { (void)work; }
 
-bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
+bool wake_work_reset(WakeWork *work, BoatSession *game, bool keep_boat, double now)
 {
     (void)work;
     (void)game;
+    (void)keep_boat;
     (void)now;
     return false;
 }
 
-bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose, double now)
 {
+    (void)now;
     (void)work;
     (void)game;
     (void)pose;

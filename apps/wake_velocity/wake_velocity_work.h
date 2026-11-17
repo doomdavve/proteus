@@ -87,13 +87,14 @@ bool wake_work_frame(
 // The menu's RETURN CRATE, applied with the next frame.
 void wake_work_return_crate(WakeWork *work);
 // A fresh session and job (the menu's reset): host management on the authority, then a new
-// generation. False on an endpoint failure.
-bool wake_work_reset(WakeWork *work, BoatSession *game, double now);
+// generation. KEEP_BOAT (a package change's restart) leaves a boat that is under way where it is.
+// False on an endpoint failure.
+bool wake_work_reset(WakeWork *work, BoatSession *game, bool keep_boat, double now);
 // Developer-only bounded review fixture: "swing" hooks the real crate and runs the crane,
 // "deck" loads and lashes it, "approach" uses the existing surveyed approach fixture and moor
 // query at the landing. GAME is synced after success. False for an unknown name or
 // when the real actions cannot reach the requested state.
-bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose);
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose, double now);
 // The scripted capture drive for TICKS ticks: idle at the berth, and from tick
 // WAKE_WORK_DELIVERY_TICK on the landing delivery, then idle.
 enum { WAKE_WORK_DELIVERY_TICK = 1200 };

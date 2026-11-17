@@ -227,10 +227,6 @@ static void usage(void)
     cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
     cli_usage_line(
         stdout, "--demo-idle", "Neutral helm in solo --demo or --screenshot; world time runs");
-    cli_usage_line(stdout, "--work-clock-report FILE",
-        "Developer review: with --work and --frames, write a live lighting CSV");
-    cli_usage_line(stdout, "--work-review-pose swing|deck|approach",
-        "Developer review: bounded --work pose for lighting inspection");
 
     cli_usage_section(stdout, "RECORDINGS");
     cli_usage_line(stdout, "--save-run FILE", "Export each finish");
@@ -462,6 +458,60 @@ static bool console_save(
 #endif
 }
 
+// The `/work` console requests of a working-harbour run: developer review tools that used to be
+// command-line options. They act on the running session between frames.
+typedef struct {
+    WakeWork *work;
+    BoatSession *session;
+    WakeLightingReview *review;
+    WaterfrontGpuScene *scene; // NULL for the CPU renderer.
+} WorkRequests;
+
+static bool work_request(
+    void *context, const char *name, const char *argument, char *message, size_t capacity)
+{
+    WorkRequests *r = context;
+    if (!strcmp(name, "pose")) {
+        if (strcmp(argument, "swing") && strcmp(argument, "deck") && strcmp(argument, "approach")) {
+            snprintf(message, capacity, "pose is swing, deck or approach");
+            return false;
+        }
+        if (!wake_work_review_pose(r->work, r->session, argument, GetTime())) {
+            snprintf(message, capacity, "the %s pose is not reachable from here", argument);
+            return false;
+        }
+        snprintf(message, capacity, "POSED %s", argument);
+        return true;
+    }
+    if (!strcmp(name, "clock-report")) {
+        if (!strcmp(argument, "stop")) {
+            if (!r->review->state) {
+                snprintf(message, capacity, "no clock report is running");
+                return false;
+            }
+            bool ok = wake_lighting_review_end(r->review);
+            snprintf(message, capacity, ok ? "CLOCK REPORT WRITTEN" : "the report was not written");
+            return ok;
+        }
+        if (!*argument) {
+            snprintf(message, capacity, "usage: clock-report FILE|stop");
+            return false;
+        }
+        if (r->review->state) {
+            snprintf(message, capacity, "a clock report is running; clock-report stop first");
+            return false;
+        }
+        if (!wake_lighting_review_begin(r->review, argument, r->scene)) {
+            snprintf(message, capacity, "cannot start the report (native builds only)");
+            return false;
+        }
+        snprintf(message, capacity, "CLOCK REPORT RUNNING; clock-report stop writes it");
+        return true;
+    }
+    snprintf(message, capacity, "unknown request %s", name);
+    return false;
+}
+
 // The personal best of the session's course, from DATA_DIR or the default data directory.
 static void select_course_best(BoatSession *session, const char *data_dir, bool waves)
 {
@@ -656,8 +706,6 @@ static int study(int argc, char **argv)
     bool work_mode = false; // The package has work sites: the working-harbour session (SV1f).
     const char *save_path = NULL; // --save: the work session's file (default: the data directory).
     bool fresh_work = false, save_now = false; // --new ignores a save; --save-now (tests).
-    const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
-    const char *work_review_pose_name = NULL; // --work-review-pose: developer bounded fixture.
 #ifdef PROTEUS_BOAT_NET
     WakeRoom *net = NULL;
 #endif
@@ -795,15 +843,6 @@ static int study(int argc, char **argv)
             fresh_work = true;
         } else if (strcmp(argv[i], "--save-now") == 0) {
             save_now = true;
-        } else if (strcmp(argv[i], "--work-clock-report") == 0 && i + 1 < argc) {
-            work_clock_report = argv[++i];
-            if (!work_clock_report[0])
-                goto invalid;
-        } else if (strcmp(argv[i], "--work-review-pose") == 0 && i + 1 < argc) {
-            const char *value = argv[++i];
-            if (strcmp(value, "swing") && strcmp(value, "deck") && strcmp(value, "approach"))
-                goto invalid;
-            work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--demo-idle") == 0) {
@@ -977,28 +1016,9 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--plugin-bridge is only available in native builds.\n");
         goto invalid;
     }
-    if (work_clock_report) {
-        fprintf(stderr, "--work-clock-report is only available in native builds.\n");
-        goto invalid;
-    }
 #endif
     if (bridge_path && (!plugin_path || screenshot)) {
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
-        goto invalid;
-    }
-    if ((work_clock_report || work_review_pose_name) && !work_mode) {
-        fprintf(stderr,
-            "--work-clock-report and --work-review-pose belong to a working-harbour package.\n");
-        goto invalid;
-    }
-    if (work_clock_report && (!frame_limit || screenshot || performance_report)) {
-        fprintf(stderr,
-            "--work-clock-report needs a working-harbour package and --frames, with no --screenshot or "
-            "--performance-report.\n");
-        goto invalid;
-    }
-    if (work_review_pose_name && !screenshot && !frame_limit) {
-        fprintf(stderr, "--work-review-pose needs a bounded --screenshot or --frames run.\n");
         goto invalid;
     }
     if ((save_path || fresh_work || save_now) && !work_mode) {
@@ -1208,6 +1228,7 @@ static int study(int argc, char **argv)
     static WakePlugin plugin;
     static WakeConsole console;
     static WakeCommand command;
+    static WorkRequests work_requests;
     wake_console_init(&console);
     wake_command_init(&command, wake_console_print, wake_console_clear, console_save, &console);
     if (plugin_path) {
@@ -1234,13 +1255,13 @@ static int study(int argc, char **argv)
         work.lighting_cycle = !daylight_set && !lighting_hour_set;
         // Only interactive play reads or writes the game's data directory unasked; scripted runs
         // use a save only when told which one (--save or --data-dir).
-        bool plain = !screenshot && !demo && !frame_limit && !save_now;
+        // A package from disk is under authoring and never touches the player's save unasked.
+        bool plain = !screenshot && !demo && !frame_limit && !save_now && !plugin_path;
         wake_work_save_open(&work, &session, save_path, data_dir, plain, fresh_work);
     }
-    if (work_review_pose_name && !wake_work_review_pose(&work, &session, work_review_pose_name)) {
-        fprintf(stderr, "Could not prepare the %s work review pose.\n", work_review_pose_name);
-        goto cleanup;
-    }
+    work_requests = (WorkRequests) { &work, &session, &lighting_review, NULL };
+    if (work_mode)
+        wake_command_work(&command, work_request, &work_requests);
     if (save_now) {
         // Test fixture: the scripted drive, then one save and exit.
         bool ok = wake_work_script(&work, &session, (uint64_t)round(time / BOAT_TICK_SECONDS))
@@ -1628,14 +1649,7 @@ static int study(int argc, char **argv)
         = { .capture = &capture, .lighting = &lighting_review };
     if (performance_capture && gpu_enabled)
         boat_gpu_timer_init(&performance_timer);
-    if (work_clock_report) {
-        WaterfrontGpuScene *scene = gpu_enabled ? &gpu.scene : NULL;
-        if (!wake_lighting_review_begin(&lighting_review, work_clock_report, scene)) {
-            fprintf(stderr, "Could not start the work clock report %s.\n", work_clock_report);
-            result = 1;
-            goto cleanup;
-        }
-    }
+    work_requests.scene = gpu_enabled ? &gpu.scene : NULL;
     result = 0;
     if (work_mode) {
         wake_work_autosave(&work, true);
@@ -2089,7 +2103,7 @@ static int study(int argc, char **argv)
             work_frame_sent = true;
             if (work_mode && plugin_restart && plugin_active)
                 wake_work_use(&work, boat_plugin_host_active(&plugin.host));
-            if (work_mode && !wake_work_reset(&work, &session, GetTime())) {
+            if (work_mode && !wake_work_reset(&work, &session, plugin_restart && !reset_requested, GetTime())) {
                 // D10: back to the title; the leave-time save below still runs.
                 snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
                     work.local.failure);
@@ -2627,7 +2641,7 @@ static int study(int argc, char **argv)
             sample.traffic_wake_live
                 = objects && objects->traffic_enabled ? objects->traffic.live : 0;
             boat_capture_add(&capture, &sample);
-            if (work_clock_report)
+            if (lighting_review.state)
                 wake_lighting_review_frame(&lighting_review, &sample, wake_work_view(&work)->tick,
                     wake_work_view(&work)->lighting_hours,
                     wake_work_view(&work)->lighting_cycle_seconds, boat_time_rate(time_speed_index),

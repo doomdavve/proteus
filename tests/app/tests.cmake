@@ -359,30 +359,11 @@ add_test(NAME wake_velocity_time_scale_unsupported_rejected COMMAND wake_velocit
 add_test(NAME wake_velocity_time_scale_missing_rejected COMMAND wake_velocity --time-scale)
 add_test(NAME wake_velocity_time_scale_multiplayer_rejected
   COMMAND wake_velocity --host free --time-scale 2)
-add_test(NAME wake_velocity_work_review_pose_name_rejected
-  COMMAND wake_velocity --package proteus.outer-work --work-review-pose pirouette)
-add_test(NAME wake_velocity_work_review_pose_without_work_rejected
-  COMMAND wake_velocity --renderer cpu --work-review-pose swing
-    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/work-review-unused.png --time 0)
-add_test(NAME wake_velocity_work_review_pose_unbounded_rejected
-  COMMAND wake_velocity --renderer cpu --package proteus.outer-work --work-review-pose swing)
-add_test(NAME wake_velocity_work_clock_report_missing_arg_rejected
-  COMMAND wake_velocity --work-clock-report)
-add_test(NAME wake_velocity_work_clock_report_empty_rejected
-  COMMAND wake_velocity --work-clock-report "")
-add_test(NAME wake_velocity_work_clock_report_without_frames_rejected
-  COMMAND wake_velocity --package proteus.outer-work --work-clock-report ${CMAKE_CURRENT_BINARY_DIR}/work-clock.csv)
 set_tests_properties(
   wake_velocity_time_scale_nan_rejected
   wake_velocity_time_scale_unsupported_rejected
   wake_velocity_time_scale_missing_rejected
   wake_velocity_time_scale_multiplayer_rejected
-  wake_velocity_work_review_pose_name_rejected
-  wake_velocity_work_review_pose_without_work_rejected
-  wake_velocity_work_review_pose_unbounded_rejected
-  wake_velocity_work_clock_report_missing_arg_rejected
-  wake_velocity_work_clock_report_empty_rejected
-  wake_velocity_work_clock_report_without_frames_rejected
   PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)

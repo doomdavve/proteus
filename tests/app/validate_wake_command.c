@@ -225,7 +225,7 @@ static void test_console_completion(void)
     CHECK(!wake_console_complete(&console, false) && !strcmp(console.input, "def.scene"),
         "Lua is untouched");
     const char *matches[16];
-    CHECK(wake_command_completions("", matches, 16) == 12, "completion covers every help command");
+    CHECK(wake_command_completions("", matches, 16) == 13, "completion covers every help command");
 }
 
 static void test_source(void)
@@ -619,12 +619,48 @@ static void test_non_voyage_revisions(void)
     }
 }
 
+static char work_seen[64];
+
+static bool take_work(
+    void *context, const char *name, const char *argument, char *message, size_t capacity)
+{
+    (void)context;
+    snprintf(work_seen, sizeof(work_seen), "%s|%s", name, argument);
+    snprintf(message, capacity, "%s", strcmp(name, "pose") ? "no such request" : "POSED");
+    return !strcmp(name, "pose");
+}
+
+// `/work` is the working harbour's developer request: refused without a host, otherwise routed
+// by name and argument with the host's one-line result.
+static void test_work_requests(void)
+{
+    static WakePlugin plugin;
+    static BoatSession session;
+    Output output = { 0 };
+    WakeCommand command;
+    wake_command_init(&command, collect, clear_output, saved, &output);
+    wake_command_submit(&command, &plugin, &session, "/work pose swing", 0);
+    CHECK(has_line(&output, "NO WORKING HARBOUR IN THIS SESSION"), "no host refused");
+    output.count = 0;
+    wake_command_work(&command, take_work, NULL);
+    CHECK(!wake_command_submit(&command, &plugin, &session, "/work pose  swing", 0), "no restart");
+    CHECK(!strcmp(work_seen, "pose|swing") && has_line(&output, "POSED"), "routed: %s", work_seen);
+    output.count = 0;
+    wake_command_submit(&command, &plugin, &session, "/work clock-report out.csv", 0);
+    CHECK(!strcmp(work_seen, "clock-report|out.csv") && has_line(&output, "REFUSED: no such request"),
+        "refusal carries the reason");
+    output.count = 0;
+    wake_command_submit(&command, &plugin, &session, "/work", 0);
+    CHECK(has_line(&output, "USAGE: /work pose swing|deck|approach"), "bare /work prints usage");
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
     if (argc == 2 && !strcmp(argv[1], "--plugin-query-worker"))
         return boat_plugin_query_worker();
+    test_work_requests();
     test_console();
     test_console_comfort();
     test_console_completion();

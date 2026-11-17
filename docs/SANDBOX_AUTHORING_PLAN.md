@@ -1,12 +1,13 @@
 # Sandbox authoring: an agent edits the working harbour
 
-Status, 2026-11-15: **SA1 partly implemented locally** on `feat/sandbox-authoring` (not pushed).
+Status, 2026-11-17: **SA1 implemented locally** on `feat/sandbox-authoring` (not pushed).
 Done: SA0.2 (a working harbour is a plugin run; `--work` removed; `--package` implies its
-location) and the live stage/Undo path on a running work session (see the
-[SA1 result](#sa1-result-2026-11-15)). Open: the review options as bridge requests (rest of
-SA1), SA2-SA4. Done when: the user plays a work-site change that an agent staged through `./wv`
-in `wake_velocity --plugin`, and the contract is in the specs (SA4). Next task: the rest of SA1,
-then SA2 (`./wv check` fails on free packages today).
+location), SA0.1 and SA0.3 as proposed (the user accepted the defaults, 2026-11-17), live
+stage/Undo with the boat kept, no default-directory save for a `--plugin DIR` run, and the review
+options as `/work` console requests (see the [SA1 results](#sa1-result-2026-11-15)). Open: SA2-SA4.
+Done when: the user plays a work-site change that an agent staged through `./wv` in
+`wake_velocity --plugin`, and the contract is in the specs (SA4). Next task: SA2 (`./wv check`
+fails on free packages today).
 
 This plan owns the authoring loop for work packages. The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) still owns the gameplay and the saves, the
@@ -125,4 +126,26 @@ Found: `./wv check` fails for a free package (`preview is not available for free
 packages`); SA2 must make it run the survey without the preview. The restart is the session's ordinary reset (`boat_work_session_reset`, read from the code, not
 measured beyond the tick returning to 25): the boat returns to the service berth, the job
 starts over and the tick resets; the session clock's hour is kept. That is a fresh job rather
-than SA0.1's proposed "keep the boat", so SA0.1 still needs the user's decision.
+than SA0.1's proposed "keep the boat", so SA0.1 still needed the user's decision (taken 2026-11-17, below).
+
+## SA1 completion (2026-11-17)
+
+The user accepted the proposed SA0.1 and SA0.3. Implemented: `boat_work_session_restart`, used for
+a package change's restart: cargo, sites and job start over at the new definition; a boat under
+way (not moored, mooring or capsized) keeps its pose and motion and the clock keeps its hour; a
+moored boat returns to the berth. The menu's RESTART JOB and the reset key still use the full
+reset. A `--plugin DIR` run does not use the game's default data directory unasked (`--save` or
+`--data-dir` still do). `--work-review-pose` and `--work-clock-report` are removed; the console
+requests `/work pose swing|deck|approach` and `/work clock-report FILE|stop` replace them (wake
+command layer `WakeCommandWork`; the pose applies to the authority and restarts the local
+client). The six rejection cases on the options are gone; `wake_command` covers the routing and
+`boat_work_local.restart_keeps_boat` the restart.
+
+Automated (macOS arm64, Debug, 2026-11-17): the work-local, wake_command, bridge and CLI cases
+pass; the full preset then passed (596 of 596). Windowed, agent-run: with `--plugin`
+on an `init --from plugins/outer-work` workspace and the bridge, `./wv console --line "/work pose
+deck"` posed the boat, an unreachable pose and an unknown name were refused with their reasons,
+and `/work clock-report FILE` wrote a CSV when the bounded run ended (45 KB, rows from the live GL
+observations). Not checked: a live stage with the boat under way (only the session unit case),
+the posed frames by eye, the virtual-clock bridge case in the plan's test list, and other
+platforms. `ARCHITECTURE_PLAN.md` still names `--work-review-pose` as written when it landed.

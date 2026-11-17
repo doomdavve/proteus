@@ -266,6 +266,7 @@ static const struct {
     { "clear", "/clear", "Clear output; keep input and history." },
     { "save", "/save DIR", "Save a package; browser: download it." },
     { "capability", "/capability scene.define", "Grant scene editing to this voyage." },
+    { "work", "/work pose|clock-report ...", "Working harbour: pose swing|deck|approach; clock-report FILE|stop." },
 };
 
 unsigned wake_command_completions(const char *prefix, const char **matches, unsigned capacity)
@@ -396,6 +397,25 @@ static bool run_command(
         emit(command, "%s", plugin->status);
         return restart;
     }
+    if (!strncmp(line, "/work", 5) && (line[5] == ' ' || !line[5])) {
+        char name[32] = "", message[192] = "";
+        const char *rest = trim(line + 5);
+        size_t n = strcspn(rest, " \t");
+        if (!command->work) {
+            emit(command, "NO WORKING HARBOUR IN THIS SESSION");
+            return false;
+        }
+        if (!n || n >= sizeof(name)) {
+            emit(command, "USAGE: /work pose swing|deck|approach");
+            emit(command, "       /work clock-report FILE|stop");
+            return false;
+        }
+        memcpy(name, rest, n);
+        name[n] = 0;
+        bool ok = command->work(command->work_context, name, trim(rest + n), message, sizeof(message));
+        emit(command, "%s%s", ok ? "" : "REFUSED: ", message);
+        return false;
+    }
     if (!strcmp(line, "/restart")) {
         emit(command, "RESTARTING THE SESSION");
         return true;
@@ -481,4 +501,10 @@ void wake_command_tee(WakeCommand *command, WakeCommandPrint tee, void *context)
 {
     command->tee = tee;
     command->tee_context = context;
+}
+
+void wake_command_work(WakeCommand *command, WakeCommandWork work, void *context)
+{
+    command->work = work;
+    command->work_context = context;
 }

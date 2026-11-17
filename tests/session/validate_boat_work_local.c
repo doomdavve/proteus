@@ -377,9 +377,41 @@ static int failures(void)
     return 0;
 }
 
+// A package change restarts the cargo session at the new definition. A boat under way keeps its
+// pose and the clock keeps its hour; a moored boat returns to the berth like any reset.
+static int restart_keeps_boat(void)
+{
+    BoatWorkSession e;
+    setup(&e);
+    boat_work_moor_action(&e); // Depart.
+    CHECK(!e.sandbox.moored);
+    e.boat.position.x += 40;
+    e.boat.position.y += 25;
+    e.boat.heading = 1.25f;
+    e.boat.yaw_velocity = 0.5f;
+    e.tick = 300;
+    e.lighting_hours += 3;
+    Boat under_way = e.boat;
+    double hours = e.lighting_hours;
+    boat_work_session_restart(&e);
+    CHECK(e.tick == 0 && !e.sandbox.moored && !e.sandbox.mooring);
+    CHECK(e.boat.position.x == under_way.position.x && e.boat.position.y == under_way.position.y);
+    CHECK(e.boat.heading == under_way.heading && e.boat.yaw_velocity == under_way.yaw_velocity);
+    CHECK(e.lighting_hours == hours);
+    CHECK(e.sandbox.cargo.state == BOAT_CARGO_PAD);
+    // The plain reset still returns an under-way boat to the berth.
+    boat_work_session_reset(&e);
+    CHECK(e.sandbox.moored);
+    Vector2 berth = e.boat.position;
+    boat_work_session_restart(&e); // Moored: nothing to keep.
+    CHECK(e.sandbox.moored && e.boat.position.x == berth.x && e.boat.position.y == berth.y);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     static const TestCase cases[] = {
+        TEST_CASE(restart_keeps_boat),
         TEST_CASE(codec),
         TEST_CASE(failures),
         SLOW_CASE(trace),

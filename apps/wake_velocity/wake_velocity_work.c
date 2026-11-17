@@ -103,10 +103,13 @@ bool wake_work_start(WakeWork *work, BoatSession *game, double now)
 
 void wake_work_stop(WakeWork *work) { boat_work_local_stop(&work->local); }
 
-bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
+bool wake_work_reset(WakeWork *work, BoatSession *game, bool keep_boat, double now)
 {
     BoatWorkSession *s = authority(work);
-    boat_work_session_reset(s);
+    if (keep_boat)
+        boat_work_session_restart(s);
+    else
+        boat_work_session_reset(s);
     // A reset returns the tick to zero. Mark the reset as a save milestone so an old last-write
     // tick cannot postpone the periodic write behind the new, lower tick.
     if (work->save.enabled)
@@ -118,9 +121,9 @@ bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
     return ok;
 }
 
-bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose, double now)
 {
-    BoatWorkSession *s = &work->session;
+    BoatWorkSession *s = authority(work);
     if (!work->open || !pose)
         return false;
     bool ok = false;
@@ -150,8 +153,10 @@ bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
     }
     if (!ok)
         return false;
+    // A running session's client catches up through a new generation's checkpoint.
+    ok = !work->local.running || boat_work_local_restart(&work->local, now);
     wake_work_sync(work, game);
-    return true;
+    return ok;
 }
 
 static void present_tick(void *context, const BoatWorkSession *view)
