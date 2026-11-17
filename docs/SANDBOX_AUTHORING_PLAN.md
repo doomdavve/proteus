@@ -208,3 +208,11 @@ boat; `boat_work_local.restart_keeps_boat_local` drives the running local sessio
 view, thrust, restart, new generation) and checks the mirror's boat and view. The earlier "works
 well" does not cover this step; the retry is owed again. Whether the boat's position itself had
 been kept in the user's run was not measured.
+
+## SA3 retry, user's play (2026-11-17)
+
+On the rebuilt game (`4ef23fc`) the user staged-and-undone R2 with the boat under way (helm view,
+open water): the boat did not return to the berth and stayed roughly where it was; the user noticed
+a "blip" at the Undo. Not diagnosed: the blip is probably the restart's presentation reset (player
+wake trail and camera) or the new generation's checkpoint, but that is a guess. Accepted as
+working; the blip is an open item for SA4. Native Debug on macOS, one run.
