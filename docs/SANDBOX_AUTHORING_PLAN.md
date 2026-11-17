@@ -1,13 +1,13 @@
 # Sandbox authoring: an agent edits the working harbour
 
-Status, 2026-11-17: **SA1 implemented locally** on `feat/sandbox-authoring` (not pushed).
-Done: SA0.2 (a working harbour is a plugin run; `--work` removed; `--package` implies its
-location), SA0.1 and SA0.3 as proposed (the user accepted the defaults, 2026-11-17), live
-stage/Undo with the boat kept, no default-directory save for a `--plugin DIR` run, and the review
-options as `/work` console requests (see the [SA1 results](#sa1-result-2026-11-15)). SA2 implemented locally too (2026-11-17). Open: SA3-SA4.
-Done when: the user plays a work-site change that an agent staged through `./wv` in
-`wake_velocity --plugin`, and the contract is in the specs (SA4). Next task: SA2 (`./wv check`
-fails on free packages today).
+Status, 2026-11-17: **Done; this plan is history.** SA1-SA4 are implemented on
+`feat/sandbox-authoring` (not pushed; one pull request awaits the user's approval). A working
+harbour is a plugin run (`--plugin DIR` or `--package ID`; `--work` and the two review options are
+gone, the latter as `/work` console requests); a package change restarts the session keeping an
+under-way boat; the workspace tools accept free packages. The contract now lives in
+[COMMAND_LINE](COMMAND_LINE.md), [PLUGIN_API](PLUGIN_API.md#agent-workspaces) and
+[AGENT_AUTHORING](AGENT_AUTHORING.md). The user played a staged work-site change and Undo (accepted).
+Open items: see [Leftovers](#leftovers-sa4-2026-11-17). Done when: met 2026-11-17. Next task: none.
 
 This plan owns the authoring loop for work packages. The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) still owns the gameplay and the saves, the
@@ -216,3 +216,20 @@ open water): the boat did not return to the berth and stayed roughly where it wa
 a "blip" at the Undo. Not diagnosed: the blip is probably the restart's presentation reset (player
 wake trail and camera) or the new generation's checkpoint, but that is a guess. Accepted as
 working; the blip is an open item for SA4. Native Debug on macOS, one run.
+
+## Leftovers (SA4, 2026-11-17)
+
+Open items, not gates; nothing here is scheduled.
+
+- The site survey's rejection names no obstacle and no nearest clear position, so an agent scans
+  by hand (about 35 `./wv check` runs in the trial).
+- `status` and `stage` report `digest` `0000000000000000` for a free package; only `check`'s
+  `gameplay_digest` identifies the content.
+- A small "blip" at the restart with the boat under way (unexplained; probably the presentation
+  reset or the new generation's first frame).
+- Not checked: the user's own Plugin API change list (collect it and fold in what touches work
+  sites), a held change or a stale pin on a work package, the posed `/work pose` frames by eye,
+  the virtual-clock bridge case named in SA1, a staged edit during a carried crate, browser
+  authoring and rooms with work sites, and Windows and Linux.
+- `ARCHITECTURE_PLAN.md` and `SUNSET_PLAN.md` still describe `--work-review-pose` and
+  `--work-clock-report` as written when they landed (the latter is marked superseded).

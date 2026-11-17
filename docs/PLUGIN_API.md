@@ -238,6 +238,15 @@ checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and
 next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
 that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
 
+A package change in a running game (a stage, Undo, reload or F5 from the bridge, console or keys)
+restarts the work session at the new definition: cargo, sites and job start over and the job's
+`init` runs again. A boat that is under way (not moored, mooring or capsized) keeps its pose and
+motion and stays in the helm view, and the presentation clock keeps its hour; a moored boat
+returns to its berth. The menu's RESTART JOB and the reset key still return the boat to the
+berth. A run from a package directory (`--plugin DIR`) is under authoring: it never reads or
+writes the game's default data directory, only a `--save` or `--data-dir` it is given. A bundled
+package (`--package ID`) saves as a player's session does.
+
 Saves (SV1d, merged in #169, 2026-11-07): `cargo_sandbox` and the game's Working Harbour save and resumes the session automatically; the
 package does nothing. It writes `cargo-<package id>.sav` (with `.bak`) in the data directory
 (`--data-dir DIR` overrides it, `--save FILE` names a file, `--new` starts fresh), at milestones
@@ -1953,7 +1962,13 @@ happen and a game that moved in between answers `stale`.
 | `play` | Run the game on this directory with its bridge (for the person, not the agent). `busy` when a live game already holds the bridge's session file; without a session file the commands answer `no_game` |
 
 A rejected candidate is reported by `check` or `stage` with the diagnostic file, line and field and
-nothing is staged. Voyage plugins in `wake_velocity` only, as for the bridge. The wrapper is a Python
+nothing is staged. The workspace and the bridge accept `voyage` packages and `free` packages with
+`scene.work` (a working harbour, run by `wake_velocity --plugin DIR`); `capabilities` lists them as
+`workspace.kinds` and `live.kinds`, and `capture` stays voyage-only. For a working harbour `init`
+writes instructions about sites, the job, the survey diagnostics and the restart rule (above), and
+`check` runs `validate` only. Its console also answers `/work pose swing|deck|approach` (a real
+cargo pose) and `/work clock-report FILE|stop` (a lighting CSV): the developer review tools that
+were command-line options. The wrapper is a Python
 script: Windows runs it as `py wv COMMAND`; that path has not been run.
 
 ## Packaged authoring tools (P4.7)

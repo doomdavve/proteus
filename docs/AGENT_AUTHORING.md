@@ -1,11 +1,13 @@
 # Authoring plugins with an external agent
 
-Status, 2026-11-15: **implemented, not yet re-tried.** This is the replacement for the in-game agent
+Status, 2026-11-17: **implemented; two human plays.** This is the replacement for the in-game agent
 of [P6](PLUGIN_PLAN.md#p6--external-agent-authoring-instead-of-an-in-game-agent): no provider code in
-the game, a coding agent such as Claude Code drives the P4 tools. Three Claude Code sessions ran an
-earlier, manual version of the loop (see the [trial](#trial)); the workspace below was built from
-their friction and has been checked by automated tests only. No human has played an agent-made change,
-so nothing is accepted. [The plugin API](PLUGIN_API.md#agent-workspaces) owns the commands and files.
+the game, a coding agent such as Claude Code drives the P4 tools. It works on voyages and on
+working-harbour packages ([sandbox authoring](SANDBOX_AUTHORING_PLAN.md), done 2026-11-17). Three
+Claude Code sessions ran an earlier, manual voyage loop and one subagent ran the workspace on a
+work package (see the [trial](#trial)); the user played the staged work-site change and Undo.
+No human has played an agent-made voyage change. [The plugin API](PLUGIN_API.md#agent-workspaces)
+owns the commands and files.
 
 ## Quick start
 
@@ -97,6 +99,17 @@ agent's own report of its commands; none was independently checked and no one pl
   one bridge directory serves one game. Not tried: a change that is held (migration or restart),
   a stale pin from a concurrent edit, and the poll delay was not measured.
 - Owed from the user: play R2 (the moved shelter) and judge it, then run Undo in the window.
+
+**Working harbour, 2026-11-17, `outer-work`, native Debug on macOS, a Claude subagent confined to the
+workspace** (its own report; not independently checked). It found that north is +z unaided; a 25 m
+move of the landing north failed the survey at its x (`scene.work.sites[2]`), so it scanned about 35
+`./wv check` runs and staged (x -135, z 25) (`applied`, R2, "WORK SESSION RESTARTED WITH THE NEW
+PACKAGE"). A jetty moved off the map was refused by `check` and `stage` at `scene.work.sites[4]`
+with the game unchanged. Friction: the survey names no obstacle or nearest clear spot, and
+`digest` reads `0000000000000000` for a free package (only `check`'s `gameplay_digest` identifies
+it). The user played R2 and Undo and said it "works well"; the first Undo with the boat under way
+froze the helm in crane view (fixed), and the retry kept the boat roughly in place with a small
+"blip" at the Undo. Delivery and approach were not itemised. One run, one machine.
 
 The checks a trial covers; items 1-5 passed on the manual loop, item 6 is the friction list.
 
