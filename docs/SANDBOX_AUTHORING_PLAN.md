@@ -165,3 +165,27 @@ refused at `scene.work.sites[2]`; an `error()` in `init` is refused) and
 `test_capabilities_name_workspace_kinds`; the `boat_plugin_author` case passed (55 tests, 3
 skipped as before). Not run: `./wv stage` of a free package against a live game through the
 test bridge server (the SA1 windowed run covered it by hand); `capture` stays voyage-only.
+
+## SA3 trial, agent half (2026-11-17)
+
+Everything below is the agent's own report of its commands (a Claude subagent confined to
+`/private/tmp/proteus-sa3/ws`, `outer-work` copy, native Debug on macOS, a windowed game started
+with `./wv play`); I did not re-run or independently check it, and nobody has played the result.
+
+- Request 1, move the landing 25 m north. The agent found that north is +z from `AGENTS.md`, the
+  comment in `main.lua` and the API reference, unaided. The survey rejected (x -105, z 25)
+  (`scene.work.sites[2]`: "platform, approach or crane sweep is not clear of the outer map,
+  berths, modules or traffic"). By scanning (about 35 `./wv check` runs) it found only z 0-3
+  accepted at x -105, and chose (x -135, z 25), which delivers the 25 m north but also moves
+  30 m west. `./wv stage`: `applied`, R2, epoch 1, "WORK SESSION RESTARTED WITH THE NEW PACKAGE".
+- Rejection probe: the jetty at (15000, 15000) was refused by `check` and `stage` at
+  `scene.work.sites[4]`; `./wv status` still showed R2 epoch 1, nothing held. The agent reverted
+  the file, and `check` then gave the same `bundle_id` as the staged bundle.
+- Not verified: motion, feel, whether the boat still arrives straight in, the stale comment above
+  the landing line, and the staged digest (`status` and `stage` report `0000000000000000` for a
+  free package; only `check`'s `gameplay_digest` 935553c06c380e35 identifies the content).
+- Friction (to fold into SA4 or plan separately): the survey rejection names no obstacle and no
+  nearest clear position, so the agent had to scan by hand; the zero `digest` field is confusing
+  for a free package; `undo` has not been tried.
+- Owed from the user: play R2 (landing at -135, 25) and judge it, then run Undo; record that
+  separately from this report.
