@@ -3,7 +3,8 @@
 Owner: [wake research plan](../../../WAKE_RESEARCH_PLAN.md).
 Proposal: [historical weighting and divergence](../../../WAKE_R2B_DESIGN.md).
 Current follow-up: [private capture ledger](capture/README.md), completed 2026-11-17; the
-field evaluator remains unimplemented. The results below are the original design-only checkpoint.
+[private field screen](field/README.md) now retains useful coverage but CPU tail/encounter gates
+remain open. The results below are the original design-only checkpoint.
 
 Completed design-only checkpoint, 2026-11-15. No candidate evaluator, source adapter, shader,
 protocol or production behavior is implemented or selected by this step.

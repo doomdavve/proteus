@@ -27,5 +27,8 @@ R2Source r2_source(const char *path, unsigned tick, unsigned emitter, bool dispe
 BoatWakeObjectSample r2_query(const R2Field *field, Vector2 point, double seconds);
 BoatWakeObjectSample r2_piece(
     const BoatWakeObject *record, R2Mode mode, Vector2 point, double seconds);
+// Private local-coordinate entry point; gradient is still expressed in world coordinates.
+BoatWakeObjectSample r2_piece_coordinates(
+    const BoatWakeObject *record, R2Mode mode, float u, float v, double seconds);
 
 #endif

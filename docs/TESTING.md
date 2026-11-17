@@ -1583,3 +1583,40 @@ check. Tracking includes source evaluation/expiry/ledger work; queries include p
 and accumulation. Restore validation and snapshot copies are outside timed frames. The report
 retains p50/p95/p99, p95 spread, absolute deltas and percentages only above .005 ms references.
 This is private harness overhead, not a production server or graphics budget qualification.
+
+### Private outward transport screen (R2b)
+
+`wake_transport` is the isolated p=1 outward-dilation field experiment; no production target
+links it. `wake_transport_contract` checks sampled baseline/inner identity, transformed support
+and envelope derivatives, signed mixed-curvature overlap in independent/nonadjacent emitter
+slots, unequal straight histories and same-build restored field equality. These tests do not
+qualify coupled hull response, GPU parity or gameplay acceptance.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_transport -j
+./build-release/wake_transport --check
+mkdir -p build-release/wake-r2b/field-new/screen
+./build-release/wake_transport --screen build-release/wake-r2b/field-new/screen
+python3 tools/wake_transport.py --binary build-release/wake_transport --output build-release/wake-r2b/field-new/cpu --bench
+python3 tools/wake_transport.py --binary build-release/wake_transport --output build-release/wake-r2b/field-new/media --media
+python3 tools/wake_transport_report.py --screen build-release/wake-r2b/field-new/screen --cpu build-release/wake-r2b/field-new/cpu --output build-release/wake-r2b/field-new/report
+ffplay -autoexit -an build-release/wake-r2b/field-new/media/circle-detail-spread-paired.mp4
+```
+
+Use fresh directories. Timing runs must not overlap tests, media generation or playback. The
+report command expects the default 72-run matrix and checks every raw CPU hash, then retains
+p50/p95/p99, repetition ranges, absolute/relative changes and individual-run provisional CPU
+screen exceedances. Medians do not waive per-run tails. Both modes use the same captured source
+ledger and synthetic queries; baseline mode evaluates the original geometry. Pair order reverses
+between repetitions. The metadata records source/binary/driver hashes and exact commands.
+
+`--screen` writes straight/arrival, derivative, turning, mixed signed-crossing and full-support
+concentration tables. Source-off times are relative to emission stopping, not each record's
+age; concentration rows include surviving occupancy and expanded-support bounds. Grid extrema
+are sampled diagnostics. No local baseline-zero division is used as a mechanical tolerance.
+`--media` makes twelve matched fixed wide/detail field movies over six histories. Each revision
+shows signed height and separate cosmetic foam; movies are 100 frames/10 Hz after source-off,
+with nearest-neighbor integer enlargement. They are not game/chase or coupled-hull footage.
+See [field evidence](evidence/wakes/r2b/field/README.md) for the retained results, tail failure,
+reproduction limits and the still-open selection gates.

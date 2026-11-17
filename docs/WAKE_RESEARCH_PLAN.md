@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-17: R2a rejected; R2b private capture ledger implemented.
-Current step: retain baseline; outward-dilation evaluator remains unimplemented.
-Open: HDR tails/variation, human review, browser/slower-GPU and unavailable counters.
+Status, 2026-11-17: R2a rejected; R2b private field screen completed, retained for investigation.
+Current step: retain production baseline; prototype has useful coverage but unresolved costs/encounters.
+Open: prototype CPU tails/relative cost and hull response; HDR, human and wider-platform review.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: implement the private p=1 CPU field screen; no production geometry selected.
+Next: CPU profiling/tail investigation, then private coupled-hull screen; no geometry selected.
 
 ## Scope and existing work
 
@@ -152,7 +152,9 @@ including CPU pose/query work and server cost if physical sources are authoritat
 
 **Status:** R2a CPU-only screen complete; all alternatives rejected. R2b design reviewed;
 [the transport proposal](WAKE_R2B_DESIGN.md) and [algebra evidence](evidence/wakes/r2b/README.md)
-define the next private experiment. Its capture ledger is implemented; no new evaluator is implemented.
+define the next private experiment. Its capture ledger and p=1 evaluator are implemented privately;
+[field evidence](evidence/wakes/r2b/field/README.md) retains the coverage benefit, CPU tail failure
+and unresolved coupled-hull gate. No geometry is selected.
 [R2a evidence](evidence/wakes/r2/README.md) owns candidate definitions, numerical results,
 matched diagnostic motion, CPU costs, raw artifact locations and limitations.
 No production geometry or shader change is selected. GPU/gameplay adaptation is conditional on
@@ -525,3 +527,42 @@ Next: private p=1 field evaluator and baseline-relative straight/endpoints, turn
 derivative, full-domain concentration, signed-crossing and saturated-cost screens. GPU, protocol,
 quantization and authority integration remain unimplemented; R0/R1 HDR tails, human and wider
 platform reviews stay open. R3 still waits for a selected geometry. Work remains local.
+
+
+### R2b private p=1 field screen — 2026-11-17
+
+Completed the proposed single fixed-parameter outward-dilation CPU evaluator, separate from
+all production targets. [Field evidence](evidence/wakes/r2b/field/README.md) owns detailed
+mechanics, matched motion, all measurements/provenance and limitations. Baseline cadence,
+strength and lifetime are unchanged; no exponent/height tuning or geometry fallback is added.
+
+Sampled straight height/gradient/velocity and 1,921 arrival samples match exactly, including
+finite-train tails; derivative and mixed signed-superposition contracts pass. Finest-grid
+outer 25%-crest gap length at radius 12 m / 4 s improves 2.30→.90 m, at 8 s 3.825→2.825 m;
+radius 50 m / 8 s improves 2.925→0 m. Full-support grids find one flagged increase: figure-eight
+trough magnitude .582894→.586607 m (+.637%) at four seconds after stop. Finite-grid extrema
+and better coverage do not establish preserved encounters or a universal concentration bound.
+
+The final 72-run Release matrix uses three alternating paired runs, 20 s preroll and 60 s
+measured saturation per run. Dense-four enclosing p95 is .060→.086 ms circle, .061→.089 ms
+reversal and .026→.065 ms straight. Relative regressions exceed investigation screens. Median
+p99 fits the provisional .15 ms ceiling, but an individual reversal run reaches .257 ms p99:
+**the performance gate is open**. Source audit finds tiny nonzero curvature in rotated straight
+float histories; profiling is needed before attributing cost or changing source behavior.
+
+Twelve paired diagnostic field movies are retained; all decode, five complete visible paced
+playback, and temporal sheets are inspected. Straight/crossing supply 400 identical PNG pairs.
+These are CPU field views, not production chase or coupled hull driving. The baseline timing
+wrapper's early guard was corrected and final timings rerun; pre/post guard field tables and
+2,400 PNGs agree. Discarded timing folders are explicitly superseded in the evidence.
+
+Astra reviewed design, code and evidence and verified screen/raw CPU hashes. Findings on
+seams, endpoints, overlap, bounds/probes, trough growth and hidden p99 outlier were addressed.
+Supervisor decision: retain only the private prototype for further investigation; keep the
+production baseline and do not select geometry. Full Debug build/Release targets pass without
+project warnings; final full CTest passes 620/620 (36 GPU, 102.82 s), plus Release/ASan/UBSan
+private contracts. No GPU transform, browser/slower-GPU, player or human handling acceptance.
+
+Next: profile CPU paths and tails, then private coupled-hull encounters targeting changed outer
+fronts and figure-eight concentration. R3 still waits for geometry selection. Production resource,
+wire, GPU and authority work, R0/R1 HDR issues and wider review remain open. Work stays local.

@@ -130,3 +130,10 @@ target_link_libraries(wake_capture PRIVATE proteus_boat_core)
 target_compile_options(wake_capture PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME wake_capture_contract COMMAND wake_capture)
 set_tests_properties(wake_capture_contract PROPERTIES LABELS "cpu;slow")
+
+add_executable(wake_transport tools/wake_geometry.c tools/wake_capture.c
+    tools/wake_transport.c tools/wake_transport_review.c)
+target_link_libraries(wake_transport PRIVATE proteus_boat_core)
+target_compile_options(wake_transport PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_transport_contract COMMAND wake_transport --check)
+set_tests_properties(wake_transport_contract PROPERTIES LABELS "cpu;slow")

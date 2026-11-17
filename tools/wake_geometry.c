@@ -122,11 +122,21 @@ static float bump(float q, float width, float *slope)
 
 BoatWakeObjectSample r2_piece(const BoatWakeObject *o, R2Mode mode, Vector2 p, double seconds)
 {
+    if (!o->amplitude || seconds < o->born / 120.0
+        || seconds >= (o->born + BOAT_OBJECT_LIFE_TICKS) / 120.0)
+        return (BoatWakeObjectSample) { 0 };
+    Vector2 d = Vector2Subtract(p, o->position), n = { -o->direction.y, o->direction.x };
+    return r2_piece_coordinates(
+        o, mode, Vector2DotProduct(d, o->direction), Vector2DotProduct(d, n), seconds);
+}
+
+BoatWakeObjectSample r2_piece_coordinates(
+    const BoatWakeObject *o, R2Mode mode, float u, float v, double seconds)
+{
     BoatWakeObjectSample result = { 0 };
     if (!o->amplitude || seconds < o->born / 120.0 || seconds >= (o->born + 1920) / 120.0)
         return result;
-    Vector2 d = Vector2Subtract(p, o->position), n = { -o->direction.y, o->direction.x };
-    float u = Vector2DotProduct(d, o->direction), v = Vector2DotProduct(d, n);
+    Vector2 n = { -o->direction.y, o->direction.x };
     float clock = (float)(seconds * 120.0 - o->born) / 120, s = u, su = 1, excess = 0, eu = 0;
     bool rounded = mode == R2_OPEN || mode == R2_ANGLE;
     if (!rounded && fabsf(u) >= o->length)

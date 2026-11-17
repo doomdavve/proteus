@@ -17,7 +17,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 | Area | Open loop (human check or unfinished step) | Since | Owner |
 | --- | --- | --- | --- |
-| Wakes | R2b historical transport design reviewed; private outward-dilation screen next; physical recipe unchanged, HDR tails and human review open | 2026-11-15 | [wake research](WAKE_RESEARCH_PLAN.md) |
+| Wakes | R2b private field prototype improves outer coverage; CPU tail/relative costs and coupled-hull screen next; production recipe unchanged, HDR and human review open | 2026-11-17 | [wake research](WAKE_RESEARCH_PLAN.md) |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
 | Plugins | P5 follow-ups: hunt tick cost has Debug and Release numbers (M1 Max, ENet bots) but no WebRTC clients or other platform, and Release reading slower than Debug is unexplained (the browser hunt case and old-bundle rejection passed on Chrome/macOS 2026-11-14); P5g recording not qualified beyond macOS Debug, with disk cost and a human view of a reconstruction open; R2 loaded maps not scheduled | 2026-11-14 | [P5 plan](PLUGIN_P5_PLAN.md#p5i-closing-step) |
 | Plugins | Marina M3 complete; M4 vessels and resident/visitor services implemented locally (PR pending); M5 modules next | 2026-11-15 | [marina plan](MARINA_AUTHORING_PLAN.md) |

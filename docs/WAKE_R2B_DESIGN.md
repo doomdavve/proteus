@@ -1,10 +1,10 @@
 # R2b historical weighting and divergence proposal
 
-Status: private capture ledger implemented; field transform remains a design proposal.
+Status: private capture ledger and p=1 field prototype implemented; no geometry selected.
 Owner: [wake research plan](WAKE_RESEARCH_PLAN.md#r2--turning-geometry-experiments).
 Evidence: [R2a rejection](evidence/wakes/r2/README.md), [R2b algebra audit](evidence/wakes/r2b/README.md).
-Open: actual coverage/encounters, total-field concentration and integration costs.
-Next: implement and review the private baseline-cadence outward-dilation field screen.
+Open: CPU relative/tail cost, coupled encounters and integration qualification.
+Next: profile CPU paths/tails, then run the private coupled-hull screen.
 
 ## Scope and decision
 
@@ -326,3 +326,19 @@ the destination. They carry full witnesses even after predecessor expiry; they a
 portable file format nor a production checkpoint/wire proposal. The witness-heavy audit allocation
 is measured in [the capture evidence](evidence/wakes/r2b/capture/README.md). A smaller representation,
 quantization, GPU packing, protocol changes and production allocation still require review.
+
+
+## Private field-screen decision
+
+The fixed p=1 prototype uses the captured descriptors and the original baseline scalar in local
+coordinates, with exact direct baseline returns for zero curvature and each record's inner side.
+Its gradient includes shear/gain terms. Conservative bounds cover the widened support; foam is
+an explicitly cosmetic policy. No production target links the evaluator.
+
+[The field evidence](evidence/wakes/r2b/field/README.md) records useful outer coverage, exact
+sampled straight identity and passing derivative/superposition screens. It also retains a
+figure-eight trough increase, substantial relative CPU costs and a per-run .257 ms p99 failure
+against the provisional .15 ms fixture ceiling. These results support further private research,
+not geometry selection or performance/gameplay acceptance. CPU profiling and coupled-hull tests
+precede any integration decision. No exponent, height, curvature threshold or lifetime retune
+is selected to overcome the unresolved findings.

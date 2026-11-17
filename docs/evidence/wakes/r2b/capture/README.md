@@ -2,6 +2,9 @@
 
 Owner: [wake research plan](../../../../WAKE_RESEARCH_PLAN.md).
 Design: [historical transport proposal](../../../../WAKE_R2B_DESIGN.md).
+Follow-up: [the private field screen](../field/README.md) now records the evaluator results;
+this document retains the earlier infrastructure checkpoint.
+
 Completed infrastructure step only: no outward-dilation evaluator, shader, protocol or production
 source policy is implemented. Baseline geometry and 16-second lifetime remain unchanged.
 
