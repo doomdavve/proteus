@@ -58,7 +58,7 @@ multiplayer propagation, other browsers/devices and platform coverage remain ope
 [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08) records complete evidence,
 remaining limits and the unrelated generic web all-targets build failure.
 
-T4 is native-only: Working Harbour and its `--work` clock stay behind the no-Lua browser guard.
+T4 is native-only: Working Harbour and its package clock stay behind the no-Lua browser guard.
 Supported Web packaging and Chrome/ANGLE Metal non-work render smoke passed for this slice. No browser work cycle, saved
 work clock or night-cargo behavior is claimed; the
 [lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the native contract.

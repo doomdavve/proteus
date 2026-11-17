@@ -24,7 +24,7 @@ Saving the files reloads it; see PLUGIN_API.md for F5/F6/F7, the live tool bridg
 Agent workspace: to let a coding agent (for example Claude Code) author a voyage, scaffold a directory
 and open both the game and the agent in it:
 
-  python3 AUTHORING/plugin_author.py init MY-WORKSPACE [--example NAME] [--bridge DIR]
+  python3 AUTHORING/plugin_author.py init MY-WORKSPACE --from NAME [--bridge DIR]
   cd MY-WORKSPACE && ./wv play          (the game, with the live bridge)
   cd MY-WORKSPACE && claude             (the agent, in a second terminal)
 

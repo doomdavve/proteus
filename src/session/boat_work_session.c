@@ -260,6 +260,18 @@ void boat_work_session_reset(BoatWorkSession *e)
     boat_work_job_reset(e);
 }
 
+void boat_work_session_restart(BoatWorkSession *e)
+{
+    const Boat boat = e->boat;
+    bool under_way = !e->sandbox.moored && !e->sandbox.mooring && boat.motion_state != BOAT_CAPSIZED;
+    boat_work_session_reset(e);
+    if (under_way) {
+        e->boat = boat;
+        e->sandbox.moored = false;
+        e->crane_view = false; // Under way the helm view stays; a crane view would freeze the helm.
+    }
+}
+
 // SV1c: the session as a save record. The package's identity compares the work digest of its
 // scene, the manifest state_version and the physics revision; the source hash and build string
 // are for messages only.

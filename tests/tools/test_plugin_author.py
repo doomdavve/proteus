@@ -458,7 +458,10 @@ class AgentWorkspace(unittest.TestCase):
                              cwd=self.directory)
         return run.returncode, json.loads(run.stdout)
 
-    def init(self, *options):
+    def init(self, *options, source="langedrag"):
+        """init with `--from langedrag` unless options name a source or source is None."""
+        if source and "--from" not in options:
+            options = ("--from", source, *options)
         return self.tool("init", str(self.directory), "--bridge", str(self.mailbox), *options)
 
     def serve(self):
@@ -475,7 +478,7 @@ class AgentWorkspace(unittest.TestCase):
 
     def test_init_scaffold(self):
         code, result = self.init()
-        self.assertEqual((code, result["status"], result["example"]), (0, "ok", "langedrag"))
+        self.assertEqual((code, result["status"], result["source"]), (0, "ok", "langedrag"))
         files = sorted(p.name for p in self.directory.iterdir())
         self.assertEqual(files, [".claude", ".wv.json", "AGENTS.md", "CLAUDE.md", "main.lua",
                                  "plugin.json", "reference", "wv"])
@@ -501,16 +504,20 @@ class AgentWorkspace(unittest.TestCase):
         self.assertIn("not empty", result["message"])
         self.assertEqual([p.name for p in self.directory.iterdir()], ["keep.txt"])
         shutil.rmtree(self.directory)
-        code, result = self.init("--example", "nope")
+        code, result = self.init("--from", "nope")
         self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertFalse(self.directory.exists())
+        code, result = self.init(source=None)
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        self.assertIn("requires --from", result["message"])
         self.assertFalse(self.directory.exists())
         code, result = self.tool("status", str(self.scratch.name))
         self.assertEqual((code, result["status"]), (1, "input_error"))
         self.assertIn("not a workspace", result["message"])
 
     def test_init_from_directory(self):
-        code, result = self.init("--example", str(ROOT / "plugins/shelter-tour"))
-        self.assertEqual((code, result["example"]), (0, "shelter-tour"))
+        code, result = self.init("--from", str(ROOT / "plugins/shelter-tour"))
+        self.assertEqual((code, result["source"]), (0, "shelter-tour"))
 
     def test_check_without_game(self):
         self.init()
@@ -523,6 +530,40 @@ class AgentWorkspace(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertEqual(result["diagnostic_field"], "voyage.arrival.max_speed")
         self.assertEqual(result["operation"], "validate")
+
+    def test_work_package_workspace(self):
+        """A working harbour gets its own instructions and a check with no preview."""
+        code, result = self.init(source=str(ROOT / "plugins/outer-work"))
+        self.assertEqual((code, result["kind"]), (0, "free"))
+        text = (self.directory / "AGENTS.md").read_text()
+        self.assertIn("working-harbour plugin", text)
+        self.assertIn("## Work sites", text)
+        self.assertNotIn("--anchor", text)
+        voyage = self.directory.with_name("voyage")
+        self.tool("init", str(voyage), "--bridge", str(self.mailbox), "--from", "langedrag")
+        self.assertNotIn("## Work sites", (voyage / "AGENTS.md").read_text())
+        code, result = self.wv("check")
+        self.assertEqual((code, result["status"], result["steps"]), (0, "ok", ["validate"]))
+        self.assertIn("init probe", result["note"])
+        self.assertTrue(result["gameplay_digest"])
+        code, result = self.wv("check", "--anchor", "bridge")
+        self.assertEqual((code, result["status"]), (1, "input_error"))
+        # The survey rejects a site that is nowhere near the water; the job's init probe too.
+        self.edit(b"x = -105, z = 0,", b"x = -105, z = 9000,")
+        code, result = self.wv("check")
+        self.assertNotEqual(code, 0)
+        self.assertEqual(result["diagnostic_field"], "scene.work.sites[2]")
+        self.edit(b"x = -105, z = 9000,", b"x = -105, z = 0,")
+        self.edit(b"local s = {delivered=0", b"error('boom'); local s = {delivered=0")
+        code, result = self.wv("check")
+        self.assertNotEqual(code, 0)
+        self.assertIn("boom", result["diagnostic_message"])
+
+    def test_capabilities_name_workspace_kinds(self):
+        caps = author.capabilities()
+        self.assertEqual(caps["live"]["kinds"], ["voyage", "free"])
+        self.assertEqual(caps["workspace"]["check"]["free"], ["validate"])
+        self.assertEqual(caps["capture"]["kinds"], ["voyage"])
 
     def test_no_game(self):
         self.init()
@@ -817,7 +858,8 @@ class Packaged(unittest.TestCase):
             self.assertEqual((code, result["status"]), (0, "ok"), result)
             # An agent workspace made by the packaged tools runs its checks through them.
             workspace = Path(scratch) / "workspace"
-            code, result = tool("init", str(workspace), "--bridge", str(Path(scratch) / "bridge"))
+            code, result = tool("init", str(workspace), "--from", data["examples"][0], "--bridge",
+                              str(Path(scratch) / "bridge"))
             self.assertEqual((code, result["status"]), (0, "ok"), result)
             run = subprocess.run([str(workspace / "wv"), "check"], cwd=scratch,
                                  capture_output=True, timeout=60)

@@ -8,12 +8,30 @@
 // the work package's Lua, which the browser game must not link (tools/check_web_wasm.py), and the
 // browser menu stops at CANAL TOUR, so none of this runs. Opening a work session simply fails.
 
+bool wake_work_probe_directory(const char *directory)
+{
+    (void)directory;
+    return false;
+}
+
+bool wake_work_probe_catalog(const char *id)
+{
+    (void)id;
+    return false;
+}
+
+void wake_work_use(WakeWork *work, const BoatPluginRevision *revision)
+{
+    (void)work;
+    (void)revision;
+}
+
 bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources *resources,
-    const BoatWorldDefinition *location, char *diagnostic, size_t capacity)
+    const BoatPluginRevision *revision, char *diagnostic, size_t capacity)
 {
     (void)game;
     (void)resources;
-    (void)location;
+    (void)revision;
     *work = (WakeWork) { 0 };
     if (diagnostic && capacity)
         snprintf(diagnostic, capacity, "the working harbour is not available in the browser");
@@ -94,16 +112,18 @@ bool wake_work_frame(
 
 void wake_work_return_crate(WakeWork *work) { (void)work; }
 
-bool wake_work_reset(WakeWork *work, BoatSession *game, double now)
+bool wake_work_reset(WakeWork *work, BoatSession *game, bool keep_boat, double now)
 {
     (void)work;
     (void)game;
+    (void)keep_boat;
     (void)now;
     return false;
 }
 
-bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose, double now)
 {
+    (void)now;
     (void)work;
     (void)game;
     (void)pose;

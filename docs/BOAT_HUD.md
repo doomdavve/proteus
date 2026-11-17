@@ -421,7 +421,7 @@ distinguishes automated review from human playtesting.
 
 ## Working-harbour rows, 2026-11-07 (SV1g)
 
-`wake_velocity --work` draws the package's job rows (`LABEL: value`, yellow) at the top left
+a working-harbour package in `wake_velocity` draws the package's job rows (`LABEL: value`, yellow) at the top left
 under the P: MENU hint, then `JOB SUSPENDED` or the waiting reason in red, and one status line
 (`CRANE` or `HELM`, mooring state, crate state). There are no control or help lines: the full
 key list is the pause menu's CONTROLS page (also `?`). At the helm a yellow marker (site and
