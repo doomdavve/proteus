@@ -189,3 +189,10 @@ with `./wv play`); I did not re-run or independently check it, and nobody has pl
   for a free package; `undo` has not been tried.
 - Owed from the user: play R2 (landing at -135, 25) and judge it, then run Undo; record that
   separately from this report.
+
+## SA3 trial, user's play (2026-11-17)
+
+The user played the staged R2 (landing at x -135, z 25) and Undo in the window and reported
+"Works well!", without further detail. Not recorded, so not claimed: whether the delivery was
+completed, how the approach felt, and whether the boat stayed in place on Undo while under way
+(the user was asked to check it; the answer was not itemised). Native Debug on macOS only.
