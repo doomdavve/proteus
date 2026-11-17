@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-15: R2a rejected; R2b historical transport design reviewed.
-Current step: retain baseline; one private outward-dilation experiment proposed.
+Status, 2026-11-17: R2a rejected; R2b private capture ledger implemented.
+Current step: retain baseline; outward-dilation evaluator remains unimplemented.
 Open: HDR tails/variation, human review, browser/slower-GPU and unavailable counters.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: private descriptor/capture ledger and p=1 CPU screen; no production geometry selected.
+Next: implement the private p=1 CPU field screen; no production geometry selected.
 
 ## Scope and existing work
 
@@ -152,7 +152,7 @@ including CPU pose/query work and server cost if physical sources are authoritat
 
 **Status:** R2a CPU-only screen complete; all alternatives rejected. R2b design reviewed;
 [the transport proposal](WAKE_R2B_DESIGN.md) and [algebra evidence](evidence/wakes/r2b/README.md)
-define the next private experiment. No new evaluator is implemented.
+define the next private experiment. Its capture ledger is implemented; no new evaluator is implemented.
 [R2a evidence](evidence/wakes/r2/README.md) owns candidate definitions, numerical results,
 matched diagnostic motion, CPU costs, raw artifact locations and limitations.
 No production geometry or shader change is selected. GPU/gameplay adaptation is conditional on
@@ -492,3 +492,36 @@ Next: define a private immutable descriptor/capture ledger, then test only the p
 near-threshold captures, frozen history, signed crossings and existing resource screens.
 Metadata/quantization, shader/compatibility/authority costs, R0/R1 HDR tails, human and wider
 platform review remain open. R3 waits for a selected geometry. Nothing is pushed or promoted.
+
+
+### R2b private capture ledger — 2026-11-17
+
+Completed the immutable descriptor/capture infrastructure in the existing research worktree.
+[Capture evidence](evidence/wakes/r2b/capture/README.md) owns lifecycle details, source/review
+findings, exact resource sizes, overhead data and provenance. The private wrapper retains raw
+baseline records and birth timing, including dry/slow carry-in spans: those freeze zero curvature
+and are ineligible to seed a pair. Explicit reset/identity changes break source epochs. Frozen
+successor descriptors and copied witnesses survive predecessor expiry and slot reuse. Versioned,
+checksum-protected same-build snapshots validate before destination mutation; this is no wire
+or portable-save proposal. No new field evaluator or production behavior is implemented.
+
+Astra design/code review findings on baseline timing, overflow, live witness identity and unknown
+provenance were addressed; final inspection found no blocking ledger issue. The supervisor retains
+this infrastructure only. Full Debug build and Release target builds passed without project
+warnings; the desktop-enabled full CTest preset passed 619/619 (36 GPU) in 104.55 s. Standalone
+Release and ASan/UBSan capture contracts passed. Tests compare five 80-second four-source histories
+exactly with baseline and replay 55 seconds after restoration, plus explicit lifecycle/threshold
+cases. These are automated checks, not player acceptance or a transform qualification.
+
+Twelve alternating Release runs retain 60 measured seconds each after 20 seconds warmup.
+All 21,600 paired frames agree on births, occupancy and printed signed-height sums. Four-source
+enclosing p50/p95/p99 is approximately .041/.044/.050 ms for baseline and ledger; source tracking
+is near the .001 ms timer quantum, so no zero-overhead claim is made. Added audit ledger storage
+is 13,568 bytes, including full predecessor witnesses; production allocation is unchanged.
+No new motion capture is claimed for this capture-only infrastructure step; R2b's eventual field
+checkpoint still needs matched diagnostic movies and its mechanical/performance review bundle.
+
+Next: private p=1 field evaluator and baseline-relative straight/endpoints, turn coverage,
+derivative, full-domain concentration, signed-crossing and saturated-cost screens. GPU, protocol,
+quantization and authority integration remain unimplemented; R0/R1 HDR tails, human and wider
+platform reviews stay open. R3 still waits for a selected geometry. Work remains local.

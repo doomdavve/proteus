@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-17",
+  "base_revision": "091dbaa",
+  "branch": "plan/wake-research",
+  "scope": "private capture-only infrastructure; transform unimplemented",
+  "platform": {
+    "hardware": "M1 Max",
+    "arch": "arm64",
+    "os": "macOS 26.6.2",
+    "compiler": "Apple clang 21.0.0",
+    "timing_build": "Release"
+  },
+  "commands": [
+    "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug",
+    "cmake --build build -j 8",
+    "cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release",
+    "cmake --build build-release --target wake_capture -j 8",
+    "./build-release/wake_capture",
+    "caffeinate -di ctest --preset full",
+    "cc -std=c17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc -Itools -I/Users/davve/src/proteus/build/_deps/raylib-src/src tools/wake_capture.c tools/wake_geometry.c tools/wake_capture_review.c -o build-release/wake-r2b/capture/wake_capture_sanitized",
+    "./build-release/wake-r2b/capture/wake_capture_sanitized",
+    "./build-release/wake_capture --bench > build-release/wake-r2b/capture/timings-raw.csv",
+    "python3 tools/wake_capture_report.py build-release/wake-r2b/capture/timings-raw.csv build-release/wake-r2b/capture/timings.json"
+  ],
+  "sources": [
+    {
+      "path": "tools/wake_capture.c",
+      "sha256": "d4f4850408c2938317d4cc2d53b0bffbaa516effef15d25b1f09a7b394b5754a"
+    },
+    {
+      "path": "tools/wake_capture.h",
+      "sha256": "9c0b335bffea8684aa5ffbd760fddb270bed08a2b13ef2c7b530a0b286a3177b"
+    },
+    {
+      "path": "tools/wake_capture_review.c",
+      "sha256": "ab93cf83c01645abd7f292d8ee53a9745d18f34c9de3ce8e3dc33d5fcad247a1"
+    },
+    {
+      "path": "tools/wake_capture_report.py",
+      "sha256": "4eb9cbea367a387bc54c45bbd7a373d771d898edad7f0464699a19c0c0f2766e"
+    },
+    {
+      "path": "tools/wake_geometry.c",
+      "sha256": "8ce4396ce064234bbda348234591ec2d0fa6d99fe2faffbb84fcbcd2f951e5b1"
+    },
+    {
+      "path": "tools/wake_geometry.h",
+      "sha256": "dfd6342b840950794dfa810ac8ec4942a5a47e8f7f30010c92f2c2d94746b1d0"
+    },
+    {
+      "path": "tests/tools/tests.cmake",
+      "sha256": "c17f8b9ef09dc55f0d6ca6a05ba61d21f22a4a64900f2e92a042849e9cbb3257"
+    }
+  ],
+  "retained_report": {
+    "path": "docs/evidence/wakes/r2b/capture/timings.json",
+    "sha256": "6be1d4abf4ea04023d4c0bc8900d9a7097aeb4920c47be162cf891f7e8f14a69"
+  },
+  "local_artifact_root": "/private/tmp/proteus-wake-research",
+  "artifacts": [
+    {
+      "path": "build-release/wake-r2b/capture/timings-raw.csv",
+      "sha256": "b9cc20e5b9d3b42a2bce50eca92d6eb468e68d8213b23d9df34eaf2bf9b7808d"
+    },
+    {
+      "path": "build-release/wake-r2b/capture/timings.json",
+      "sha256": "6be1d4abf4ea04023d4c0bc8900d9a7097aeb4920c47be162cf891f7e8f14a69"
+    },
+    {
+      "path": "build-release/wake-r2b/capture/build.log",
+      "sha256": "78e5a402b5361f570e255d5c7010696eb49b307939b9b8e1ccf24cd04548c7ad"
+    },
+    {
+      "path": "build-release/wake-r2b/capture/ctest-desktop.log",
+      "sha256": "061b308fde13c6c19406788bc0d6c2b6c4a74753a5918ea16f4affce613e13b1"
+    },
+    {
+      "path": "build-release/wake-r2b/capture/sanitized.log",
+      "sha256": "bc3e811b2b3234b8f138f26aaf040cd35d2a040bbe1b37c51ab832888366cc17"
+    },
+    {
+      "path": "build-release/wake_capture",
+      "sha256": "3b5739791c7e6e1a6bdc7e4b11db1d008e44230e05bac448f27d2eaa1d5c767f"
+    },
+    {
+      "path": "build-release/wake-r2b/capture/wake_capture_sanitized",
+      "sha256": "8aed0c6e8873aa9e21642ad4ac0e7485d0245aec21c1382327c3a81260c091f2"
+    }
+  ],
+  "qualification": {
+    "ctest_passed": 619,
+    "gpu_labelled": 36,
+    "ctest_seconds": 104.55,
+    "asan_ubsan": "passed",
+    "new_audiovisual_review": false,
+    "player_acceptance": false
+  },
+  "excluded_history": [
+    "build-release/wake-r2b/capture/timings-exploratory.csv (concurrent tests)",
+    "build-release/wake-r2b/capture/ctest.log (sandbox errors; interrupted)"
+  ],
+  "review": "Astra design/code and final evidence review; findings addressed; no independent reviewer test execution."
+}

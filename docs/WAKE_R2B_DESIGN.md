@@ -1,10 +1,10 @@
 # R2b historical weighting and divergence proposal
 
-Status: design proposal for one private CPU experiment; no game implementation selected.
+Status: private capture ledger implemented; field transform remains a design proposal.
 Owner: [wake research plan](WAKE_RESEARCH_PLAN.md#r2--turning-geometry-experiments).
 Evidence: [R2a rejection](evidence/wakes/r2/README.md), [R2b algebra audit](evidence/wakes/r2b/README.md).
-Open: actual coverage/encounters, total-field concentration, capture/lifecycle behavior and costs.
-Next: review a private baseline-cadence outward-dilation experiment against the declared gates.
+Open: actual coverage/encounters, total-field concentration and integration costs.
+Next: implement and review the private baseline-cadence outward-dilation field screen.
 
 ## Scope and decision
 
@@ -271,7 +271,8 @@ not an observed boat trajectory or capsize result.
 
 No source/query can safely recover frozen `K` merely from the currently live predecessor: the
 parent can expire, and the oldest record in a checkpoint can lack its predecessor. A future
-private prototype needs an immutable descriptor sidecar plus explicit source-epoch capture state.
+private prototype uses an immutable descriptor sidecar plus explicit source-epoch capture state
+(`tools/wake_capture.[ch]`), with copied predecessor witnesses for same-build snapshot validation.
 Debug lineage keys are additional to the curvature scalar.
 
 A 32-bit scalar sidecar alone would require 512 logical bytes across 128 slots. This is not an
@@ -303,3 +304,25 @@ Before a private candidate is retained, require:
 
 If the next private field screen fails, retain the rejection. Do not quietly switch to `p=.5`,
 retune source height, symmetrize old records or add joins to force an apparent continuity win.
+
+
+## Private capture implementation
+
+The capture-only harness retains the baseline field evaluator and physical records. It freezes
+successor descriptors using captured endpoints, source identity and epochs; it never reconstructs
+lineage from surviving ring neighbors. The strict turn gate uses the chord dot product, rejecting
+an exact right angle without a rounded `pi/2` comparison. A sharp but valid span remains eligible
+as the next span's predecessor.
+
+Dry/slow and missed observations break capture history. The raw baseline tracker can begin a
+wet span from its last dry sample: the harness preserves that birth/strength timing for parity,
+marks the carry-in descriptor ineligible, and gives it zero curvature. It cannot seed a pair.
+This is a retained baseline source-policy limitation, not proof of continuously wet emission.
+Explicit teleport/session resets reset the private tracker and break the epoch while retaining
+old records. Callers must supply these reset signals; no teleport detector is added.
+
+Snapshots are versioned, checksum-protected same-build memory copies, validated before committing
+the destination. They carry full witnesses even after predecessor expiry; they are neither a
+portable file format nor a production checkpoint/wire proposal. The witness-heavy audit allocation
+is measured in [the capture evidence](evidence/wakes/r2b/capture/README.md). A smaller representation,
+quantization, GPU packing, protocol changes and production allocation still require review.

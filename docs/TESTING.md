@@ -1553,3 +1553,33 @@ audits with script checksums. The report includes a synthetic regional concentra
 counterexample. It takes time as a mathematical input and has no wall-clock pass condition.
 The signed synthetic profile is not the production crest/trough; no gameplay, C-float/GPU
 parity, capture/reset/restore or performance qualification is implied.
+
+
+### Private capture lifecycle (R2b)
+
+`wake_capture` is a separate capture-only CPU harness using the unchanged R2a baseline evaluator.
+No production target links it. Its CTest drives virtual ticks through source restarts, strict
+turn-domain gates, frozen descriptors, predecessor expiry, slot reuse and transactional same-build
+snapshot restoration. Continuous fixtures and dry/slow/missed-tracking fixtures compare baseline
+physical records exactly. [Capture evidence](evidence/wakes/r2b/capture/README.md) records scope,
+resources, measurements and remaining limits.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target wake_capture -j
+ctest --test-dir build -R '^wake_capture_contract$' --output-on-failure
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_capture -j
+mkdir -p build-release/wake-r2b/capture-new
+./build-release/wake_capture --bench > build-release/wake-r2b/capture-new/timings-raw.csv
+python3 tools/wake_capture_report.py build-release/wake-r2b/capture-new/timings-raw.csv build-release/wake-r2b/capture-new/timings.json
+```
+
+Run the uncapped benchmark without concurrent tests, GPU measurements or media processing. It
+alternates three baseline/capture pairs (baseline first) for one and four continuously emitting sources, each
+with 20 simulated seconds warmup and 60 measured seconds at two 120 Hz ticks per frame. Thirty
+unchanged baseline queries per frame provide a common workload and signed-height neutrality
+check. Tracking includes source evaluation/expiry/ledger work; queries include probe construction
+and accumulation. Restore validation and snapshot copies are outside timed frames. The report
+retains p50/p95/p99, p95 spread, absolute deltas and percentages only above .005 ms references.
+This is private harness overhead, not a production server or graphics budget qualification.

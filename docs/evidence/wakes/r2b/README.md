@@ -2,6 +2,9 @@
 
 Owner: [wake research plan](../../../WAKE_RESEARCH_PLAN.md).
 Proposal: [historical weighting and divergence](../../../WAKE_R2B_DESIGN.md).
+Current follow-up: [private capture ledger](capture/README.md), completed 2026-11-17; the
+field evaluator remains unimplemented. The results below are the original design-only checkpoint.
+
 Completed design-only checkpoint, 2026-11-15. No candidate evaluator, source adapter, shader,
 protocol or production behavior is implemented or selected by this step.
 
@@ -121,7 +124,8 @@ build/CTest log locations. Raw retained data are also under
 `/private/tmp/proteus-wake-research/build-release/wake-r2b/algebra-retained/`.
 Earlier `algebra*` directories are exploratory history, not the retained result.
 
-Next: decide the private descriptor/capture ledger, then implement only the proposed `p=1`
+At the 2026-11-15 checkpoint, next was to decide the private descriptor/capture ledger, then
+implement only the proposed `p=1`
 baseline-cadence field experiment if work continues. Measure baseline-relative straight/endpoints,
 outer coverage and full-history concentration before considering coupled hull or GPU integration.
 No C join, lifetime change or production compatibility change is selected.
