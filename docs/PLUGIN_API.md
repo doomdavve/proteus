@@ -1943,7 +1943,7 @@ happen and a game that moved in between answers `stale`.
 
 | Command | Effect |
 | --- | --- |
-| `check [--anchor NAME --output FILE.png]` | `validate` and `preview` of the directory; with `--anchor`, a `capture` (default `.wv/frame.png`). Offline; never touches a game |
+| `check [--anchor NAME --output FILE.png]` | `validate` and `preview` of the directory; with `--anchor`, a `capture` (default `.wv/frame.png`). A `free` package (a working harbour) has no preview or capture: `check` runs `validate` only, which already includes the work-site survey and the job's `init` probe, and `--anchor` is refused. Offline; never touches a game |
 | `stage` | `validate`, then `live-inspect`, then `live-stage` of the directory with the game's revision and epoch and the snapshot's bundle id; `next` says whether the result is live or held |
 | `apply` | `live-apply` with the game's `held_revision`; `conflict` when nothing is held |
 | `undo`, `discard` | `live-undo`, `live-discard` pinned to the inspected state |

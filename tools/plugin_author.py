@@ -174,9 +174,12 @@ def capabilities():
                         "locations": ["basin", "outer"],
                         "bundle_format": "wake-velocity-plugin", "bundle_version": 2,
                         "result_bytes": 16384},
+            "workspace": {"kinds": ["voyage", "free"],
+                          "check": {"voyage": ["validate", "preview"], "free": ["validate"]}},
             "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,
                         "width": 320, "height": 200, "format": "png"},
-            "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage"],
+            "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage", "free"],
+                     "free_requires": "scene.work (a working harbour)",
                      "transport": "private local directory mailbox; per-launch token",
                      "actions": list(LIVE_ACTIONS), "pins": {
                          "stage": ["base_revision", "base_epoch", "expect_bundle"],

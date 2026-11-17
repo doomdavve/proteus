@@ -4,7 +4,7 @@ Status, 2026-11-17: **SA1 implemented locally** on `feat/sandbox-authoring` (not
 Done: SA0.2 (a working harbour is a plugin run; `--work` removed; `--package` implies its
 location), SA0.1 and SA0.3 as proposed (the user accepted the defaults, 2026-11-17), live
 stage/Undo with the boat kept, no default-directory save for a `--plugin DIR` run, and the review
-options as `/work` console requests (see the [SA1 results](#sa1-result-2026-11-15)). Open: SA2-SA4.
+options as `/work` console requests (see the [SA1 results](#sa1-result-2026-11-15)). SA2 implemented locally too (2026-11-17). Open: SA3-SA4.
 Done when: the user plays a work-site change that an agent staged through `./wv` in
 `wake_velocity --plugin`, and the contract is in the specs (SA4). Next task: SA2 (`./wv check`
 fails on free packages today).
@@ -149,3 +149,19 @@ and `/work clock-report FILE` wrote a CSV when the bounded run ended (45 KB, row
 observations). Not checked: a live stage with the boat under way (only the session unit case),
 the posed frames by eye, the virtual-clock bridge case in the plan's test list, and other
 platforms. `ARCHITECTURE_PLAN.md` still names `--work-review-pose` as written when it landed.
+
+## SA2 result (2026-11-17)
+
+Implemented in `tools/plugin_author.py` and `tools/plugin_workspace.py`: `capabilities` reports
+`live.kinds` `["voyage","free"]` (a free package needs `scene.work`) and `workspace.check` per
+kind; `init` writes work-site instructions (sites, job, survey diagnostics, the restart rule,
+`/work` requests, no player save) for a `free` source and `init`'s result names the `kind`;
+`./wv check` on a free package runs `validate` only and says in `note` that it covers the survey
+and the job's `init` probe (there is no preview), and refuses `--anchor`. `./wv play` already
+starts `--plugin DIR`, so it needed no change. Finding: `validate` already ran the survey and the
+`init` probe, so no new worker code was needed; only the preview step was the failure. Tests in
+`tests/tools/test_plugin_author.py`: `test_work_package_workspace` (a site moved to z = 9000 is
+refused at `scene.work.sites[2]`; an `error()` in `init` is refused) and
+`test_capabilities_name_workspace_kinds`; the `boat_plugin_author` case passed (55 tests, 3
+skipped as before). Not run: `./wv stage` of a free package against a live game through the
+test bridge server (the SA1 windowed run covered it by hand); `capture` stays voyage-only.

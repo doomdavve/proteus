@@ -17,6 +17,8 @@ cd ~/my-voyage && ./wv play                         # terminal 1: the game, with
 cd ~/my-voyage && claude                            # terminal 2: the agent, scoped to this directory
 ```
 
+A working-harbour package works the same way (`init ~/my-harbor --from outer-work`): its `AGENTS.md` explains sites, the job, the survey diagnostics and that a staged change restarts the cargo session (a boat under way keeps its pose); [the sandbox authoring plan](SANDBOX_AUTHORING_PLAN.md) owns that track.
+
 `init` copies the package named by the required `--from NAME` (a shipped example such as `langedrag`) or `--from DIRECTORY`, the agent's instructions
 (`AGENTS.md`, imported by `CLAUDE.md`), a Claude Code permission file, a copy of the API reference and
 the `./wv` wrapper. A release package has the same tools in its `authoring/` directory. The agent
@@ -52,7 +54,7 @@ the bridge. Each item became part of the workspace:
 ## The loop
 
 The agent's own instructions are the workspace's `AGENTS.md`; in short: `./wv check` (validate, preview,
-optional capture), `./wv stage`, then `./wv apply` for a held change or `./wv undo`, with `./wv status`
+optional capture; for a working-harbour package, validate only, which runs the site survey and the job's `init` probe), `./wv stage`, then `./wv apply` for a held change or `./wv undo`, with `./wv status`
 for the revision, epoch, digest and boat/objective state. A change that moves the water or needs a
 migration is held, and `stage` says so in `next`; a moved mark or route goes live at once. Every
 mutation goes through the same staging, revision and Undo a human uses, so the agent cannot move the
