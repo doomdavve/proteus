@@ -268,6 +268,7 @@ void boat_work_session_restart(BoatWorkSession *e)
     if (under_way) {
         e->boat = boat;
         e->sandbox.moored = false;
+        e->crane_view = false; // Under way the helm view stays; a crane view would freeze the helm.
     }
 }
 

@@ -196,3 +196,15 @@ The user played the staged R2 (landing at x -135, z 25) and Undo in the window a
 "Works well!", without further detail. Not recorded, so not claimed: whether the delivery was
 completed, how the approach felt, and whether the boat stayed in place on Undo while under way
 (the user was asked to check it; the answer was not itemised). Native Debug on macOS only.
+
+## SA3 correction (2026-11-17)
+
+The user retried SA0.1's check (Undo with the boat under way) and reported that the boat snapped
+back. Cause found by reading, then covered by a test: the restart reset the session's view to the
+crane view (`boat_work_session_reset_world`), which takes the helm and shows the berth's crane, so
+a boat the player had taken to the helm view with Tab was frozen and shown at the berth although
+its position was kept. `boat_work_session_restart` now also keeps the helm view for an under-way
+boat; `boat_work_local.restart_keeps_boat_local` drives the running local session (depart, helm
+view, thrust, restart, new generation) and checks the mirror's boat and view. The earlier "works
+well" does not cover this step; the retry is owed again. Whether the boat's position itself had
+been kept in the user's run was not measured.

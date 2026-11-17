@@ -383,8 +383,9 @@ static int restart_keeps_boat(void)
 {
     BoatWorkSession e;
     setup(&e);
-    boat_work_moor_action(&e); // Depart.
-    CHECK(!e.sandbox.moored);
+    boat_work_moor_action(&e); // Depart,
+    boat_work_view_action(&e); // and take the helm view, as a player must to steer.
+    CHECK(!e.sandbox.moored && !e.crane_view);
     e.boat.position.x += 40;
     e.boat.position.y += 25;
     e.boat.heading = 1.25f;
@@ -398,7 +399,7 @@ static int restart_keeps_boat(void)
     CHECK(e.boat.position.x == under_way.position.x && e.boat.position.y == under_way.position.y);
     CHECK(e.boat.heading == under_way.heading && e.boat.yaw_velocity == under_way.yaw_velocity);
     CHECK(e.lighting_hours == hours);
-    CHECK(e.sandbox.cargo.state == BOAT_CARGO_PAD);
+    CHECK(e.sandbox.cargo.state == BOAT_CARGO_PAD && !e.crane_view);
     // The plain reset still returns an under-way boat to the berth.
     boat_work_session_reset(&e);
     CHECK(e.sandbox.moored);
@@ -408,9 +409,36 @@ static int restart_keeps_boat(void)
     return 0;
 }
 
+// The game's package-change restart on the running local session: the authority restarts keeping
+// an under-way boat, then a new generation; the mirror shows the kept boat, not the berth.
+static int restart_keeps_boat_local(void)
+{
+    start();
+    frames(keys(BOAT_WORK_MOOR), 1, 12); // Depart,
+    frames(keys(BOAT_WORK_VIEW), 1, 12); // and take the helm view.
+    BoatWorkFrame ahead = keys(0);
+    ahead.thrust_target = 1;
+    frames(ahead, 40, 12);
+    BoatWorkSession *authority = boat_work_local_authority(&local);
+    CHECK(!authority->sandbox.moored);
+    Vector2 berth = boat_cargo_berth(boat_work_active(authority));
+    Boat out = authority->boat;
+    CHECK(hypotf(out.position.x - berth.x, out.position.y - berth.y) > 5);
+    boat_work_session_restart(authority);
+    CHECK(boat_work_local_restart(&local, now));
+    const BoatWorkSession *view = boat_work_local_view(&local);
+    CHECK(authority->boat.position.x == out.position.x && authority->boat.position.y == out.position.y);
+    CHECK(view->boat.position.x == out.position.x && view->boat.position.y == out.position.y);
+    CHECK(!view->sandbox.moored && view->tick == 0);
+    CHECK(!authority->crane_view && !view->crane_view); // Still at the helm, not frozen in a crane view.
+    boat_work_local_stop(&local);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     static const TestCase cases[] = {
+        TEST_CASE(restart_keeps_boat_local),
         TEST_CASE(restart_keeps_boat),
         TEST_CASE(codec),
         TEST_CASE(failures),
