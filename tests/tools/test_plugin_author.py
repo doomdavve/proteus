@@ -657,6 +657,23 @@ class MapQuery(unittest.TestCase):
         row = grid["rows_text"][grid["rows"] - 1 - (173 - 140)]
         self.assertEqual(row[45 - 38], "Q")
 
+    def test_hulls_traffic_and_clear_errors(self):
+        hulls = self.run_map(ROOT / "plugins/harbor-life", hulls=True)["evidence"]["map"]["hulls"]
+        recipes = {r["recipe"]: r for r in hulls["recipes"]}
+        self.assertEqual(set(recipes), {"skiff", "runabout", "sailboat", "cruiser", "speedboat",
+                                        "sailboat_7m", "workboat"})
+        for recipe in recipes.values():
+            self.assertAlmostEqual(recipe["envelope_length_m"], recipe["length_m"] + 1.8, 2)
+            self.assertAlmostEqual(recipe["envelope_beam_m"], recipe["beam_m"] + .9, 2)
+        grid = self.run_map(ROOT / "plugins/harbor-life", box=(-46, 130, 26, 210), step=2.0)
+        grid = grid["evidence"]["map"]
+        self.assertEqual([t["id"] for t in grid["traffic"]][:2], ["passing", "ferry"])
+        self.assertIn("t", "".join(grid["grid"]["rows_text"]))
+        with self.assertRaises(ValueError) as caught:
+            self.run_map(ROOT / "plugins/harbor-life", box=(-46, 110, 26, 200), step=1.0)
+        self.assertIn("6643 cells", str(caught.exception))
+        self.assertIn("--step 2", str(caught.exception))
+
     def test_rejected_draft_still_maps_without_overlay(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / "pkg"
@@ -671,11 +688,8 @@ class MapQuery(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_map(ROOT / "plugins/langedrag", **request)
         for box, step in (((0, 0, 100, 100), 1.0), ((0, 0, 10, 10), 0.1), ((0, 0, 10, 10), 9.0)):
-            job = author.ValidationJob(WORKER, author.snapshot(ROOT / "plugins/langedrag"), 0, 0,
-                                       operation="map", map_args={"box": box, "step": step})
-            job.process.wait()
-            self.assertEqual(job.poll(0)["status"], "worker_failed")
-            job.close()
+            with self.assertRaises(ValueError):
+                self.run_map(ROOT / "plugins/langedrag", box=box, step=step)
 
 
 class Modules(unittest.TestCase):

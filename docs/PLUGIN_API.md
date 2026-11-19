@@ -1988,13 +1988,19 @@ read-only and deterministic: the same snapshot and request give the same bytes.
   simulation x is minus east, so row 0 is the largest z and column 0 the largest x
   (`x = x_west − col·step`, `z = z_north − row·step`). Cells are sampled at their centres, so a
   coarse step can alias a thin pier. `~` water, `#` land, and the draft: `+` floating module,
-  `=` gangway, `Q` quay deck, `B` moored hull, `b` empty berth slot, `E` declared entrance.
+  `=` gangway, `Q` quay deck, `B` moored hull, `b` empty berth slot, `E` declared entrance, `t` the
+  swept centreline of a travelling craft (its hull is wider; the grid's `traffic` list gives each
+  craft's id, size and period). In a workspace, `./wv map` returns the grid as `view`, with a z
+  label on every row and an x ruler on top, in place of `rows_text`. A box over the cell cap is
+  refused with the cell count and the step that fits.
+- `--hulls` returns every berth recipe's length and beam, the berth envelope (the hull grown by
+  0.9 m fore and aft and 0.45 m each side) and the validator's spacing rule.
 - The draft is drawn only once it validates (`draft: "accepted"`). A rejected draft still returns
   the bare map with the diagnostic, `overlay: false`.
 - Limits are refused rather than truncated. The query knows water, land, ground height and the
   draft; it does not know buildings, scenery or depth.
 
-The overlay uses the hull length and beam without the validator's margins, so a clear grid is
+Diagnostic indices (`scene.marina.berths[4]`) are 1-based. The overlay uses the hull length and beam without the validator's margins, so a clear grid is
 necessary but not sufficient; `check` remains the authority.
 
 ## Packaged authoring tools (P4.7)

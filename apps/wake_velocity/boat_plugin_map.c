@@ -1,5 +1,7 @@
 #include "wake_velocity/boat_plugin_map.h"
 #include "core/waterfront_outer.h"
+#include "core/waterfront_route.h"
+#include "core/waterfront_traffic.h"
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
@@ -31,6 +33,10 @@ bool boat_plugin_map_parse(
     int argc, char **argv, BoatPluginMapRequest *r, char *message, unsigned size)
 {
     *r = (BoatPluginMapRequest) { 0 };
+    if (argc == 1 && !strcmp(argv[0], "hulls")) {
+        r->hulls = true;
+        return true;
+    }
     if (argc >= 1 && !strcmp(argv[0], "probe")) {
         int n = argc - 1;
         if (n < 2 || n % 2 || n / 2 > BOAT_PLUGIN_MAP_PROBES)
@@ -67,7 +73,7 @@ bool boat_plugin_map_parse(
                 message, size, "box exceeds 4096 cells; use a larger step or a smaller box");
         return true;
     }
-    return fail(message, size, "usage: --map probe X Z [X Z ...] | --map box X0 Z0 X1 Z1 STEP");
+    return fail(message, size, "usage: --map probe X Z [X Z ...] | box X0 Z0 X1 Z1 STEP | hulls");
 }
 
 // Oriented footprints of the draft, in simulation metres. Hulls and modules share the validator's
@@ -197,6 +203,84 @@ static void print_probe(const BoatMap *map, const BoatSceneDefinition *scene, co
     printf("],\"in_entrance\":%s}", in_entrance(scene, p) ? "true" : "false");
 }
 
+static void print_hulls(void)
+{
+    printf("\"hulls\":{\"rule\":\"A berth's envelope is its hull grown by 0.9 m fore and aft and "
+           "0.45 m each side. Envelopes of two berths must stay 0.45 m apart, all nine envelope "
+           "sample points need 0.5 m of open water, and modules keep 0.3 m from an envelope. "
+           "Same heading: in line, centre spacing > (L1+L2)/2 + 2.25; side by side, centre "
+           "spacing > (B1+B2)/2 + 1.35 (L length, B beam, metres).\",\"recipes\":[");
+    for (unsigned i = 0; i < BOAT_SCENE_BERTH_RECIPES; ++i) {
+        BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)i);
+        printf("%s{\"recipe\":\"%s\",\"length_m\":%.3g,\"beam_m\":%.3g,"
+               "\"envelope_length_m\":%.3g,\"envelope_beam_m\":%.3g,\"mast_m\":%.3g}",
+            i ? "," : "", boat_scene_berth_recipe_name((BoatSceneBerthRecipe)i),
+            (double)spec.length, (double)spec.beam, (double)spec.length + 1.8,
+            (double)spec.beam + .9, (double)spec.mast_height);
+    }
+    printf("]}}");
+}
+
+// Marks the swept centreline of every travelling craft on a grid cell. The craft hull is wider:
+// the validator checks it along this path, so a cell beside a mark may still be crossed.
+static void mark_traffic(const BoatPluginMapRequest *r, const BoatSceneDefinition *scene,
+    unsigned cols, unsigned rows, char *cells)
+{
+    const WaterfrontRouteDefinition *routes
+        = scene && scene->traffic_present ? &scene->traffic : NULL;
+    int count = waterfront_traffic_actor_count(routes);
+    for (int a = 0; a < count; ++a) {
+        double period = waterfront_traffic_period_routes(routes, a);
+        if (!(period > 0) || period > 4000)
+            continue;
+        const unsigned samples = 800;
+        Vector2 last = { 0, 0 };
+        for (unsigned k = 0; k <= samples; ++k) {
+            WaterfrontVesselMotion m
+                = waterfront_traffic_motion_routes(routes, a, period * k / samples);
+            Vector2 p = { -m.position.x, m.position.z }; // renderer X is minus simulation x
+            unsigned pieces = 1;
+            if (k) {
+                float gap = hypotf(p.x - last.x, p.y - last.y);
+                pieces = gap > r->step * .5f ? (unsigned)ceilf(gap / (r->step * .5f)) : 1;
+                if (pieces > 64)
+                    pieces = 64;
+            }
+            for (unsigned j = 1; j <= pieces; ++j) {
+                Vector2 q = k ? (Vector2) { last.x + (p.x - last.x) * j / pieces,
+                    last.y + (p.y - last.y) * j / pieces }
+                              : p;
+                float fc = (r->x1 - q.x) / r->step, fr = (r->z1 - q.y) / r->step;
+                if (fc < -.5f || fr < -.5f)
+                    continue;
+                unsigned col = (unsigned)(fc + .5f), row = (unsigned)(fr + .5f);
+                if (col < cols && row < rows && cells[row * cols + col] == '~')
+                    cells[row * cols + col] = 't';
+            }
+            last = p;
+        }
+    }
+}
+
+static void print_traffic_list(const BoatSceneDefinition *scene)
+{
+    const WaterfrontRouteDefinition *routes
+        = scene && scene->traffic_present ? &scene->traffic : NULL;
+    int count = waterfront_traffic_actor_count(routes);
+    printf("\"traffic\":[");
+    for (int a = 0; a < count; ++a) {
+        BoatModelSpec spec = waterfront_traffic_spec_routes(routes, a);
+        printf("%s{\"index\":%d,\"id\":", a ? "," : "", a + 1);
+        if (routes)
+            json_text(routes->actors[a].id);
+        else
+            printf("\"compiled\"");
+        printf(",\"length_m\":%.3g,\"beam_m\":%.3g,\"period_s\":%.4g}", (double)spec.length,
+            (double)spec.beam, waterfront_traffic_period_routes(routes, a));
+    }
+    printf("],");
+}
+
 void boat_plugin_map_print(
     const BoatPluginMapRequest *r, const BoatMap *map, const BoatSceneDefinition *scene)
 {
@@ -205,6 +289,10 @@ void boat_plugin_map_print(
     WaterfrontGround ground = waterfront_kit_ground(map->description);
     WaterfrontOverhead over = waterfront_overhead(map->description);
     printf("\"map\":{\"overlay\":%s,", scene ? "true" : "false");
+    if (r->hulls) {
+        print_hulls();
+        return;
+    }
     if (!r->grid) {
         printf("\"probes\":[");
         for (unsigned i = 0; i < r->probe_count; ++i) {
@@ -220,23 +308,35 @@ void boat_plugin_map_print(
     unsigned rows = (unsigned)ceil(((double)r->z1 - r->z0) / r->step) + 1;
     // North is up and east is right, as on a map: simulation x is minus east, so column 0 is the
     // largest x (west) and row 0 the largest z (north). Cells are sampled at their centres.
+    char *cells = malloc((size_t)cols * rows);
+    if (!cells) {
+        printf("\"error\":\"out of memory\"}");
+        return;
+    }
+    for (unsigned row = 0; row < rows; ++row)
+        for (unsigned col = 0; col < cols; ++col) {
+            Vector2 p = { r->x1 - (float)col * r->step, r->z1 - (float)row * r->step };
+            char c = overlay(scene, f, n, p);
+            cells[row * cols + col] = c ? c : boat_map_water(map, p, 0) ? '~' : '#';
+        }
+    mark_traffic(r, scene, cols, rows, cells);
+    print_traffic_list(scene);
     printf("\"grid\":{\"step\":%.9g,\"cols\":%u,\"rows\":%u,\"x_west\":%.9g,\"z_north\":%.9g,"
            "\"axes\":\"row 0 is north (max z); column 0 is west (max x); x = x_west - col*step, "
            "z = z_north - row*step\","
            "\"legend\":{\"~\":\"water\",\"#\":\"land\",\"+\":\"floating module\","
            "\"=\":\"gangway\",\"Q\":\"quay deck\",\"B\":\"moored hull\","
-           "\"b\":\"empty berth slot\",\"E\":\"marina entrance\"},\"rows_text\":[",
+           "\"b\":\"empty berth slot\",\"E\":\"marina entrance\","
+           "\"t\":\"swept centreline of a travelling craft (its hull is wider)\"},"
+           "\"rows_text\":[",
         (double)r->step, cols, rows, (double)r->x1, (double)r->z1);
     for (unsigned row = 0; row < rows; ++row) {
         if (row)
             putchar(',');
         putchar('"');
-        for (unsigned col = 0; col < cols; ++col) {
-            Vector2 p = { r->x1 - (float)col * r->step, r->z1 - (float)row * r->step };
-            char c = overlay(scene, f, n, p);
-            putchar(c ? c : boat_map_water(map, p, 0) ? '~' : '#');
-        }
+        fwrite(cells + (size_t)row * cols, 1, cols, stdout);
         putchar('"');
     }
     printf("]}}");
+    free(cells);
 }

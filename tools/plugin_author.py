@@ -530,6 +530,8 @@ def map_args_checked(request):
     "step": metres}. The worker re-checks every limit; this keeps bad input out of argv."""
     if not isinstance(request, dict):
         raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
+    if request.get("hulls"):
+        return ["hulls"]
     if request.get("probe"):
         points = request["probe"]
         if len(points) > MAP_PROBES:
@@ -538,7 +540,20 @@ def map_args_checked(request):
     box = request.get("box")
     if not box or len(box) != 4:
         raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
-    return ["box"] + [repr(float(v)) for v in box] + [repr(float(request.get("step", 1.0)))]
+    step = float(request.get("step", 1.0))
+    if not 0.25 <= step <= 8:
+        raise ValueError(f"map step {step:g} m is outside 0.25..8 m")
+    x0, x1 = sorted((float(box[0]), float(box[2])))
+    z0, z1 = sorted((float(box[1]), float(box[3])))
+    cols, rows = math.ceil((x1 - x0) / step) + 1, math.ceil((z1 - z0) / step) + 1
+    if cols * rows > MAP_CELLS:
+        fit = next((s for s in (0.25, 0.5, 1, 2, 4, 8) if
+                    (math.ceil((x1 - x0) / s) + 1) * (math.ceil((z1 - z0) / s) + 1) <= MAP_CELLS),
+                   None)
+        advice = (f"use --step {fit:g}" if fit else "split the box into smaller boxes")
+        raise ValueError(f"map box is {cols} x {rows} = {cols * rows} cells at {step:g} m; the "
+                         f"limit is {MAP_CELLS}. {advice}")
+    return ["box"] + [repr(float(v)) for v in box] + [repr(step)]
 
 
 class ValidationJob:
@@ -644,6 +659,8 @@ class ValidationJob:
 
 def map_request(args):
     try:
+        if args.hulls:
+            return {"hulls": True}
         if args.probe:
             return {"probe": [tuple(float(v) for v in text.split(",", 1)) for text in args.probe]}
         if args.box:
@@ -979,6 +996,8 @@ def main():
     parser.add_argument("--probe", action="append", metavar="X,Z",
                         help="map: a point to query (repeatable, at most 24)")
     parser.add_argument("--box", metavar="X0,Z0,X1,Z1", help="map: a grid over this box")
+    parser.add_argument("--hulls", action="store_true",
+                        help="map: the hull recipes and the berth envelope rule")
     parser.add_argument("--step", type=float, default=1.0, help="map: grid cell metres, 0.25..8")
     parser.add_argument("--time", type=float, default=1.0)
     parser.add_argument("--camera-distance", type=float)

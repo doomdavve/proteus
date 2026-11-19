@@ -12,12 +12,13 @@
 
 typedef struct {
     bool grid; // false: PROBES points
+    bool hulls; // the registered hull recipes and the validator's envelope rule
     unsigned probe_count;
     float probe[BOAT_PLUGIN_MAP_PROBES][2]; // x, z
     float x0, z0, x1, z1, step; // grid box, simulation metres
 } BoatPluginMapRequest;
 
-// Parses the worker arguments that follow "--map": `probe X Z [X Z ...]` or
+// Parses the worker arguments that follow "--map": `probe X Z [X Z ...]`, `hulls` or
 // `box X0 Z0 X1 Z1 STEP`. False (with MESSAGE) when malformed or over a limit.
 bool boat_plugin_map_parse(
     int argc, char **argv, BoatPluginMapRequest *request, char *message, unsigned message_size);

@@ -52,7 +52,7 @@ Run them from this directory. Each prints one JSON object and exits 0 only when 
 | Command | What it does |
 | --- | --- |
 | `./wv check{anchor}` | {check} Never touches the game. |
-| `./wv map --probe X,Z ...` / `./wv map --box X0,Z0,X1,Z1 [--step M]` | Ask the compiled map: water or land, clear-water radius, ground height and what the draft occupies at up to 24 points, or an ASCII grid (at most 4096 cells, step 0.25..8 m; north is up, east is right; `~` water, `#` land, `+ = Q B b E` your draft) with the draft overlaid once it validates. Use it before placing anything; the grid's shoreline is the truth, a guess is not. Depth is not known. Never touches the game. |
+| `./wv map --probe X,Z ...` / `./wv map --box X0,Z0,X1,Z1 [--step M]` / `./wv map --hulls` | Ask the compiled map: water or land, clear-water radius, ground height and what the draft occupies at up to 24 points, or an ASCII grid (at most 4096 cells, step 0.25..8 m, with a z label on every row and an x ruler on top; north is up, east is right; `~` water, `#` land, `+ = Q B b E` your draft, `t` a travelling craft's path) with the draft overlaid once it validates; `--hulls` gives every hull recipe's length, beam and the berth spacing rule, and `./wv map` also lists the traffic craft and periods with the draft overlaid once it validates. Use it before placing anything; the grid's shoreline is the truth, a guess is not. Depth is not known. Never touches the game. |
 | `./wv stage` | Validate, then hand the files to the running game. Pins come from the game, so there is nothing to guess. `outcome` is `applied` (live), `held` (needs `./wv apply`), `unchanged` or a rejection with a diagnostic. |
 | `./wv apply` | Commit a held candidate. Refused when nothing is held. |
 | `./wv undo` | Go back one revision. |
@@ -65,6 +65,15 @@ Run them from this directory. Each prints one JSON object and exits 0 only when 
 
 - Change one thing per `./wv stage`, so `./wv undo` returns to a known state.
 - Run `./wv check` before `./wv stage`, and stop after two rejections with the same diagnostic.
+- Diagnostic indices such as `scene.marina.berths[4]` are 1-based, in list order. A rejection names
+  one entry: the later one of a pair, or the entry that fails alone.
+- A gangway sits on the pontoon `attaches` names, at the middle of that pontoon's `+x` edge, where
+  `+x` is `(cos h, sin h)` of the pontoon's heading `h`: its shore `anchor` must be land exactly
+  along that line, `length` must equal the distance from the edge to the anchor (2..20 m), and the
+  landing must be water. To put the shore on the other side, turn the pontoon by pi.
+- Place hulls with `./wv map --hulls` (envelope and spacing rule) and watch the `t` marks and the
+  `traffic` list of a grid for travelling craft: keep their paths, a hull's width either side,
+  clear of every berth rather than deleting them.
 - `status` `stale` or `conflict` means the game moved: run `./wv status` and look before retrying.
 - If the request needs something the plugin API cannot express, say so and describe the C change
   it would need; do not invent a field or edit anything outside this directory.
@@ -335,11 +344,36 @@ def read_rule(bridge):
         return f"Read(//{bridge.as_posix().lstrip('/')}/**)"
 
 
+def ruled(grid):
+    """The grid with a labelled ruler: every row begins with its z, and two header lines give the
+    x at every tenth column. `rows_text` (bare cells) is dropped; `view` replaces it."""
+    cols, step = grid["cols"], grid["step"]
+    width = max(len(f"{grid['z_north'] - i * step:.4g}") for i in range(grid["rows"])) + 1
+    ticks = [" " * width + " "] * 2
+    labels = [""] * cols
+    for col in range(0, cols, 10):
+        labels[col] = f"{grid['x_west'] - col * step:.4g}"
+    line = [" "] * (cols + 8)
+    for col, text in enumerate(labels):
+        if text:
+            line[col:col + len(text)] = text
+    marks = "".join("|" if labels[c] else " " for c in range(cols))
+    view = [" " * (width + 1) + "".join(line).rstrip(), " " * (width + 1) + marks]
+    for i, row in enumerate(grid["rows_text"]):
+        view.append(f"{grid['z_north'] - i * step:>{width}.4g} {row}")
+    out = {k: v for k, v in grid.items() if k != "rows_text"}
+    out["view"] = view
+    out["view_note"] = ("each row starts with its z; the header gives x at every tenth column "
+                        "(x falls to the right: east is right)")
+    return out
+
+
 def map_query(author, directory, args):
     """The compiled map around the draft: exact probes or an ASCII grid, with the draft overlaid."""
     request = author.map_request(args)
     if request is None:
-        raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
+        raise ValueError("map needs --probe X,Z (repeatable), --box X0,Z0,X1,Z1 [--step M] "
+                         "or --hulls")
     payload = author.snapshot(directory)
     job = author.ValidationJob(args.worker, payload, 0, time.monotonic(), args.timeout or 5, None,
                                "map", 0, request)
@@ -347,6 +381,9 @@ def map_query(author, directory, args):
     evidence = result.get("evidence") or {}
     if result["status"] not in ("ok", "rejected") or "map" not in evidence:
         raise Refused(refusal("map", result))
+    grid = evidence["map"].get("grid")
+    if grid:
+        evidence["map"]["grid"] = ruled(grid)
     out = {"protocol": 1, "operation": "map", "status": "ok",
            "bundle_id": hashlib.sha256(payload).hexdigest(), "map": evidence["map"],
            "draft": "accepted" if result["status"] == "ok" else "rejected"}
