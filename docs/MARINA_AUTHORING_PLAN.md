@@ -1146,6 +1146,11 @@ The closing step (W7) moved the module contract into
 [Package modules](PLUGIN_API.md#package-modules-m5) and the M4 contract was already in the Plugin API.
 Nothing below is built. Each item is open unless marked dropped; none is scheduled.
 
+Added 2026-11-19: the agent map query (`./wv map`, [Map query](PLUGIN_API.md#map-query)) gives an authoring
+agent exact water/land probes and an ASCII grid with the draft overlaid. Still owed for agent-written
+marinas: curated anchors for the other Eriksberg basins (the east side and Lilla Bommen) once their
+coordinates are read off the grid, and human review of what an agent produces.
+
 Open, product and behaviour:
 
 - M4 leftovers: a parked visitor needs a second resting place; repeating services; services on loop

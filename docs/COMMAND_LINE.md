@@ -155,6 +155,9 @@ so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-
 ./build/boat_plugin_review plugins/shelter-tour 120 360
 python3 tools/plugin_author.py schema
 python3 tools/plugin_author.py preview plugins/shelter-tour --ticks 360
+# In an `init` workspace: exact water/land probes or an ASCII grid of the map (PLUGIN_API.md, Map query)
+./wv map --probe 34.1,161.5 --probe 21.175,161.5
+./wv map --box -30,140,45,182 --step 1
 python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
 ```
 

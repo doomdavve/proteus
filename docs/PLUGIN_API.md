@@ -1952,6 +1952,7 @@ happen and a game that moved in between answers `stale`.
 
 | Command | Effect |
 | --- | --- |
+| `map --probe X,Z ... \| --box X0,Z0,X1,Z1 [--step M]` | Query the compiled map around the draft (below). Offline; never touches a game |
 | `check [--anchor NAME --output FILE.png]` | `validate` and `preview` of the directory; with `--anchor`, a `capture` (default `.wv/frame.png`). A `free` package (a working harbour) has no preview or capture: `check` runs `validate` only, which already includes the work-site survey and the job's `init` probe, and `--anchor` is refused. Offline; never touches a game |
 | `stage` | `validate`, then `live-inspect`, then `live-stage` of the directory with the game's revision and epoch and the snapshot's bundle id; `next` says whether the result is live or held |
 | `apply` | `live-apply` with the game's `held_revision`; `conflict` when nothing is held |
@@ -1970,6 +1971,31 @@ writes instructions about sites, the job, the survey diagnostics and the restart
 cargo pose) and `/work clock-report FILE|stop` (a lighting CSV): the developer review tools that
 were command-line options. The wrapper is a Python
 script: Windows runs it as `py wv COMMAND`; that path has not been run.
+
+### Map query
+
+`plugin_author.py map DIR` (`./wv map` in a workspace) asks the worker for the compiled map of the
+package's location, so an agent places geometry from facts instead of guessing. It is offline,
+read-only and deterministic: the same snapshot and request give the same bytes.
+
+- `--probe X,Z` (repeatable, at most 24) returns one record per point: `surface` (`water` or
+  `land`), `clear_water_m` (the largest of 0.5, 1, 2, 4 and 8 m that is all water around the point,
+  0 on land), `ground_m` (land height, outer map only), `overhead_m` (a bridge underside, when
+  there is one), `occupied_by` (draft berths and modules containing the point, by id and kind) and
+  `in_entrance`.
+- `--box X0,Z0,X1,Z1 [--step M]` returns a grid of at most 4096 cells with a step of 0.25–8 m
+  (default 1 m), one string per row in `rows_text`. North is up and east is right, as on a map:
+  simulation x is minus east, so row 0 is the largest z and column 0 the largest x
+  (`x = x_west − col·step`, `z = z_north − row·step`). Cells are sampled at their centres, so a
+  coarse step can alias a thin pier. `~` water, `#` land, and the draft: `+` floating module,
+  `=` gangway, `Q` quay deck, `B` moored hull, `b` empty berth slot, `E` declared entrance.
+- The draft is drawn only once it validates (`draft: "accepted"`). A rejected draft still returns
+  the bare map with the diagnostic, `overlay: false`.
+- Limits are refused rather than truncated. The query knows water, land, ground height and the
+  draft; it does not know buildings, scenery or depth.
+
+The overlay uses the hull length and beam without the validator's margins, so a clear grid is
+necessary but not sufficient; `check` remains the authority.
 
 ## Packaged authoring tools (P4.7)
 

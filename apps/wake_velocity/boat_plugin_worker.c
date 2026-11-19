@@ -3,6 +3,7 @@
 #include "core/waterfront_traffic.h"
 #include "plugins/boat_plugin_host.h"
 #include "plugins/boat_plugin_stage.h"
+#include "wake_velocity/boat_plugin_map.h"
 #include "wake_velocity/wake_velocity_plugin.h"
 #include <errno.h>
 #include <math.h>
@@ -147,6 +148,8 @@ int main(int argc, char **argv)
     _setmode(_fileno(stdin), _O_BINARY);
 #endif
     unsigned ticks = 0;
+    BoatPluginMapRequest map_request;
+    bool run_map = false;
     bool run_preview = argc == 3 && !strcmp(argv[1], "--preview");
     if (run_preview) {
         char *end;
@@ -155,6 +158,11 @@ int main(int argc, char **argv)
         if (errno || !argv[2][0] || *end || parsed > 72000)
             return 2;
         ticks = (unsigned)parsed;
+    } else if (argc >= 2 && !strcmp(argv[1], "--map")) {
+        char message[96];
+        if (!boat_plugin_map_parse(argc - 2, argv + 2, &map_request, message, sizeof(message)))
+            return 2;
+        run_map = true;
     } else if (argc != 1)
         return 2;
     unsigned char header[8];
@@ -216,6 +224,23 @@ done:
         printf("\"scenario\":{");
         preview(plugin, &resources, ticks, &d);
         printf("},");
+    }
+    if (run_map && boat_map_ready(&resources.map)) {
+        // The overlay needs an accepted draft; a rejected one still gets the bare map.
+        const BoatSceneDefinition *scene = NULL;
+        if (d.status == BOAT_PLUGIN_OK) {
+            const BoatPluginRevision *active = boat_plugin_host_active(host);
+            if (host->kind == BOAT_PLUGIN_KIND_VOYAGE && active->voyage.has_scene)
+                scene = &active->voyage.scene;
+            else if (host->kind == BOAT_PLUGIN_KIND_FREE && active->free.has_scene)
+                scene = &active->free.scene;
+            else if (host->kind == BOAT_PLUGIN_KIND_RACE && active->race.has_scene)
+                scene = &active->race.scene;
+            else if (host->kind == BOAT_PLUGIN_KIND_MATCH && active->match.has_scene)
+                scene = &active->match.scene;
+        }
+        boat_plugin_map_print(&map_request, &resources.map, scene);
+        printf(",");
     }
     printf("\"status\":");
     json_text(boat_plugin_status_name(d.status));

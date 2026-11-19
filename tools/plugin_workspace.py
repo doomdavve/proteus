@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 CONFIG = ".wv.json"
 SCRATCH = ".wv"
-OPERATIONS = ("init", "check", "status", "stage", "apply", "undo", "discard", "console", "play")
+OPERATIONS = ("init", "check", "map", "status", "stage", "apply", "undo", "discard", "console", "play")
 # What a caller needs from a bridge response; the rest (request ids, raw inspection) is noise.
 KEEP = ("plugin", "revision", "epoch", "digest", "undo_depth", "held_revision", "held_change",
         "outcome", "message", "detail", "diagnostic_status", "diagnostic_file", "diagnostic_line",
@@ -30,7 +30,7 @@ import sys
 
 TOOL = {tool!r}
 if len(sys.argv) < 2:
-    sys.exit("usage: ./wv check|stage|apply|undo|discard|status|console|schema|capabilities|"
+    sys.exit("usage: ./wv check|map|stage|apply|undo|discard|status|console|schema|capabilities|"
              "anchors|play [OPTIONS]")
 if not os.path.exists(TOOL):
     sys.exit(f"{{TOOL}} is gone; run plugin_author.py init again from the current tools")
@@ -52,6 +52,7 @@ Run them from this directory. Each prints one JSON object and exits 0 only when 
 | Command | What it does |
 | --- | --- |
 | `./wv check{anchor}` | {check} Never touches the game. |
+| `./wv map --probe X,Z ...` / `./wv map --box X0,Z0,X1,Z1 [--step M]` | Ask the compiled map: water or land, clear-water radius, ground height and what the draft occupies at up to 24 points, or an ASCII grid (at most 4096 cells, step 0.25..8 m; north is up, east is right; `~` water, `#` land, `+ = Q B b E` your draft) with the draft overlaid once it validates. Use it before placing anything; the grid's shoreline is the truth, a guess is not. Depth is not known. Never touches the game. |
 | `./wv stage` | Validate, then hand the files to the running game. Pins come from the game, so there is nothing to guess. `outcome` is `applied` (live), `held` (needs `./wv apply`), `unchanged` or a rejection with a diagnostic. |
 | `./wv apply` | Commit a held candidate. Refused when nothing is held. |
 | `./wv undo` | Go back one revision. |
@@ -334,6 +335,29 @@ def read_rule(bridge):
         return f"Read(//{bridge.as_posix().lstrip('/')}/**)"
 
 
+def map_query(author, directory, args):
+    """The compiled map around the draft: exact probes or an ASCII grid, with the draft overlaid."""
+    request = author.map_request(args)
+    if request is None:
+        raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
+    payload = author.snapshot(directory)
+    job = author.ValidationJob(args.worker, payload, 0, time.monotonic(), args.timeout or 5, None,
+                               "map", 0, request)
+    result = finish(job)
+    evidence = result.get("evidence") or {}
+    if result["status"] not in ("ok", "rejected") or "map" not in evidence:
+        raise Refused(refusal("map", result))
+    out = {"protocol": 1, "operation": "map", "status": "ok",
+           "bundle_id": hashlib.sha256(payload).hexdigest(), "map": evidence["map"],
+           "draft": "accepted" if result["status"] == "ok" else "rejected"}
+    if result["status"] != "ok":
+        # The grid is still useful, but the draft is not drawn until it validates.
+        for key in ("file", "line", "field", "message"):
+            if evidence.get(key):
+                out["diagnostic_" + key] = evidence[key]
+    return out
+
+
 def init(author, directory, args):
     directory = Path(directory).resolve()
     if directory.exists() and any(directory.iterdir()):
@@ -357,7 +381,7 @@ def init(author, directory, args):
     (directory / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
     (directory / ".claude").mkdir()
     allowed = [f"Bash(./wv {name}:*)" for name in
-               ("check", "stage", "apply", "undo", "discard", "status", "console", "schema",
+               ("check", "map", "stage", "apply", "undo", "discard", "status", "console", "schema",
                 "capabilities", "anchors")]
     (directory / ".claude" / "settings.json").write_text(
         json.dumps({"permissions": {"allow": allowed, "deny": [read_rule(bridge)]}}, indent=2)
@@ -378,6 +402,8 @@ def run(author, args):
         bridge = Path(args.bridge) if args.bridge else config(args.directory)["bridge"]
         if args.operation == "check":
             return check(author, args.directory, args)
+        if args.operation == "map":
+            return map_query(author, args.directory, args)
         if args.operation == "status":
             return summary("status", state(author, bridge, args.timeout), position=True)
         if args.operation == "stage":

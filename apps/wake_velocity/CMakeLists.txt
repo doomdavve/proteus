@@ -145,7 +145,7 @@ endif()
 
 if(NOT EMSCRIPTEN)
 # P4 native isolated authoring validator; intentionally absent from the browser runtime.
-  add_executable(boat_plugin_worker boat_plugin_worker.c wake_velocity_plugin.c)
+  add_executable(boat_plugin_worker boat_plugin_worker.c boat_plugin_map.c wake_velocity_plugin.c)
   target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_wake_objective proteus_plugin_catalog proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
 endif()
