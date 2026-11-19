@@ -1822,7 +1822,7 @@ dock, bridge, east shore, squall edge and Långedrag arrival, plus the head and 
 capturable yet. This is a small curated list, not a
 semantic map; anchors carry no gameplay meaning and plugins cannot read them.
 
-`capture DIRECTORY --output FILE.png` takes one snapshot of the draft (same framing, pins and
+`capture DIRECTORY --output FILE.png` (`--pose X,Z,DEGREES` instead of `--anchor` frames any boat pose on outer water) takes one snapshot of the draft (same framing, pins and
 `--expect-bundle` as validation), writes those exact bytes into a private temporary package and
 runs the native game's display-free CPU screenshot path from the source root:
 `wake_velocity --renderer cpu --plugin COPY --screenshot … --time SECONDS`, plus `--start` from

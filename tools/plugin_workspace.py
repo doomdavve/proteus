@@ -87,8 +87,8 @@ Run them from this directory. Each prints one JSON object and exits 0 only when 
 {extra}"""
 
 VOYAGE = dict(
-    what="voyage plugin", anchor=" [--anchor NAME --output FILE.png]",
-    check="Validate and preview the files in isolation; with `--anchor`, also render a frame "
+    what="voyage plugin", anchor=" [--anchor NAME | --pose X,Z,DEG --output FILE.png]",
+    check="Validate and preview the files in isolation; with `--anchor` or `--pose X,Z,DEGREES` (any boat pose on outer water; heading 0 faces -z, 90 faces +x), also render a frame "
           "(default `.wv/frame.png`).",
     extra="")
 
@@ -214,7 +214,8 @@ def package_kind(author, directory):
 
 def check(author, directory, args):
     free = package_kind(author, directory) == "free"
-    if free and args.anchor:
+    anchor = author.capture_anchor(args)
+    if free and anchor:
         raise ValueError("--anchor renders a voyage; a working harbour has no frame to capture")
     payload, validated = validate(author, directory, args)
     if not free:
@@ -226,10 +227,10 @@ def check(author, directory, args):
     if free:
         out["note"] = ("validate ran the work-site survey and the job's init probe; a free "
                        "package has no preview")
-    if args.anchor:
+    if anchor:
         output = args.output or Path(directory) / SCRATCH / "frame.png"
         job = author.CaptureJob(args.game, payload, 0, time.monotonic(),
-                                author.find_anchor(args.anchor), args.time, {},
+                                anchor, args.time, {},
                                 args.timeout or 20, None)
         try:
             result = finish(job, close=False)

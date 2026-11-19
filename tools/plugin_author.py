@@ -682,6 +682,22 @@ def find_anchor(name):
     raise ValueError(f"unknown anchor {name}; see the anchors operation")
 
 
+def capture_anchor(args):
+    """The named anchor, or the ad-hoc pose --pose X,Z,DEGREES (outer; heading 0 faces -z)."""
+    if getattr(args, "anchor", None) and getattr(args, "pose", None):
+        raise ValueError("use --anchor or --pose, not both")
+    if getattr(args, "pose", None):
+        try:
+            x, z, heading = (float(v) for v in args.pose.split(","))
+        except ValueError:
+            raise ValueError("--pose is X,Z,DEGREES") from None
+        if not all(math.isfinite(v) for v in (x, z, heading)) or abs(x) > 20000 or abs(z) > 20000:
+            raise ValueError("--pose values must be finite and within 20000 m")
+        return {"id": f"pose:{x:g},{z:g},{heading:g}", "location": "outer", "x": x, "z": z,
+                "heading_degrees": heading}
+    return find_anchor(args.anchor) if args.anchor else None
+
+
 def png_size(frame):
     if (len(frame) < 24 or frame[:8] != b"\x89PNG\r\n\x1a\n" or frame[12:16] != b"IHDR"):
         raise ValueError("capture is not a PNG")
@@ -993,6 +1009,8 @@ def main():
     parser.add_argument("--check", action="store_true", help="sync-shared: report drift only")
     parser.add_argument("--game", type=Path, default=LAYOUT["game"])
     parser.add_argument("--anchor")
+    parser.add_argument("--pose", metavar="X,Z,DEGREES",
+                        help="capture/check: an ad-hoc boat pose on outer water instead of --anchor")
     parser.add_argument("--probe", action="append", metavar="X,Z",
                         help="map: a point to query (repeatable, at most 24)")
     parser.add_argument("--box", metavar="X0,Z0,X1,Z1", help="map: a grid over this box")
@@ -1073,7 +1091,7 @@ def main():
             camera = {key: value for key, value in (("distance", args.camera_distance),
                       ("height", args.camera_height)) if value is not None}
             job = CaptureJob(args.game, snapshot(args.directory), offline_base,
-                             time.monotonic(), find_anchor(args.anchor) if args.anchor else None,
+                             time.monotonic(), capture_anchor(args),
                              args.time, camera, args.timeout or 20, args.expect_bundle)
         else:
             job = ValidationJob(args.worker, snapshot(args.directory), offline_base,
