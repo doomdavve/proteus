@@ -1817,7 +1817,7 @@ python3 tools/plugin_author.py capture plugins/langedrag --anchor outer.squall-e
 an `id` prefixed by its location, simulation `x`/`z` metres, `heading_degrees` (0 faces −z;
 forward is `(sin, −cos)`, so the Lua radians × 180/π) and a short label. Each is a navigable
 named place for prompts and a camera bookmark for capture. Outer anchors cover the voyage's
-dock, bridge, east shore, squall edge and Långedrag arrival; `outer.sprint-start` and
+dock, bridge, east shore, squall edge and Långedrag arrival, plus the head and mouth of the Eriksberg basin; `outer.sprint-start` and
 `outer.sprint-finish` name the river sprint's start and finish for race descriptors, which are not
 capturable yet. This is a small curated list, not a
 semantic map; anchors carry no gameplay meaning and plugins cannot read them.
