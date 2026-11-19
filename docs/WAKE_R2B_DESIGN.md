@@ -1,10 +1,10 @@
 # R2b historical weighting and divergence proposal
 
-Status: private capture ledger and p=1 field prototype implemented; no geometry selected.
+Status: private p=1 CPU basin trial implemented; curved handling preservation failed.
 Owner: [wake research plan](WAKE_RESEARCH_PLAN.md#r2--turning-geometry-experiments).
 Evidence: [R2a rejection](evidence/wakes/r2/README.md), [R2b algebra audit](evidence/wakes/r2b/README.md).
-Open: CPU relative/tail cost, coupled encounters and integration qualification.
-Next: profile CPU paths/tails, then run the private coupled-hull screen.
+Open: changed encounter contract/player feedback, full-frame/relative CPU and wider integration.
+Next: experimental basin comparison and mechanical review; no geometry selected.
 
 ## Scope and decision
 
@@ -342,3 +342,16 @@ against the provisional .15 ms fixture ceiling. These results support further pr
 not geometry selection or performance/gameplay acceptance. CPU profiling and coupled-hull tests
 precede any integration decision. No exponent, height, curvature threshold or lifetime retune
 is selected to overcome the unresolved findings.
+
+
+## CPU basin trial
+
+[The coupled evidence](evidence/wakes/r2b/basin/README.md) records exact field-preserving
+optimization, production-hull sampling and the experimental CPU trial. A borrowed object-only
+sampler on `BoatWater` replaces the player-object contribution and keeps current/normal composition
+and arcade recovery. The CPU view shares that sampler; the GPU refuses it. Context copies are
+borrowed and must be rebound by their owner after copying/resetting trial storage.
+
+The targeted curved encounter screen fails its provisional preservation criteria despite useful
+coverage and improved CPU measurements. The trial permits user comparison of changed gameplay;
+it is not geometry selection. Production baseline, lifetime, capacities and protocol remain.

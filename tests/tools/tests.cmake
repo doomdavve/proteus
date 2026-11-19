@@ -137,3 +137,15 @@ target_link_libraries(wake_transport PRIVATE proteus_boat_core)
 target_compile_options(wake_transport PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME wake_transport_contract COMMAND wake_transport --check)
 set_tests_properties(wake_transport_contract PROPERTIES LABELS "cpu;slow")
+
+add_executable(wake_transport_basin tools/wake_geometry.c tools/wake_capture.c
+    tools/wake_transport.c tools/wake_transport_basin.c)
+target_link_libraries(wake_transport_basin PRIVATE proteus_boat_session proteus_gpu)
+target_compile_options(wake_transport_basin PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_transport_basin_contract COMMAND wake_transport_basin --check)
+set_tests_properties(wake_transport_basin_contract PROPERTIES LABELS "cpu;render;slow"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME wake_transport_basin_gpu_rejected COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_wake_transport_basin.py
+    $<TARGET_FILE:wake_transport_basin>)
+set_tests_properties(wake_transport_basin_gpu_rejected PROPERTIES LABELS "cpu;quick")

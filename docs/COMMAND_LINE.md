@@ -455,3 +455,25 @@ For joining and firewall guidance see [multiplayer](PLAYING.md#multiplayer). For
 and browser endpoint operation see [hosting](MULTIPLAYER_HOSTING.md) and
 [WebRTC rooms](WEB_BUILD.md#webrtc-rooms). Wire layout belongs to the
 [protocol reference](MULTIPLAYER_PROTOCOL.md).
+
+## Experimental CPU wake basin tool
+
+`wake_transport_basin` is a separate research executable; these options do not belong to
+`wake_velocity`. It always uses CPU rendering and rejects `--renderer gpu`.
+
+```sh
+./build-release/wake_transport_basin --mode spread
+./build-release/wake_transport_basin --mode baseline
+./build-release/wake_transport_basin --demo --frames 600
+./build-release/wake_transport_basin --screenshot build-release/wake-basin.png --ticks 720
+```
+
+`--mode baseline|spread` starts the chosen evaluator (default spread). `--demo` supplies scripted
+controls; `--frames N` closes a windowed run after N frames. `--screenshot FILE --ticks N` or
+`--capture EXISTING_DIR --ticks N` drives a display-free script; capture writes a PNG every
+12 ticks (10 Hz). `--encounter gap12|gap50|eight-trough` selects a frozen receiver fixture and
+requires screenshot/capture with at most 240 ticks, keeping the view near the rendered basin.
+`--screen CSV` writes paired hull outcomes; `--check` runs private adapter/replay checks.
+See [trial controls](PLAYING.md#experimental-wake-research-basin) and
+[reproduction commands](TESTING.md#experimental-cpu-basin-trial-r2b). Changed curved handling
+remains experimental; no geometry or production GPU/network integration is selected.

@@ -291,3 +291,19 @@ limited; see [mobile controls and qualification](WEB_BUILD.md#mobile-controls-an
 Authority developers can capture a hosted session with `boat_server --record PATH` and inspect
 it with the headless reconstruction tool; see [session recordings](SESSION_RECORDING.md).
 These files use separate commands from solo course replays.
+
+## Experimental wake research basin
+
+The local research branch provides a separate CPU-only basin trial:
+
+```sh
+cmake --build build-release --target wake_transport_basin -j
+./build-release/wake_transport_basin
+```
+
+Run it from the research worktree. W/S or Up/Down adjust throttle; A/D or Left/Right steer.
+Throttle holds when released. R resets; B switches baseline/spread and resets the boat, clock
+and wakes; Esc closes. The spread model can produce substantially larger launches in curved
+old wakes. Its handling-preservation screen failed, so this trial is for comparing changed
+gameplay. It has no audio, networking, plugins or saved preferences. The normal game retains
+its existing wake recipe. [Research status and evidence](WAKE_RESEARCH_PLAN.md).

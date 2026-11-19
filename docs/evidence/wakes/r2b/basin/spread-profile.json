@@ -1,0 +1,209 @@
+{
+  "samples": 14977,
+  "running_weight_ms": 14977.0,
+  "leaf": [
+    {
+      "name": "r2_piece_coordinates",
+      "ms": 7915.0,
+      "percent": 52.84769980636977
+    },
+    {
+      "name": "r2_transport_piece",
+      "ms": 2250.0,
+      "percent": 15.023035320825265
+    },
+    {
+      "name": "sinf",
+      "ms": 1524.0,
+      "percent": 10.175602590638979
+    },
+    {
+      "name": "r2_transport_query",
+      "ms": 1051.0,
+      "percent": 7.017426720972157
+    },
+    {
+      "name": "r2_piece",
+      "ms": 909.0,
+      "percent": 6.069306269613407
+    },
+    {
+      "name": "__sincosf_stret",
+      "ms": 801.0,
+      "percent": 5.348200574213794
+    },
+    {
+      "name": "DYLD-STUB$$sinf",
+      "ms": 73.0,
+      "percent": 0.4874140348534419
+    },
+    {
+      "name": "r2_source",
+      "ms": 68.0,
+      "percent": 0.4540295119182747
+    },
+    {
+      "name": "r2_advance",
+      "ms": 55.0,
+      "percent": 0.3672297522868398
+    },
+    {
+      "name": "DYLD-STUB$$__sincosf_stret",
+      "ms": 38.0,
+      "percent": 0.2537223743072711
+    },
+    {
+      "name": "_platform_strcmp$VARIANT$Base",
+      "ms": 37.0,
+      "percent": 0.2470454697202377
+    },
+    {
+      "name": "mach_absolute_time",
+      "ms": 34.0,
+      "percent": 0.22701475595913734
+    },
+    {
+      "name": "bench",
+      "ms": 30.0,
+      "percent": 0.20030713761100355
+    },
+    {
+      "name": "__dtoa",
+      "ms": 29.0,
+      "percent": 0.1936302330239701
+    },
+    {
+      "name": "DYLD-STUB$$strcmp",
+      "ms": 26.0,
+      "percent": 0.17359951926286973
+    },
+    {
+      "name": "__vfprintf",
+      "ms": 22.0,
+      "percent": 0.14689190091473592
+    },
+    {
+      "name": "r2_capture_advance",
+      "ms": 21.0,
+      "percent": 0.14021499632770248
+    },
+    {
+      "name": "DYLD-STUB$$_platform_strcmp",
+      "ms": 17.0,
+      "percent": 0.11350737797956867
+    },
+    {
+      "name": "__sfvwrite",
+      "ms": 17.0,
+      "percent": 0.11350737797956867
+    },
+    {
+      "name": "r2_capture_track",
+      "ms": 15.0,
+      "percent": 0.10015356880550177
+    }
+  ],
+  "inclusive": [
+    {
+      "name": "start",
+      "ms": 14977.0,
+      "percent": 100.0
+    },
+    {
+      "name": "main",
+      "ms": 14972.0,
+      "percent": 99.96661547706483
+    },
+    {
+      "name": "bench",
+      "ms": 14953.0,
+      "percent": 99.8397542899112
+    },
+    {
+      "name": "r2_transport_query",
+      "ms": 13981.0,
+      "percent": 93.34980303131468
+    },
+    {
+      "name": "r2_piece_coordinates",
+      "ms": 10263.0,
+      "percent": 68.52507177672432
+    },
+    {
+      "name": "r2_transport_piece",
+      "ms": 3805.0,
+      "percent": 25.405621953662283
+    },
+    {
+      "name": "sinf",
+      "ms": 1524.0,
+      "percent": 10.175602590638979
+    },
+    {
+      "name": "r2_piece",
+      "ms": 909.0,
+      "percent": 6.069306269613407
+    },
+    {
+      "name": "__sincosf_stret",
+      "ms": 801.0,
+      "percent": 5.348200574213794
+    },
+    {
+      "name": "r2_source",
+      "ms": 229.0,
+      "percent": 1.5290111504306603
+    },
+    {
+      "name": "fprintf",
+      "ms": 95.0,
+      "percent": 0.6343059357681778
+    },
+    {
+      "name": "vfprintf_l",
+      "ms": 95.0,
+      "percent": 0.6343059357681778
+    },
+    {
+      "name": "__vfprintf",
+      "ms": 95.0,
+      "percent": 0.6343059357681778
+    },
+    {
+      "name": "r2_capture_advance",
+      "ms": 76.0,
+      "percent": 0.5074447486145423
+    },
+    {
+      "name": "DYLD-STUB$$sinf",
+      "ms": 73.0,
+      "percent": 0.4874140348534419
+    },
+    {
+      "name": "r2_advance",
+      "ms": 55.0,
+      "percent": 0.3672297522868398
+    },
+    {
+      "name": "DYLD-STUB$$__sincosf_stret",
+      "ms": 38.0,
+      "percent": 0.2537223743072711
+    },
+    {
+      "name": "_platform_strcmp$VARIANT$Base",
+      "ms": 37.0,
+      "percent": 0.2470454697202377
+    },
+    {
+      "name": "clock_gettime",
+      "ms": 37.0,
+      "percent": 0.2470454697202377
+    },
+    {
+      "name": "__dtoa",
+      "ms": 36.0,
+      "percent": 0.24036856513320426
+    }
+  ],
+  "input_sha256": "204866dd2eeded96ccd7fa668a570883f856f4a7fb26f3b0e646d3a60ecab9ab"
+}

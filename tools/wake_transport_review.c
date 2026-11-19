@@ -650,6 +650,15 @@ int main(int argc, char **argv)
         f = output(argv[2], "concentration.csv");
         concentration(f);
         CHECK(fclose(f) == 0);
+    } else if (argc == 4 && !strcmp(argv[1], "--profile")) {
+        CHECK(valid_path(argv[2]));
+        R2Mode mode = (R2Mode)index_argument(argv[3], 2);
+        for (unsigned repeat = 0; repeat < 100; ++repeat)
+#ifdef _WIN32
+            bench(argv[2], mode, 4, false, "NUL");
+#else
+            bench(argv[2], mode, 4, false, "/dev/null");
+#endif
     } else if (argc == 8 && !strcmp(argv[1], "--bench")) {
         CHECK(valid_path(argv[2]) && !strcmp(argv[6], "--output"));
         unsigned mode = index_argument(argv[3], 2), emitters = index_argument(argv[4], 5);

@@ -1620,3 +1620,59 @@ shows signed height and separate cosmetic foam; movies are 100 frames/10 Hz afte
 with nearest-neighbor integer enlargement. They are not game/chase or coupled-hull footage.
 See [field evidence](evidence/wakes/r2b/field/README.md) for the retained results, tail failure,
 reproduction limits and the still-open selection gates.
+
+### Experimental CPU basin trial (R2b)
+
+`wake_transport_basin` is a private CPU-only tool using production session/physics/render
+libraries. An optional borrowed `BoatWater` object sampler replaces only the object contribution;
+null retains the existing path. The GPU rejects an adapted surface rather than showing a different
+wave model. Contexts outlive every borrowed world/view copy and must be rebound after owner copies.
+Normal/current composition and arcade recovery remain shared; the private target owns source ticks.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_transport_basin -j
+./build-release/wake_transport_basin --check
+./build-release/wake_transport_basin
+mkdir -p build-release/wake-r2b/basin-new
+./build-release/wake_transport_basin --screen build-release/wake-r2b/basin-new/hulls.csv
+python3 tools/wake_transport_hull_report.py build-release/wake-r2b/basin-new/hulls.csv build-release/wake-r2b/basin-new/hulls.json
+python3 tools/wake_transport_basin_media.py --binary build-release/wake_transport_basin --output build-release/wake-r2b/basin-new/media
+```
+
+The hull matrix has 252 frozen-source pairs, including 27 exact straight controls. Receivers do
+not emit. A mechanically equal calm reference is retained. Runs wait for source expiry and one
+second of stable virtual ticks after at least eight seconds, capped at 24 seconds. The report
+retains changed outcomes and ±10% screen flags, with absolute differences near zero; ratio floors
+are not new acceptance tolerances. The at-time trough matches the prior one-metre field sample
+and asserts an actual support query at its four-second source-off clock. This is not a universal
+concentration test or multi-source qualification. The handling-preservation screen fails.
+
+Media compares a ten-second closed-loop self-wake drive and two-second frozen gap12, gap50 and
+trough approaches. The gap50 case uses 24 m/s. Physics fixtures have distant walls to avoid contacts;
+short encounter clips stay within the finite rendered basin. Capture inspection and paced playback
+are distinct from human steering acceptance. The tool supports screenshots and ordinary windowed
+input; B selects the other model with a full reset. It has no GPU or network backend.
+
+For fully instrumented private checks (the first configure may fetch pinned dependencies):
+
+```sh
+cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_SANITIZE=address,undefined
+cmake --build build-sanitize --target wake_transport_basin -j
+./build-sanitize/wake_transport_basin --check
+```
+
+On macOS, profile the repeated private query workload with Instruments. `--profile PATH 0|1`
+repeats the dense-four benchmark with output discarded (0 baseline, 1 spread); it is not a CTest.
+Keep timing comparisons separate from profiling, encoding, tests and playback.
+
+```sh
+xcrun xctrace record --template 'Time Profiler' --time-limit 15s --output build-release/wake-r2b/basin-new/spread.trace --launch -- ./build-release/wake_transport --profile circle 1
+xcrun xctrace export --input build-release/wake-r2b/basin-new/spread.trace --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]' --output build-release/wake-r2b/basin-new/spread.xml
+python3 tools/wake_transport_profile.py build-release/wake-r2b/basin-new/spread.xml build-release/wake-r2b/basin-new/spread-profile.json
+```
+
+The time-profile aggregator resolves exported XML references and weights running samples;
+its leaf/inclusive percentages include warmup and harness work. Retain raw traces and exact binaries.
+The [trial evidence](evidence/wakes/r2b/basin/README.md) owns measurements, failed handling screens,
+verification and remaining CPU/GPU/platform limits. No testing result establishes user acceptance.

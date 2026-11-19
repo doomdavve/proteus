@@ -1,0 +1,871 @@
+{
+  "pairs": 252,
+  "straight_controls": 27,
+  "outcome_changes": [
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap12",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "old12",
+        "turn": "1",
+        "after_stop_seconds": "12",
+        "target": "0",
+        "initial_speed": "16",
+        "initial_angle": "60"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "old12",
+        "turn": "1",
+        "after_stop_seconds": "12",
+        "target": "0",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "old12",
+        "turn": "1",
+        "after_stop_seconds": "12",
+        "target": "0",
+        "initial_speed": "24",
+        "initial_angle": "60"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap50",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap50",
+        "turn": "1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap50",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "gap50",
+        "turn": "-1",
+        "after_stop_seconds": "8",
+        "target": "1",
+        "initial_speed": "16",
+        "initial_angle": "60"
+      },
+      "changes": {
+        "landings": [
+          "2",
+          "1"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "inner50",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "2",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "inner50",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "2",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "inner50",
+        "turn": "-1",
+        "after_stop_seconds": "4",
+        "target": "2",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "eight-trough",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "3",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "eight-trough",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "3",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "changes": {
+        "landings": [
+          "2",
+          "3"
+        ]
+      }
+    },
+    {
+      "case": {
+        "fixture": "reversal",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "4",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "changes": {
+        "landings": [
+          "3",
+          "1"
+        ]
+      }
+    }
+  ],
+  "unsettled": [],
+  "at_time_extrema": [
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "8",
+        "initial_angle": "60"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "16",
+        "initial_angle": "60"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-trough-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "5",
+        "initial_speed": "24",
+        "initial_angle": "60"
+      },
+      "target": [
+        19.2214966,
+        -12.6661835
+      ],
+      "baseline_height": -0.582893729,
+      "spread_height": -0.586606503
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "8",
+        "initial_angle": "0"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "8",
+        "initial_angle": "30"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "8",
+        "initial_angle": "60"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "16",
+        "initial_angle": "0"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "16",
+        "initial_angle": "30"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "16",
+        "initial_angle": "60"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "24",
+        "initial_angle": "0"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "24",
+        "initial_angle": "30"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    },
+    {
+      "case": {
+        "fixture": "eight-crest-at-time",
+        "turn": "1",
+        "after_stop_seconds": "4",
+        "target": "6",
+        "initial_speed": "24",
+        "initial_angle": "60"
+      },
+      "target": [
+        28.2214966,
+        -1.66618347
+      ],
+      "baseline_height": 2.04394293,
+      "spread_height": 2.04394293
+    }
+  ],
+  "ratio_floors": {
+    "heave": 0.05,
+    "roll": 0.01,
+    "pitch": 0.01,
+    "launch": 0.1,
+    "landing_delta_v_proxy": 0.1
+  },
+  "flagged_one_metre_trough_matched": true,
+  "input_sha256": "abe440d5a0b24b3e78e9e06238563be21c3e4571bf6497ab949383386131ab94",
+  "geometry_selected": false,
+  "metric_flag_count": 424,
+  "metric_flag_pair_count": 167,
+  "near_zero_baseline_change_count": 135,
+  "interpretation": "Fails provisional handling-preservation screen; experimental trial only."
+}

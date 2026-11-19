@@ -2,7 +2,9 @@
 
 Owner: [wake research plan](../../../WAKE_RESEARCH_PLAN.md).
 Proposal: [historical weighting and divergence](../../../WAKE_R2B_DESIGN.md).
-Current follow-up: [private capture ledger](capture/README.md), completed 2026-11-17; the
+Latest: [CPU profiling, coupled hulls and experimental basin](basin/README.md), 2026-11-19.
+
+Earlier follow-up: [private capture ledger](capture/README.md), completed 2026-11-17; the
 [private field screen](field/README.md) now retains useful coverage but CPU tail/encounter gates
 remain open. The results below are the original design-only checkpoint.
 

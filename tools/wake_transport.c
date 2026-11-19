@@ -13,14 +13,19 @@ BoatWakeObjectSample r2_transport_piece(
         || seconds >= (o->born + BOAT_OBJECT_LIFE_TICKS) / 120.0)
         return (BoatWakeObjectSample) { 0 };
     Vector2 t = o->direction, n = { -t.y, t.x }, p = Vector2Subtract(point, o->position);
-    float v = Vector2DotProduct(p, n);
+    float u = Vector2DotProduct(p, t), v = Vector2DotProduct(p, n);
     if (k * v >= 0)
-        return r2_piece(o, R2_BASELINE, point, seconds);
-    float u = Vector2DotProduct(p, t), x = -k * v;
+        return r2_piece_coordinates(o, R2_BASELINE, u, v, seconds);
+    float x = -k * v;
     float denominator = .0625f + x * x, d = dilation(x);
-    float dv = -k * x * x * (.1875f + x * x) / (denominator * denominator);
     float s = u / d;
+    if (fabsf(s) >= o->length)
+        return (BoatWakeObjectSample) { 0 };
     BoatWakeObjectSample h = r2_piece_coordinates(o, R2_BASELINE, s, v, seconds);
+    if (h.height == 0 && h.gradient.x == 0 && h.gradient.y == 0 && h.vertical_velocity == 0
+        && h.crest_foam == 0)
+        return h;
+    float dv = -k * x * x * (.1875f + x * x) / (denominator * denominator);
     float norm2 = Vector2LengthSqr(t);
     float hs = Vector2DotProduct(h.gradient, t) / norm2;
     float hv = Vector2DotProduct(h.gradient, n) / norm2;

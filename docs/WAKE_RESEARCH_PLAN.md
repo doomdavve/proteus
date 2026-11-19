@@ -1,11 +1,11 @@
 # Wake coverage, turning continuity and lifetime research
 
-Status, 2026-11-17: R2a rejected; R2b private field screen completed, retained for investigation.
-Current step: retain production baseline; prototype has useful coverage but unresolved costs/encounters.
-Open: prototype CPU tails/relative cost and hull response; HDR, human and wider-platform review.
+Status, 2026-11-19: R2b experimental CPU basin trial implemented; handling preservation failed.
+Current step: retain production baseline; offer reset-based experimental comparison.
+Open: changed curved encounters/player feedback; full-frame, multi-source, GPU/platform and HDR review.
 Done when: each step has matched before/after motion demos and performance numbers,
 a reviewed candidate meets the agreed budgets, and its contract is moved into the specs.
-Next: CPU profiling/tail investigation, then private coupled-hull screen; no geometry selected.
+Next: user basin comparison and review the changed encounter contract; no geometry selected.
 
 ## Scope and existing work
 
@@ -566,3 +566,41 @@ private contracts. No GPU transform, browser/slower-GPU, player or human handlin
 Next: profile CPU paths and tails, then private coupled-hull encounters targeting changed outer
 fronts and figure-eight concentration. R3 still waits for geometry selection. Production resource,
 wire, GPU and authority work, R0/R1 HDR issues and wider review remain open. Work stays local.
+
+
+### R2b CPU profiling, coupled hulls and basin trial — 2026-11-19
+
+Implemented the requested experimental CPU basin trial in the existing worktree. Run
+`./build-release/wake_transport_basin`: W/S throttle, A/D steer, R reset, B baseline/spread
+comparison with reset, Esc quit. [Playing](PLAYING.md#experimental-wake-research-basin) and
+[trial evidence](evidence/wakes/r2b/basin/README.md) own commands, measurements and limits.
+Production `wake_velocity` keeps its wake recipe; no GPU transform or network option is added.
+
+Instruments profiles guided exact support rejection and avoided redundant transform work.
+All six field tables remain byte-identical. Eighteen alternating same-geometry pre/post runs
+reduce dense-four circle/reversal p95 from .083/.084 to .073/.073 ms. A separate 72-run matrix
+has no individual provisional CPU limit exceedance, but relative overhead and rare tails remain
+open; full-frame CPU and authority budgets are not qualified.
+
+The optional borrowed CPU object sampler feeds production hull physics and CPU displacement/
+foam with one surface/clock; the GPU explicitly refuses it. Null-path and airborne whole-boat
+parity, borrowed-pointer resets and deterministic replay are checked. The calm reference keeps
+arcade recovery. Live stepping preserves advance → physics → stern-source ordering.
+
+The 252 frozen-source pairs all settle after field expiry, with 27 exact straight controls.
+**Curved handling preservation fails:** 167 pairs exceed a provisional ±10% metric screen and
+35 change landing count; none changes capsize outcome or final state. The radius-50 eight-second
+gap at 24 m/s changes launch 2.110→6.112 m/s. At-time supports match the previously flagged
+figure-eight trough at four seconds after stop. These are targeted probes, not ordinary-play
+rates or a universal safety/concentration bound. Multi-source coupled response remains open.
+
+Astra reviewed design/code/outcomes and supports a clearly experimental CPU trial after checks;
+the supervisor retains production baseline, with no geometry selection. Four matched CPU-view
+movies cover self-wake feedback, gap12, large-launch gap50 and the trough. Capture inspection,
+playback, automated tests and human acceptance remain distinct in the evidence. Full Debug build,
+Release targets and fully instrumented ASan/UBSan check pass. Full CTest on 2026-11-19 passes
+622/622 (36 GPU, 108.35 s); final help/label-only updates passed three focused checks including the CI lane check.
+
+Next: user comparison and review of the changed curved encounter contract. Do not infer acceptance
+from launching the trial. R3 remains dependent on a selected geometry; full-frame/relative CPU,
+HDR, GPU, wider platforms, networking and multi-source checks retain their owners. No push or PR.
