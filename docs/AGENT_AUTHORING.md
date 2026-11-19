@@ -21,6 +21,8 @@ cd ~/my-voyage && claude                            # terminal 2: the agent, sco
 
 A working-harbour package works the same way (`init ~/my-harbor --from outer-work`): its `AGENTS.md` explains sites, the job, the survey diagnostics and that a staged change restarts the cargo session (a boat under way keeps its pose); [the sandbox authoring plan](SANDBOX_AUTHORING_PLAN.md) owns that track.
 
+On a terminal, `init` prints a short welcome (the two commands to run, a first prompt and what is safe); piped, or with `--json`, it prints the result object that scripts read.
+
 `init` copies the package named by the required `--from NAME` (a shipped example such as `langedrag`) or `--from DIRECTORY`, the agent's instructions
 (`AGENTS.md`, imported by `CLAUDE.md`), a Claude Code permission file, a copy of the API reference and
 the `./wv` wrapper. A release package has the same tools in its `authoring/` directory. The agent

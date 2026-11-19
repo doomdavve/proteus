@@ -944,6 +944,8 @@ def main():
     parser.add_argument("--camera-distance", type=float)
     parser.add_argument("--camera-height", type=float)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--json", action="store_true",
+                        help="init: print the result object even on a terminal")
     parser.add_argument("--from", dest="source", metavar="PLUGIN",
                         help="init (required): the shipped package name or plugin directory to copy")
     args = parser.parse_args()
@@ -970,6 +972,12 @@ def main():
     if args.operation in WORKSPACE_OPERATIONS:
         import plugin_workspace  # Agent workspaces take their pins from the game itself.
         result = plugin_workspace.run(sys.modules[__name__], args)
+        if args.operation == "init" and not args.json and sys.stdout.isatty():
+            if result.get("status") == "ok":
+                print(plugin_workspace.welcome(result))
+            else:
+                print(f"init could not finish: {result.get('message', result.get('status'))}")
+            return 0 if result.get("status") == "ok" else 1
         print(json.dumps(result, sort_keys=True))
         return 0 if result.get("status") == "ok" else 1
     offline_base = args.base_revision or 0  # Correlation only; live pins must be explicit.

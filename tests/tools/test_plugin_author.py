@@ -496,6 +496,13 @@ class AgentWorkspace(unittest.TestCase):
         self.assertEqual(author.snapshot(self.directory),
                          author.snapshot(ROOT / "plugins/langedrag"))
 
+    def test_init_welcome(self):
+        import plugin_workspace
+        text = plugin_workspace.welcome({"directory": str(Path.home() / "w"), "source": "x",
+                                         "kind": "voyage"})
+        for expected in ("~/w", "./wv play", "claude", "Done", "Next"):
+            self.assertIn(expected, text)
+
     def test_init_refusals(self):
         self.directory.mkdir()
         (self.directory / "keep.txt").write_text("mine")

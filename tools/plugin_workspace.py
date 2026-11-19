@@ -368,6 +368,34 @@ def init(author, directory, args):
                      f"cd {directory} && claude        (the agent, in a second terminal)"]}
 
 
+def welcome(result):
+    """The human reading of a finished init: what exists, what to do, and what is safe."""
+    directory = result["directory"]
+    home = str(Path.home())
+    shown = "~" + directory[len(home):] if directory.startswith(home + "/") else directory
+    free = result["kind"] == "free"
+    prompt = ("Walk me through this working harbour in plain words, then suggest three small "
+              "changes to its work sites that I could try." if free else
+              "Walk me through this voyage in plain words, then suggest three small changes "
+              "I could try.")
+    return f"""
+Workspace ready: {shown}
+
+Done
+  [x] copied "{result["source"]}" ({result["kind"]}); the original is untouched
+  [x] plugin.json, main.lua, modules/
+  [x] reference/PLUGIN_API.md
+  [x] AGENTS.md (agent instructions), CLAUDE.md
+  [x] .claude/settings.json (agent may run ./wv; bridge directory denied)
+  [x] ./wv (check stage apply undo discard status console play)
+
+Next
+  1. terminal 1:  cd {shown} && ./wv play
+  2. terminal 2:  cd {shown} && claude
+  3. first prompt: "{prompt}"
+"""
+
+
 def run(author, args):
     """The result object for workspace operation args.operation."""
     try:
