@@ -284,7 +284,10 @@ Every pass must cull at least one tile.
 `detail_transitions` (`boat_water_review --check-detail`, `gpu`; graphics G2b) drives a river view
 through the distance-detail threshold. Orbiting the boat must change no level, a cell that just
 switched must hold under small camera movement, repeated out-and-back trips must end alike, and
-every cell with windows must keep them far. It prints the switch counts and near/far cells.
+every cell with windows must keep them far. It also checks the migrated buildings' window cells
+(`docs/BUILDINGS.md`): expanded exactly within the near range plus prefetch of the anchor, released
+beyond twice the range, none left after a far teleport and expanded again on return. It prints the
+switch counts, near/far cells and window cell events.
 `instancing_parity` (`boat_water_review --check-instancing`, `gpu`, about 6 s; graphics G1) draws
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be

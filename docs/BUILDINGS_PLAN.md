@@ -1,12 +1,12 @@
 # Buildings and waterfront architecture overhaul
 
-Status, 2026-11-20: B0 done. B1 implemented locally, awaiting review (no PR, no user acceptance):
-pack v2 records, shared kit and both adapters, role-aware CPU/GPU consumers, rebaked packs and
-ambient, packaging fix and water-pin test; 16 pilot buildings migrated, the rest unchanged.
-Checks run and limits: [B1 results](#b1-results--2026-11-20).
+Status, 2026-11-20: B0 done. B1 implemented locally and reworked to the user's "variant 2" decision
+(facade records instead of baked windows; one C window generator; GPU facade-shader mask beyond
+the near range), awaiting review (no PR, no user acceptance). 16 pilot buildings migrated, the
+rest unchanged. Checks run and limits: [B1 rework results](#b1-rework-results--2026-11-20).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: re-measure budgets on AC power, far-window merging (B4), frontage migration (B2), pilot look.
+Open: near range and mask look (proposals), expansion hitch (B4), frontage migration (B2), rollout record size (B3), pilot look.
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
 Next: B2 Eriksberg pilot (after review of B1).
@@ -197,24 +197,16 @@ no disappeared buildings, doubled parts or obvious intersections. Next: B4 quali
 - Exercise native GPU, CPU captures and the browser on this machine. Name wider-platform and
   human-review gaps explicitly; use Instruments if measurements warrant deeper investigation.
 
-### Runtime cost levers (proposal, 2026-11-20)
+### Runtime cost levers (updated 2026-11-20)
 
-Baked windows raise triangle counts, so keep these levers available; none is decided or
-measured. The audit comes first: the GPU renderer already merges far windows 2x2 and tiles
-geometry into 512 m cells, and the CPU path already limits windows to about 430 m and
-camera-facing walls. Depth testing saves fill rate, not triangles.
-
-1. Window detail range: beyond a distance, replace window quads by a mask in the facade
-   shader or merged strips (windows are about 650k of 1.37M outer triangles in the B0 baseline).
-2. Group windows by facade orientation per tile so back-facing groups are skipped whole.
-3. Per-building distance/frustum culling from the v2 first/last triangle ranges and bounds.
-4. Instancing for repeated windows and balconies (larger change, mainly for the CPU path).
-5. Occlusion by the nearest quay row at boat level, only if measured to pay for its CPU cost.
-6. Drop windows, or use the far detail, in shadow and reflection passes (the far shadow map
-   has 1.5 m texels).
-
-B1 should keep per-building bounds, a detail range and facade grouping available in the v2
-records; B4 chooses and measures levers against the B0 budgets.
+Variant 2 took levers 1 and 3 in B1: windows are generated, not stored, and the GPU draws quads
+only for cells near the followed boat and a shader mask beyond 430 m (`docs/BUILDINGS.md`). Still
+available for B4, none measured: (2) group windows by facade orientation per cell so back-facing
+groups are skipped whole; (4) instancing for repeated windows and balconies; (5) occlusion by the
+nearest quay row at boat level, only if measured to pay; (6) drop windows, or use the mask, in
+shadow and reflection passes (the far shadow map has 1.5 m texels; reflections already draw the
+mask beyond the range). Cell expansion runs in the frame that needs it; spreading it over frames
+is a B4 candidate if a hitch is measured.
 
 Acceptance: measured budgets hold, required automated checks pass and review artifacts expose
 motion/pop/shadow/reflection behaviour. Automated demo exit is not human acceptance. Next: B5.
@@ -401,9 +393,9 @@ Proposals for B1 to confirm, except where marked. The user decided on 2026-11-20
 | Source schema | One offline `buildings.json` per map (or manifest section), keyed by normalised OSM id (`way/ID`; outer's `w/`, `r/` mapped to it) with parent id, part id, base or raised part, footprint rings with holes, base and top y, height with provenance (tag, levels, fallback, terrain lift), a small tag subset (building, levels, roof shape, material), family, palette and optional override id. Source facts are stored apart from assumed fields. | Today the river manifest keeps only osm, height, basis, courtyards, parts; the outer map keeps nothing per building |
 | Draping | Carry parent ids through `river_overlay` instead of rebuilding solids from shared XZ corners | Needed for detached balconies and canopies |
 | Shared emission | New `tools/building_kit.py`, called by `prepare_waterfront.py` (flat-ground adapter) and `outer_dressing.py` (terrain adapter); retire the two private extrusion and roof paths. Architecture is baked into triangles offline. | The C renderers stay consumers; no second grammar |
-| Window layout in C | **Decided: bake window quads** for migrated buildings; the grid loops in `waterfront.c` and `renderer_gpu.c` are retired for them (legacy path stays for unmigrated buildings). | Baked quads add triangles against the budget |
+| Window layout in C | **Decided 2026-11-20 (variant 2, replacing the baked-quads decision of the same day): the pack stores facade records (wall pair, bay and floor counts, window style), not window triangles.** One C generator, `src/scenery/building_windows.[ch]`, expands them into quads when a tile or building is within `BUILDING_WINDOW_NEAR_RANGE` of the camera; beyond it the facade shader draws the same grid as a mask. The grid loops in `waterfront.c` and `renderer_gpu.c` are retired for migrated buildings (the legacy path stays for unmigrated ones). | Baking every building would add about 170k triangles (0.85 to 3.4 MB) to the river pack alone; records add about 0.18 MB at full rollout. |
 | Metadata transport | **Decided: pack v2** with a trailing record block (loader accepts v1 and v2). Not chosen: an optional sidecar `assets/geometry/<map>/buildings.bin`, keyed by the same mesh FNV as `ambient.bin`, with per-building first/last triangle, stable id hash, roles and facade-run table; plus `detail_first`. | Sidecar keeps v1 and the loader's version check and tolerates absence, but a stale or missing sidecar fails silently (the `ambient.bin` hazard) and needs a lifecycle, web and package entry. Pack v2 makes metadata exact and atomic with the mesh, at the cost of a version bump in writer, reader, tests and web.  |
-| Identity and seeds | Seed = crc32 of the stable id plus facade, bay, floor (as `outer_dressing.py:232` does for its own seed); replace `waterfront_window_seed(triangle, ...)`, the frontage trims `(i/2)%4` and the `id % 4` tint with a family palette keyed by id hash | `validate_waterfront_lighting.c:337` pins the current seed signature and must change with it |
+| Identity and seeds | Facade seed = crc32 of the stable id and facade number (`crc32("<id>/<facade>")`, computed by continuing the pack's id hash), window seed = murmur3 `fmix32(facade_seed + bay * 0x9E3779B1 + floor * 0x85EBCA77)`; the glass and lit rules are the legacy ones. Replaces `waterfront_window_seed(triangle, ...)` for migrated buildings; the frontage trims `(i/2)%4` and the `id % 4` tint still need a family palette keyed by id hash (B2). | Proposal that deviates from a literal `crc32(id, facade, bay, floor)`: bay and floor are mixed by an integer function so that the facade shader reproduces the seed exactly (a shader cannot format and hash a decimal string). Identity is still the id, the facade number, the bay and the floor. `validate_waterfront_lighting.c:337` pins the legacy seed signature, which stays for unmigrated buildings. |
 | Collision separation | New detail sits after the leading water; `water.h` and the atlas stay byte-identical; add a test comparing `water_sha256` before and after a rebake; classify detail by explicit role, not exact RGB | No content-digest change expected; verify by test, not assumption |
 | Family selection | Order: explicit override by source id, supported mapped facts (tags, parts), conservative inference from footprint, height and context, then a simple fallback. Missing data never implies a shop or public entrance. Report the family and fallback reason per building. | Family list stays provisional until B3 |
 | Fallback in C | When the sidecar is absent or stale, keep the legacy tint and triangle-index path unchanged and versioned; never mix both on one building (suppress generic windows where baked ones exist rather than masking geometrically as the cafe does) | Keeps old packs, test maps and `cargo_sandbox` rendering |
@@ -449,7 +441,7 @@ Starting poses that were not navigable (the game exits non-zero): -600,-60,140, 
 -2300,1100,180, -2200,1000,180, 3620,-3150,270. No documentation outside this plan changed,
 so no other live summary was affected; the index row stays accurate.
 
-## B1 results — 2026-11-20
+## B1 results — 2026-11-20 (superseded in part by the rework below)
 
 Implemented (commits on feat/buildings, see `git log`): scenery pack v2 with trailing building
 records (loader still accepts v1); `tools/building_kit.py` with `prepare_waterfront.py` and
@@ -487,3 +479,51 @@ untested); native windowed demo run beyond scripted captures; Windows and Linux;
 and Windows workflow edits (sidecar copies) not run; Release performance and the B0 budgets
 (not re-measured); far-window merging for baked windows (drawn one to one in both levels, a
 B4 lever); user visual review.
+
+## B1 rework results — 2026-11-20
+
+The user decided "variant 2" on 2026-11-20: the pack stores compact facade-run data, not window
+triangles. Commits on feat/buildings: facade records and pack v3 (kit, writer, loader, tests,
+rebaked packs and ambient); the window generator `src/scenery/building_windows.[ch]` and tests;
+CPU and GPU wiring (CPU expansion within 430 m; GPU cells near the anchor plus a facade-shader
+mask beyond). Contract: [BUILDINGS.md](BUILDINGS.md).
+
+Choices to review (proposals): (1) the facade record names the wall pair and keeps counts and a
+style; origin, length, base, top and heading come from the pair's vertices rather than being
+stored again, so draping cannot disagree (the user listed those fields; they are available, not
+duplicated); (2) seeds are `crc32("<id>/<facade>")` then `fmix32` with bay and floor, not a crc of
+all four, so the shader can reproduce them exactly; (3) near range 430 m (the CPU's old limit; a
+1.5 m window is about one pixel there at 320x200), 96 m prefetch, release beyond 860 m; (4)
+windows now fit inside the wall (0.3 m from corners, 0.5 m under the top), so pilot buildings have
+1,239 (river) and 1,623 (outer) windows instead of about 1,430 and 1,860 baked; (5) walls buried
+in another section of the same building get none; (6) mask: filtered by the pixel footprint,
+settling on the palette mean and a 3/8 lit share once a pixel spans a bay.
+
+Sizes (bytes). B0: river 852,701, outer 5,370,005. Baked pilot (B1 before the rework): 891,823 and
+5,417,388. Now: river 854,285 (+0.2% on B0), outer 5,372,445 (+0.05%). Experiment, not committed
+(every building migrated): river 1,033,047 (+21%; 1,498 buildings, 5,038 facades, 78,826
+windows; baking them would have been about 3.4 MB), outer 5,987,482 (+11.5%; 4,914 buildings,
+18,587 facades, 307,373 windows). The record block is uncompressed and regular; B3 should
+compress it or shrink the building and run records if the +20% pack budget binds. 18,587 facades fit the
+vertex format's 32,767.
+
+Checks run (Apple M1 Max, macOS 26.6.2): `map_pack.py --self-test`; `building_kit.py` fixtures
+and `prepare_outer_map.py --self-test` (venv with the pinned shapely/pyproj/numpy); both bakes
+re-run (the unmodified bakes reproduced the committed packs first); `water.h` byte-identical
+(CTest `building_packs`); river kit back to 7,944 boxes and its pre-kit digest; Debug
+`ctest --preset full` with `PROTEUS_GPU_TESTS=ON`: 635 of 635 passed, including new
+`building_windows`, extended `boat_scenery` (v3 and 28 invalid-record cases) and
+`detail_transitions` (window cells expand, release and re-expand). GPU stills at 1280x800 (near,
+mid, far; day, dusk, night) with the mask only and the quads only (range forced to -1000 and
+1e6) agree: same windows, glass and lit state, mean difference under 0.8/765 per pixel,
+differences at window edges. CPU stills inspected. Release, AC power, `boat_water_review`-style
+fixed poses, 3 runs each, interleaved with main (41f3420) built the same way: scene triangles
+-2,316 to +914 (pilot only); submissions +0 to +6; render p50 and gpu p50 within the 10-30%
+run-to-run noise (for example eriksberg-near gpu p50 3.54-3.66 ms on main, 3.59-3.97 new;
+render 2.7-4.3 ms either way). No budget claim is made beyond: no regression distinguishable from
+noise on the pilot. Not measured: all buildings migrated (the case that matters), cell
+expansion time (it runs inside the frame that crosses a cell), bind time.
+
+Not verified: browser/web (WebGL2 `texelFetch`, integer shader maths, a v3 pack in wasm), Windows
+and Linux, macOS package, the more-than-32,767-facades fallback, human review of the mask look and
+of motion across the 430 m boundary (stills only), the shadow pass (windows are not drawn in it).
