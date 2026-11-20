@@ -1,7 +1,8 @@
 # Buildings and waterfront architecture overhaul
 
 Status, 2026-11-20: B0 done. B1 in progress: pack v2 records, writer, loader and tests done
-(commit "B1: scenery pack v2"); kit, renderer consumers and rebake pending. No visual acceptance.
+(commit "B1: scenery pack v2"); tools/building_kit.py and both adapters done (16 pilot buildings
+migrated, rest emitted as before); renderer consumers, rebaked packs and ambient pending.
 Results and decisions are in [B0 results](#b0-results--2026-11-20).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.

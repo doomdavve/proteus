@@ -9,6 +9,7 @@ import gzip
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 from pyproj import Transformer
@@ -18,6 +19,10 @@ from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+import building_kit  # noqa: E402
+
 SOURCE = ROOT / "docs/river/osm-survey.json.gz"
 EXPECTED_HASH = "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a"
 GROUND = 3.5
@@ -247,7 +252,7 @@ def prepare(output, expanded=False):
         bottom = float(e["tags"].get("min_height", "0").replace(",", "."))
         assert math.isfinite(bottom) and 0 <= bottom < height, e["id"]
         parts.append((e, shape.intersection(CROP), height, bottom))
-    manifest_buildings, solids = [], []
+    manifest_buildings, solids, descriptions = [], [], []
     for e in sorted(buildings, key=lambda e: (e["type"], e["id"])):
         if e["tags"].get("man_made") == "crane" or (e["type"] == "way" and e["id"] in members):
             continue
@@ -269,19 +274,26 @@ def prepare(output, expanded=False):
         # for partitioning so shared edges do not grow slivers from separate simplification.
         matching = [(p, h, part["id"]) for part, p, h, bottom in parts
                     if bottom == 0 and shape.intersection(p).area > p.area * .9]
-        for section, part_height, _ in resolve_parts(shape, matching):
+        # One description per mapped building: its ground-based sections and its raised parts
+        # are sections of the same building (tools/building_kit.py), so they keep one identity.
+        sections = []
+        for section, part_height, part_id in resolve_parts(shape, matching):
             top = GROUND + (height if part_height is None else part_height)
-            walls(section, GROUND, top, tint)
-            surface(section, top, tuple(max(0, c - 30) for c in tint))
+            sections.append(building_kit.Section(section, GROUND, top, part_id))
         for part, p, part_height, bottom in parts:
             if bottom > 0 and shape.intersection(p).area > p.area * .9:
-                section = p.intersection(shape)
-                walls(section, GROUND + bottom, GROUND + part_height, tint)
-                surface(section, GROUND + part_height, tuple(max(0, c - 30) for c in tint))
+                sections.append(building_kit.Section(
+                    p.intersection(shape), GROUND + bottom, GROUND + part_height,
+                    f"way/{part['id']}"))
+        descriptions.append(building_kit.BuildingDescription(
+            f"{e['type']}/{e['id']}", sections, tint, tuple(max(0, c - 30) for c in tint)))
         solids.append(shape)
         manifest_buildings.append({"osm": f"{e['type']}/{e['id']}", "height": height,
                                    "basis": basis, "courtyards": sum(len(p.interiors) for p in polygons(shape)),
                                    "parts": [key for _, _, key in matching]})
+    records = building_kit.Emitter(
+        triangle, lambda: len(triangles),
+        lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)]).emit_all(descriptions)
     solid_union = unary_union(solids)
     roads = []
     for e in elements:
@@ -358,7 +370,8 @@ def prepare(output, expanded=False):
     # The runtime loads the whole bake as a scenery pack; collision compiles its water (A3.5i).
     import map_pack
     pack = map_pack.write(output, "river", "tools/prepare_waterfront.py", vertices, triangles,
-                          bridge_first_triangle if expanded else len(triangles))
+                          bridge_first_triangle if expanded else len(triangles),
+                          buildings=records)
     manifest = {"source": str(SOURCE.relative_to(ROOT)), "source_sha256": EXPECTED_HASH,
                 "snapshot": data.get("osm3s", {}).get("timestamp_osm_base", data.get("retrieved_utc")),
                 "origin_epsg3007": [ox, oy],
@@ -370,6 +383,8 @@ def prepare(output, expanded=False):
                 "crop": list(CROP.bounds), "vertices": len(vertices), "triangles": len(triangles),
                 "scenery_sha256": hashlib.sha256(pack).hexdigest(),
                 "water_sha256": hashlib.sha256((output / "water.h").read_bytes()).hexdigest(),
+                "building_records": {"count": len(records),
+                                     "windows": sum(r["end"] - r["detail_first"] for r in records)},
                 "buildings": manifest_buildings, "landscape": garden_manifest,
                 "building_parts": [{"osm": f"{e['type']}/{e['id']}", "height": h,
                                     "min_height": bottom} for e, _, h, bottom in parts]}

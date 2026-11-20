@@ -97,29 +97,29 @@ def building_block(vertices, triangles, water, buildings):
     by first triangle."""
     records, runs_out, seen = [], [], set()
     previous_end = water
-    for b in sorted(buildings, key=lambda b: (b["first"], b["id"])):
-        ident = stable_id_hash(b["id"])
+    for b in sorted(buildings, key=lambda b: b["first"]):
+        ident = b["hash"] if "hash" in b else stable_id_hash(b["id"])
         first, end, detail = b["first"], b["end"], b["detail_first"]
         if ident in seen:
-            raise ValueError(f"duplicate building id {b['id']}")
+            raise ValueError(f"duplicate building id {b.get('id', ident)}")
         seen.add(ident)
         if not (previous_end <= first < end <= len(triangles)):
-            raise ValueError(f"{b['id']}: triangle range {first}..{end} overlaps, is empty, "
+            raise ValueError(f"{b.get('id', ident)}: triangle range {first}..{end} overlaps, is empty, "
                              f"precedes the water or leaves the mesh")
         if not first <= detail <= end:
-            raise ValueError(f"{b['id']}: detail_first {detail} outside its range")
+            raise ValueError(f"{b.get('id', ident)}: detail_first {detail} outside its range")
         previous_end = end
         low = [min(vertices[i][k] for ids, _ in triangles[first:end] for i in ids) for k in range(3)]
         high = [max(vertices[i][k] for ids, _ in triangles[first:end] for i in ids) for k in range(3)]
         if not all(math.isfinite(v) for v in low + high):
-            raise ValueError(f"{b['id']}: non-finite bounds")
+            raise ValueError(f"{b.get('id', ident)}: non-finite bounds")
         run_first, cursor = len(runs_out), first
         for r_first, r_end, role, facade, heading in b["runs"]:
             if not (cursor <= r_first < r_end <= end):
-                raise ValueError(f"{b['id']}: run {r_first}..{r_end} overlaps or leaves it")
+                raise ValueError(f"{b.get('id', ident)}: run {r_first}..{r_end} overlaps or leaves it")
             if not 1 <= role < ROLE_COUNT or not (0 <= facade <= NO_FACADE) \
                     or not 0 <= heading <= 0xFFFF:
-                raise ValueError(f"{b['id']}: bad run role/facade/heading")
+                raise ValueError(f"{b.get('id', ident)}: bad run role/facade/heading")
             cursor = r_end
             runs_out.append(RUN.pack(r_first, r_end, role | facade << 8 | heading << 16))
         records.append(BUILDING.pack(ident, first, end, detail, run_first,
@@ -129,13 +129,13 @@ def building_block(vertices, triangles, water, buildings):
 
 
 def pack_bytes(vertices, triangles, bridge_first, buildings=None):
-    """VERTICES: float32-exact (x, y, z); TRIANGLES: [((a, b, c), (r, g, b))]. BUILDINGS None
+    """VERTICES: float32-exact (x, y, z); TRIANGLES: [((a, b, c), (r, g, b[, alpha]))]. BUILDINGS None
     writes a version 1 pack; a list (possibly empty) writes version 2 with its records."""
     payload = bytearray()
     for p in vertices:
         payload += struct.pack("<3f", *p)
     for ids, color in triangles:
-        payload += TRIANGLE.pack(*ids, *color[:3], 255)
+        payload += TRIANGLE.pack(*ids, *color[:3], color[3] if len(color) > 3 else 255)
     deflate = zlib.compressobj(9, zlib.DEFLATED, -15)
     data = deflate.compress(bytes(payload)) + deflate.flush()
     water = leading_water(vertices, triangles)
@@ -176,8 +176,8 @@ def read_pack(path, with_buildings=False):
     vertices = [struct.unpack_from("<3f", payload, 12 * i) for i in range(nv)]
     triangles = []
     for i in range(nt):
-        *ids, r, g, b, _ = TRIANGLE.unpack_from(payload, 12 * nv + TRIANGLE.size * i)
-        triangles.append((tuple(ids), (r, g, b)))
+        *ids, r, g, b, a = TRIANGLE.unpack_from(payload, 12 * nv + TRIANGLE.size * i)
+        triangles.append((tuple(ids), (r, g, b) if a == 255 else (r, g, b, a)))
     if with_buildings:
         tail = blob[HEADER.size + packed:]
         return vertices, triangles, water, bridge, (read_buildings(tail) if version == VERSION

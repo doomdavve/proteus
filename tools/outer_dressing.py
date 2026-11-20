@@ -6,13 +6,19 @@ roof shapes, crane and mark proportions, colours and the tree scatter are author
 recorded in the manifest. Coordinates are crane-origin metres, x = east, z = north, y = up.
 """
 import math
+import sys
 import zlib
+from pathlib import Path
 
 import numpy as np
 from shapely import contains_xy, make_valid, prepare, transform
 from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import building_kit  # noqa: E402
 
 HOUSE_TYPES = {"detached", "house", "semidetached_house", "terrace", "villa", "farm",
                "residential", "bungalow", "cabin"}
@@ -215,11 +221,16 @@ def add_buildings(builder, osm, frame, area, model, fort, multipolygon, skip=())
     stats = {"buildings": 0, "gabled": 0, "skipped_small": 0, "stone": 0}
     solids = []
     port = []
+    emitter = building_kit.Emitter(
+        lambda points, color: builder.triangles.append(([tuple(map(float, p)) for p in points],
+                                                        color)),
+        lambda: len(builder.triangles), _triangulate)
+    records = []
     for key, tags, shape in sorted(footprints(osm, frame, multipolygon), key=lambda e: e[0]):
         if key in skip or not area.intersects(shape):
             continue
         shape = shape.intersection(area).simplify(.25, preserve_topology=True)
-        for part in _parts(shape):
+        for piece, part in enumerate(_parts(shape)):
             if part.area < MIN_AREA:
                 stats["skipped_small"] += 1
                 continue
@@ -246,12 +257,18 @@ def add_buildings(builder, osm, frame, area, model, fort, multipolygon, skip=())
                 gable(builder, rect, base, eave, color, top)
                 stats["gabled"] += 1
             else:
-                builder.prism(list(part.exterior.coords), base, eave, color, roof=top)
+                # Stable id: "way/ID" or "relation/ID", "#N" for the N-th piece of the clipped
+                # footprint (the river crop's own buildings carry the bare id).
+                ident = ("way" if key.startswith("w/") else "relation") + "/" + key[2:] + f"#{piece}"
+                record = emitter.emit(building_kit.BuildingDescription(
+                    ident, [building_kit.Section(part, base, eave)], color, top, facade=not stone))
+                if record:
+                    records.append(record)
             stats["buildings"] += 1
             solids.append(part)
             if tags.get("building") in PORT_TYPES or part.area > 3000:
                 port.append(part)
-    return stats, unary_union(solids), unary_union(port)
+    return stats, unary_union(solids), unary_union(port), records
 
 
 def container_crane(builder, x, z, ground, toward, height):
@@ -386,7 +403,8 @@ def carve_marks(water, mark_list):
 
 
 def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip=()):
-    """(buildings, other) triangles ((three (x, y, z)), colour) and manifest stats.
+    """(buildings, other) triangles ((three (x, y, z)), colour), manifest stats and the building
+    records of the migrated buildings (tools/building_kit.py), indexed into the buildings list.
 
     Since A3.5f the buildings are returned apart: the bake puts them before the authored
     range, like the river's own buildings, so the renderers give their walls facades and
@@ -395,7 +413,7 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip
     houses = Builder()
     builder = Builder()
     outside = land.difference(crop)
-    stats, solids, port = add_buildings(houses, osm, frame, outside, model, fort,
+    stats, solids, port, records = add_buildings(houses, osm, frame, outside, model, fort,
                                          multipolygon, skip)
     port_zone = [port.buffer(40)]
     cranes = masts = 0
@@ -429,7 +447,7 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip
     trees = add_trees(builder, outside, keep_out, model)
     stats.update(container_cranes=cranes, lighting_masts=masts, marks=placed, trees=trees,
                  building_triangles=len(houses.triangles), triangles=len(builder.triangles))
-    return houses.triangles, builder.triangles, stats
+    return houses.triangles, builder.triangles, stats, records
 
 
 def self_test():

@@ -72,6 +72,47 @@ UPSTREAM_ROUTE = survey.RIVER[:3] + [(400, 40), (900, 380), (1500, 560), (2000, 
                                      (3700, 2100), (3950, 2230)]
 
 
+class Overlay:
+    """Which river pack triangle each plain overlay triangle came from, and the pack's building
+    records (version 2), so buildings keep their identity through draping: a building is one
+    solid for draping and its record follows its triangles into the outer pack."""
+
+    def __init__(self, source, records):
+        self.source = list(source)  # Pack triangle index of plain[k].
+        self.records = records
+        self.owner = [-1] * len(source)  # Index of the record holding plain[k], or -1.
+        position = {s: k for k, s in enumerate(self.source)}
+        for number, r in enumerate(records):
+            for index in range(r["first"], r["end"]):
+                assert index in position, f"building record triangle {index} not in the overlay"
+                self.owner[position[index]] = number
+
+    def keep(self, keep):
+        """The overlay of only plain triangles K with KEEP[k] true (order kept)."""
+        result = Overlay([], [])
+        result.records = self.records
+        result.source = [s for s, k in zip(self.source, keep) if k]
+        result.owner = [o for o, k in zip(self.owner, keep) if k]
+        return result
+
+    def records_at(self, base=0):
+        """The records re-indexed to triangle positions BASE + k of the kept plain list."""
+        position = {s: k for k, s in enumerate(self.source)}
+        out = []
+        for r in self.records:
+            def at(i, end=False):
+                return base + (position[i - 1] + 1 if end else position[i])
+
+            first, end = at(r["first"]), at(r["end"], True)
+            assert end - first == r["end"] - r["first"], f"building {r['hash']:08x} is not contiguous"
+            out.append({"hash": r["hash"], "first": first, "end": end,
+                        "detail_first": end if r["detail_first"] == r["end"]
+                        else at(r["detail_first"]),
+                        "runs": [(at(a), at(b, True), role, facade, heading)
+                                 for a, b, role, facade, heading in r["runs"]]})
+        return out
+
+
 def river_overlay():
     """The river bake's triangles above its ground: buildings, roads, gardens, trees, bridge.
 
@@ -80,36 +121,41 @@ def river_overlay():
     its triangles, which start at the pack's bridge first triangle. Coordinates are the pack's
     float32 values (before A3.5i, the header's 0.1 mm decimals).
     """
-    vertices, triangles, _, bridge_first = map_pack.read_pack(RIVER_GEOMETRY)
-    plain, bridge = [], []
+    vertices, triangles, _, bridge_first, records = map_pack.read_pack(RIVER_GEOMETRY, True)
+    plain, bridge, source = [], [], []
     for index, (ids, color) in enumerate(triangles):
         points = [vertices[i] for i in ids]
         if index >= bridge_first:
             bridge.append((points, color))
-        elif any(y != 0 for _, y, _ in points) and color not in RIVER_GROUND_COLORS:
+        elif any(y != 0 for _, y, _ in points) and color[:3] not in RIVER_GROUND_COLORS:
             plain.append((points, color))
-    return plain, bridge
+            source.append(index)
+    return plain, bridge, Overlay(source, records or [])
 
 
-def split_overlay(plain):
+def split_overlay(plain, overlay=None):
     """Separate the river's ground paint from its solid objects.
 
     Roads and garden beds are flat triangles just above the river's GROUND. They become paint:
     the terrain surface takes their colour where they lie, so they follow the ground with no
     extra layer. Everything else (buildings, planting islands, trees) stays solid and is moved
     onto the terrain by drape_objects. Returns (objects, paint), paint being
-    [(geometry in X/Z, colour)].
+    [(geometry in X/Z, colour)]; with OVERLAY (river_overlay's), (objects, paint, overlay of the
+    objects).
     """
     from shapely.geometry import Polygon
 
     pieces = {color: [] for color in PAINT}
-    objects = []
+    objects, keep = [], []
     for points, color in plain:
-        if color in PAINT and all(abs(y - GROUND - PAINT[color]) < 1e-3 for _, y, _ in points):
+        paint = color in PAINT and all(abs(y - GROUND - PAINT[color]) < 1e-3 for _, y, _ in points)
+        if paint:
             pieces[color].append(Polygon([(x, z) for x, _, z in points]))
         else:
             objects.append((points, color))
-    return objects, [(p, color) for color, p in pieces.items()]
+        keep.append(not paint)
+    paint = [(p, color) for color, p in pieces.items()]
+    return (objects, paint) if overlay is None else (objects, paint, overlay.keep(keep))
 
 
 def paint_layers(land, paint):
@@ -138,7 +184,7 @@ def paint_layers(land, paint):
     return [(rest, None)] + layers
 
 
-def drape_objects(objects, model):
+def drape_objects(objects, model, owners=None):
     """Move each solid of the river overlay by the terrain under it, less the river's GROUND.
 
     Solids are the groups of triangles that share a corner in X/Z. One standing on the
@@ -146,6 +192,11 @@ def drape_objects(objects, model):
     so no edge floats and the uphill side is sunk instead. A raised building part moves with
     the solid whose footprint holds its centre; a floating one without such a solid uses its
     own footprint. Returns (moved triangles, per-solid lifts in metres).
+
+    OWNERS (an Overlay's owner list, parallel to OBJECTS) names the building record each
+    triangle belongs to: all of a building's triangles, its raised parts and any detached
+    feature included, form one solid with the footprint of its lowest points, whatever corners
+    they share. Triangles with no owner are grouped by shared corners as above.
     """
     import numpy as np
     from shapely import STRtree, contains_xy, get_coordinates
@@ -162,7 +213,9 @@ def drape_objects(objects, model):
     def key(x, z):
         return (round(x, 3), round(z, 3))
 
-    for points, _ in objects:
+    for index, (points, _) in enumerate(objects):
+        if owners and owners[index] >= 0:
+            continue
         ks = [key(x, z) for x, _, z in points]
         for k in ks:
             parent.setdefault(k, k)
@@ -172,7 +225,12 @@ def drape_objects(objects, model):
                 parent[b] = a
     groups = {}
     for index, (points, _) in enumerate(objects):
-        groups.setdefault(find(key(points[0][0], points[0][2])), []).append(index)
+        if owners and owners[index] >= 0:
+            groups.setdefault(("o", owners[index]), []).append(index)
+    owned = {i for indices in groups.values() for i in indices}
+    for index, (points, _) in enumerate(objects):
+        if index not in owned:
+            groups.setdefault(("u", find(key(points[0][0], points[0][2]))), []).append(index)
 
     def footprint(indices):
         pts = [p for i in indices for p in objects[i][0]]
@@ -201,8 +259,12 @@ def drape_objects(objects, model):
         holders = sorted(tree.query(shape.centroid, predicate="within"))
         lift[root] = lift[standing[holders[0]][0]] if holders else lowest(shape) - GROUND
     # The original order is kept: the renderers pair consecutive facade triangles.
-    moved = [([(x, y + lift[find(key(points[0][0], points[0][2]))], z) for x, y, z in points],
-              color) for points, color in objects]
+    group_of = {}
+    for root, indices in groups.items():
+        for index in indices:
+            group_of[index] = root
+    moved = [([(x, y + lift[group_of[index]], z) for x, y, z in points], color)
+             for index, (points, color) in enumerate(objects)]
     return moved, lift
 
 
@@ -332,7 +394,7 @@ def ground_grid(cells, height, model, area=GROUND_AREA, step=GROUND_STEP):
             "cm": [int(round(h * 100)) for h in values]}
 
 
-def bake(water, region, model=None, overlay=None, dressing=()):
+def bake(water, region, model=None, overlay=None, dressing=(), records=None):
     """Return (vertices, triangles, stats) for water at y=0 then land and walls.
 
     Without MODEL the land is flat at GROUND; with one it is the 20 m/5 m terrain surface.
@@ -341,6 +403,8 @@ def bake(water, region, model=None, overlay=None, dressing=()):
     index; PAINT (split_overlay's) colours the land top. DRESSING triangles, already on
     the terrain, come last: like the bridge they are authored geometry in flat colours, so they
     share its range, which the renderers keep out of facade texturing and windows.
+    RECORDS are building records (tools/map_pack.py) indexed into PLAIN; they are returned in
+    stats["records"] shifted to the pack's triangle numbers, or None for a version 1 pack.
     """
     vertices, triangles, lookup = [], [], {}
 
@@ -413,6 +477,7 @@ def bake(water, region, model=None, overlay=None, dressing=()):
             triangle([a, d, c], wall_color)
     surface_area = sum(abs((x1 - x0) * (z2 - z0) - (x2 - x0) * (z1 - z0)) / 2
                        for (x0, z0), (x1, z1), (x2, z2) in cells)
+    plain_first = len(triangles)
     for points, color in plain:
         triangle(points, color)
     bridge_first = len(triangles)
@@ -425,7 +490,11 @@ def bake(water, region, model=None, overlay=None, dressing=()):
         f"land surface {surface_area:.1f} m2 differs from land {land.area:.1f} m2"
     tiny_edges = check_watertight(cells, land)
     assert sum(a for a, _ in DROPPED) < 1.0, f"untriangulated land {DROPPED[:5]}"
-    stats.update(overlay_triangles=len(plain), bridge_first=bridge_first,
+    shift = lambda r: {**r, "first": r["first"] + plain_first, "end": r["end"] + plain_first,
+                       "detail_first": r["detail_first"] + plain_first,
+                       "runs": [(a + plain_first, b + plain_first, *rest) for a, b, *rest in r["runs"]]}
+    stats.update(records=None if records is None else [shift(r) for r in records],
+                 overlay_triangles=len(plain), bridge_first=bridge_first,
                  bridge_triangles=len(bridge), dressing_first=dressing_first,
                  dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
                  land_triangles=len(cells), shore_edges=len(shore_edges),
@@ -474,7 +543,8 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
               for i in range(0, len(cm), 16)]
     lines += ["};", "", *bridges]
     pack = map_pack.write(output, "outer", "tools/prepare_outer_map.py", vertices, triangles,
-                          stats["bridge_first"], "\n".join(lines))
+                          stats["bridge_first"], "\n".join(lines),
+                          buildings=stats.get("records"))
     land = stats["land"]
     terrain = terrain if isinstance(terrain, dict) else None
     boundary = water.boundary.intersection(region.boundary.buffer(0.01))
@@ -516,6 +586,11 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
                                        "solid moves by the lowest terrain under it less "
                                        "river_ground_m; the bridge is unchanged",
                           **(stats.get("draped") or {})},
+        "building_records": stats.get("records") and {
+            "count": len(stats["records"]),
+            "windows": sum(r["end"] - r["detail_first"] for r in stats["records"]),
+            "contract": "docs/BUILDINGS.md; ids are the stable source ids, '#N' for pieces of a "
+                        "footprint clipped to the dressing area"},
         "land_triangles": stats.get("land_triangles"),
         "kit_ground": stats.get("ground") and {
             "area": list(GROUND_AREA), "step_m": GROUND_STEP,
@@ -622,19 +697,24 @@ def main():
         "check_vs_baskarta_spot_heights": outer_terrain.spot_check(
             model, outer_terrain.load_spots(), geo_land(region, water)),
     }
-    plain, bridge = river_overlay()
-    objects, paint = split_overlay(plain)
-    objects, lifts = drape_objects(objects, model)
+    plain, bridge, overlay = river_overlay()
+    objects, paint, overlay = split_overlay(plain, overlay)
+    objects, lifts = drape_objects(objects, model, overlay.owner)
     fort = next(Point(m["east_north"]) for m in survey.features(osm, frame)[1]
                 if m["label"] == "Nya Älvsborg")
-    buildings, dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
+    buildings, dressing, dressed, building_records = outer_dressing.dress(osm, frame, region, crop, water,
                                              geo_land(region, water), model, fort,
                                              survey.multipolygon, outer_landmarks.SKIP)
     dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS,
                    landmarks=landmark_stats, canal_bridges=bridge_stats)
     dressing = dressing + landmarks + canal_bridges
+    records = overlay.records_at() + [
+        {**r, "first": r["first"] + len(objects), "end": r["end"] + len(objects),
+         "detail_first": r["detail_first"] + len(objects),
+         "runs": [(a + len(objects), b + len(objects), *rest) for a, b, *rest in r["runs"]]}
+        for r in building_records]
     vertices, triangles, stats = bake(water, region, model, (objects + buildings, bridge, paint),
-                                      dressing)
+                                      dressing, records)
     stats["dressing"] = dressed
     values = sorted(lifts.values())
     stats["draped"] = {"solids": len(values), "paint_source_triangles": sum(len(p) for p, _ in paint),
