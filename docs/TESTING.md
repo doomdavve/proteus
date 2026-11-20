@@ -632,12 +632,21 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   map validators and review tools load the packs from the source tree
   (`tests/support/boat_test_scenery.h`).
 - `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
-  count, a pack round trip, and the version 2 building records (round trip, version 1 packs, every
-  invalid-record case, identity independent of input order and of other buildings).
+  count, a pack round trip, and the version 3 building records (round trip, version 1 packs, every
+  invalid-record case for buildings, runs, facades and styles, identity independent of input order
+  and of other buildings).
+- `building_windows` runs `validate_building_windows` (quick): the seeds, glass and occupancy
+  against values computed with Python's `zlib.crc32` and murmur3's finalizer (the formulas the
+  facade shader repeats), a synthetic wall's exact window corners, determinism, independence of
+  wall position and the facade number's effect, and every migrated facade of the shipped packs:
+  its windows lie inside the wall and the building's bounds, face outward 3.5 cm off the wall, no
+  wall is listed twice and the window totals are pinned (they change when the kit's migrated set
+  or grid does).
 - `building_packs` (`tests/tools/check_building_packs.py`, quick) pins `water.h` of `river` and
   `outer` (sha256) and checks that each pack's leading water is exactly its compiled water, so a
   rebake that adds or changes buildings cannot change water, collision or the content digest; it
-  also checks the packs carry building records after the water. Update a pin only for a
+  also checks the packs carry building records after the water, hold no baked window triangles and
+  that every facade record names a wall pair of its building. Update a pin only for a
   deliberate change to a map's water. `building_kit` (`tools/building_kit.py`) runs the kit
   fixtures (validation, determinism, outward faces, roles) and is registered only when
   shapely, numpy and pyproj are installed (`docs/adventure/requirements.txt`).

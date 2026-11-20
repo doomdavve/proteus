@@ -1,4 +1,5 @@
 #include "render/waterfront_corner.h"
+#include "scenery/building_windows.h"
 
 #include "core/waterfront_city.h"
 #include "render/waterfront_scene.h"
@@ -69,18 +70,9 @@ unsigned int waterfront_window_seed(size_t triangle, int column, int floor)
         + (unsigned int)floor * 374761393u;
 }
 
-Color waterfront_window_glass(unsigned int seed)
-{
-    return seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-        : seed % 7 == 3 ? (Color) { 181, 211, 221, 255 }
-                        : (Color) { 66, 100, 120, 255 };
-}
+Color waterfront_window_glass(unsigned int seed) { return building_window_glass(seed); }
 
-// About three in eight, mixed independently of the glass colour.
-bool waterfront_window_occupied(unsigned int seed)
-{
-    return ((seed ^ (seed >> 15)) * 2654435761u) >> 29 < 3;
-}
+bool waterfront_window_occupied(unsigned int seed) { return building_window_occupied(seed); }
 
 #define SCENERY_MAX_BOXES 16384
 

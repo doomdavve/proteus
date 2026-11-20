@@ -40,6 +40,25 @@ not depend on input order or on other buildings.
 C access: `boat_scenery_buildings`, `boat_scenery_runs`, `boat_scenery_roles`,
 `boat_scenery_facades` and `boat_scenery_window_styles` in `src/scenery/boat_scenery.h`.
 
+## Window generation
+
+`src/scenery/building_windows.[ch]` (in `proteus_boat_scenery`) is the one place that turns a
+facade record into windows; it draws nothing and allocates nothing. `building_wall` reads the
+wall's origin, end, outward normal, length and top from its triangle pair;
+`building_windows` and `building_window` give each window's quad (bottom left, top left, top
+right, bottom right, seen from outside), glass colour and whether it is lit at night, in the
+style's grid. Ground-floor windows have their own size. `BUILDING_WINDOW_NEAR_RANGE` (430 m) is
+the horizontal distance within which the renderers use the quads.
+
+Seeds depend on identity only: the facade seed is `crc32("<id>/<facade number>")` (computed by
+continuing the pack's id hash over `/<n>`, so the pack needs no id strings) and a window's seed is
+`fmix32(facade_seed + bay * 0x9E3779B1 + floor * 0x85EBCA77)`. Glass is `seed % 7` (0 to 2 mid
+blue, 3 pale, else dark); occupied (lit at night) is `((seed ^ (seed >> 15)) * 2654435761) >> 29 <
+3`, three in eight. The bay and floor are mixed by an integer function rather than hashed into
+the crc string so that the facade shader can repeat the formula exactly. Moving, reordering or
+adding other buildings never changes a window; changing a building's id or the number of a wall
+(an extra wall before it in the footprint ring) does.
+
 ## Commands
 
 ```sh
