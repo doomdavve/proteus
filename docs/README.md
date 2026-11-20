@@ -37,7 +37,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Controls | Pedal controls are on `main`; the human feel review is still open | 2026-10-26 | [pedals handoff](CONTROLS_PEDALS_HANDOFF.md) |
 | Living city | Step 06 people and cyclists; perched gulls | 2026-10-31 | [living city plan](LIVING_CITY_PLAN.md) |
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
-| Releases | v0.0.26 published/deployed; human input/audio, physical-device/network and browser timing/freshness review remain | 2026-11-09 | [releases](RELEASES.md#status-and-verification) |
+| Releases | v0.0.26 recorded; v0.0.31 is the latest published/deployed release; human input/audio, physical-device/network and browser timing/freshness review remain | 2026-11-14 | [releases](RELEASES.md#status-and-verification) |
 
 ## Empty-room server CPU
 
