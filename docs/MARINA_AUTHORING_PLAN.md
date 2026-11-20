@@ -5,8 +5,9 @@ one-shot services are merged (M4: #209); M5 (package-local modules, the shared E
 and the integrated example `marina-integrated-demo`) is merged (#211). The contracts live in the [Plugin API](PLUGIN_API.md): M4 in
 [Marina vessel services](PLUGIN_API.md#marina-vessel-services-m4), M5 in
 [Package modules](PLUGIN_API.md#package-modules-m5). What remains is listed as explicit open items in
-[Closing leftovers](#closing-leftovers--2026-11-15). No next task is scheduled. Automated verification and human acceptance are separate; no human review of
-M5 motion has happened. The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
+[Closing leftovers](#closing-leftovers--2026-11-15). No next task is scheduled. Automated verification and human acceptance are separate: on
+2026-11-15 the user watched `marina-berth-demo` and `marina-integrated-demo` in motion and said
+"Looks ok" (a motion check, not a formal acceptance; the details they looked at were not recorded). The [plugin plan](PLUGIN_PLAN.md) owns the broader roadmap.
 
 ## Agreed result
 
@@ -1168,8 +1169,8 @@ Open, verification not performed:
 - An independent-session comparison.
 - Windows and Linux builds of the new IO and `modules` paths.
 - Release-build measurements (the W6 numbers are Debug only).
-- Human motion review of `marina-berth-demo` and `marina-integrated-demo`; the windowed runs were
-  never watched.
+- Human motion review of `marina-berth-demo` and `marina-integrated-demo`: done 2026-11-15 (the user
+  watched both and said "Looks ok"); the recorded windowed runs were unwatched when made.
 - The measured baseline in the #131 note is not reproduced by this tree on this host (13.7/14.3 ms
   here against 9.2/9.5 ms there), so W6 compared against `harbor-life` today.
 
