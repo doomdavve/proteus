@@ -18,7 +18,7 @@ Working Harbour is the exception: it starts at noon and follows its own day/nigh
 default, so the saved LIGHTING choice does not fix that view.
 PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
 SMOOTH (the default) supersamples it,
-and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
+and HIGH RES draws the scene at up to 1280×800 behind a HUD drawn on a finer 640×400 grid (half the size); it needs a GPU
 and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
 cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during
