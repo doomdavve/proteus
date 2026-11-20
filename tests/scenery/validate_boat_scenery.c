@@ -90,44 +90,32 @@ static bool rejected(const unsigned char *copy, size_t size)
 }
 
 // The migrated buildings of a loaded pack: records in range after the water, one role per
-// triangle, windows baked as quads of glass in the legacy palette with occupancy in alpha, and
-// no migrated wall the legacy window rule would add generic windows to.
+// triangle, no baked window triangles, and facade records on wall pairs of their building.
 static int check_migrated(const BoatMapDescription *map)
 {
     const BoatMapDescription *full = boat_scenery_of(map);
-    size_t count = 0;
+    size_t count = 0, facades = 0, styles = 0;
     const BoatSceneryBuilding *list = boat_scenery_buildings(map, &count);
+    const BoatSceneryFacade *facade = boat_scenery_facades(map, &facades);
+    const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
     const unsigned char *roles = boat_scenery_roles(map);
-    CHECK(full && list && roles && count > 0);
-    size_t water = boat_map_leading_water(full->mesh), windows = 0, firsts = 0, lit = 0;
+    CHECK(full && list && roles && facade && style && count > 0 && facades > 0 && styles == 1);
+    size_t water = boat_map_leading_water(full->mesh), listed = 0;
     for (size_t b = 0; b < count; ++b) {
         CHECK(list[b].first >= water && list[b].end <= full->mesh->triangle_count);
         CHECK(list[b].min.y < list[b].max.y);
-        for (size_t i = list[b].first; i < list[b].end; ++i) {
-            const Triangle3D *t = &full->mesh->triangles[i];
+        CHECK(list[b].detail_first == list[b].end); // Windows are generated, not baked.
+        for (size_t i = list[b].first; i < list[b].end; ++i)
             CHECK(roles[i] != BOAT_SCENERY_ROLE_NONE);
-            // Windows are exactly the triangles from detail_first on, in pairs.
-            CHECK((roles[i] == BOAT_SCENERY_ROLE_WINDOW) == (i >= list[b].detail_first));
-            if (roles[i] != BOAT_SCENERY_ROLE_WINDOW)
-                continue;
-            ++windows;
-            Vector3 q[4];
-            bool first = waterfront_baked_window(full->mesh, i, q);
-            firsts += first;
-            CHECK(first == ((i - list[b].detail_first) % 2 == 0));
-            CHECK(t->color.a == 0 || t->color.a == 255);
-            CHECK((t->color.r == 138 && t->color.g == 185 && t->color.b == 204)
-                || (t->color.r == 181 && t->color.g == 211 && t->color.b == 221)
-                || (t->color.r == 66 && t->color.g == 100 && t->color.b == 120));
-            lit += first && waterfront_baked_window_occupied(t->color);
-            if (first) { // Outward, 3.5 cm off the wall: on the building's side of its bounds.
-                Vector3 n
-                    = Vector3CrossProduct(Vector3Subtract(q[1], q[0]), Vector3Subtract(q[2], q[0]));
-                CHECK(fabsf(n.y) < 1e-3f * Vector3Length(n) && q[2].y > q[0].y);
-            }
+        for (size_t f = 0; f < list[b].facade_count; ++f, ++listed) {
+            const BoatSceneryFacade *w = &facade[list[b].facade_first + f];
+            CHECK(w->id_hash == list[b].id_hash && w->bays > 0 && w->floors > 0);
+            CHECK(w->wall >= list[b].first && w->wall + 2 <= list[b].end);
+            CHECK(roles[w->wall] == BOAT_SCENERY_ROLE_WALL
+                && roles[w->wall + 1] == BOAT_SCENERY_ROLE_WALL);
         }
     }
-    CHECK(windows > 0 && windows == 2 * firsts && lit > firsts / 5 && lit < firsts / 2);
+    CHECK(listed == facades);
     return 0;
 }
 
@@ -173,7 +161,7 @@ int main(void)
     copy[0] ^= 1; // Magic.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
-    put32(copy + 4, 3); // Unknown version.
+    put32(copy + 4, 4); // Unknown version.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
     put32(copy + 8, 1); // Vertex count no longer matches the payload size.
@@ -189,76 +177,115 @@ int main(void)
     CHECK(river_pack && rejected(river_pack, river_size)); // Another map's water.
     free(river_pack);
 
-    // Version 2: the same pack with a trailing building-record block (tools/map_pack.py).
-    // The shipped pack is version 2; the synthetic cases reuse only its vertices and triangles.
+    // Version 3: the same pack with a trailing building-record block (tools/map_pack.py). The
+    // shipped pack is version 3; the synthetic cases reuse only its vertices and triangles, and a
+    // real wall pair of it (a, c, b), (a, d, c) as the facade's wall.
     size_t stream = 32 + (size_t)pack[28] + 256u * pack[29] + 65536u * pack[30];
     CHECK(stream < size);
     uint32_t water_count = (uint32_t)waterfront_outer_map.mesh->triangle_count;
-    CHECK(water_count + 20 < pack[12] + 256u * pack[13] + 65536u * pack[14]);
+    uint32_t wall = 0;
+    {
+        CHECK(boat_scenery_load_bytes(&waterfront_outer_map, pack, size));
+        const Mesh3D *mesh = boat_scenery_of(&waterfront_outer_map)->mesh;
+        for (uint32_t i = water_count + 1; !wall && i + 20 < mesh->triangle_count; ++i) {
+            const Triangle3D *t = &mesh->triangles[i], *u = &mesh->triangles[i + 1];
+            Vector3 a = mesh->vertices[t->vertices[0]], c = mesh->vertices[t->vertices[1]];
+            Vector3 e = mesh->vertices[t->vertices[2]];
+            if (u->vertices[0] == t->vertices[0] && u->vertices[2] == t->vertices[1] && a.y == e.y
+                && c.x == e.x && c.z == e.z && c.y > a.y)
+                wall = i;
+        }
+        boat_scenery_unload();
+        CHECK(wall > water_count);
+    }
     free(copy);
     copy = malloc(stream + 4096);
     CHECK(copy);
-    struct {
-        uint32_t id, first, end, detail, run_first, run_count;
-        float box[6];
-    } b[2] = { { 11, water_count + 1, water_count + 9, water_count + 7, 0, 2,
-                   { 0, 3, 0, 1, 9, 1 } },
-        { 22, water_count + 12, water_count + 15, water_count + 15, 2, 0, { 0, 0, 0, 1, 1, 1 } } };
-    uint32_t r[2][3] = { { water_count + 1, water_count + 5, 1 | 7 << 8 | 4096u << 16 },
-        { water_count + 7, water_count + 9, 3 | 255 << 8 } };
+    enum { HEAD = 5, B0 = HEAD, B1 = B0 + 14, RUNS = B1 + 14, FACADE = RUNS + 6, STYLE = FACADE + 3,
+        WORDS = STYLE + 9 };
+    float tiny[9] = { 0, 1, 0, 1, .01f, .01f, .01f, .01f, 0 }; // Fits any wall.
+    uint32_t words0[WORDS] = { 0x444C4250u, 2, 2, 1, 1 };
+    uint32_t b0[14] = { 11, wall, wall + 8, wall + 6, 0, 2, 0, 1 };
+    uint32_t b1[14] = { 22, wall + 12, wall + 15, wall + 15, 2, 0, 1, 0 };
+    float box0[6] = { 0, 3, 0, 1, 9, 1 }, box1[6] = { 0, 0, 0, 1, 1, 1 };
+    memcpy(b0 + 8, box0, sizeof(box0));
+    memcpy(b1 + 8, box1, sizeof(box1));
+    memcpy(words0 + B0, b0, sizeof(b0));
+    memcpy(words0 + B1, b1, sizeof(b1));
+    uint32_t r[6] = { wall, wall + 4, 1 | 7 << 8 | 4096u << 16, wall + 6, wall + 8, 3 | 255 << 8 };
+    memcpy(words0 + RUNS, r, sizeof(r));
+    words0[FACADE] = wall;
+    words0[FACADE + 1] = 3 | 1u << 16; // Facade number 3, one bay.
+    words0[FACADE + 2] = 1; // One floor, style 0, reserved byte 0.
+    memcpy(words0 + STYLE, tiny, sizeof(tiny));
     struct {
         const char *what;
-        int field; // Index into the 4 head, 24 building and 6 run words; -1: no change.
+        int field; // Index into the words above; -1: no change.
         uint32_t value;
     } cases[] = { { "ok", -1, 0 }, { "magic", 0, 1 }, { "building count", 1, 3 },
-        { "run count", 2, 1 }, { "reserved", 3, 5 }, { "first in water", 4 + 1, 1 },
-        { "overlap", 4 + 12 + 1, water_count + 8 }, { "empty", 4 + 2, water_count + 1 },
-        { "past mesh", 4 + 2, 0xFFFFFFF0u }, { "detail past end", 4 + 3, water_count + 10 },
-        { "duplicate id", 4 + 12, 11 }, { "run mismatch", 4 + 4, 1 }, { "bad role", 4 + 24 + 2, 9 },
-        { "role none", 4 + 24 + 5, 0 }, { "run outside", 4 + 24 + 4, water_count + 12 },
-        { "run order", 4 + 24 + 3, 0 } };
-    size_t block_words = 4 + 12 + 12 + 6;
+        { "run count", 2, 1 }, { "facade count", 3, 2 }, { "style count", 4, 0 },
+        { "first in water", B0 + 1, 1 }, { "overlap", B1 + 1, wall + 7 },
+        { "empty", B0 + 2, wall }, { "past mesh", B0 + 2, 0xFFFFFFF0u },
+        { "detail past end", B0 + 3, wall + 9 }, { "duplicate id", B1, 11 },
+        { "run mismatch", B0 + 4, 1 }, { "facade mismatch", B0 + 6, 1 },
+        { "bad role", RUNS + 2, 9 }, { "role none", RUNS + 5, 0 }, { "run outside", RUNS + 3, wall + 12 },
+        { "run order", RUNS + 3, 0 }, { "wall outside building", FACADE, wall + 7 },
+        { "wall not a wall", FACADE, wall + 6 }, { "wall unpaired", FACADE, wall + 1 },
+        { "no bays", FACADE + 1, 3 }, { "no floors", FACADE + 2, 0 },
+        { "no such style", FACADE + 2, 1 | 1u << 16 }, { "reserved byte", FACADE + 2, 1 | 1u << 24 },
+        { "grid larger than the wall", FACADE + 1, 3 | 60000u << 16 },
+        { "style not finite", STYLE, 0x7FC00000u }, { "style pitch", STYLE + 1, 0 },
+        { "style size", STYLE + 4, 0 } };
     for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
         memcpy(copy, pack, stream);
-        put32(copy + 4, 2);
-        unsigned char *at = copy + stream;
-        uint32_t words[4 + 12 + 12 + 6] = { 0x444C4250u, 2, 2, 0 };
-        memcpy(words + 4, b, sizeof(b));
-        memcpy(words + 4 + 24, r, sizeof(r));
+        put32(copy + 4, 3);
+        uint32_t words[WORDS];
+        memcpy(words, words0, sizeof(words));
         if (cases[c].field >= 0)
             words[cases[c].field] = cases[c].value;
-        for (size_t i = 0; i < block_words; ++i)
-            put32(at + 4 * i, words[i]);
-        size_t total = stream + block_words * 4;
+        for (size_t i = 0; i < WORDS; ++i)
+            put32(copy + stream + 4 * i, words[i]);
+        size_t total = stream + WORDS * 4;
         if (c == 0) {
             CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, total));
-            size_t count = 0, runs = 0;
+            size_t count = 0, runs = 0, facades = 0, styles = 0;
             const BoatSceneryBuilding *list = boat_scenery_buildings(&waterfront_outer_map, &count);
             const BoatSceneryRun *run = boat_scenery_runs(&waterfront_outer_map, &runs);
-            const BoatMapDescription *v2 = boat_scenery_of(&waterfront_outer_map);
-            CHECK(list && run && count == 2 && runs == 2 && list[1].id_hash == 22
-                && list[0].detail_first == water_count + 7 && list[0].max.y == 9
+            const BoatSceneryFacade *fa = boat_scenery_facades(&waterfront_outer_map, &facades);
+            const BoatSceneryWindowStyle *st
+                = boat_scenery_window_styles(&waterfront_outer_map, &styles);
+            const BoatMapDescription *v3 = boat_scenery_of(&waterfront_outer_map);
+            CHECK(list && run && fa && st && count == 2 && runs == 2 && facades == 1 && styles == 1);
+            CHECK(list[1].id_hash == 22 && list[0].detail_first == wall + 6 && list[0].max.y == 9
+                && list[0].facade_count == 1 && list[1].facade_first == 1
                 && run[0].facade == 7 && run[0].heading == 4096 && run[1].facade == 255);
-            CHECK(boat_scenery_buildings(v2, NULL) == list);
-            const unsigned char *roles = boat_scenery_roles(v2);
-            CHECK(roles && roles[water_count] == BOAT_SCENERY_ROLE_NONE
-                && roles[water_count + 1] == BOAT_SCENERY_ROLE_WALL
-                && roles[water_count + 5] == BOAT_SCENERY_ROLE_DETAIL
-                && roles[water_count + 7] == BOAT_SCENERY_ROLE_WINDOW
-                && roles[water_count + 9] == BOAT_SCENERY_ROLE_NONE
-                && roles[water_count + 12] == BOAT_SCENERY_ROLE_DETAIL);
+            CHECK(fa[0].id_hash == 11 && fa[0].wall == wall && fa[0].index == 3 && fa[0].bays == 1
+                && fa[0].floors == 1 && fa[0].style == 0 && st[0].bay_pitch == 1
+                && st[0].ground_width == .01f);
+            CHECK(boat_scenery_buildings(v3, NULL) == list);
+            const unsigned char *roles = boat_scenery_roles(v3);
+            CHECK(roles && roles[wall - 1] == BOAT_SCENERY_ROLE_NONE
+                && roles[wall] == BOAT_SCENERY_ROLE_WALL
+                && roles[wall + 5] == BOAT_SCENERY_ROLE_DETAIL
+                && roles[wall + 6] == BOAT_SCENERY_ROLE_DETAIL
+                && roles[wall + 8] == BOAT_SCENERY_ROLE_NONE
+                && roles[wall + 12] == BOAT_SCENERY_ROLE_DETAIL);
             boat_scenery_unload();
-            CHECK(!boat_scenery_buildings(&waterfront_outer_map, &count) && count == 0);
+            CHECK(!boat_scenery_buildings(&waterfront_outer_map, &count) && count == 0
+                && !boat_scenery_facades(&waterfront_outer_map, &facades) && facades == 0);
         } else {
             if (!rejected(copy, total))
-                fprintf(stderr, "v2 case accepted: %s\n", cases[c].what);
+                fprintf(stderr, "v3 case accepted: %s\n", cases[c].what);
             CHECK(rejected(copy, total));
         }
     }
     memcpy(copy, pack, stream);
-    put32(copy + 4, 2);
-    memset(copy + stream, 0, 16);
-    CHECK(rejected(copy, stream + 16) && rejected(copy, stream + 3) && rejected(copy, stream));
+    put32(copy + 4, 3);
+    memset(copy + stream, 0, 20);
+    CHECK(rejected(copy, stream + 20) && rejected(copy, stream + 3) && rejected(copy, stream));
+    memcpy(copy, pack, stream);
+    put32(copy + 4, 2); // Version 2 (baked windows) was never shipped and is not read.
+    CHECK(rejected(copy, stream + 20));
     memcpy(copy, pack, stream);
     put32(copy + 4, 1);
     CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, stream)); // Version 1 still loads.

@@ -34,6 +34,7 @@ from shapely.geometry import LineString, Point, Polygon, box  # noqa: E402
 from shapely.geometry.polygon import orient  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
 
+import building_kit  # noqa: E402
 import map_pack  # noqa: E402
 import outer_bridges  # noqa: E402
 import outer_dressing  # noqa: E402
@@ -74,7 +75,7 @@ UPSTREAM_ROUTE = survey.RIVER[:3] + [(400, 40), (900, 380), (1500, 560), (2000, 
 
 class Overlay:
     """Which river pack triangle each plain overlay triangle came from, and the pack's building
-    records (version 2), so buildings keep their identity through draping: a building is one
+    records (version 3), so buildings keep their identity through draping: a building is one
     solid for draping and its record follows its triangles into the outer pack."""
 
     def __init__(self, source, records):
@@ -103,13 +104,10 @@ class Overlay:
             def at(i, end=False):
                 return base + (position[i - 1] + 1 if end else position[i])
 
-            first, end = at(r["first"]), at(r["end"], True)
-            assert end - first == r["end"] - r["first"], f"building {r['hash']:08x} is not contiguous"
-            out.append({"hash": r["hash"], "first": first, "end": end,
-                        "detail_first": end if r["detail_first"] == r["end"]
-                        else at(r["detail_first"]),
-                        "runs": [(at(a), at(b, True), role, facade, heading)
-                                 for a, b, role, facade, heading in r["runs"]]})
+            moved = map_pack.shift_record(r, at)
+            assert moved["end"] - moved["first"] == r["end"] - r["first"], \
+                f"building {r['hash']:08x} is not contiguous"
+            out.append(moved)
         return out
 
 
@@ -121,7 +119,8 @@ def river_overlay():
     its triangles, which start at the pack's bridge first triangle. Coordinates are the pack's
     float32 values (before A3.5i, the header's 0.1 mm decimals).
     """
-    vertices, triangles, _, bridge_first, records = map_pack.read_pack(RIVER_GEOMETRY, True)
+    vertices, triangles, _, bridge_first, block = map_pack.read_pack(RIVER_GEOMETRY, True)
+    records = block[0] if block else None
     plain, bridge, source = [], [], []
     for index, (ids, color) in enumerate(triangles):
         points = [vertices[i] for i in ids]
@@ -490,9 +489,7 @@ def bake(water, region, model=None, overlay=None, dressing=(), records=None):
         f"land surface {surface_area:.1f} m2 differs from land {land.area:.1f} m2"
     tiny_edges = check_watertight(cells, land)
     assert sum(a for a, _ in DROPPED) < 1.0, f"untriangulated land {DROPPED[:5]}"
-    shift = lambda r: {**r, "first": r["first"] + plain_first, "end": r["end"] + plain_first,
-                       "detail_first": r["detail_first"] + plain_first,
-                       "runs": [(a + plain_first, b + plain_first, *rest) for a, b, *rest in r["runs"]]}
+    shift = lambda r: map_pack.shift_record(r, lambda i, end: i + plain_first)
     stats.update(records=None if records is None else [shift(r) for r in records],
                  overlay_triangles=len(plain), bridge_first=bridge_first,
                  bridge_triangles=len(bridge), dressing_first=dressing_first,
@@ -544,7 +541,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
     lines += ["};", "", *bridges]
     pack = map_pack.write(output, "outer", "tools/prepare_outer_map.py", vertices, triangles,
                           stats["bridge_first"], "\n".join(lines),
-                          buildings=stats.get("records"))
+                          buildings=stats.get("records"), styles=building_kit.STYLES)
     land = stats["land"]
     terrain = terrain if isinstance(terrain, dict) else None
     boundary = water.boundary.intersection(region.boundary.buffer(0.01))
@@ -588,7 +585,9 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
                           **(stats.get("draped") or {})},
         "building_records": stats.get("records") and {
             "count": len(stats["records"]),
-            "windows": sum(r["end"] - r["detail_first"] for r in stats["records"]),
+            "facades": sum(len(r["facades"]) for r in stats["records"]),
+            "windows": sum(f["bays"] * f["floors"] for r in stats["records"]
+                          for f in r["facades"]),
             "contract": "docs/BUILDINGS.md; ids are the stable source ids, '#N' for pieces of a "
                         "footprint clipped to the dressing area"},
         "land_triangles": stats.get("land_triangles"),
@@ -709,10 +708,7 @@ def main():
                    landmarks=landmark_stats, canal_bridges=bridge_stats)
     dressing = dressing + landmarks + canal_bridges
     records = overlay.records_at() + [
-        {**r, "first": r["first"] + len(objects), "end": r["end"] + len(objects),
-         "detail_first": r["detail_first"] + len(objects),
-         "runs": [(a + len(objects), b + len(objects), *rest) for a, b, *rest in r["runs"]]}
-        for r in building_records]
+        map_pack.shift_record(r, lambda i, end: i + len(objects)) for r in building_records]
     vertices, triangles, stats = bake(water, region, model, (objects + buildings, bridge, paint),
                                       dressing, records)
     stats["dressing"] = dressed

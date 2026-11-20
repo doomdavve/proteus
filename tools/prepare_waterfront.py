@@ -371,7 +371,7 @@ def prepare(output, expanded=False):
     import map_pack
     pack = map_pack.write(output, "river", "tools/prepare_waterfront.py", vertices, triangles,
                           bridge_first_triangle if expanded else len(triangles),
-                          buildings=records)
+                          buildings=records, styles=building_kit.STYLES)
     manifest = {"source": str(SOURCE.relative_to(ROOT)), "source_sha256": EXPECTED_HASH,
                 "snapshot": data.get("osm3s", {}).get("timestamp_osm_base", data.get("retrieved_utc")),
                 "origin_epsg3007": [ox, oy],
@@ -384,7 +384,9 @@ def prepare(output, expanded=False):
                 "scenery_sha256": hashlib.sha256(pack).hexdigest(),
                 "water_sha256": hashlib.sha256((output / "water.h").read_bytes()).hexdigest(),
                 "building_records": {"count": len(records),
-                                     "windows": sum(r["end"] - r["detail_first"] for r in records)},
+                                     "facades": sum(len(r["facades"]) for r in records),
+                                     "windows": sum(f["bays"] * f["floors"] for r in records
+                                                    for f in r["facades"])},
                 "buildings": manifest_buildings, "landscape": garden_manifest,
                 "building_parts": [{"osm": f"{e['type']}/{e['id']}", "height": h,
                                     "min_height": bottom} for e, _, h, bottom in parts]}

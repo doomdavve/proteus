@@ -4,30 +4,41 @@ Specification of the building data contract as implemented. It grows with the
 [buildings plan](BUILDINGS_PLAN.md); sections for source schema, families and facade
 construction are added when they exist. Nothing here describes unimplemented behaviour.
 
-## Scenery pack v2 building records
+## Scenery pack v3 building records
 
 `assets/geometry/<map>/scenery.bin` is written by `tools/map_pack.py` and read by
 `src/scenery/boat_scenery.c`. Version 1 is the 32-byte header plus one DEFLATE stream of
-vertices and triangles. Version 2 has the same header and stream, then an uncompressed record
-block that ends the file exactly (the layout is documented in `tools/map_pack.py`):
+vertices and triangles. Version 3 has the same header and stream, then an uncompressed record
+block that ends the file exactly (the layout is documented in `tools/map_pack.py`). Version 2,
+which baked a quad of triangles per window, was never shipped; the loader rejects it.
 
 - Per building: crc32 of its stable source id (for example `way/164963584`), triangle range
-  `[first, end)`, `detail_first` (attached detail such as windows starts there; walls and roof
-  come before it), its run table slice and the bounds of its triangles.
-- Per run: a triangle range with a role (`wall`, `roof`, `window`, `detail`), a facade index and
-  the facade's outward heading, so triangles can be grouped by orientation.
+  `[first, end)`, `detail_first` (attached detail starts there; walls and roof come before it,
+  and a migrated building has none yet), its run and facade table slices and the bounds of its
+  triangles.
+- Per run: a triangle range with a role (`wall`, `roof`, `detail`), a facade index and the
+  facade's outward heading, so triangles can be grouped by orientation.
+- Per facade (a wall that takes windows): the first triangle of its wall pair, its number in the
+  building, bay and floor counts and a window style. Origin, length, base and top y and heading
+  come from the pair's vertices, so draping and rebakes cannot disagree with the mesh. No window
+  triangles are stored: the runtime generator expands the grid (see
+  [Window generation](#window-generation)).
+- Per style: the grid (first bay offset, bay pitch, first floor height, floor pitch, ground and
+  upper window sizes, offset from the wall), shared by the facades that name it.
 - The leading water, `water.h`, the water atlas and the collision/digest data are not part of the
   records and do not change when records are added: all building triangles follow the water.
 
 The loader accepts version 1 (no records: renderers keep their legacy colour and geometry
-classification) and rejects a version 2 pack whose block is truncated, has trailing bytes,
+classification) and rejects a version 3 pack whose block is truncated, has trailing bytes,
 overlaps buildings or runs, places a building inside the water or outside the mesh, repeats an id
-hash, or has an unknown role. A triangle of a building outside every run is `detail`.
+hash, has an unknown role, a facade that is not on a wall pair of its building or whose grid does
+not fit its wall, or a style that is not finite and positive. A triangle of a building outside
+every run is `detail`.
 Identity is the id, not the position: the writer sorts records by first triangle and the hash does
 not depend on input order or on other buildings.
 
-C access: `boat_scenery_buildings`, `boat_scenery_runs`, `boat_scenery_roles` in
-`src/scenery/boat_scenery.h`.
+C access: `boat_scenery_buildings`, `boat_scenery_runs`, `boat_scenery_roles`,
+`boat_scenery_facades` and `boat_scenery_window_styles` in `src/scenery/boat_scenery.h`.
 
 ## Commands
 
@@ -51,12 +62,14 @@ entry. Descriptions are emitted in stable-id order, so input order does not matt
   5 upstream) are emitted with records. Every other building is emitted exactly as before the kit
   and has no record. With an empty set the packs equal the pre-kit packs.
 - A migrated building emits all its walls (the bake's pairs `a, c, b` and `a, d, c`, outward for
-  exterior rings and into courtyards), then the roofs, then baked window quads. Roles: one wall
-  run, one roof run, one window run per facade with its outward heading; `detail_first` is the
-  first window. A building with `facade=False` (stone) is all `detail`.
-- Windows: the legacy grid (2.5 m in, every 4 m; floors from 1.5 m every 3.2 m; none on walls under
-  5.5 m) as two triangles per window, glass colour from `crc32("<id>/<facade>/<bay>/<floor>")`;
-  the alpha byte is occupancy (255 lit at night). `glass` and `occupied` mirror the C functions.
+  exterior rings and into courtyards), then the roofs. Roles: one wall run and one roof run;
+  `detail_first` is the building's end. A building with `facade=False` (stone) is all `detail`.
+- Windows are facade records, not triangles. Window style 0 is the legacy grid (first bay 2.5 m
+  in, a bay every 4 m; floors from 1.5 m every 3.2 m; ground floor windows 2.2 x 1.9 m, upper 1.5
+  x 1.5 m; glass 3.5 cm off the wall). A wall gets a record when it is at least 5.5 m high and
+  `grid()` fits at least one window clear of the corners (0.3 m) and the top (0.5 m), and it is
+  not buried: its outside is not covered by another section of the same building that is as tall.
+  The facade number counts every wall in emission order, windowless ones included.
 - Draping into the outer map (`prepare_outer_map.py`): `Overlay` keeps each river triangle's pack
   index and building record. A recorded building is one solid for draping (lowest terrain under
   its base footprint), so raised parts and detached features follow it; other solids are grouped
@@ -70,6 +83,9 @@ python -I tools/prepare_outer_map.py                   # outer pack (reads the r
 ```
 
 ## Rendering consumers
+
+Transitional (rework step 1): the renderers read roles as below but have no window source for
+migrated buildings yet; the baked-window paths this section described are removed.
 
 Both renderers read roles through `boat_scenery_roles` and never classify a migrated building's
 triangles by colour or geometry (`waterfront_facade_role`, `waterfront_baked_window` in

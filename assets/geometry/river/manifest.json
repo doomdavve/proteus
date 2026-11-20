@@ -18,13 +18,14 @@
     950.0,
     800.0
   ],
-  "vertices": 68755,
-  "triangles": 81472,
-  "scenery_sha256": "85c75a74d38afd361c7d8b5c48067667d08f2456752650558a22cba58c2e9c48",
+  "vertices": 63035,
+  "triangles": 78612,
+  "scenery_sha256": "bfbab5808df2d1da1de7716a19fdb8944f2e4eeba3235f7706ce1b7e2ec471b2",
   "water_sha256": "f0dc521fd2e657cbe0b615a9e14a6cebf96d039553767575bc979ad82b68cf4c",
   "building_records": {
     "count": 11,
-    "windows": 2860
+    "facades": 54,
+    "windows": 1239
   },
   "buildings": [
     {

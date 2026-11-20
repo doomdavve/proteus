@@ -5,18 +5,22 @@ Both bakes (prepare_waterfront.py on flat ground, outer_dressing.py on terrain) 
 mapped building as a BuildingDescription and emit it through one Emitter, which writes the
 triangles in the order the pack records name:
 
-    walls of every section, then the roofs, then (detail_first) the baked window quads.
+    walls of every section, then the roofs.
 
 Walls come as the bake's pairs (a, c, b), (a, d, c) with a and b on the bottom edge, outward
 for the exterior ring counter-clockwise and the courtyard rings clockwise (shapely orient
-sign=1); roofs face up. Window quads stand 3.5 cm off their wall as (p, p + up, q + up) and
-(p, q + up, q). Each window is two triangles in glass colour; the alpha byte is the occupancy
-(255 lit at night, 0 dark), decided by the seed crc32("<id>/<facade>/<bay>/<floor>"), so a
-window's look depends on the building's stable id and its place on the facade only. The glass
-and occupancy functions mirror waterfront_window_glass/occupied in src/render/waterfront_corner.c.
+sign=1); roofs face up. Windows are not triangles: each wall that takes windows gets a facade
+record (map_pack.py documents it) with its wall pair, bay and floor counts and a window style,
+and the runtime generator (src/scenery/building_windows.c) expands them into quads near the
+camera and the facade shader draws them beyond. A window's identity and look depend on the
+building's stable id, its facade number (the wall's place in emission order, counting walls
+without windows) and its bay and floor only: see the seed in building_windows.h.
 
-Emitted records are the dicts tools/map_pack.py writes: id, first, end, detail_first, runs.
-A building without facade treatment (houses, stone) is all ROLE_DETAIL: drawn flat, no windows.
+Emitted records are the dicts tools/map_pack.py writes: id, first, end, detail_first, runs and
+facades. A building without facade treatment (houses, stone) is all ROLE_DETAIL: drawn flat,
+no windows. A wall buried in another section of the same building (a facade wall whose outside
+is covered by a section as tall as itself) gets none either; party walls between separate
+buildings are not known to the kit.
 
 Migration. Only buildings whose base id is in MIGRATED get records and baked windows; every other
 building is emitted exactly as before the kit (per section: walls, then roof; no records), so the
@@ -25,16 +29,22 @@ B3 rollout); an empty set reproduces the pre-kit packs byte for byte (apart from
 """
 import math
 import re
-import zlib
 from dataclasses import dataclass, field
 
+from shapely.geometry import LineString
 from shapely.geometry.polygon import orient
+from shapely.ops import unary_union
 
 import map_pack
 
 ID_PATTERN = re.compile(r"^(way|relation)/[0-9]+(#[0-9]+)?$")
 MIN_WINDOW_WALL = 5.5  # walls shorter than this get no windows
-WINDOW_OFFSET = .035
+# Window style 0, the legacy grid: first bay 2.5 m in, a bay every 4 m; first floor 1.5 m up, a
+# floor every 3.2 m; ground floor windows 2.2 x 1.9 m, upper floors 1.5 x 1.5 m; the glass stands
+# 3.5 cm off its wall. (u0, pitch_u, y0, pitch_v, w0, h0, w1, h1, offset), see map_pack.py.
+STYLES = [(2.5, 4.0, 1.5, 3.2, 2.2, 1.9, 1.5, 1.5, .035)]
+WINDOW_END_MARGIN = .3  # clear wall between the last window and the corner, metres
+WINDOW_TOP_MARGIN = .5  # and between the top window and the wall's top
 OVERRIDE_KEYS = {"wall", "roof", "windows"}
 # Source ids (without a "#piece" suffix) emitted with records and baked windows. B1 pilot, to
 # exercise the pipeline: the Eriksberg quay row and its neighbours (river crop), and a few
@@ -83,19 +93,6 @@ def sort_key(ident):
     kind, number = ident.split("/")
     number, _, piece = number.partition("#")
     return (kind, int(number), int(piece or -1))
-
-
-def glass(seed):
-    return ((138, 185, 204) if seed % 7 < 3 else (181, 211, 221) if seed % 7 == 3
-            else (66, 100, 120))
-
-
-def occupied(seed):
-    return (((seed ^ (seed >> 15)) * 2654435761) & 0xFFFFFFFF) >> 29 < 3
-
-
-def window_seed(ident, facade, bay, floor):
-    return zlib.crc32(f"{ident}/{facade}/{bay}/{floor}".encode()) & 0xFFFFFFFF
 
 
 def _rgb(color, what):
@@ -178,9 +175,8 @@ class Emitter:
         wall, roof = over.get("wall", d.wall), over.get("roof", d.roof)
         windows = d.facade and over.get("windows", True)
         first = self.count()
-        edges = []  # (a, b, bottom, top, facade) for walls that take windows
-        facade = 0
-        for s in d.sections:
+        edges = []  # (a, b, bottom, top, section) of each wall, in emission order
+        for section, s in enumerate(d.sections):
             for poly in polygons(s.shape):
                 poly = orient(poly, sign=1)
                 for ring in [poly.exterior, *poly.interiors]:
@@ -192,8 +188,7 @@ class Emitter:
                         c, e = (xx, s.top, zz), (x, s.top, z)
                         self.triangle([a, c, b], wall)
                         self.triangle([a, e, c], wall)
-                        edges.append((a, b, s.bottom, s.top, facade))
-                        facade += 1
+                        edges.append((a, b, s.bottom, s.top, section))
         runs = []
         walls_end = self.count()
         if walls_end > first:
@@ -209,49 +204,46 @@ class Emitter:
             runs.append((walls_end, roof_end,
                          map_pack.ROLE_ROOF if d.facade else map_pack.ROLE_DETAIL,
                          map_pack.NO_FACADE, 0))
-        detail_first = roof_end
+        facades = []
         if windows:
-            for a, b, bottom, top, index in edges:
-                start = self.count()
-                self._windows(d.id, index, a, b, bottom, top)
-                if self.count() > start:
-                    runs.append((start, self.count(), map_pack.ROLE_WINDOW,
-                                 index % map_pack.NO_FACADE, self._heading(a, b)))
-        return {"id": d.id, "first": first, "end": self.count(), "detail_first": detail_first,
-                "runs": runs}
+            for index, (a, b, bottom, top, section) in enumerate(edges):
+                bays, floors = grid(math.hypot(b[0] - a[0], b[2] - a[2]), top - bottom)
+                if bays and floors and not buried(d, section, a, b):
+                    # Walls are the first triangles of the building, a pair each, in edge order.
+                    facades.append({"wall": first + 2 * index, "index": index, "bays": bays,
+                                    "floors": floors, "style": 0})
+        return {"id": d.id, "first": first, "end": self.count(), "detail_first": roof_end,
+                "runs": runs, "facades": facades}
 
-    @staticmethod
-    def _heading(a, b):
-        dx, dz = b[0] - a[0], b[2] - a[2]
-        length = math.hypot(dx, dz)
-        nx, nz = dz / length, -dx / length  # outward, as the renderers derive it
-        return int(round(math.atan2(nz, nx) % math.tau / math.tau * 65536)) % 65536
 
-    def _windows(self, ident, facade, a, b, bottom, top):
-        if top - bottom < MIN_WINDOW_WALL:
-            return
-        dx, dz = b[0] - a[0], b[2] - a[2]
-        length = math.hypot(dx, dz)
-        ax, az = dx / length, dz / length
-        nx, nz = az, -ax
-        bays = 0
-        while 2.5 + bays * 4 < length - 1.5:
-            bays += 1
-        floors = 0
-        while bottom + 2.5 + floors * 3.2 < top - 1:
-            floors += 1
-        for floor in range(floors):
-            width, height = (2.2, 1.9) if floor == 0 else (1.5, 1.5)
-            y = bottom + 1.5 + floor * 3.2
-            for bay in range(bays):
-                seed = window_seed(ident, facade, bay, floor)
-                color = (*glass(seed), 255 if occupied(seed) else 0)
-                u = 2.5 + bay * 4
-                p = (a[0] + ax * u + nx * WINDOW_OFFSET, y, a[2] + az * u + nz * WINDOW_OFFSET)
-                q = (p[0] + ax * width, y, p[2] + az * width)
-                pu, qu = (p[0], y + height, p[2]), (q[0], y + height, q[2])
-                self.triangle([p, pu, qu], color)
-                self.triangle([p, qu, q], color)
+def grid(length, height, style=STYLES[0]):
+    """(bays, floors) of the window grid STYLE on a wall LENGTH metres long and HEIGHT high:
+    every window fits inside the wall, clear of the corners and the top. Walls under
+    MIN_WINDOW_WALL high get none."""
+    u0, pitch_u, y0, pitch_v, w0, h0, w1, h1, _ = style
+    if height < MIN_WINDOW_WALL:
+        return 0, 0
+    bays = 0
+    while u0 + bays * pitch_u + max(w0, w1) <= length - WINDOW_END_MARGIN:
+        bays += 1
+    floors = 0
+    while y0 + floors * pitch_v + (h0 if floors == 0 else h1) <= height - WINDOW_TOP_MARGIN:
+        floors += 1
+    return bays, floors
+
+
+def buried(d, section, a, b):
+    """True if the outside of wall A..B of SECTION of D lies inside another section of the same
+    building that spans the wall's full height: such a wall is interior and takes no windows."""
+    s = d.sections[section]
+    covering = [o.shape for i, o in enumerate(d.sections)
+                if i != section and o.bottom <= s.bottom + 1e-6 and o.top >= s.top - 1e-6]
+    if not covering:
+        return False
+    length = math.hypot(b[0] - a[0], b[2] - a[2])
+    nx, nz = (b[2] - a[2]) / length, -(b[0] - a[0]) / length  # outward, as the renderers derive it
+    line = LineString([(a[0] + nx * .05, a[2] + nz * .05), (b[0] + nx * .05, b[2] + nz * .05)])
+    return unary_union(covering).buffer(.02).contains(line)
 
 
 def map_pack_clockwise(triangle):
@@ -287,30 +279,47 @@ def self_test():
     assert out == out2 and records == records2
     assert [r["id"] for r in records] == ["way/3#1", "way/7", "relation/2"] or \
         [r["id"] for r in records] == sorted([r["id"] for r in records], key=sort_key)
-    # Adding an unrelated building leaves the other buildings' windows (seeds) unchanged.
+    # Adding an unrelated building leaves the other buildings' records (and so their windows)
+    # unchanged: identity is the id and the wall's place in the building, never a global index.
     extra = Desc("way/1", [Section(box(100, 0, 110, 10), 3.5, 12)], (5, 5, 5), (6, 6, 6))
     out3, records3 = build([a, b, c, extra])
-    windows = lambda o, r: [t for t in o[r["detail_first"]:r["end"]]]
     by = {r["id"]: r for r in records}
     by3 = {r["id"]: r for r in records3}
-    assert windows(out, by["way/7"]) == windows(out3, by3["way/7"]) and by["way/7"]["end"] > by["way/7"]["detail_first"]
+    rel = lambda r: [{**f, "wall": f["wall"] - r["first"]} for f in r["facades"]]
+    assert rel(by["way/7"]) == rel(by3["way/7"]) and by["way/7"]["facades"]
+    assert [r["id"] for r in records3] != [r["id"] for r in records]  # way/1 sorts in
     for r in records:
         pos = r["first"]
         for first, end, role, facade, heading in r["runs"]:
             assert first >= pos and end > first and end <= r["end"]
             pos = end
-        assert r["detail_first"] <= r["end"]
-    # Roles: walls, then roof, then windows; houses are detail only.
+        assert r["detail_first"] == r["end"]  # no baked detail: windows are runtime data
+    # No window triangles: a building is its walls then its roof, as before the kit.
+    assert len(out) == sum(r["end"] - r["first"] for r in records)
+    # Roles: one wall run, one roof run; houses are detail only.
     runs = by["way/7"]["runs"]
-    assert [x[2] for x in runs][:2] == [map_pack.ROLE_WALL, map_pack.ROLE_ROOF]
-    assert all(x[2] == map_pack.ROLE_WINDOW for x in runs[2:]) and len(runs) > 3
+    assert [x[2] for x in runs] == [map_pack.ROLE_WALL, map_pack.ROLE_ROOF]
     assert [x[2] for x in by["relation/2"]["runs"]] == [map_pack.ROLE_DETAIL] * 2
-    assert by["relation/2"]["detail_first"] == by["relation/2"]["end"]
+    assert by["relation/2"]["facades"] == []
+    # Facade records name wall pairs (a, c, b), (a, d, c) of the building and fit their wall.
+    r = by["way/7"]
+    seen = []
+    for f in r["facades"]:
+        t = out[f["wall"]][0]
+        nxt = out[f["wall"] + 1][0]
+        assert r["first"] <= f["wall"] < runs[0][1] and (f["wall"] - r["first"]) % 2 == 0
+        assert f["index"] == (f["wall"] - r["first"]) // 2 and f["index"] not in seen
+        seen.append(f["index"])
+        assert t[0][1] == t[2][1] and t[1][1] > t[0][1] and nxt[0] == t[0] and nxt[2] == t[1]
+        length = math.hypot(t[2][0] - t[0][0], t[2][2] - t[0][2])
+        assert (f["bays"], f["floors"]) == grid(length, t[1][1] - t[0][1])
+        assert f["bays"] >= 1 and f["floors"] >= 1 and f["style"] == 0
+    # Four outer walls, four courtyard walls facing the yard and the wing's four.
+    assert len(r["facades"]) == 4 + 4 + 4 and by["way/3#1"]["facades"]
     # Wall triangles are the bake's pairs facing away from the material (courtyard walls into
-    # the yard); every window quad faces away from it too; short walls have no windows.
+    # the yard); short walls take no windows.
     from shapely.geometry import Point
     material = court.union(box(45, 0, 55, 8))
-    r = by["way/7"]
 
     def outward(points):
         n = _normal(*points[:3])
@@ -323,13 +332,30 @@ def self_test():
     for i in range(r["first"], runs[0][1], 2):
         p0, p1, p2 = out[i][0]
         assert p0[1] == p2[1] and p1[1] > p0[1] and out[i + 1][0][0] == p0 and outward(out[i][0])
-    for i in range(r["detail_first"], r["end"], 2):
-        n = _normal(*out[i][0])
-        assert abs(n[1]) < 1e-9 and out[i][1][3] in (0, 255) and outward(out[i][0])
-        assert out[i][1] == out[i + 1][1]
-    assert len(by["way/3#1"]["runs"]) > 2 and by3["way/1"]["end"] > by3["way/1"]["detail_first"]
     for pts, _ in out[by["way/7"]["first"]:by["way/7"]["end"]]:
         assert all(math.isfinite(v) for p in pts for v in p)
+    # The grid: windows fit inside the wall, clear of corners and top; short and low walls none.
+    for length, height in [(5, 6), (9, 6), (40, 16), (4.9, 20), (20, 5.4), (20, 5.5)]:
+        bays, floors = grid(length, height)
+        u0, pu, y0, pv, w0, h0, w1, h1, _ = STYLES[0]
+        if bays:
+            assert u0 + (bays - 1) * pu + max(w0, w1) <= length - WINDOW_END_MARGIN + 1e-9
+            assert u0 + bays * pu + max(w0, w1) > length - WINDOW_END_MARGIN
+        if floors:
+            assert y0 + (floors - 1) * pv + (h0 if floors == 1 else h1) \
+                <= height - WINDOW_TOP_MARGIN + 1e-9
+    assert grid(4.9, 20) == (0, 0) or grid(4.9, 20)[0] == 0
+    assert grid(20, 5.4) == (0, 0) and grid(20, 5.5)[0] > 0 and grid(5, 6)[0] == 1
+    # A wall buried in a taller or equal neighbouring section of the same building has none:
+    # two blocks sharing the wall x = 10 (the lower block's wall is inside the tall one).
+    tall = Section(box(0, 0, 10, 10), 3.5, 20)
+    low = Section(box(10, 0, 20, 10), 3.5, 12)
+    twin = Desc("way/20", [tall, low], (1, 1, 1), (2, 2, 2))
+    out6, rec6 = build([twin])
+    shared = [out6[f["wall"]][0] for f in rec6[0]["facades"]
+              if out6[f["wall"]][0][0][0] == 10 == out6[f["wall"]][0][2][0]]
+    assert len(rec6[0]["facades"]) == 7  # 8 walls: the low block's wall at x = 10 is buried
+    assert len(shared) == 1 and shared[0][1][1] == 20  # only the tall block's wall keeps windows
     # A legacy building has no record and is walls then roof per section; migration is by id.
     old = BuildingDescription("way/50", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1), (2, 2, 2))
     assert not migrated("way/50") and migrated("way/164963584#2")
@@ -339,7 +365,7 @@ def self_test():
     d = Desc("way/9", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1), (2, 2, 2),
                             override="no-windows")
     out4, rec4 = build([d], {"no-windows": {"windows": False}})
-    assert rec4[0]["detail_first"] == rec4[0]["end"]
+    assert rec4[0]["detail_first"] == rec4[0]["end"] and rec4[0]["facades"] == []
     for bad in [Desc("way/9", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1),
                                     (2, 2, 2), override="missing"),
                 Desc("bogus", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1), (2, 2, 2)),
@@ -368,10 +394,6 @@ def self_test():
         pass
     else:
         raise AssertionError("unknown override key accepted")
-    # The glass and occupancy functions mirror the C ones.
-    assert glass(0) == (138, 185, 204) and glass(3) == (181, 211, 221) and glass(6) == (66, 100, 120)
-    assert occupied(0) is True and sum(occupied(window_seed("way/1", 0, i, 0))
-                                       for i in range(800)) in range(200, 400)
     # The same building and the same geometry always give the same pack bytes.
     import tempfile
     from pathlib import Path
@@ -392,7 +414,7 @@ def self_test():
             water = [[(0, 0, 0), (0, 0, 1), (1, 0, 0)]]
             sink(water[0], (1, 2, 3))
             records = Emitter(sink, lambda: len(tris), tri).emit_all(order)
-            packs.append(map_pack.pack_bytes(verts, tris, len(tris), records))
+            packs.append(map_pack.pack_bytes(verts, tris, len(tris), records, STYLES))
         assert packs[0] == packs[1]
 
 

@@ -132,21 +132,6 @@ static void windows(Renderer3D *r, const BoatMapDescription *map, const unsigned
         if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *t = &city->triangles[i];
-        if (roles && roles[i] == BOAT_SCENERY_ROLE_WINDOW) {
-            // A baked window of a migrated building: draw it as the generic ones are.
-            Vector3 q[4];
-            if (!waterfront_baked_window(city, i, q))
-                continue;
-            Vector3 normal = Vector3Normalize(
-                Vector3CrossProduct(Vector3Subtract(q[1], q[0]), Vector3Subtract(q[2], q[0])));
-            if (Vector3DotProduct(normal, Vector3Subtract(r->camera.position, q[0])) <= 0
-                || Vector3Distance(r->camera.position, q[0]) > 430)
-                continue;
-            Color color = window_tint((Color) { t->color.r, t->color.g, t->color.b, 255 },
-                waterfront_baked_window_occupied(t->color), lighting);
-            glow_quad(r, q[0], q[1], q[2], q[3], color);
-            continue;
-        }
         if (roles && roles[i] != BOAT_SCENERY_ROLE_NONE)
             continue; // Migrated building: no generic windows on its walls.
         Vector3 a = city->vertices[t->vertices[0]];
@@ -250,26 +235,6 @@ bool waterfront_draw_harbor(
     return true;
 }
 
-// The land triangles of one tile, less the baked windows, which the windows pass draws lit.
-static void draw_land(Renderer3D *r, const Mesh3D *city, const unsigned char *roles,
-    const unsigned int *triangles, size_t count)
-{
-    if (!roles) {
-        renderer3d_draw_mesh_triangles(r, city, triangles, count);
-        return;
-    }
-    unsigned int chunk[512];
-    size_t n = 0;
-    for (size_t k = 0; k < count; ++k) {
-        if (roles[triangles[k]] != BOAT_SCENERY_ROLE_WINDOW)
-            chunk[n++] = triangles[k];
-        if (n == sizeof(chunk) / sizeof(chunk[0]) || (k + 1 == count && n)) {
-            renderer3d_draw_mesh_triangles(r, city, chunk, n);
-            n = 0;
-        }
-    }
-}
-
 bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,
     int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall,
     const WaterfrontLighting *lighting, double time)
@@ -287,7 +252,6 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
     // off their wall, so the test grows each tile's box by more than that.
     const BoatMapTiles *tiles = &scenery->tiles;
     const Mesh3D *city = scenery->full->mesh;
-    const unsigned char *roles = boat_scenery_roles(scenery->full);
     if (!omit_water) {
         Mesh3D water = *city;
         water.triangle_count = tiles->water_count;
@@ -305,7 +269,8 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
         if (tile->land_count
             && renderer3d_box_visible(
                 r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
-            draw_land(r, city, roles, &tiles->land[tile->land_first], tile->land_count);
+            renderer3d_draw_mesh_triangles(
+                r, city, &tiles->land[tile->land_first], tile->land_count);
     }
     if (scenery->river) {
         WaterfrontSceneFrame frame;

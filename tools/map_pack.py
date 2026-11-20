@@ -8,8 +8,9 @@ A bake writes two files into assets/geometry/<name>/:
   triangles, bridge first triangle, payload bytes, compressed bytes) and one raw DEFLATE stream.
   The payload holds the vertices as float32 x, y, z, then the triangles as three u32 vertex
   indices and an RGBA colour, the layout of geometry3d.h.
-  Version 2 appends, after the DEFLATE stream, an uncompressed building-record block (see
-  BUILDING_BLOCK below); version 1 packs have none and the loader still accepts them. The
+  Version 3 appends, after the DEFLATE stream, an uncompressed building-record block (see
+  BUILDING_BLOCK below); version 1 packs have none and the loader still accepts them. (Version 2,
+  which baked window triangles, was never shipped and is no longer read.) The
   header's water count and the leading water triangles are the same in both versions.
 - water.h, the compiled collision map: the leading water triangles alone, with their vertices
   renumbered in their original order. Physics, the server and the multiplayer content digest
@@ -31,29 +32,42 @@ from pathlib import Path
 
 MAGIC = 0x4E435350  # "PSCN"
 VERSION_1 = 1
-VERSION = 2
+VERSION = 3
 HEADER = struct.Struct("<8I")
 TRIANGLE = struct.Struct("<3I4B")
 
-# Version 2 building-record block, little-endian, directly after the DEFLATE stream and ending
-# the file exactly: a 16-byte head of four u32 (magic "PBLD", building count, run count, 0), then
-# the buildings, then the runs.
-#   building (48 bytes): u32 id hash (crc32 of the stable id, e.g. "way/164963584"), first
+# Version 3 building-record block, little-endian, directly after the DEFLATE stream and ending
+# the file exactly: a 20-byte head of five u32 (magic "PBLD", building count, run count, facade
+# count, style count), then the buildings, runs, facades and styles.
+#   building (56 bytes): u32 id hash (crc32 of the stable id, e.g. "way/164963584"), first
 #     triangle, end triangle (exclusive), detail_first (the first triangle of the building's
-#     attached detail: windows, balconies; walls and roof come before it), first run, run count;
-#     f32 min x, y, z and max x, y, z of its triangles (base_y and top_y are the y values).
+#     attached detail: balconies, canopies; walls and roof come before it), first run, run count,
+#     first facade, facade count; f32 min x, y, z and max x, y, z of its triangles.
 #   run (12 bytes): u32 first triangle, end triangle (exclusive), then u8 role, u8 facade index
 #     (255 none), u16 heading (outward facade direction, 0..65535 for the full turn from +X
 #     toward +Z; 0 when not a facade).
+#   facade (12 bytes): one wall that takes windows, as compact grid data; no window triangles are
+#     stored (src/scenery/building_windows.c expands them). u32 first triangle of the wall's pair
+#     (a, c, b) and (a, d, c), which gives the wall's origin a, end b, base y and top y, so a
+#     rebake or draping cannot disagree with the mesh; u16 facade number in its building (the
+#     window seed input; walls without windows leave gaps), u16 bays, u16 floors, u8 style
+#     (index into the styles), u8 zero.
+#   style (36 bytes): f32 first bay offset along the wall, bay pitch, first floor height above the
+#     base, floor pitch, ground floor window width and height, upper floor window width and
+#     height, and the offset of the window plane from the wall. Window F of bay B spans
+#     [u0 + B pitch, + width] along the wall and [y0 + F pitch, + height] above its base.
 # Buildings are sorted by first triangle, do not overlap, and lie after the leading water. Runs
 # of a building are ordered, disjoint and inside it; a triangle outside every run has no role
-# (the loader draws it as detail). Roles: ROLE_*.
+# (the loader draws it as detail). Facades of a building are ordered by number, inside it and on
+# wall-role triangles. Roles: ROLE_*.
 BUILDING_MAGIC = 0x444C4250  # "PBLD"
-BUILDING_HEAD = struct.Struct("<4I")
-BUILDING = struct.Struct("<6I6f")
+BUILDING_HEAD = struct.Struct("<5I")
+BUILDING = struct.Struct("<8I6f")
 RUN = struct.Struct("<3I")
-ROLE_NONE, ROLE_WALL, ROLE_ROOF, ROLE_WINDOW, ROLE_DETAIL = range(5)
-ROLE_COUNT = 5
+FACADE = struct.Struct("<I3HBB")
+STYLE = struct.Struct("<9f")
+ROLE_NONE, ROLE_WALL, ROLE_ROOF, ROLE_DETAIL = range(4)
+ROLE_COUNT = 4
 NO_FACADE = 255
 
 
@@ -90,13 +104,32 @@ def stable_id_hash(stable_id):
     return zlib.crc32(stable_id.encode("utf-8")) & 0xFFFFFFFF
 
 
-def building_block(vertices, triangles, water, buildings):
-    """The version 2 record block for BUILDINGS: dicts with "id" (stable id string), "first",
-    "end", "detail_first" and "runs" [(first, end, role, facade, heading)]. Raises ValueError on
-    any violation of the contract above. Order of the input does not matter; records are sorted
-    by first triangle."""
-    records, runs_out, seen = [], [], set()
+def shift_record(record, index):
+    """RECORD with every triangle number passed through INDEX(triangle, is_end): is_end is True
+    for an exclusive range end, which maps from the last triangle it names. Used to re-base
+    records when triangles are renumbered or moved."""
+    detail = record["detail_first"]
+    return {**record, "first": index(record["first"], False), "end": index(record["end"], True),
+            "detail_first": index(record["end"], True) if detail == record["end"]
+            else index(detail, False),
+            "runs": [(index(a, False), index(b, True), *rest) for a, b, *rest in record["runs"]],
+            "facades": [{**f, "wall": index(f["wall"], False)}
+                        for f in record.get("facades", [])]}
+
+
+def building_block(vertices, triangles, water, buildings, styles=()):
+    """The version 3 record block for BUILDINGS: dicts with "id" (stable id string), "first",
+    "end", "detail_first", "runs" [(first, end, role, facade, heading)] and optionally "facades"
+    [{"wall", "index", "bays", "floors", "style"}]. STYLES are the window grids facades refer to:
+    tuples of the nine STYLE floats. Raises ValueError on any violation of the contract above.
+    Order of the input does not matter; records are sorted by first triangle."""
+    records, runs_out, facades_out, seen = [], [], [], set()
     previous_end = water
+    for style in styles:
+        if len(style) != 9 or not all(math.isfinite(v) for v in style) \
+                or not all(v > 0 for v in style[1:4:2] + style[4:8]) or style[0] < 0 \
+                or style[2] < 0 or style[8] < 0:
+            raise ValueError(f"bad window style {style!r}")
     for b in sorted(buildings, key=lambda b: b["first"]):
         ident = b["hash"] if "hash" in b else stable_id_hash(b["id"])
         first, end, detail = b["first"], b["end"], b["detail_first"]
@@ -122,15 +155,27 @@ def building_block(vertices, triangles, water, buildings):
                 raise ValueError(f"{b.get('id', ident)}: bad run role/facade/heading")
             cursor = r_end
             runs_out.append(RUN.pack(r_first, r_end, role | facade << 8 | heading << 16))
+        facade_first, last = len(facades_out), -1
+        for f in b.get("facades", []):
+            wall = f["wall"]
+            if not (first <= wall and wall + 2 <= end) or not last < f["index"] <= 0xFFFF \
+                    or not (1 <= f["bays"] <= 0xFFFF and 1 <= f["floors"] <= 0xFFFF) \
+                    or not 0 <= f["style"] < len(styles):
+                raise ValueError(f"{b.get('id', ident)}: bad facade {f!r}")
+            last = f["index"]
+            facades_out.append(FACADE.pack(wall, f["index"], f["bays"], f["floors"], f["style"], 0))
         records.append(BUILDING.pack(ident, first, end, detail, run_first,
-                                     len(runs_out) - run_first, *low, *high))
-    return (BUILDING_HEAD.pack(BUILDING_MAGIC, len(records), len(runs_out), 0)
-            + b"".join(records) + b"".join(runs_out))
+                                     len(runs_out) - run_first, facade_first,
+                                     len(facades_out) - facade_first, *low, *high))
+    return (BUILDING_HEAD.pack(BUILDING_MAGIC, len(records), len(runs_out), len(facades_out),
+                               len(styles))
+            + b"".join(records) + b"".join(runs_out) + b"".join(facades_out)
+            + b"".join(STYLE.pack(*style) for style in styles))
 
 
-def pack_bytes(vertices, triangles, bridge_first, buildings=None):
+def pack_bytes(vertices, triangles, bridge_first, buildings=None, styles=()):
     """VERTICES: float32-exact (x, y, z); TRIANGLES: [((a, b, c), (r, g, b[, alpha]))]. BUILDINGS None
-    writes a version 1 pack; a list (possibly empty) writes version 2 with its records."""
+    writes a version 1 pack; a list (possibly empty) writes version 3 with its records."""
     payload = bytearray()
     for p in vertices:
         payload += struct.pack("<3f", *p)
@@ -141,33 +186,42 @@ def pack_bytes(vertices, triangles, bridge_first, buildings=None):
     water = leading_water(vertices, triangles)
     head = HEADER.pack(MAGIC, VERSION_1 if buildings is None else VERSION, len(vertices),
                        len(triangles), water, bridge_first, len(payload), len(data))
-    block = b"" if buildings is None else building_block(vertices, triangles, water, buildings)
+    block = b"" if buildings is None else building_block(vertices, triangles, water, buildings,
+                                                           styles)
     return head + data + block
 
 
 def read_buildings(blob):
-    """The version 2 block BLOB as [{"hash", "first", "end", "detail_first", "min", "max",
-    "runs": [(first, end, role, facade, heading)]}]."""
-    magic, count, run_count, _ = BUILDING_HEAD.unpack_from(blob)
+    """The version 3 block BLOB as ([{"hash", "first", "end", "detail_first", "min", "max",
+    "runs": [(first, end, role, facade, heading)], "facades": [{"wall", "index", "bays",
+    "floors", "style"}]}], styles)."""
+    magic, count, run_count, facade_count, style_count = BUILDING_HEAD.unpack_from(blob)
     assert magic == BUILDING_MAGIC
-    assert len(blob) == BUILDING_HEAD.size + count * BUILDING.size + run_count * RUN.size
     runs_at = BUILDING_HEAD.size + count * BUILDING.size
+    facades_at = runs_at + run_count * RUN.size
+    styles_at = facades_at + facade_count * FACADE.size
+    assert len(blob) == styles_at + style_count * STYLE.size
     out = []
     for i in range(count):
-        ident, first, end, detail, run_first, n, *box = BUILDING.unpack_from(
+        ident, first, end, detail, run_first, n, facade_first, facade_n, *box = BUILDING.unpack_from(
             blob, BUILDING_HEAD.size + i * BUILDING.size)
         runs = []
         for j in range(run_first, run_first + n):
             a, b, packed = RUN.unpack_from(blob, runs_at + j * RUN.size)
             runs.append((a, b, packed & 255, packed >> 8 & 255, packed >> 16))
+        facades = []
+        for j in range(facade_first, facade_first + facade_n):
+            wall, index, bays, floors, style, _ = FACADE.unpack_from(blob, facades_at + j * FACADE.size)
+            facades.append({"wall": wall, "index": index, "bays": bays, "floors": floors,
+                            "style": style})
         out.append({"hash": ident, "first": first, "end": end, "detail_first": detail,
-                    "min": box[:3], "max": box[3:], "runs": runs})
-    return out
+                    "min": box[:3], "max": box[3:], "runs": runs, "facades": facades})
+    return out, [STYLE.unpack_from(blob, styles_at + j * STYLE.size) for j in range(style_count)]
 
 
 def read_pack(path, with_buildings=False):
     """(vertices, triangles, water_count, bridge_first) from a scenery.bin, plus the building
-    records (None for version 1) when WITH_BUILDINGS."""
+    records and styles (None for version 1; read_buildings' pair) when WITH_BUILDINGS."""
     blob = Path(path).read_bytes()
     magic, version, nv, nt, water, bridge, size, packed = HEADER.unpack_from(blob)
     assert magic == MAGIC and version in (VERSION_1, VERSION), f"{path}: unknown pack version"
@@ -202,12 +256,13 @@ def water_header(prefix, generator, vertices, triangles, extra=""):
     return "\n".join(lines) + extra
 
 
-def write(output, prefix, generator, vertices, triangles, bridge_first, extra="", buildings=None):
+def write(output, prefix, generator, vertices, triangles, bridge_first, extra="", buildings=None,
+          styles=()):
     """Write scenery.bin and water.h; returns the pack bytes (for the manifest hash). BUILDINGS
-    as for pack_bytes."""
+    and STYLES as for pack_bytes."""
     output.mkdir(parents=True, exist_ok=True)
     vertices = [tuple(f32(f"{v:.4f}") for v in p) for p in vertices]
-    blob = pack_bytes(vertices, triangles, bridge_first, buildings)
+    blob = pack_bytes(vertices, triangles, bridge_first, buildings, styles)
     (output / "scenery.bin").write_bytes(blob)
     (output / "water.h").write_text(
         water_header(prefix, generator, vertices, triangles, extra))
@@ -264,37 +319,45 @@ def self_test():
         assert header.count("f, ") == 2 * 4, header  # Four water vertices, renumbered.
 
 
+STYLE_FIXTURE = (2.5, 4.0, 1.5, 3.2, 2.2, 1.9, 1.5, 1.5, .035)
+
+
 def building_fixture():
-    """Two buildings after two water triangles; returns (vertices, triangles, buildings)."""
+    """Two buildings after two water triangles; returns (vertices, triangles, buildings). Each
+    has one wall pair (a, c, b), (a, d, c), a roof-less detail triangle and one facade record."""
     vertices = [(0, 0, 0), (1, 0, 0), (0, 0, 1), (1, 0, 1)]
     triangles = [((0, 2, 1), (1, 2, 3)), ((1, 2, 3), (1, 2, 3))]
     buildings = []
     for n, (x, name) in enumerate([(10, "way/2"), (20, "way/1")]):
         base = len(vertices)
-        vertices += [(x, 3.5, 0), (x + 4, 3.5, 0), (x + 4, 9.5, 0), (x, 9.5, 0)]
+        vertices += [(x, 3.5, 0), (x + 8, 3.5, 0), (x + 8, 9.5, 0), (x, 9.5, 0)]
         first = len(triangles)
         triangles += [((base, base + 2, base + 1), (166, 173, 195)),
                       ((base, base + 3, base + 2), (166, 173, 195)),
                       ((base, base + 2, base + 3), (50, 60, 70))]
         buildings.append({"id": name, "first": first, "end": first + 3, "detail_first": first + 2,
-                          "runs": [(first, first + 2, ROLE_WALL, 0, 100 * n),
-                                   (first + 2, first + 3, ROLE_WINDOW, 0, 100 * n)]})
+                          "runs": [(first, first + 2, ROLE_WALL, NO_FACADE, 0),
+                                   (first + 2, first + 3, ROLE_DETAIL, NO_FACADE, 100 * n)],
+                          "facades": [{"wall": first, "index": 3 * n, "bays": 2, "floors": 1,
+                                       "style": 0}]})
     return vertices, triangles, buildings
 
 
 def building_test():
     vertices, triangles, buildings = building_fixture()
+    styles = [STYLE_FIXTURE]
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "scenery.bin"
-        blob = pack_bytes(vertices, triangles, 8, buildings)
+        blob = pack_bytes(vertices, triangles, 8, buildings, styles)
         path.write_bytes(blob)
-        *_, records = read_pack(path, True)
+        *_, (records, read_styles) = read_pack(path, True)
         assert [(r["first"], r["end"]) for r in records] == [(2, 5), (5, 8)]
-        assert records[0]["hash"] == stable_id_hash("way/2")
+        assert records[0]["hash"] == stable_id_hash("way/2") and read_styles == [STYLE.unpack(STYLE.pack(*STYLE_FIXTURE))]
         assert records[0]["min"][1] == 3.5 and records[0]["max"][1] == 9.5
-        assert records[1]["runs"][1] == (7, 8, ROLE_WINDOW, 0, 100)
+        assert records[1]["runs"][1] == (7, 8, ROLE_DETAIL, NO_FACADE, 100)
+        assert records[1]["facades"] == [{"wall": 5, "index": 3, "bays": 2, "floors": 1, "style": 0}]
         # Identity is the id, not the input order or the list position.
-        assert pack_bytes(vertices, triangles, 8, buildings[::-1]) == blob
+        assert pack_bytes(vertices, triangles, 8, buildings[::-1], styles) == blob
         # A version 1 pack carries no block and reads as before.
         v1 = pack_bytes(vertices, triangles, 8)
         path.write_bytes(v1)
@@ -303,9 +366,14 @@ def building_test():
         extra = [dict(b) for b in buildings]
         extra.append({"id": "way/9", "first": 8, "end": 9, "detail_first": 8, "runs": []})
         triangles2 = triangles + [((4, 6, 5), (1, 1, 1))]
-        records2 = read_buildings(building_block(vertices, triangles2, 2, extra))
+        records2, _ = read_buildings(building_block(vertices, triangles2, 2, extra, styles))
         assert [r["hash"] for r in records2[:2]] == [r["hash"] for r in records]
         assert records2[:2] == records
+        # Re-basing keeps the facade references with their triangles.
+        moved = shift_record(buildings[0], lambda i, end: i + 10)
+        assert moved["facades"][0]["wall"] == buildings[0]["facades"][0]["wall"] + 10
+        assert moved["first"] == buildings[0]["first"] + 10 and moved["end"] == buildings[0]["end"] + 10
+    wall = {"wall": 2, "index": 0, "bays": 1, "floors": 1, "style": 0}
     bad = [lambda b: b[0].update(first=1),  # inside the water
            lambda b: b[0].update(end=9),  # leaves the mesh
            lambda b: b[1].update(first=4),  # overlaps
@@ -313,15 +381,29 @@ def building_test():
            lambda b: b[0].update(id="way/1"),  # duplicate id
            lambda b: b[0]["runs"].append((2, 3, ROLE_WALL, 0, 0)),  # overlapping run
            lambda b: b[0]["runs"].__setitem__(0, (2, 4, 9, 0, 0)),  # bad role
-           lambda b: b[0]["runs"].__setitem__(0, (2, 4, ROLE_WALL, 0, 70000))]
+           lambda b: b[0]["runs"].__setitem__(0, (2, 4, ROLE_WALL, 0, 70000)),
+           lambda b: b[0]["facades"].__setitem__(0, {**wall, "wall": 4}),  # pair leaves the building
+           lambda b: b[0]["facades"].__setitem__(0, {**wall, "bays": 0}),
+           lambda b: b[0]["facades"].__setitem__(0, {**wall, "floors": 70000}),
+           lambda b: b[0]["facades"].__setitem__(0, {**wall, "style": 1}),  # no such style
+           lambda b: b[0]["facades"].append({**wall, "index": 0})]  # numbers must increase
     for mutate in bad:
         v, t, b = building_fixture()
         mutate(b)
         try:
-            building_block(v, t, 2, b)
+            building_block(v, t, 2, b, styles)
         except ValueError:
             continue
         raise AssertionError("invalid building records were accepted")
+    v, t, b = building_fixture()
+    for style in [(1,) * 8, (2.5, 0, 1.5, 3.2, 2.2, 1.9, 1.5, 1.5, .035),
+                  (2.5, 4, 1.5, 3.2, 2.2, 1.9, 1.5, float("nan"), .035),
+                  (2.5, 4, 1.5, 3.2, -2.2, 1.9, 1.5, 1.5, .035)]:
+        try:
+            building_block(v, t, 2, b, [style])
+        except ValueError:
+            continue
+        raise AssertionError(f"bad style {style} accepted")
 
 
 def main():

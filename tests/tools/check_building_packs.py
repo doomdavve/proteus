@@ -29,8 +29,9 @@ def main():
         pack = (directory / "scenery.bin").read_bytes()
         assert manifest["scenery_sha256"] == hashlib.sha256(pack).hexdigest(), \
             f"{name}: manifest does not describe scenery.bin"
-        vertices, triangles, leading, bridge, records = map_pack.read_pack(
+        vertices, triangles, leading, bridge, block = map_pack.read_pack(
             directory / "scenery.bin", True)
+        records, styles = block if block else (None, None)
         # The pack's leading water is exactly water.h's, triangle for triangle.
         compiled = re.findall(r"\{ \{ (\d+), (\d+), (\d+) \}, \{ (\d+), (\d+), (\d+), 255 \} \},",
                               water.decode())
@@ -41,6 +42,16 @@ def main():
         # Building detail lies after the water and the records are in range.
         assert records is not None and records, f"{name}: no building records"
         assert all(leading <= r["first"] and r["end"] <= len(triangles) for r in records)
+        # No baked window triangles: facade records (wall pairs of their building) hold windows.
+        assert len(styles) == 1 and all(r["detail_first"] == r["end"] for r in records)
+        facades = [f for r in records for f in r["facades"]]
+        assert facades, f"{name}: no facade records"
+        for r in records:
+            for f in r["facades"]:
+                t, u = triangles[f["wall"]][0], triangles[f["wall"] + 1][0]
+                a, c, b = (vertices[i] for i in t)
+                assert r["first"] <= f["wall"] and f["wall"] + 2 <= r["end"]
+                assert u[0] == t[0] and u[2] == t[1] and a[1] == b[1] and c[1] > a[1]
     print("building_packs=ok")
 
 

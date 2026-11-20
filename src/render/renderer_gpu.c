@@ -1058,8 +1058,6 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         Vector3 c = city->vertices[triangle->vertices[2]];
         const unsigned char *corners = occlusion ? &occlusion[i * 3] : NULL;
         unsigned char role = roles ? roles[i] : 0;
-        if (role == BOAT_SCENERY_ROLE_WINDOW)
-            continue; // Baked windows are drawn by the windows pass (build_windows).
         if (is_water_triangle(triangle)) {
             if (!builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
                 goto failed;
@@ -1166,20 +1164,8 @@ static bool build_windows(
         if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *triangle = &city->triangles[i];
-        if (roles && roles[i] != BOAT_SCENERY_ROLE_NONE) {
-            // Migrated building: its windows are baked quads, drawn one to one in both levels
-            // (distance merging of baked windows is a B4 lever); no generic windows.
-            Vector3 q[4];
-            if (roles[i] != BOAT_SCENERY_ROLE_WINDOW || !waterfront_baked_window(city, i, q))
-                continue;
-            Vector3 centroid = Vector3Scale(Vector3Add(q[0], q[2]), .5f);
-            size_t cell = detail_cell_of(scenery, centroid);
-            Color color = triangle->color; // Glass; alpha is the occupancy.
-            if (!builder_quad(&tiled.tiles[cell], q[0], q[1], q[2], q[3], color)
-                || !builder_quad(&far_tiled.tiles[cell], q[0], q[1], q[2], q[3], color))
-                goto failed;
-            continue;
-        }
+        if (roles && roles[i] != BOAT_SCENERY_ROLE_NONE)
+            continue; // Migrated building: no generic windows (its facade records have them).
         Vector3 a = city->vertices[triangle->vertices[0]];
         Vector3 c = city->vertices[triangle->vertices[1]];
         Vector3 b = city->vertices[triangle->vertices[2]];

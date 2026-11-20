@@ -80,14 +80,8 @@ bool waterfront_window_occupied(unsigned int seed);
 // Migrated buildings (scenery pack v2 records, scenery/boat_scenery.h) carry explicit roles
 // instead of the colour and geometry conventions above. ROLE is the BoatSceneryRole of a
 // triangle (0 for a pack without records or an unmigrated building, which keeps the legacy
-// classification); a migrated building never gets generic windows, since its windows are baked.
+// classification); a migrated building never gets generic windows: its facade records do.
 // A facade triangle: a WALL-role wall that is upright, or by the legacy rule for ROLE 0.
 bool waterfront_facade_role(unsigned char role, Vector3 a, Vector3 b, Vector3 c, Color color);
-// The four corners (bottom left, top left, top right, bottom right, outward) of baked window
-// TRIANGLE of MESH, if it is the first of its two triangles (the second returns false).
-bool waterfront_baked_window(const Mesh3D *mesh, size_t triangle, Vector3 corners[4]);
-// Daytime glass of a baked window triangle colour (its alpha is the occupancy: 255 is lit at
-// night) as waterfront_window_glass and waterfront_window_occupied give for a legacy seed.
-bool waterfront_baked_window_occupied(Color baked);
 
 #endif
