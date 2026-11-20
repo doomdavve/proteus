@@ -679,6 +679,7 @@ static int study(int argc, char **argv)
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false, far_detail = true;
     BoatResolution resolution = BOAT_RESOLUTION_LOW;
+    int hud_scale = 1; // High resolution draws the HUD on a finer grid so it takes less room.
     int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
     float lighting_hour = 0;
@@ -1108,6 +1109,8 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--resolution high needs the GPU renderer and replaces --gpu-aa.\n");
         goto invalid;
     }
+    if (gpu_enabled && resolution != BOAT_RESOLUTION_LOW)
+        hud_scale = 2;
     bool hdr = hdr_option < 0 ? resolution == BOAT_RESOLUTION_HIGH : hdr_option;
     if (hdr && (!gpu_enabled || gpu_aa)) {
         fprintf(stderr, "--hdr on needs the GPU renderer without --gpu-aa.\n");
@@ -1566,7 +1569,7 @@ static int study(int argc, char **argv)
             goto cleanup;
     }
     SetTextureFilter(texture, TEXTURE_FILTER_POINT);
-    frame_target = LoadRenderTexture(width, height);
+    frame_target = LoadRenderTexture(width * hud_scale, height * hud_scale);
     if (!IsRenderTextureValid(frame_target))
         goto cleanup;
     SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
@@ -1681,7 +1684,8 @@ static int study(int argc, char **argv)
         int next_width = width, next_height = height;
         if (wake_app_viewport(&next_width, &next_height) && gpu_enabled
             && (next_width != width || next_height != height)) {
-            RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
+            RenderTexture2D next_frame
+                = LoadRenderTexture(next_width * hud_scale, next_height * hud_scale);
             int window_scale = wake_app_canvas_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
                 next_width * window_scale, next_height * window_scale);
@@ -1783,9 +1787,11 @@ static int study(int argc, char **argv)
         if (gpu_enabled && (resolution != BOAT_RESOLUTION_LOW || hdr)
             && apply_screen_layout(&gpu, layout))
             texture = gpu.target.texture;
-        Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
-                                     destination.y + (height - 200) * scale / 2 },
-            .zoom = scale };
+        // High resolution draws the menu at the HUD's finer grid (never below one pixel).
+        int menu_zoom = scale / hud_scale < 1 ? 1 : scale / hud_scale;
+        Camera2D menu_camera = { .offset = { destination.x + (width * scale - 320 * menu_zoom) / 2,
+                                     destination.y + (height * scale - 200 * menu_zoom) / 2 },
+            .zoom = menu_zoom };
         if (menu_gate) {
             BoatMenuChoice choice
                 = boat_menu_update(&menu, &app_input, menu_camera, GetFrameTime());
@@ -2422,6 +2428,7 @@ static int study(int argc, char **argv)
         // High resolution draws the HUD over a transparent frame, accumulating premultiplied
         // alpha, and composites it over the full-size scene; low draws the scene into the frame.
         bool hud_overlay = gpu_enabled && resolution != BOAT_RESOLUTION_LOW;
+        int hw = width * hud_scale, hh = height * hud_scale; // The HUD's own grid.
         BeginTextureMode(frame_target);
         if (hud_overlay) {
             boat_screen_begin_overlay();
@@ -2437,20 +2444,19 @@ static int study(int argc, char **argv)
                 .steering = view->boat.wheel,
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
-            width,
-            height > width ? height - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80)
-                           : height);
+            hw,
+            hh > hw ? hh - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80) : hh);
         if (work_mode)
             wake_work_hud(&work,
                 &(WakeWorkProjection) { .view = view,
                     .presentation = view_presentation,
                     .world = view_world,
                     .camera = camera_settings },
-                width, height);
+                hw, hh);
         minimap.room_marks = live_view.marks;
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
-        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
+        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, hw, hh);
         if (chart) {
             Rectangle bounds = minimap_bounds;
             UpdateTexture(minimap_textures[minimap_mode], chart->data);
@@ -2459,10 +2465,10 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_NET
         if (net)
             wake_room_combat_hud(
-                net, width, height, view, view_presentation, view_world, camera_settings);
+                net, hw, hh, view, view_presentation, view_world, camera_settings);
 #endif
         if (mirror_visible)
-            boat_rearview_draw(&mirror, width);
+            boat_rearview_draw(&mirror, hw);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (!(mobile_buttons & 16) && mouse_driving && !menu.open)
             boat_ui_text(mouse_captured ? "MOUSE / P: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
@@ -2474,16 +2480,18 @@ static int study(int argc, char **argv)
                 (Color) { 218, 223, 202, 255 });
         if (review_label_frames > 0 && review_label) {
             --review_label_frames;
-            boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
+            boat_ui_text(review_label, 4, hh - 76, 10, (Color) { 233, 180, 104, 255 });
         }
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
             const char *time_label = TextFormat("TIME %.2gx%s", boat_time_rate(time_speed_index),
                 session.runs.practice ? " / PRACTICE" : "");
-            boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
+            boat_ui_text(time_label, 4, hh - 64, 10, (Color) { 233, 180, 104, 255 });
         }
+        BeginMode2D((Camera2D) { .zoom = (float)hud_scale });
         draw_touch_controls(width, height, destination, active && !demo && !session.runs.playing,
             mobile_buttons, mobile_button_height);
+        EndMode2D();
         if (hud_overlay)
             boat_screen_end_overlay();
         EndTextureMode();
@@ -2524,11 +2532,11 @@ static int study(int argc, char **argv)
             boat_ui_text(wake_room_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
                 12, SKYBLUE);
             int match_top
-                = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
+                = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale / hud_scale : 12;
             int roster_top = mirror_visible ? match_top + 28 : 12;
             if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
                 roster_top = (int)fmaxf((float)roster_top,
-                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
+                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale / hud_scale);
             int feed_top = wake_room_draw_roster(net, GetScreenWidth() - 12, roster_top);
             int objective_bottom
                 = wake_room_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
