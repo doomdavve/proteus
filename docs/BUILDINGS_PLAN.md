@@ -195,6 +195,25 @@ no disappeared buildings, doubled parts or obvious intersections. Next: B4 quali
 - Exercise native GPU, CPU captures and the browser on this machine. Name wider-platform and
   human-review gaps explicitly; use Instruments if measurements warrant deeper investigation.
 
+### Runtime cost levers (proposal, 2026-11-20)
+
+Baked windows raise triangle counts, so keep these levers available; none is decided or
+measured. The audit comes first: the GPU renderer already merges far windows 2x2 and tiles
+geometry into 512 m cells, and the CPU path already limits windows to about 430 m and
+camera-facing walls. Depth testing saves fill rate, not triangles.
+
+1. Window detail range: beyond a distance, replace window quads by a mask in the facade
+   shader or merged strips (windows are about 650k of 1.37M outer triangles in the B0 baseline).
+2. Group windows by facade orientation per tile so back-facing groups are skipped whole.
+3. Per-building distance/frustum culling from the v2 first/last triangle ranges and bounds.
+4. Instancing for repeated windows and balconies (larger change, mainly for the CPU path).
+5. Occlusion by the nearest quay row at boat level, only if measured to pay for its CPU cost.
+6. Drop windows, or use the far detail, in shadow and reflection passes (the far shadow map
+   has 1.5 m texels).
+
+B1 should keep per-building bounds, a detail range and facade grouping available in the v2
+records; B4 chooses and measures levers against the B0 budgets.
+
 Acceptance: measured budgets hold, required automated checks pass and review artifacts expose
 motion/pop/shadow/reflection behaviour. Automated demo exit is not human acceptance. Next: B5.
 
