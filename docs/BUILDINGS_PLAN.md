@@ -1,7 +1,8 @@
 # Buildings and waterfront architecture overhaul
 
-Status, 2026-11-20: B0 (inventory, baseline, decisions) done; no building implementation or visual
-acceptance yet. Results and proposed decisions are in [B0 results](#b0-results--2026-11-20).
+Status, 2026-11-20: B0 done. B1 in progress: pack v2 records, writer, loader and tests done
+(commit "B1: scenery pack v2"); kit, renderer consumers and rebake pending. No visual acceptance.
+Results and decisions are in [B0 results](#b0-results--2026-11-20).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
 Open: confirm the B0 decisions in B1, re-measure budgets on AC power, pilot look.

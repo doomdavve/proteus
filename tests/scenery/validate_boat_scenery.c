@@ -128,7 +128,7 @@ int main(void)
     copy[0] ^= 1; // Magic.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
-    put32(copy + 4, 2); // Version.
+    put32(copy + 4, 3); // Unknown version.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
     put32(copy + 8, 1); // Vertex count no longer matches the payload size.
@@ -143,6 +143,83 @@ int main(void)
     unsigned char *river_pack = read_file(RIVER_PACK, &river_size);
     CHECK(river_pack && rejected(river_pack, river_size)); // Another map's water.
     free(river_pack);
+
+    // Version 2: the same pack with a trailing building-record block (tools/map_pack.py).
+    uint32_t water_count = (uint32_t)waterfront_outer_map.mesh->triangle_count;
+    CHECK(water_count + 20 < pack[12] + 256u * pack[13] + 65536u * pack[14]);
+    free(copy);
+    copy = malloc(size + 4096);
+    CHECK(copy);
+    struct {
+        uint32_t id, first, end, detail, run_first, run_count;
+        float box[6];
+    } b[2] = { { 11, water_count + 1, water_count + 9, water_count + 7, 0, 2,
+                   { 0, 3, 0, 1, 9, 1 } },
+        { 22, water_count + 12, water_count + 15, water_count + 15, 2, 0, { 0, 0, 0, 1, 1, 1 } } };
+    uint32_t r[2][3] = { { water_count + 1, water_count + 5, 1 | 7 << 8 | 4096u << 16 },
+        { water_count + 7, water_count + 9, 3 | 255 << 8 } };
+    struct {
+        const char *what;
+        int field; // Index into the 4 head, 24 building and 6 run words; -1: no change.
+        uint32_t value;
+    } cases[] = { { "ok", -1, 0 }, { "magic", 0, 1 }, { "building count", 1, 3 },
+        { "run count", 2, 1 }, { "reserved", 3, 5 }, { "first in water", 4 + 1, 1 },
+        { "overlap", 4 + 12 + 1, water_count + 8 }, { "empty", 4 + 2, water_count + 1 },
+        { "past mesh", 4 + 2, 0xFFFFFFF0u }, { "detail past end", 4 + 3, water_count + 10 },
+        { "duplicate id", 4 + 12, 11 }, { "run mismatch", 4 + 4, 1 }, { "bad role", 4 + 24 + 2, 9 },
+        { "role none", 4 + 24 + 5, 0 }, { "run outside", 4 + 24 + 4, water_count + 12 },
+        { "run order", 4 + 24 + 3, 0 } };
+    size_t block_words = 4 + 12 + 12 + 6;
+    for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+        memcpy(copy, pack, size);
+        put32(copy + 4, 2);
+        unsigned char *at = copy + size;
+        uint32_t words[4 + 12 + 12 + 6] = { 0x444C4250u, 2, 2, 0 };
+        memcpy(words + 4, b, sizeof(b));
+        memcpy(words + 4 + 24, r, sizeof(r));
+        if (cases[c].field >= 0)
+            words[cases[c].field] = cases[c].value;
+        for (size_t i = 0; i < block_words; ++i)
+            put32(at + 4 * i, words[i]);
+        size_t total = size + block_words * 4;
+        if (c == 0) {
+            CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, total));
+            size_t count = 0, runs = 0;
+            const BoatSceneryBuilding *list = boat_scenery_buildings(&waterfront_outer_map, &count);
+            const BoatSceneryRun *run = boat_scenery_runs(&waterfront_outer_map, &runs);
+            const BoatMapDescription *v2 = boat_scenery_of(&waterfront_outer_map);
+            CHECK(list && run && count == 2 && runs == 2 && list[1].id_hash == 22
+                && list[0].detail_first == water_count + 7 && list[0].max.y == 9
+                && run[0].facade == 7 && run[0].heading == 4096 && run[1].facade == 255);
+            CHECK(boat_scenery_buildings(v2, NULL) == list);
+            const unsigned char *roles = boat_scenery_roles(v2);
+            CHECK(roles && roles[water_count] == BOAT_SCENERY_ROLE_NONE
+                && roles[water_count + 1] == BOAT_SCENERY_ROLE_WALL
+                && roles[water_count + 5] == BOAT_SCENERY_ROLE_DETAIL
+                && roles[water_count + 7] == BOAT_SCENERY_ROLE_WINDOW
+                && roles[water_count + 9] == BOAT_SCENERY_ROLE_NONE
+                && roles[water_count + 12] == BOAT_SCENERY_ROLE_DETAIL);
+            boat_scenery_unload();
+            CHECK(!boat_scenery_buildings(&waterfront_outer_map, &count) && count == 0);
+        } else {
+            if (!rejected(copy, total))
+                fprintf(stderr, "v2 case accepted: %s\n", cases[c].what);
+            CHECK(rejected(copy, total));
+        }
+    }
+    memcpy(copy, pack, size);
+    put32(copy + 4, 2);
+    memset(copy + size, 0, 16);
+    CHECK(rejected(copy, size + 16) && rejected(copy, size + 3) && rejected(copy, size));
+    memcpy(copy, pack, size);
+    CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, size)); // Version 1 still loads.
+    size_t none = 7;
+    CHECK(!boat_scenery_buildings(&waterfront_outer_map, &none) && none == 0
+        && !boat_scenery_roles(&waterfront_outer_map));
+    boat_scenery_unload();
+    free(copy);
+    copy = malloc(size);
+    CHECK(copy);
 
     // A well-formed pack loads once; its water is the compiled map's, triangle for triangle.
     CHECK(boat_scenery_load_bytes(&waterfront_outer_map, pack, size));

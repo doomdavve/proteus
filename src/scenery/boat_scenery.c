@@ -4,6 +4,7 @@
 #include "scenery/boat_ambient.h"
 #include "scenery/boat_water_atlas.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,8 @@
 // allocate and wipe a 64 MB scratch buffer per call; the pack states its exact size instead.
 extern int sinflate(void *out, int cap, const void *in, int size);
 
-enum { PACK_MAGIC = 0x4E435350, PACK_VERSION = 1, PACK_HEADER = 32 };
+enum { PACK_MAGIC = 0x4E435350, PACK_VERSION_1 = 1, PACK_VERSION = 2, PACK_HEADER = 32 };
+enum { BUILDING_MAGIC = 0x444C4250, BUILDING_HEAD = 16, BUILDING_SIZE = 48, RUN_SIZE = 12 };
 
 typedef struct {
     const BoatMapDescription *map; // The compiled description it belongs to; NULL: free slot.
@@ -21,6 +23,10 @@ typedef struct {
     Mesh3D mesh;
     void *payload; // Vertices, then triangles.
     size_t bytes;
+    BoatSceneryBuilding *buildings; // Version 2 records; NULL for version 1.
+    BoatSceneryRun *runs;
+    size_t building_count, run_count;
+    unsigned char *roles; // One per triangle when there are records.
 } Scenery;
 
 // Every location, plus the Eriksberg river crop (the river kit's layout source).
@@ -30,7 +36,7 @@ static Scenery loaded[SLOTS];
 static Scenery *find(const BoatMapDescription *map)
 {
     for (size_t i = 0; map && i < SLOTS; ++i)
-        if (loaded[i].map == map)
+        if (loaded[i].map == map || (loaded[i].map && &loaded[i].description == map))
             return &loaded[i];
     return NULL;
 }
@@ -39,6 +45,28 @@ const BoatMapDescription *boat_scenery_of(const BoatMapDescription *map)
 {
     Scenery *s = find(map);
     return s ? &s->description : NULL;
+}
+
+const BoatSceneryBuilding *boat_scenery_buildings(const BoatMapDescription *map, size_t *count)
+{
+    Scenery *s = find(map);
+    if (count)
+        *count = s ? s->building_count : 0;
+    return s && s->building_count ? s->buildings : NULL;
+}
+
+const BoatSceneryRun *boat_scenery_runs(const BoatMapDescription *map, size_t *count)
+{
+    Scenery *s = find(map);
+    if (count)
+        *count = s ? s->run_count : 0;
+    return s && s->run_count ? s->runs : NULL;
+}
+
+const unsigned char *boat_scenery_roles(const BoatMapDescription *map)
+{
+    Scenery *s = find(map);
+    return s ? s->roles : NULL;
 }
 
 const BoatMapDescription *boat_scenery_drawn(const BoatMapDescription *map)
@@ -52,6 +80,83 @@ const BoatMapDescription *boat_scenery_drawn(const BoatMapDescription *map)
 static uint32_t u32(const unsigned char *p)
 {
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+static float f32le(const unsigned char *p)
+{
+    uint32_t v = u32(p);
+    float f;
+    memcpy(&f, &v, sizeof f);
+    return f;
+}
+
+static void scenery_free(Scenery *s)
+{
+    free(s->payload);
+    free(s->buildings);
+    free(s->runs);
+    free(s->roles);
+    *s = (Scenery) { 0 };
+}
+
+// Parse the version 2 record block (exactly SIZE bytes) into S, checking the contract of
+// tools/map_pack.py: buildings sorted by first triangle after the leading water, disjoint, ids
+// unique, details and runs inside their building, runs ordered and disjoint, finite bounds.
+static bool read_buildings(
+    Scenery *s, const unsigned char *p, size_t size, uint32_t triangles, uint32_t water)
+{
+    if (size < BUILDING_HEAD || u32(p) != BUILDING_MAGIC || u32(p + 12) != 0)
+        return false;
+    uint64_t count = u32(p + 4), runs = u32(p + 8);
+    if ((uint64_t)size != BUILDING_HEAD + count * BUILDING_SIZE + runs * RUN_SIZE)
+        return false;
+    s->buildings = calloc(count ? count : 1, sizeof(*s->buildings));
+    s->runs = calloc(runs ? runs : 1, sizeof(*s->runs));
+    s->roles = calloc(triangles ? triangles : 1, 1);
+    if (!s->buildings || !s->runs || !s->roles)
+        return false;
+    const unsigned char *rp = p + BUILDING_HEAD + count * BUILDING_SIZE;
+    for (uint64_t i = 0; i < runs; ++i, rp += RUN_SIZE) {
+        uint32_t packed = u32(rp + 8);
+        s->runs[i] = (BoatSceneryRun) { u32(rp), u32(rp + 4), (uint8_t)packed,
+            (uint8_t)(packed >> 8), (uint16_t)(packed >> 16) };
+    }
+    uint32_t previous_end = water;
+    uint64_t next_run = 0;
+    for (uint64_t i = 0; i < count; ++i) {
+        const unsigned char *bp = p + BUILDING_HEAD + i * BUILDING_SIZE;
+        BoatSceneryBuilding *b = &s->buildings[i];
+        *b = (BoatSceneryBuilding) { u32(bp), u32(bp + 4), u32(bp + 8), u32(bp + 12), u32(bp + 16),
+            u32(bp + 20), { f32le(bp + 24), f32le(bp + 28), f32le(bp + 32) },
+            { f32le(bp + 36), f32le(bp + 40), f32le(bp + 44) } };
+        if (b->first < previous_end || b->end <= b->first || b->end > triangles
+            || b->detail_first < b->first || b->detail_first > b->end || b->run_first != next_run
+            || b->run_count > runs - next_run)
+            return false;
+        for (int k = 0; k < 3; ++k) {
+            float lo = (&b->min.x)[k], hi = (&b->max.x)[k];
+            if (!(isfinite(lo) && isfinite(hi) && lo <= hi))
+                return false;
+        }
+        for (uint64_t j = i; j-- > 0;)
+            if (s->buildings[j].id_hash == b->id_hash)
+                return false;
+        memset(s->roles + b->first, BOAT_SCENERY_ROLE_DETAIL, b->end - b->first);
+        uint32_t cursor = b->first;
+        for (uint32_t j = 0; j < b->run_count; ++j) {
+            const BoatSceneryRun *r = &s->runs[b->run_first + j];
+            if (r->first < cursor || r->end <= r->first || r->end > b->end || r->role == 0
+                || r->role >= BOAT_SCENERY_ROLE_COUNT)
+                return false;
+            memset(s->roles + r->first, r->role, r->end - r->first);
+            cursor = r->end;
+        }
+        next_run += b->run_count;
+        previous_end = b->end;
+    }
+    s->building_count = (size_t)count;
+    s->run_count = (size_t)runs;
+    return next_run == runs;
 }
 
 static bool same_vertex(Vector3 a, Vector3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
@@ -89,15 +194,19 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
     uint32_t bridge = u32(h + 20), payload = u32(h + 24), packed = u32(h + 28);
     uint64_t expected
         = (uint64_t)vertices * sizeof(Vector3) + (uint64_t)triangles * sizeof(Triangle3D);
-    if (u32(h) != PACK_MAGIC || u32(h + 4) != PACK_VERSION || payload != expected
-        || payload > INT32_MAX || packed > size - PACK_HEADER || water > bridge
-        || bridge > triangles || !water)
+    uint32_t version = u32(h + 4);
+    if (u32(h) != PACK_MAGIC || (version != PACK_VERSION_1 && version != PACK_VERSION)
+        || payload != expected || payload > INT32_MAX || packed > size - PACK_HEADER
+        || water > bridge || bridge > triangles || !water)
         return false;
     _Static_assert(sizeof(Vector3) == 12 && sizeof(Triangle3D) == 16, "Pack payload layout");
     unsigned char *out = malloc(payload ? payload : 1);
     if (!out)
         return false;
-    if (sinflate(out, (int)payload, h + PACK_HEADER, (int)packed) != (int)payload) {
+    // Version 1 ends with its stream; version 2 continues with exactly the record block.
+    size_t tail = size - PACK_HEADER - packed;
+    if ((version == PACK_VERSION_1 && tail) || (version == PACK_VERSION && tail < BUILDING_HEAD)
+        || sinflate(out, (int)payload, h + PACK_HEADER, (int)packed) != (int)payload) {
         free(out);
         return false;
     }
@@ -113,6 +222,11 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
         return false;
     }
     *slot = (Scenery) { .map = map, .mesh = mesh, .payload = out, .bytes = payload };
+    if (version == PACK_VERSION
+        && !read_buildings(slot, h + PACK_HEADER + packed, tail, triangles, water)) {
+        scenery_free(slot);
+        return false;
+    }
     slot->description = (BoatMapDescription) { &slot->mesh, bridge };
     return true;
 }
@@ -186,8 +300,6 @@ void boat_scenery_unload(void)
 {
     boat_ambient_unload();
     boat_water_atlas_unload();
-    for (size_t i = 0; i < SLOTS; ++i) {
-        free(loaded[i].payload);
-        loaded[i] = (Scenery) { 0 };
-    }
+    for (size_t i = 0; i < SLOTS; ++i)
+        scenery_free(&loaded[i]);
 }
