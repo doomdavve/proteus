@@ -7,6 +7,7 @@ in vec3 fragWorldNormal;
 in float fragOcclusion;
 flat in vec4 fragObjectColor;
 flat in int fragEmissive;
+flat in int fragFacade;
 
 uniform sampler2D texture0;
 uniform float ghostOpacity;
@@ -37,6 +38,15 @@ uniform int windowPass;
 uniform float windowLight;
 uniform vec3 windowLit;
 uniform vec3 windowDark;
+// Window mask (facade pass): the windows of migrated buildings (scenery/building_windows.h)
+// beyond windowMaskRange metres from windowMaskAnchor (X/Z), where they are not quads. facadeData
+// holds 3 RGBA32F texels per facade record, 256 records a row: (seed low 16 bits, seed high 16
+// bits, bays, floors), (first bay, bay pitch, first floor, floor pitch), (ground width and
+// height, upper width and height).
+uniform int windowMask;
+uniform vec2 windowMaskAnchor;
+uniform float windowMaskRange;
+uniform highp sampler2D facadeData;
 uniform int localLightCount;
 uniform vec4 localLightPositionRadius[32];
 uniform vec4 localLightColorIntensity[32];
@@ -158,6 +168,64 @@ vec3 facade_albedo()
     float aa = max(footprint.y, .001);
     float base = 1.0 - smoothstep(1.05 - aa * .5, 1.05 + aa * .5, p.y);
     return mix(color, color * vec3(.69, .72, .76), base);
+}
+
+uint fmix32(uint h)
+{
+    h ^= h >> 16;
+    h *= 0x85EBCA6Bu;
+    h ^= h >> 13;
+    h *= 0xC2B2AE35u;
+    h ^= h >> 16;
+    return h;
+}
+
+// The share of this pixel a migrated facade's window covers, and its colour: the same grid, seed,
+// glass and lit rule as building_windows.c, filtered by the pixel's footprint. Many windows under
+// one pixel (a footprint near the pitch) settle on the mean of the palette and the lit share, so
+// the far facade neither shimmers nor pops against the quads nearer in.
+float window_mask(out vec3 color)
+{
+    color = vec3(0.0);
+    // Derivatives come first: the tests below differ between pixels of one quad.
+    vec2 p = fragTexCoord; // wall-local metres: along the wall, above its base
+    vec2 footprint = max(max(abs(dFdx(p)), abs(dFdy(p))), vec2(1e-4));
+    if (windowMask == 0 || fragFacade <= 0
+        || distance(fragWorldPosition.xz, windowMaskAnchor) < windowMaskRange)
+        return 0.0;
+    int id = fragFacade - 1;
+    ivec2 at = ivec2(3 * (id % 256), id / 256);
+    vec4 seedBays = texelFetch(facadeData, at, 0);
+    vec4 grid = texelFetch(facadeData, at + ivec2(1, 0), 0);
+    vec4 sizes = texelFetch(facadeData, at + ivec2(2, 0), 0);
+    if (p.x < grid.x || p.y < grid.z || p.x >= grid.x + seedBays.z * grid.y
+        || p.y >= grid.z + seedBays.w * grid.w)
+        return 0.0;
+    float bay = floor((p.x - grid.x) / grid.y);
+    float level = floor((p.y - grid.z) / grid.w);
+    vec2 size = level < 0.5 ? sizes.xy : sizes.zw;
+    vec2 pitch = grid.yw;
+    vec2 local = p - grid.xz - vec2(bay, level) * pitch;
+    vec2 lo = max(local - footprint * 0.5, vec2(0.0));
+    vec2 hi = min(local + footprint * 0.5, size);
+    vec2 inside = clamp((hi - lo) / footprint, 0.0, 1.0);
+    float mean = size.x * size.y / (pitch.x * pitch.y);
+    float settle = smoothstep(0.4, 1.0, max(footprint.x / pitch.x, footprint.y / pitch.y));
+    float cover = mix(inside.x * inside.y, mean, settle);
+    uint seed = fmix32((uint(seedBays.x) | (uint(seedBays.y) << 16)) + uint(bay) * 0x9E3779B1u
+        + uint(level) * 0x85EBCA77u);
+    uint kind = seed % 7u;
+    vec3 glass = kind < 3u ? vec3(138.0, 185.0, 204.0) / 255.0
+        : kind == 3u ? vec3(181.0, 211.0, 221.0) / 255.0 : vec3(66.0, 100.0, 120.0) / 255.0;
+    vec3 palette = (3.0 * vec3(138.0, 185.0, 204.0) + vec3(181.0, 211.0, 221.0)
+                       + 3.0 * vec3(66.0, 100.0, 120.0)) / (7.0 * 255.0);
+    float lit = float(((((seed ^ (seed >> 15)) * 2654435761u) >> 29) < 3u));
+    glass = mix(glass, palette, settle);
+    lit = mix(lit, 0.375, settle);
+    color = glass;
+    if (windowLight > 0.0)
+        color = mix(glass, mix(glass * windowDark, windowLit, lit), windowLight);
+    return cover;
 }
 
 vec3 apply_atmosphere(vec3 color)
@@ -311,7 +379,16 @@ void main()
     // illumination before multiplying albedo, rather than adding white, so nearby lamps do not
     // bleach materials.
     vec3 lit = clamp(illumination, 0.0, 1.25);
-    finalColor = vec4(apply_atmosphere(min(albedo.rgb * lit, vec3(1.0))), albedo.a);
+    vec3 wall = apply_atmosphere(min(albedo.rgb * lit, vec3(1.0)));
+    if (facadePass != 0) {
+        // Windows beyond the quads' range, unlit and fogged like the window pass draws them.
+        vec3 glass;
+        float cover = window_mask(glass);
+        if (cover > 0.0)
+            wall = mix(wall, apply_atmosphere(glass * (reflectionPass != 0 ? 1.0 : emissiveGain)),
+                cover);
+    }
+    finalColor = vec4(wall, albedo.a);
     // The mirrored camera sits underwater. Submerged quay walls and hull bottoms
     // must not occlude the above-water scene or appear as a second shoreline.
     // Clip after the material derivatives, which need complete fragment quads.

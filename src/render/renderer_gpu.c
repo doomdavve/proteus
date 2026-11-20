@@ -7,6 +7,7 @@
 #include "scenery/boat_ambient.h"
 #include "scenery/boat_scenery.h"
 #include "scenery/boat_water_atlas.h"
+#include "scenery/building_windows.h"
 
 #include "raylib.h"
 #include "raymath.h"
@@ -24,6 +25,7 @@ typedef struct {
     float *texcoords;
     unsigned char *colors;
     unsigned char *occlusion; // Baked ambient occlusion per vertex, 0 (open) to 255.
+    unsigned short *facade; // Facade record number + 1 of a migrated wall's vertices, else 0.
     int count;
     int capacity;
 } MeshBuilder;
@@ -50,6 +52,7 @@ static void builder_destroy(MeshBuilder *builder)
     free(builder->texcoords);
     free(builder->colors);
     free(builder->occlusion);
+    free(builder->facade);
     *builder = (MeshBuilder) { 0 };
 }
 
@@ -65,8 +68,10 @@ static bool builder_reserve(MeshBuilder *builder, int additional)
     float *texcoords = malloc((size_t)capacity * 2 * sizeof(*texcoords));
     unsigned char *colors = malloc((size_t)capacity * 4 * sizeof(*colors));
     unsigned char *occlusion = malloc((size_t)capacity);
+    unsigned short *facade = malloc((size_t)capacity * sizeof(*facade));
     if (positions == NULL || normals == NULL || texcoords == NULL || colors == NULL
-        || occlusion == NULL) {
+        || occlusion == NULL || facade == NULL) {
+        free(facade);
         free(positions);
         free(normals);
         free(texcoords);
@@ -79,6 +84,8 @@ static bool builder_reserve(MeshBuilder *builder, int additional)
     memcpy(texcoords, builder->texcoords, (size_t)builder->count * 2 * sizeof(*texcoords));
     memcpy(colors, builder->colors, (size_t)builder->count * 4 * sizeof(*colors));
     memcpy(occlusion, builder->occlusion, (size_t)builder->count);
+    memcpy(facade, builder->facade, (size_t)builder->count * sizeof(*facade));
+    free(builder->facade);
     free(builder->positions);
     free(builder->normals);
     free(builder->texcoords);
@@ -89,6 +96,7 @@ static bool builder_reserve(MeshBuilder *builder, int additional)
     builder->texcoords = texcoords;
     builder->colors = colors;
     builder->occlusion = occlusion;
+    builder->facade = facade;
     builder->capacity = capacity;
     return true;
 }
@@ -128,6 +136,7 @@ static bool builder_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, Vector3
         builder->colors[vertex * 4 + 2] = color.b;
         builder->colors[vertex * 4 + 3] = color.a;
         builder->occlusion[vertex] = 0;
+        builder->facade[vertex] = 0;
     }
     return true;
 }
@@ -184,6 +193,7 @@ static Mesh builder_finish(MeshBuilder *builder)
     builder->texcoords = NULL;
     builder->colors = NULL;
     free(builder->occlusion);
+    free(builder->facade);
     UploadMesh(&mesh, false);
     *builder = (MeshBuilder) { 0 };
     return mesh;
@@ -200,6 +210,7 @@ typedef struct {
     float normal[3];
     unsigned char color[4];
     unsigned char occlusion;
+    unsigned short facade; // Facade record number + 1 (a facade surface only), 0 for none.
 } StaticVertex;
 
 // What a map surface's shader reads, which decides how its vertices are stored.
@@ -245,6 +256,7 @@ static StaticVertex static_vertex(const MeshBuilder *builder, int source)
     memcpy(vertex.normal, &builder->normals[source * 3], sizeof(vertex.normal));
     memcpy(vertex.color, &builder->colors[source * 4], sizeof(vertex.color));
     vertex.occlusion = builder->occlusion[source];
+    vertex.facade = builder->facade[source];
     return vertex;
 }
 
@@ -301,6 +313,10 @@ static int static_vertices_pack(
         if (surface != STATIC_UNLIT) {
             short normal[3];
             static_normal_pack(vertices[i].normal, normal, &binding_scene->geometry.normal_error);
+            // A migrated facade wall is horizontal, so its normal's y short is free: it carries
+            // the facade record number + 1 for the shader's window mask (waterfront_city.vs).
+            if (surface == STATIC_MAPPED && vertices[i].facade)
+                normal[1] = (short)vertices[i].facade;
             memcpy(p, normal, sizeof(normal));
             short occlusion = (short)(1 + vertices[i].occlusion);
             memcpy(p + sizeof(normal), &occlusion, sizeof(occlusion));
@@ -422,8 +438,10 @@ static Mesh builder_static_chunk(
             break;
         StaticVertex vertex = static_vertex(builder, source);
         // What the surface never reads must not split a vertex.
-        if (surface != STATIC_MAPPED)
+        if (surface != STATIC_MAPPED) {
             vertex.texcoord[1] = 0;
+            vertex.facade = 0;
+        }
         if (surface == STATIC_UNLIT || surface == STATIC_FLAT)
             vertex.texcoord[0] = 0;
         if (surface == STATIC_UNLIT) {
@@ -533,7 +551,8 @@ static int cached_location(Shader shader, const char *name)
 }
 
 static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
-    "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
+    "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "windowMask", "windowMaskAnchor",
+    "windowMaskRange", "facadeData", "reflectionPass", "ambientColor",
     "ambientOcclusion", "directionalColor", "directionalDirection", "directionalIntensity",
     "shadowsEnabled", "lightViewProjection", "shadowMap", "farShadowsEnabled",
     "farLightViewProjection", "farShadowMap", "farShadowTexel", "localLightCount",
@@ -1002,7 +1021,7 @@ static bool is_water_triangle(const Triangle3D *triangle)
 }
 
 static bool builder_facade_triangle(
-    MeshBuilder *builder, Vector3 a, Vector3 b, Vector3 c, Color source)
+    MeshBuilder *builder, Vector3 a, Vector3 b, Vector3 c, Color source, unsigned facade)
 {
     // Generated wall pairs are a,c,b and a,d,c: vertex zero is the same lower
     // corner, and the last vertex reaches the other end in both triangles. Texture rows start
@@ -1028,9 +1047,13 @@ static bool builder_facade_triangle(
         int vertex = builder->count - 3 + i;
         builder->texcoords[vertex * 2] = Vector3DotProduct(Vector3Subtract(points[i], a), along);
         builder->texcoords[vertex * 2 + 1] = points[i].y - a.y;
+        builder->facade[vertex] = (unsigned short)facade;
     }
     return true;
 }
+
+// The largest facade record number the vertex format carries (a signed 16-bit normal component).
+#define FACADE_ID_LIMIT 32767
 
 // Land triangles go to the tile owning their centroid, the catalogue's rule. The second
 // triangle of each generated wall pair joins the first's tile, so that every facade mesh keeps
@@ -1044,6 +1067,12 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     const unsigned char *occlusion
         = boat_scenery_of(scenery->map) == scenery->full ? boat_ambient_of(scenery->map) : NULL;
     const unsigned char *roles = boat_scenery_roles(scenery->full);
+    // The wall pairs of the facade records, ascending (buildings and their facades are sorted):
+    // their vertices carry the record number for the shader's window mask.
+    size_t record_count = 0, next_record = 0;
+    const BoatSceneryFacade *records = boat_scenery_facades(scenery->full, &record_count);
+    if (record_count > FACADE_ID_LIMIT)
+        records = NULL;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -1094,8 +1123,15 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             facade_tile = tile;
         }
         MeshBuilder *builder = &builders[surface].tiles[tile];
+        unsigned facade_id = 0;
+        if (surface == CITY_SURFACE_FACADE && records) {
+            while (next_record < record_count && records[next_record].wall + 1 < i)
+                ++next_record;
+            if (next_record < record_count && records[next_record].wall <= i)
+                facade_id = (unsigned)next_record + 1;
+        }
         bool ok = surface == CITY_SURFACE_FACADE
-            ? builder_facade_triangle(builder, a, b, c, triangle->color)
+            ? builder_facade_triangle(builder, a, b, c, triangle->color, facade_id)
             : builder_triangle(builder, a, b, c, triangle->color);
         if (!ok)
             goto failed;
@@ -1231,6 +1267,177 @@ failed:
     tiled_builder_destroy(&tiled);
     tiled_builder_destroy(&far_tiled);
     return false;
+}
+
+// Facade records of migrated buildings (scenery/building_windows.h). Each is a row of three
+// RGBA32F texels for the facade shader's window mask, FACADE_ROW records to a texture row, and a
+// member of the detail cell holding its wall's middle, which expands them into quads.
+#define FACADE_ROW 256
+// A cell expands this far inside the near range, so quads exist before the mask stops drawing, and
+// is released beyond twice the near range.
+#define WINDOW_PREFETCH 96.0f
+
+static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuScene *scene)
+{
+    const BoatMapDescription *map = scenery->full;
+    size_t count = 0, styles = 0;
+    const BoatSceneryFacade *facades = boat_scenery_facades(map, &count);
+    const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
+    if (!facades || !style)
+        return true; // No migrated buildings.
+    size_t cells = detail_cell_count(scenery);
+    scene->window_cell_total = (int)cells;
+    scene->window_cell_start = calloc(cells + 1, sizeof(*scene->window_cell_start));
+    scene->window_cell_facades = malloc(count * sizeof(*scene->window_cell_facades));
+    scene->window_cells = calloc(cells, sizeof(*scene->window_cells));
+    scene->window_cell_ready = calloc(cells, 1);
+    unsigned *cell_of = malloc(count * sizeof(*cell_of));
+    if (!scene->window_cell_start || !scene->window_cell_facades || !scene->window_cells
+        || !scene->window_cell_ready || !cell_of) {
+        free(cell_of);
+        return false;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        BuildingWall wall;
+        if (!building_wall(map->mesh, &facades[i], &wall)) {
+            free(cell_of);
+            return false;
+        }
+        Vector3 middle = Vector3Scale(Vector3Add(wall.origin, wall.end), .5f);
+        cell_of[i] = (unsigned)detail_cell_of(scenery, middle);
+        ++scene->window_cell_start[cell_of[i] + 1];
+    }
+    for (size_t c = 0; c < cells; ++c)
+        scene->window_cell_start[c + 1] += scene->window_cell_start[c];
+    unsigned *fill = calloc(cells, sizeof(*fill));
+    if (!fill) {
+        free(cell_of);
+        return false;
+    }
+    for (size_t i = 0; i < count; ++i)
+        scene->window_cell_facades[scene->window_cell_start[cell_of[i]] + fill[cell_of[i]]++]
+            = (unsigned)i;
+    free(fill);
+    free(cell_of);
+    scene->window_map = map;
+    if (count > FACADE_ID_LIMIT)
+        return true; // The vertices cannot name them: the quads alone, in every cell.
+    size_t rows = (count + FACADE_ROW - 1) / FACADE_ROW;
+    float *texels = calloc(rows * FACADE_ROW * 3 * 4, sizeof(float));
+    if (!texels)
+        return false;
+    for (size_t i = 0; i < count; ++i) {
+        const BoatSceneryFacade *f = &facades[i];
+        const BoatSceneryWindowStyle *st = &style[f->style];
+        uint32_t seed = building_window_facade_seed(f->id_hash, f->index);
+        float *t = &texels[((i / FACADE_ROW) * FACADE_ROW * 3 + (i % FACADE_ROW) * 3) * 4];
+        memcpy(t, (float[]) { (float)(seed & 0xFFFF), (float)(seed >> 16), (float)f->bays,
+                    (float)f->floors, st->first_bay, st->bay_pitch, st->first_floor,
+                    st->floor_pitch, st->ground_width, st->ground_height, st->upper_width,
+                    st->upper_height },
+            12 * sizeof(float));
+    }
+    Image image = { texels, FACADE_ROW * 3, (int)rows, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
+    scene->facade_data = LoadTextureFromImage(image);
+    free(texels);
+    if (!IsTextureValid(scene->facade_data)) {
+        scene->facade_data = (Texture2D) { 0 };
+        return false;
+    }
+    SetTextureFilter(scene->facade_data, TEXTURE_FILTER_POINT);
+    SetTextureWrap(scene->facade_data, TEXTURE_WRAP_CLAMP);
+    return true;
+}
+
+typedef struct {
+    MeshBuilder *builder;
+    bool ok;
+} WindowQuads;
+
+static void add_window_quad(const BuildingWindow *w, void *user)
+{
+    WindowQuads *quads = user;
+    Color color = w->glass; // Alpha carries occupancy to the windows pass, which draws opaque.
+    color.a = w->occupied ? 255 : 0;
+    quads->ok = quads->ok
+        && builder_quad(
+            quads->builder, w->corners[0], w->corners[1], w->corners[2], w->corners[3], color);
+}
+
+static void window_cell_release(WaterfrontGpuScene *scene, int cell)
+{
+    for (int i = 0; i < scene->window_cells[cell].count; ++i)
+        scene->window_quads -= (size_t)scene->window_cells[cell].meshes[i].triangleCount / 2;
+    tiled_destroy(&scene->window_cells[cell]);
+    scene->window_cell_ready[cell] = 0;
+    ++scene->window_released;
+}
+
+// Expands the facades of CELL into one window mesh set. Review counters of the bound map's
+// static storage are not touched: these meshes come and go while drawing.
+static bool window_cell_expand(WaterfrontGpuScene *scene, int cell)
+{
+    const BoatMapDescription *map = scene->window_map;
+    size_t count = 0, styles = 0;
+    const BoatSceneryFacade *facades = boat_scenery_facades(map, &count);
+    const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
+    TiledBuilder one = { 0 };
+    if (!tiled_builder_init(&one, 1))
+        return false;
+    WindowQuads quads = { &one.tiles[0], true };
+    for (unsigned k = scene->window_cell_start[cell]; k < scene->window_cell_start[cell + 1]; ++k) {
+        const BoatSceneryFacade *f = &facades[scene->window_cell_facades[k]];
+        BuildingWall wall;
+        if (building_wall(map->mesh, f, &wall))
+            building_windows(f, &style[f->style], &wall, add_window_quad, &quads);
+    }
+    if (!quads.ok) {
+        tiled_builder_destroy(&one);
+        return false;
+    }
+    WaterfrontGpuGeometry saved = scene->geometry;
+    binding_scene = scene;
+    bool ok = tiled_builder_finish(&one, &scene->window_cells[cell], STATIC_UNLIT);
+    binding_scene = NULL;
+    scene->geometry = saved;
+    for (int i = 0; ok && i < scene->window_cells[cell].count; ++i)
+        scene->window_quads += (size_t)scene->window_cells[cell].meshes[i].triangleCount / 2;
+    scene->window_cell_ready[cell] = ok;
+    scene->window_expanded += ok;
+    if (!ok)
+        tiled_destroy(&scene->window_cells[cell]);
+    return ok;
+}
+
+// Once per frame, before any pass: the cells within the near range (and a prefetch margin) of
+// ANCHOR hold quads, the ones beyond twice the range do not. Without the mask texture every cell
+// expands once and stays.
+static void window_select(WaterfrontGpuScene *scene, Vector3 anchor)
+{
+    scene->window_anchor = (Vector2) { anchor.x, anchor.z };
+    scene->window_expanded = scene->window_released = 0;
+    if (!scene->window_map)
+        return;
+    bool all = scene->facade_data.id == 0;
+    int cells = scene->detail_columns * scene->detail_rows;
+    for (int z = 0; z < scene->detail_rows; ++z) {
+        float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
+        float dz = fmaxf(fmaxf(low_z - anchor.z, anchor.z - low_z - scene->detail_cell), 0);
+        for (int x = 0; x < scene->detail_columns; ++x) {
+            int cell = z * scene->detail_columns + x;
+            if (cell >= cells || scene->window_cell_start[cell] == scene->window_cell_start[cell + 1])
+                continue;
+            float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
+            float dx = fmaxf(fmaxf(low_x - anchor.x, anchor.x - low_x - scene->detail_cell), 0);
+            float distance = sqrtf(dx * dx + dz * dz);
+            if (!scene->window_cell_ready[cell]
+                && (all || distance <= BUILDING_WINDOW_NEAR_RANGE + WINDOW_PREFETCH))
+                window_cell_expand(scene, cell);
+            else if (!all && scene->window_cell_ready[cell]
+                && distance > 2 * BUILDING_WINDOW_NEAR_RANGE)
+                window_cell_release(scene, cell);
+        }
+    }
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -1473,6 +1680,22 @@ static void unbind_map(WaterfrontGpuScene *scene)
         free(scene->detail_far[view]);
         scene->detail_far[view] = NULL;
     }
+    if (scene->window_cells)
+        for (int cell = 0; cell < scene->window_cell_total; ++cell)
+            tiled_destroy(&scene->window_cells[cell]);
+    free(scene->window_cells);
+    free(scene->window_cell_ready);
+    free(scene->window_cell_start);
+    free(scene->window_cell_facades);
+    scene->window_cells = NULL;
+    scene->window_cell_ready = NULL;
+    scene->window_cell_start = scene->window_cell_facades = NULL;
+    scene->window_map = NULL;
+    scene->window_quads = 0;
+    scene->window_cell_total = 0;
+    if (scene->facade_data.id != 0)
+        UnloadTexture(scene->facade_data);
+    scene->facade_data = (Texture2D) { 0 };
     unload_mesh(&scene->crane);
     if (scene->water_atlas.id != 0)
         UnloadTexture(scene->water_atlas);
@@ -1494,6 +1717,7 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
     bool built = build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
                      &scene->water, &scene->corner, &scene->corner_far, &scene->corner_emissive)
         && build_windows(scenery, &scene->windows, &scene->windows_far)
+        && build_window_data(scenery, scene)
         && (!scenery->river || build_crane(&scene->crane, scenery));
     binding_scene = NULL;
     if (!built) {
@@ -3072,11 +3296,33 @@ static void draw_ground(const WaterfrontGpuScene *scene, Material material)
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
 
+// The window mask of migrated facades: on while the facade data texture exists, from the near range
+// out. Unit 7 is free in the city material.
+static void set_window_mask_uniforms(const WaterfrontGpuScene *scene)
+{
+    Shader shader = scene->shader;
+    int enabled = scene->facade_data.id != 0;
+    SetShaderValue(shader, cached_location(shader, "windowMask"), &enabled, SHADER_UNIFORM_INT);
+    if (!enabled)
+        return;
+    float range = BUILDING_WINDOW_NEAR_RANGE;
+    SetShaderValue(shader, cached_location(shader, "windowMaskAnchor"), &scene->window_anchor,
+        SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, cached_location(shader, "windowMaskRange"), &range, SHADER_UNIFORM_FLOAT);
+    int slot = 7;
+    rlEnableShader(shader.id);
+    rlActiveTextureSlot(slot);
+    rlEnableTexture(scene->facade_data.id);
+    rlSetUniform(cached_location(shader, "facadeData"), &slot, SHADER_UNIFORM_INT, 1);
+    rlActiveTextureSlot(0);
+}
+
 static void draw_facades(const WaterfrontGpuScene *scene, Material material)
 {
     int location = cached_location(scene->shader, "facadePass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
+    set_window_mask_uniforms(scene);
     draw_tiled(scene, &scene->facades, material);
     enabled = 0;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
@@ -3088,6 +3334,19 @@ static void draw_windows(const WaterfrontGpuScene *scene, Material material)
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
     draw_detailed(scene, &scene->windows, &scene->windows_far, material);
+    // Quads of the migrated buildings in the cells near the anchor.
+    Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    for (int cell = 0; cell < scene->window_cell_total; ++cell) {
+        if (!scene->window_cell_ready[cell])
+            continue;
+        const WaterfrontGpuTiled *tiled = &scene->window_cells[cell];
+        for (int i = 0; i < tiled->count; ++i) {
+            if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
+                submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
+            else if (counting)
+                ++counting->tiles_culled[counting_pass];
+        }
+    }
     enabled = 0;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
@@ -3450,6 +3709,15 @@ bool waterfront_gpu_scene_draw(
     }
     if (!waterfront_gpu_scene_bind_harbor(scene, &frame->harbor))
         return false;
+    if (!frame->boating_basin) {
+        window_select(
+            scene, frame->player_active ? frame->camera.target : frame->camera.position);
+        for (int cell = 0; cell < scene->window_cell_total; ++cell)
+            scene->stats.window_cells += scene->window_cell_ready[cell];
+        scene->stats.window_cells_expanded = scene->window_expanded;
+        scene->stats.window_cells_released = scene->window_released;
+        scene->stats.window_quads = scene->window_quads;
+    }
     counting = &scene->stats;
     drawing_scene = scene;
     draw_scene(scene, frame, width, height);

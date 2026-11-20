@@ -2,6 +2,7 @@
 #include "core/waterfront_upstream.h"
 #include "render/waterfront_corner.h"
 #include "scenery/boat_scenery.h"
+#include "scenery/building_windows.h"
 
 #include "raylib.h"
 #include "raymath.h"
@@ -98,7 +99,7 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
     r->emissive_tint = tint;
 }
 
-// Glass tinted by the window light, for a legacy seed or a baked window (colour and occupancy).
+// Glass tinted by the window light, for a legacy seed or a generated window (colour and occupancy).
 static Color window_tint(Color glass, bool occupied, const WaterfrontLighting *lighting)
 {
     float t = lighting->window_light;
@@ -157,6 +158,58 @@ static void windows(Renderer3D *r, const BoatMapDescription *map, const unsigned
                 Vector3 up = { 0, floor == 0 ? 1.9f : 1.5f, 0 };
                 glow_quad(r, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
             }
+        }
+    }
+}
+
+typedef struct {
+    Renderer3D *r;
+    const WaterfrontLighting *lighting;
+} WindowDraw;
+
+static void draw_window(const BuildingWindow *w, void *user)
+{
+    const WindowDraw *draw = user;
+    glow_quad(draw->r, w->corners[0], w->corners[1], w->corners[2], w->corners[3],
+        window_tint(w->glass, w->occupied, draw->lighting));
+}
+
+// Windows of the migrated buildings (their facade records, scenery/building_windows.h) near the
+// camera: each wall that faces it, in view and within the generator's near range, is expanded into
+// quads drawn as the generic ones are. Beyond the range the CPU view draws no windows, as for the
+// generic ones.
+static void facade_windows(
+    Renderer3D *r, const BoatMapDescription *map, const WaterfrontLighting *lighting)
+{
+    size_t count = 0, facade_count = 0, style_count = 0;
+    const BoatSceneryBuilding *buildings = boat_scenery_buildings(map, &count);
+    const BoatSceneryFacade *facades = boat_scenery_facades(map, &facade_count);
+    const BoatSceneryWindowStyle *styles = boat_scenery_window_styles(map, &style_count);
+    if (!buildings || !facades || !styles)
+        return;
+    const Vector3 eye = r->camera.position;
+    const float range = BUILDING_WINDOW_NEAR_RANGE;
+    for (size_t b = 0; b < count; ++b) {
+        const BoatSceneryBuilding *building = &buildings[b];
+        if (!building->facade_count)
+            continue;
+        // Horizontal distance from the camera to the building's box, then the frustum.
+        float dx = fmaxf(fmaxf(building->min.x - eye.x, eye.x - building->max.x), 0);
+        float dz = fmaxf(fmaxf(building->min.z - eye.z, eye.z - building->max.z), 0);
+        if (dx * dx + dz * dz > range * range
+            || !renderer3d_box_visible(r, Vector3SubtractValue(building->min, .1f),
+                Vector3AddValue(building->max, .1f)))
+            continue;
+        for (size_t f = 0; f < building->facade_count; ++f) {
+            const BoatSceneryFacade *facade = &facades[building->facade_first + f];
+            BuildingWall wall;
+            if (!building_wall(map->mesh, facade, &wall)
+                || Vector3DotProduct(wall.normal, Vector3Subtract(eye, wall.origin)) <= 0
+                || Vector3Distance(eye, wall.origin) > range)
+                continue;
+            const BoatSceneryWindowStyle *style = &styles[facade->style];
+            WindowDraw draw = { r, lighting };
+            building_windows(facade, style, &wall, draw_window, &draw);
         }
     }
 }
@@ -285,6 +338,7 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
                 r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
             windows(r, scenery->full, &tiles->land[tile->land_first], tile->land_count, lighting);
     }
+    facade_windows(r, scenery->full, lighting);
     if (scenery->river)
         crane(r, scenery);
     return true;

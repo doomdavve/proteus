@@ -503,6 +503,34 @@ static bool same_but_for_noise(Image a, Image b)
     return changed <= 4;
 }
 
+// The window cells of the migrated buildings (scenery/building_windows.h) follow the anchor: a cell
+// is expanded exactly when a facade-holding cell lies within the near range plus the prefetch
+// margin, never beyond twice the range (the band between keeps what it has), and the expanded
+// cells hold their facades' windows, so no pixel inside the range lacks windows. Returns the
+// number of violations; *EXPANDED and *RELEASED add this frame's events.
+static int check_window_cells(const WaterfrontGpuScene *scene, size_t *expanded, size_t *released)
+{
+    int violations = 0;
+    *expanded += scene->window_expanded;
+    *released += scene->window_released;
+    for (int z = 0; z < scene->detail_rows; ++z)
+        for (int x = 0; x < scene->detail_columns; ++x) {
+            int cell = z * scene->detail_columns + x;
+            if (scene->window_cell_start[cell] == scene->window_cell_start[cell + 1])
+                continue;
+            float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
+            float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
+            float dx = fmaxf(fmaxf(low_x - scene->window_anchor.x,
+                                scene->window_anchor.x - low_x - scene->detail_cell), 0);
+            float dz = fmaxf(fmaxf(low_z - scene->window_anchor.y,
+                                scene->window_anchor.y - low_z - scene->detail_cell), 0);
+            float distance = sqrtf(dx * dx + dz * dz);
+            bool ready = scene->window_cell_ready[cell] != 0;
+            violations += (distance <= 430 + 96 && !ready) || (distance > 2 * 430 && ready);
+        }
+    return violations;
+}
+
 // G2b: drives one GPU view through the detail threshold. Orbiting the boat changes no level, the
 // band holds a camera jittering around a switch, repeated round trips end alike, and every cell
 // with windows keeps them far.
@@ -558,7 +586,8 @@ static int check_detail(void)
     view.boat.heading = 0;
     presentation.camera_heading = 0;
     int switches[2] = { 0 }, flickers = 0, frames = 0;
-    size_t main_near = 0, main_far = 0;
+    size_t main_near = 0, main_far = 0, window_expanded = 0, window_released = 0;
+    int window_violations = check_window_cells(&gpu.scene, &window_expanded, &window_released);
     for (int trip = 0; trip < 2; ++trip) {
         if (trip == 1)
             memcpy(start, gpu.scene.detail_far[0], (size_t)cells);
@@ -568,6 +597,8 @@ static int check_detail(void)
                 view.boat.position = (Vector2) { 250, -500 + (float)at * 2 };
                 boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
                 int changes = count_detail_changes(&gpu.scene, previous);
+                window_violations
+                    += check_window_cells(&gpu.scene, &window_expanded, &window_released);
                 switches[direction] += changes;
                 main_far += gpu.scene.stats.far_cells[WATERFRONT_GPU_PASS_MAIN];
                 main_near += (size_t)cells - gpu.scene.stats.far_cells[WATERFRONT_GPU_PASS_MAIN];
@@ -590,15 +621,29 @@ static int check_detail(void)
             }
     }
     bool returned = memcmp(start, gpu.scene.detail_far[0], (size_t)cells) == 0;
-    if (turn_changes || !switches[0] || !switches[1] || !returned || flickers) {
-        fprintf(stderr, "detail: turn=%d forward=%d backward=%d returned=%d flickers=%d\n",
-            turn_changes, switches[0], switches[1], returned, flickers);
+    // Far away every window cell is released, and back again they expand.
+    view.boat.position = (Vector2) { 250, 6000 };
+    boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+    window_violations += check_window_cells(&gpu.scene, &window_expanded, &window_released);
+    bool emptied = gpu.scene.window_quads == 0;
+    view.boat.position = (Vector2) { 250, -500 };
+    boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+    window_violations += check_window_cells(&gpu.scene, &window_expanded, &window_released);
+    returned = returned && emptied && gpu.scene.window_quads > 0;
+    if (turn_changes || !switches[0] || !switches[1] || !returned || flickers || window_violations
+        || !window_expanded || !window_released) {
+        fprintf(stderr,
+            "detail: turn=%d forward=%d backward=%d returned=%d flickers=%d window_violations=%d "
+            "expanded=%zu released=%zu\n",
+            turn_changes, switches[0], switches[1], returned, flickers, window_violations,
+            window_expanded, window_released);
         goto cleanup;
     }
     printf("detail_check=ok cells=%d turn_changes=0 forward_switches=%d backward_switches=%d "
-           "flickers=0 frames=%d mean_far_cells=%.1f mean_near_cells=%.1f\n",
+           "flickers=0 frames=%d mean_far_cells=%.1f mean_near_cells=%.1f window_cells_expanded=%zu "
+           "released=%zu\n",
         cells, switches[0], switches[1], frames, (double)main_far / frames,
-        (double)main_near / frames);
+        (double)main_near / frames, window_expanded, window_released);
     result = 0;
 cleanup:
     free(previous);

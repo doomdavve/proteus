@@ -103,29 +103,37 @@ python -I tools/prepare_outer_map.py                   # outer pack (reads the r
 
 ## Rendering consumers
 
-Transitional (rework step 1): the renderers read roles as below but have no window source for
-migrated buildings yet; the baked-window paths this section described are removed.
-
 Both renderers read roles through `boat_scenery_roles` and never classify a migrated building's
-triangles by colour or geometry (`waterfront_facade_role`, `waterfront_baked_window` in
-`src/render/waterfront_corner.[ch]`):
+triangles by colour or geometry (`waterfront_facade_role` in `src/render/waterfront_corner.[ch]`),
+and take its windows from the generator (`building_windows.h`) only:
 
 - Generic windows (the `waterfront_window_wall` grid, seeded by triangle index) are skipped for
-  every triangle with a role, in the CPU windows pass and in the GPU `build_windows`, so migrated
-  walls never get two window sets. Unmigrated buildings and packs without records keep the legacy
-  path unchanged, including its index-seeded windows.
-- CPU: `waterfront_draw_boating` leaves window triangles out of the land draw and draws each baked
-  quad as a glow quad tinted by the window light (daytime glass; occupied windows lit at night),
-  with the generic window's camera-facing and 430 m limits.
-- GPU: wall triangles with role `wall` join the facade mesh (the `a, c, b / a, d, c` pairing is the
-  kit's emission order), `roof` the roof mesh, `detail` the flat mesh; window triangles are not in
-  the flat mesh but in the detail-cell window meshes, near and far. Baked windows are not merged
-  for the far level yet (a B4 lever); legacy windows still merge 2x2.
+  every triangle with a role, in the CPU windows pass and in the GPU `build_windows`, so a migrated
+  wall never gets two window sets. Unmigrated buildings and packs without records keep the legacy
+  path unchanged, including its index-seeded windows. `waterfront_window_glass` and
+  `waterfront_window_occupied` call the generator's functions, so there is one palette.
+- CPU (`facade_windows` in `src/render/waterfront.c`): every frame, each building within
+  `BUILDING_WINDOW_NEAR_RANGE` (430 m, horizontal) and in view expands its facades that face the
+  camera into glow quads tinted by the window light. Beyond the range the CPU view draws no
+  windows, as for generic ones.
+- GPU (`src/render/renderer_gpu.c`, `assets/shaders/waterfront_city.*`): wall triangles with role
+  `wall` join the facade mesh (the `a, c, b / a, d, c` pairing is the kit's emission order), `roof`
+  the roof mesh, `detail` the flat mesh. Each frame `window_select` expands the 512 m detail cells
+  within the near range plus a 96 m prefetch of the followed boat (the camera without a player)
+  into window meshes drawn by the windows pass, and releases cells beyond twice the range. Beyond
+  430 m the facade shader draws the same grid: each wall vertex carries its facade record number
+  (the y of its normal, free on a horizontal wall) and `facadeData`, a three-texel RGBA32F row per
+  record, gives the shader the seed halves, counts and style. The shader repeats the generator's
+  seed, glass and occupancy formulas, filters the window rectangle by the pixel footprint and
+  settles on the palette mean and the lit share (3/8) once a pixel spans about a bay, so the far
+  facade neither shimmers nor pops against the quads. The mask and the quads overlap between 430
+  and 526 m; they are the same windows, so nothing doubles visibly. More than 32,767 facade
+  records cannot be named by the vertices: all cells then expand and stay (not exercised).
 - `tools/ambient_bake.c` classifies facades by role for migrated buildings.
 - Known side effect: the river kit's frontage pass (planters, benches, trims) keys on triangle
-  indices and the window seeds of unmigrated buildings use them too, so adding baked windows
-  shifts them. The B1 rebake changed the river kit from 7944 to 7980 boxes (clearances
-  unchanged); B2 moves the frontages to facade runs.
+  indices and the window seeds of unmigrated buildings use them too. With the kit emitting walls
+  and roofs only, the river kit is again 7944 boxes with the pre-kit digest; B2 moves the
+  frontages to facade runs.
 
 ## Generated outputs and packaging
 
