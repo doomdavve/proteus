@@ -1,5 +1,11 @@
 # Adventure survey and reference evidence
 
+Current access update, 2026-11-15: Lantmäteriet ground-terrain catalogue and download
+Basic authentication work with the existing product entitlement. A Vinga item was found
+and its TIFF signature probed; full terrain acquisition and raster coverage validation
+remain open. The [Vinga integration plan](../VINGA_INTEGRATION_PLAN.md) owns that next task
+and records the DWG investigation. Older access/order findings below are dated history.
+
 This directory holds the small, versioned evidence for the staged Gothenburg–Vinga work.
 The [A0/A1 task ledger](../FREE_RIDING_ADVENTURE_FIRST_STEPS.md) owns execution status;
 the [adventure plan](../FREE_RIDING_ADVENTURE_PLAN.md) owns scope. The original river
