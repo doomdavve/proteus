@@ -50,8 +50,8 @@ pause/resume checks. Winterfell CPU and native/browser qualification remain afte
 The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot followed by
 reusable building families across the city: distinct silhouettes, facade depth and readable
 street edges at the default resolution. The deliverable includes implementation and a
-`BUILDINGS.md` specification of the source-to-rendering construction system. Planning only;
-B0 baseline and architecture decisions are next. Crane/landmark work and living-city actors
+`BUILDINGS.md` specification of the source-to-rendering construction system. B0 and B1 (shared
+foundation) are implemented locally; the Eriksberg pilot (B2) is next. Crane/landmark work and living-city actors
 remain with their existing owners. No implementation PR is authorized.
 
 ## Cloud deck — grouping and drift follow-up, 2026-11-10

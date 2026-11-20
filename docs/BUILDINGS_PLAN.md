@@ -1,15 +1,15 @@
 # Buildings and waterfront architecture overhaul
 
-Status, 2026-11-20: B0 done. B1 in progress: pack v2 records, writer, loader and tests done
-(commit "B1: scenery pack v2"); tools/building_kit.py and both adapters done (16 pilot buildings
-migrated, rest emitted as before); renderer consumers, rebaked packs and ambient pending.
-Results and decisions are in [B0 results](#b0-results--2026-11-20).
+Status, 2026-11-20: B0 done. B1 implemented locally, awaiting review (no PR, no user acceptance):
+pack v2 records, shared kit and both adapters, role-aware CPU/GPU consumers, rebaked packs and
+ambient, packaging fix and water-pin test; 16 pilot buildings migrated, the rest unchanged.
+Checks run and limits: [B1 results](#b1-results--2026-11-20).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: confirm the B0 decisions in B1, re-measure budgets on AC power, pilot look.
+Open: re-measure budgets on AC power, far-window merging (B4), frontage migration (B2), pilot look.
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: B1 shared building foundation (confirms the proposed decisions).
+Next: B2 Eriksberg pilot (after review of B1).
 Delivery: one local implementation branch, small focused commits per step; no PR until authorized.
 
 ## Intent and boundaries
@@ -448,3 +448,42 @@ Starting poses that were not navigable (the game exits non-zero): -600,-60,140, 
 -500,-100,150, -400,-350,150, 3000,-700,180, -2350,420,0, -2350,350,0, -2250,1000,180,
 -2300,1100,180, -2200,1000,180, 3620,-3150,270. No documentation outside this plan changed,
 so no other live summary was affected; the index row stays accurate.
+
+## B1 results — 2026-11-20
+
+Implemented (commits on feat/buildings, see `git log`): scenery pack v2 with trailing building
+records (loader still accepts v1); `tools/building_kit.py` with `prepare_waterfront.py` and
+`outer_dressing.py` adapters; parent identity carried through river-to-outer draping
+(`Overlay` in `prepare_outer_map.py`); explicit-role consumers in the CPU and GPU renderers and
+`ambient_bake`; rebaked river and outer packs and `ambient.bin`; packaging fix. Contract and
+commands: [BUILDINGS.md](BUILDINGS.md).
+
+Scope choices to review. Only 16 pilot buildings are migrated (`building_kit.MIGRATED`; 11 river
+crop, 5 upstream). Migrating all buildings bakes about 170k window triangles into the river pack
+alone (0.85 to 3.4 MB, preloaded by the web build), far over the proposed +20% pack budget, so
+the rollout (B3) must decide that cost first. With the pilot set: river `scenery.bin` 852,701 to
+891,823 bytes, outer 5,370,005 to 5,417,388 bytes (+0.9%); +2,860 and +3,728 baked window
+triangles. Unmigrated buildings are triangle for triangle as before (checked: removing the baked
+windows from the river pack gives the previous pack's triangle list exactly; the outer pack
+differs in 16 non-window triangles, the pilot building that now drapes as one solid).
+
+Checks run (Apple M1 Max, macOS 26.6.2, Debug, `PROTEUS_GPU_TESTS=ON`, shared busy machine):
+`python -I tools/map_pack.py --self-test`; `tools/building_kit.py` and
+`tools/prepare_outer_map.py --self-test` under the pinned requirements (venv); both bakes
+re-run offline (the unchanged sources reproduced the pre-B1 packs byte for byte first); water.h of
+both maps byte-identical (CTest `building_packs`); `ambient_river`/`ambient_outer` rebaked and
+passing; `boat_scenery` extended (v2 round trip, 15 invalid-record cases, v1 compatibility,
+migrated-building role and window checks on both shipped packs); `city_dressing` digest updated
+(river kit 7944 to 7980 boxes, clearance digest unchanged, caused by index-keyed frontage
+planters). `ctest --preset full` (PROTEUS_GPU_TESTS=ON): 634 of 634 passed. CPU captures at the Eriksberg
+near/mid views and Masthugget (day, dusk, night) in `build/buildings/new/` against the B0
+baseline in `build/buildings/img/`: differences are confined to lit-window patterns of buildings
+after the first pilot building (index-seeded legacy windows), baked windows visible and lit at
+night; GPU captures (default resolution) of near day and night inspected.
+
+Not verified: browser/web (no emscripten here; by reading, the web build globs the pack files
+and runs the same loader, but a v2 pack in the wasm build and the 2 packs' download times are
+untested); native windowed demo run beyond scripted captures; Windows and Linux; macOS package
+and Windows workflow edits (sidecar copies) not run; Release performance and the B0 budgets
+(not re-measured); far-window merging for baked windows (drawn one to one in both levels, a
+B4 lever); user visual review.

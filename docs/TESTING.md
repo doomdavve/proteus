@@ -632,7 +632,15 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   map validators and review tools load the packs from the source tree
   (`tests/support/boat_test_scenery.h`).
 - `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
-  count and a pack round trip.
+  count, a pack round trip, and the version 2 building records (round trip, version 1 packs, every
+  invalid-record case, identity independent of input order and of other buildings).
+- `building_packs` (`tests/tools/check_building_packs.py`, quick) pins `water.h` of `river` and
+  `outer` (sha256) and checks that each pack's leading water is exactly its compiled water, so a
+  rebake that adds or changes buildings cannot change water, collision or the content digest; it
+  also checks the packs carry building records after the water. Update a pin only for a
+  deliberate change to a map's water. `building_kit` (`tools/building_kit.py`) runs the kit
+  fixtures (validation, determinism, outward faces, roles) and is registered only when
+  shapely, numpy and pyproj are installed (`docs/adventure/requirements.txt`).
 - `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `outer`
   and none for the basin, checks that both frames fit the 320×200 scene (the chart
   above the instruments), that the spawn, every voyage shelter and the destination are water

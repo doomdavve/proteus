@@ -68,3 +68,37 @@ python tools/building_kit.py                           # kit fixtures
 python -I tools/prepare_waterfront.py                  # river pack; do this first
 python -I tools/prepare_outer_map.py                   # outer pack (reads the river pack)
 ```
+
+## Rendering consumers
+
+Both renderers read roles through `boat_scenery_roles` and never classify a migrated building's
+triangles by colour or geometry (`waterfront_facade_role`, `waterfront_baked_window` in
+`src/render/waterfront_corner.[ch]`):
+
+- Generic windows (the `waterfront_window_wall` grid, seeded by triangle index) are skipped for
+  every triangle with a role, in the CPU windows pass and in the GPU `build_windows`, so migrated
+  walls never get two window sets. Unmigrated buildings and packs without records keep the legacy
+  path unchanged, including its index-seeded windows.
+- CPU: `waterfront_draw_boating` leaves window triangles out of the land draw and draws each baked
+  quad as a glow quad tinted by the window light (daytime glass; occupied windows lit at night),
+  with the generic window's camera-facing and 430 m limits.
+- GPU: wall triangles with role `wall` join the facade mesh (the `a, c, b / a, d, c` pairing is the
+  kit's emission order), `roof` the roof mesh, `detail` the flat mesh; window triangles are not in
+  the flat mesh but in the detail-cell window meshes, near and far. Baked windows are not merged
+  for the far level yet (a B4 lever); legacy windows still merge 2x2.
+- `tools/ambient_bake.c` classifies facades by role for migrated buildings.
+- Known side effect: the river kit's frontage pass (planters, benches, trims) keys on triangle
+  indices and the window seeds of unmigrated buildings use them too, so adding baked windows
+  shifts them. The B1 rebake changed the river kit from 7944 to 7980 boxes (clearances
+  unchanged); B2 moves the frontages to facade runs.
+
+## Generated outputs and packaging
+
+`scenery.bin`, `manifest.json` (building record counts) and `water.h` come from the two bakes;
+`ambient.bin` is geometry-keyed and must be rebaked after every pack change
+(`ambient_bake --map river|outer --out assets/geometry/<map>/ambient.bin`; CTest `ambient_<map>`
+fails when stale). `water.h` and the water atlas are unchanged by a rebake (CTest
+`building_packs`). The macOS package and the Windows workflow ship the outer map's
+`water_atlas.bin` and `ambient.bin` next to its pack (they were missing from them before B1); the
+web build preloads the river pack and serves the outer pack with both sidecars lazily, by
+globbing `assets/geometry/*/*.bin`, so a version 2 pack needs no list change.
