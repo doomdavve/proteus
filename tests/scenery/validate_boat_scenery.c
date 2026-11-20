@@ -8,6 +8,9 @@
 #include "scenery/boat_water_atlas.h"
 #include "support/boat_test_scenery.h"
 
+#include "raymath.h"
+
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +89,48 @@ static bool rejected(const unsigned char *copy, size_t size)
         && !boat_scenery_of(&waterfront_outer_map);
 }
 
+// The migrated buildings of a loaded pack: records in range after the water, one role per
+// triangle, windows baked as quads of glass in the legacy palette with occupancy in alpha, and
+// no migrated wall the legacy window rule would add generic windows to.
+static int check_migrated(const BoatMapDescription *map)
+{
+    const BoatMapDescription *full = boat_scenery_of(map);
+    size_t count = 0;
+    const BoatSceneryBuilding *list = boat_scenery_buildings(map, &count);
+    const unsigned char *roles = boat_scenery_roles(map);
+    CHECK(full && list && roles && count > 0);
+    size_t water = boat_map_leading_water(full->mesh), windows = 0, firsts = 0, lit = 0;
+    for (size_t b = 0; b < count; ++b) {
+        CHECK(list[b].first >= water && list[b].end <= full->mesh->triangle_count);
+        CHECK(list[b].min.y < list[b].max.y);
+        for (size_t i = list[b].first; i < list[b].end; ++i) {
+            const Triangle3D *t = &full->mesh->triangles[i];
+            CHECK(roles[i] != BOAT_SCENERY_ROLE_NONE);
+            // Windows are exactly the triangles from detail_first on, in pairs.
+            CHECK((roles[i] == BOAT_SCENERY_ROLE_WINDOW) == (i >= list[b].detail_first));
+            if (roles[i] != BOAT_SCENERY_ROLE_WINDOW)
+                continue;
+            ++windows;
+            Vector3 q[4];
+            bool first = waterfront_baked_window(full->mesh, i, q);
+            firsts += first;
+            CHECK(first == ((i - list[b].detail_first) % 2 == 0));
+            CHECK(t->color.a == 0 || t->color.a == 255);
+            CHECK((t->color.r == 138 && t->color.g == 185 && t->color.b == 204)
+                || (t->color.r == 181 && t->color.g == 211 && t->color.b == 221)
+                || (t->color.r == 66 && t->color.g == 100 && t->color.b == 120));
+            lit += first && waterfront_baked_window_occupied(t->color);
+            if (first) { // Outward, 3.5 cm off the wall: on the building's side of its bounds.
+                Vector3 n
+                    = Vector3CrossProduct(Vector3Subtract(q[1], q[0]), Vector3Subtract(q[2], q[0]));
+                CHECK(fabsf(n.y) < 1e-3f * Vector3Length(n) && q[2].y > q[0].y);
+            }
+        }
+    }
+    CHECK(windows > 0 && windows == 2 * firsts && lit > firsts / 5 && lit < firsts / 2);
+    return 0;
+}
+
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
@@ -145,10 +190,13 @@ int main(void)
     free(river_pack);
 
     // Version 2: the same pack with a trailing building-record block (tools/map_pack.py).
+    // The shipped pack is version 2; the synthetic cases reuse only its vertices and triangles.
+    size_t stream = 32 + (size_t)pack[28] + 256u * pack[29] + 65536u * pack[30];
+    CHECK(stream < size);
     uint32_t water_count = (uint32_t)waterfront_outer_map.mesh->triangle_count;
     CHECK(water_count + 20 < pack[12] + 256u * pack[13] + 65536u * pack[14]);
     free(copy);
-    copy = malloc(size + 4096);
+    copy = malloc(stream + 4096);
     CHECK(copy);
     struct {
         uint32_t id, first, end, detail, run_first, run_count;
@@ -171,9 +219,9 @@ int main(void)
         { "run order", 4 + 24 + 3, 0 } };
     size_t block_words = 4 + 12 + 12 + 6;
     for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
-        memcpy(copy, pack, size);
+        memcpy(copy, pack, stream);
         put32(copy + 4, 2);
-        unsigned char *at = copy + size;
+        unsigned char *at = copy + stream;
         uint32_t words[4 + 12 + 12 + 6] = { 0x444C4250u, 2, 2, 0 };
         memcpy(words + 4, b, sizeof(b));
         memcpy(words + 4 + 24, r, sizeof(r));
@@ -181,7 +229,7 @@ int main(void)
             words[cases[c].field] = cases[c].value;
         for (size_t i = 0; i < block_words; ++i)
             put32(at + 4 * i, words[i]);
-        size_t total = size + block_words * 4;
+        size_t total = stream + block_words * 4;
         if (c == 0) {
             CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, total));
             size_t count = 0, runs = 0;
@@ -207,12 +255,13 @@ int main(void)
             CHECK(rejected(copy, total));
         }
     }
-    memcpy(copy, pack, size);
+    memcpy(copy, pack, stream);
     put32(copy + 4, 2);
-    memset(copy + size, 0, 16);
-    CHECK(rejected(copy, size + 16) && rejected(copy, size + 3) && rejected(copy, size));
-    memcpy(copy, pack, size);
-    CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, size)); // Version 1 still loads.
+    memset(copy + stream, 0, 16);
+    CHECK(rejected(copy, stream + 16) && rejected(copy, stream + 3) && rejected(copy, stream));
+    memcpy(copy, pack, stream);
+    put32(copy + 4, 1);
+    CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, stream)); // Version 1 still loads.
     size_t none = 7;
     CHECK(!boat_scenery_buildings(&waterfront_outer_map, &none) && none == 0
         && !boat_scenery_roles(&waterfront_outer_map));
@@ -307,6 +356,7 @@ int main(void)
     // Water corners are open; land has both open and closed-off corners.
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/")
         && boat_scenery_load_location(river, PROTEUS_SOURCE_DIR "/assets/"));
+    CHECK(check_migrated(river->map) == 0 && check_migrated(outer->map) == 0);
     const unsigned char *river_ambient = boat_ambient_of(river->map);
     CHECK(river_ambient && boat_ambient_of(outer->map) && !boat_ambient_of(basin->map));
     const Mesh3D *river_mesh = boat_scenery_of(river->map)->mesh;

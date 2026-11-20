@@ -975,11 +975,18 @@ static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *o
 
 // Only imported buildings take roof and facade materials, by colour and measured from their own
 // base, so terrain and shore walls at any height stay flat.
-static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c, Color color)
+static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c, Color color, unsigned char role)
 {
     Vector3 normal
         = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
     float top = fmaxf(a.y, fmaxf(b.y, c.y));
+    if (role != BOAT_SCENERY_ROLE_NONE) {
+        // A migrated building: its pack records say what each triangle is.
+        if (role == BOAT_SCENERY_ROLE_ROOF && normal.y > .95f)
+            return CITY_SURFACE_ROOF;
+        return waterfront_facade_role(role, a, b, c, color) ? CITY_SURFACE_FACADE
+                                                            : CITY_SURFACE_FLAT;
+    }
     if (normal.y > .95f)
         return top > 4.0f && waterfront_building_roof(color) ? CITY_SURFACE_ROOF
                                                              : CITY_SURFACE_FLAT;
@@ -1036,6 +1043,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     // Baked corners exist only for a loaded pack, in its own triangle order.
     const unsigned char *occlusion
         = boat_scenery_of(scenery->map) == scenery->full ? boat_ambient_of(scenery->map) : NULL;
+    const unsigned char *roles = boat_scenery_roles(scenery->full);
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -1049,6 +1057,9 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         Vector3 b = city->vertices[triangle->vertices[1]];
         Vector3 c = city->vertices[triangle->vertices[2]];
         const unsigned char *corners = occlusion ? &occlusion[i * 3] : NULL;
+        unsigned char role = roles ? roles[i] : 0;
+        if (role == BOAT_SCENERY_ROLE_WINDOW)
+            continue; // Baked windows are drawn by the windows pass (build_windows).
         if (is_water_triangle(triangle)) {
             if (!builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
                 goto failed;
@@ -1059,7 +1070,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         // Authored bridge beams retain their flat steel/concrete colors.
         bool bridge = boat_map_is_bridge_triangle(scenery->full, i);
         CitySurface surface
-            = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c, triangle->color);
+            = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c, triangle->color, role);
         Vector3 normal
             = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
         bool road = ColorIsEqual(triangle->color, (Color) { 83, 89, 99, 255 });
@@ -1150,10 +1161,25 @@ static bool build_windows(
     if (!tiled_builder_init(&tiled, detail_cell_count(scenery))
         || !tiled_builder_init(&far_tiled, detail_cell_count(scenery)))
         goto failed;
+    const unsigned char *roles = boat_scenery_roles(map);
     for (size_t i = 0; i < city->triangle_count; ++i) {
         if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *triangle = &city->triangles[i];
+        if (roles && roles[i] != BOAT_SCENERY_ROLE_NONE) {
+            // Migrated building: its windows are baked quads, drawn one to one in both levels
+            // (distance merging of baked windows is a B4 lever); no generic windows.
+            Vector3 q[4];
+            if (roles[i] != BOAT_SCENERY_ROLE_WINDOW || !waterfront_baked_window(city, i, q))
+                continue;
+            Vector3 centroid = Vector3Scale(Vector3Add(q[0], q[2]), .5f);
+            size_t cell = detail_cell_of(scenery, centroid);
+            Color color = triangle->color; // Glass; alpha is the occupancy.
+            if (!builder_quad(&tiled.tiles[cell], q[0], q[1], q[2], q[3], color)
+                || !builder_quad(&far_tiled.tiles[cell], q[0], q[1], q[2], q[3], color))
+                goto failed;
+            continue;
+        }
         Vector3 a = city->vertices[triangle->vertices[0]];
         Vector3 c = city->vertices[triangle->vertices[1]];
         Vector3 b = city->vertices[triangle->vertices[2]];
@@ -2767,9 +2793,10 @@ static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
     draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     for (int i = 0; i < harbor->berth_count; ++i)
         if (harbor->visible[i])
-            draw_colored_mesh(scene->harbor_custom[i].vaoId ? scene->harbor_custom[i]
-                                                        : scene->harbor_boats[harbor->recipes[i]],
-            material, harbor->boats[i], WHITE, false);
+            draw_colored_mesh(scene->harbor_custom[i].vaoId
+                    ? scene->harbor_custom[i]
+                    : scene->harbor_boats[harbor->recipes[i]],
+                material, harbor->boats[i], WHITE, false);
     for (int i = 0; i < harbor->line_count; ++i)
         draw_colored_mesh(
             scene->cube, material, harbor->lines[i], (Color) { 169, 153, 113, 255 }, false);

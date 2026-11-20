@@ -227,8 +227,9 @@ static unsigned char corner(Bake *b, size_t i, int j, unsigned *serial)
     if (dot(n, n) == 0)
         return 0;
     Vector3 c = scale(add(add(v[0], v[1]), v[2]), 1 / 3.0f);
+    const unsigned char *roles = boat_scenery_roles(b->scenery);
     bool facade = !boat_map_is_bridge_triangle(b->scenery, i)
-        && waterfront_facade_triangle(v[0], v[1], v[2], t->color);
+        && waterfront_facade_role(roles ? roles[i] : 0, v[0], v[1], v[2], t->color);
     int samples = facade ? 1 : (int)(sizeof(region) / sizeof(region[0]));
     float closed = 0;
     for (int s = 0; s < samples; ++s) {

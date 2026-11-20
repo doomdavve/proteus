@@ -39,6 +39,35 @@ bool waterfront_facade_triangle(Vector3 a, Vector3 b, Vector3 c, Color color)
     return fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f;
 }
 
+bool waterfront_facade_role(unsigned char role, Vector3 a, Vector3 b, Vector3 c, Color color)
+{
+    if (role == BOAT_SCENERY_ROLE_NONE)
+        return waterfront_facade_triangle(a, b, c, color);
+    Vector3 normal
+        = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+    return role == BOAT_SCENERY_ROLE_WALL && fabsf(normal.y) < .15f;
+}
+
+bool waterfront_baked_window(const Mesh3D *mesh, size_t i, Vector3 corners[4])
+{
+    if (i + 1 >= mesh->triangle_count)
+        return false;
+    const Triangle3D *t = &mesh->triangles[i], *u = &mesh->triangles[i + 1];
+    Vector3 p = mesh->vertices[t->vertices[0]], pu = mesh->vertices[t->vertices[1]];
+    Vector3 qu = mesh->vertices[t->vertices[2]], q = mesh->vertices[u->vertices[2]];
+    // First triangle (p, p + up, q + up), second (p, q + up, q).
+    if (p.x != pu.x || p.z != pu.z || u->vertices[0] != t->vertices[0]
+        || u->vertices[1] != t->vertices[2] || p.y >= pu.y)
+        return false;
+    corners[0] = p;
+    corners[1] = pu;
+    corners[2] = qu;
+    corners[3] = q;
+    return true;
+}
+
+bool waterfront_baked_window_occupied(Color baked) { return baked.a > 127; }
+
 bool waterfront_building_roof(Color color)
 {
     for (size_t i = 0; i < sizeof(building_tints) / sizeof(building_tints[0]); ++i) {
