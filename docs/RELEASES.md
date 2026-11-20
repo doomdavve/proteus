@@ -38,7 +38,7 @@ controller vault file in place and pass its path rather than copying it.
 For the next version (replace the tag and paths as appropriate), check prerequisites first:
 
 ```sh
-python3 tools/cut_release.py v0.0.26 \
+python3 tools/cut_release.py v0.0.27 \
   --hosting-repo /path/to/clean-davve-srv-worktree \
   --vault-password-file /path/to/davve-srv/ansible/.vault_pass.txt \
   --browser-python /path/to/playwright-venv/bin/python \
@@ -290,7 +290,52 @@ and the Release-build `check_binary_hardening.py --fortify` check on the Winterf
 (still owed from H2). Whether the WebRTC build links under the new flags is shown only by the
 deployment succeeding, not by a dedicated check. Evidence:
 `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/` (`verification.json`, stage logs).
-The v0.0.26 and v0.0.27 sections are on `release/v0.0.27-evidence` and are not yet on `main`.
+
+### v0.0.26 — 2026-11-09
+
+Current release: **[v0.0.26](https://github.com/doomdavve/proteus/releases/tag/v0.0.26)**
+is published at `ab01d92daeb8d31470bd1ebbba0fd11ecda1aa06`. It collects full-day lighting,
+the working-harbour sandbox and P5 multiplayer plugin work since v0.0.25. Clients and rooms
+must upgrade together to **protocol 14 / physics 9**.
+
+The [native release](https://github.com/doomdavve/proteus/actions/runs/42660770443) passed on
+attempt 2: the first macOS job never acquired a hosted runner and GitHub cancelled it after
+capacity warnings. Retrying the failed job kept the source/tag unchanged and retained the
+successful Windows job. [Pages](https://github.com/doomdavve/proteus/actions/runs/42660769793)
+and [three-browser plugin qualification](https://github.com/doomdavve/proteus/actions/runs/42660840316)
+(Chromium, Firefox and WebKit) passed on their first attempts. This successful qualification
+does not establish that the earlier browser timing sensitivity is resolved.
+
+The tagged source passed Debug configure/build and all **472 enabled CPU CTests** on Apple
+Silicon/macOS (`ctest --preset full`, GPU tests off, 13 retired cases disabled), including the
+release-command retry. The build retains raylib's bundled stb_vorbis warning. Basin and nighttime
+outer CPU captures were inspected; a 240-frame windowed outer GPU demo completed. Both downloaded
+archives passed SHA-256, ZIP integrity and embedded version/commit checks. The Mac app reports
+`Uncommitted changes: False`, passes strict signature verification and completed a 240-frame
+outer GPU demo outside the repository; its GPU frame was inspected. The first package launch
+could not find a monitor; retrying with the display kept awake passed. No GPU CTest matrix,
+Windows package execution, human input/audio or physical-device acceptance was performed.
+
+Hosting pin `b61e289` is committed/pushed to the private baseline. The routine role completed
+with `ok=44 changed=9 unreachable=0 failed=0`; no full deployment repeat was run. Room and relay
+are active on the exact tag, both browser sites report v0.0.26 and directory compatibility is
+protocol 14 / physics 9. Both sites passed named joining/driving without page errors using
+Chrome/SwiftShader and follow-up Metal runs. The inspected software captures show `STALE`;
+the Metal frames do not, though Pages shows `WAKES REPAIRING`. Continuous freshness/repair
+behavior and the software delay's cause were not measured. The native bot shared a two-player
+room, received 150 snapshots, repaired eight mismatches and finished consistent with zero decode
+errors and zero resyncs (`received_ratio=0.987`, RTT 4.05 ms, 56.1 m travelled).
+[Hosting verification](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-09) owns deployment
+limits.
+
+Evidence: `/private/tmp/proteus-release-v0.0.26/build/releases/v0.0.26/`, including
+`verification.json`, build/test/deployment logs, native/package checks, `hosted/`, `pages/`,
+`hosted-metal/` and `pages-metal/`. The first publication attempt is preserved in
+`release-attempt-1.log` and `verification-attempt-1.json`; current orchestration log:
+`/private/tmp/proteus-release-v0.0.26.log`. The temporary Metal checker is
+`/private/tmp/proteus-v0.0.26-directory-metal.py`.
+Next: human package/input/audio and physical-device play, wider network/long-session checks,
+and continued browser timing/freshness review. Publication and required hosted cutover are complete.
 
 ### v0.0.25 — 2026-11-04
 

@@ -1,8 +1,8 @@
 # Winterfell internet room
 
-The Winterfell deployment runs released **v0.0.25**, commit
-`f6152ba3eb655772dc2fcea1de177bb8c79b86be`, with the optional WebRTC transport enabled.
-The native room, hosted browser and Pages client use protocol v12 / physics 9. The room runs the
+The Winterfell deployment runs released **v0.0.26**, commit
+`ab01d92daeb8d31470bd1ebbba0fd11ecda1aa06`, with the optional WebRTC transport enabled.
+The native room, hosted browser and Pages client use protocol v14 / physics 9. The room runs the
 `proteus.deathmatch` package and sends clients its definition as data, so the browser needs no Lua.
 Upgrade native clients to this matching release.
 It hosts one shared four-player outer-river deathmatch room for native and browser players.
@@ -12,7 +12,7 @@ A round starts when two players join. There is no room token or player account r
 
 ## Join
 
-- Native: use v0.0.25, choose MULTIPLAYER and select WINTERFELL, or enter
+- Native: use v0.0.26, choose MULTIPLAYER and select WINTERFELL, or enter
   `wake.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/) or
   [GitHub Pages](https://doomdavve.github.io/proteus/), press PLAY, choose MULTIPLAYER,
@@ -20,9 +20,9 @@ A round starts when two players join. There is no room token or player account r
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The native server and hosted browser client are built from the same v0.0.25 tag by the
-`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.25 and uses
-the same public directory and signaling endpoint. The directory reports protocol 12 / physics 9.
+The native server and hosted browser client are built from the same v0.0.26 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.26 and uses
+the same public directory and signaling endpoint. The directory reports protocol 14 / physics 9.
 Both launchers include public STUN. The public `wake.davve.net` hostname avoids the VPN's
 private `*.winterfell.davve.net` DNS override. Native v0.0.20 includes the connection fix;
 the v0.0.18 connection limitation described in the historical notes no longer applies.
@@ -32,7 +32,7 @@ the v0.0.18 connection limitation described in the historical notes no longer ap
 The v0.0.25 protocol-v12 cutover retired the room's `--location river`. Hosting preparation
 `9209fcd` selects `wake_velocity_location: outer` and makes the service description name the
 configured location; version pin `09a8cf2` and the ordinary role deployed the outer deathmatch.
-[Current verification](#status-and-verification--2026-11-04) records deployment and client evidence.
+[Current verification](#status-and-verification--2026-11-09) records deployment and client evidence.
 
 Every release must include this hosted cutover after native publication and Pages succeed.
 The [release command](RELEASES.md#release-command) automates the version-pin commit, pushes
@@ -55,8 +55,8 @@ The controller needs no Proteus checkout, local Emscripten, release artifacts or
 Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
 players; repeat deployments reuse the builds and leave a healthy room running.
 
-The v0.0.25 cutover passed through that exact wrapper on 2026-11-04.
-`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-11-04) records the client checks
+The v0.0.26 cutover passed through that exact wrapper on 2026-11-09.
+`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-11-09) records the client checks
 and their limits. Do not alternate the baseline role with the standalone Proteus playbook:
 they manage the same service names and ports. The standalone commands below are historical
 reference, not the routine workflow.
@@ -338,6 +338,31 @@ hosted and Pages browser directory checks passed in Chrome, and the matching nat
 unit does not enable `--lockdown`, so [lockdown](#in-process-lockdown) is not yet in effect on
 Winterfell. Evidence: `/private/tmp/proteus-release-v0.0.28/build/releases/v0.0.28/`. Not run: human
 input, a Release-build `--fortify` check of the deployed binary, and a relay join from outside the LAN.
+
+## Status and verification — 2026-11-09
+
+The [release command](RELEASES.md#release-command) published and deployed **v0.0.26** through
+private-baseline pin `b61e289`. The routine role completed with `ok=44 changed=9 unreachable=0
+failed=0`; no full repeat was run. Room and relay are active, with description
+`Wake Velocity v0.0.26 outer room`, on exact tagged commit
+`ab01d92daeb8d31470bd1ebbba0fd11ecda1aa06`. Both browser sites report v0.0.26; public directory
+compatibility is **protocol 14 / physics 9**. Clients must upgrade together with the room.
+
+Both sites passed named joining/driving without page errors in Chrome/SwiftShader and follow-up
+Metal runs. Inspected software frames show `STALE`; Metal frames do not, though Pages shows
+`WAKES REPAIRING`. Continuous freshness/repair behavior and the software delay's cause were not
+measured. The matching native bot shared a two-player room, received 150 snapshots, repaired
+eight mismatches and finished consistent with zero decode errors and zero resyncs;
+`received_ratio=0.987`, RTT 4.05 ms, 56.1 m travelled.
+
+Evidence: `/private/tmp/proteus-release-v0.0.26/build/releases/v0.0.26/verification.json`,
+`deployment.log`, `native.log`, `hosted/`, `pages/`, `hosted-metal/` and `pages-metal/`.
+The temporary checker is `/private/tmp/proteus-v0.0.26-directory-metal.py`.
+[Release status](RELEASES.md#status-and-verification) records package checks, 472 enabled local
+CPU tests, passing three-browser plugin qualification and the macOS runner-capacity retry.
+Windows package execution, human input/audio, physical devices, independent external-network/
+TURN selection, restrictive networks and long sessions remain unverified. Next: those human and
+network checks, plus continued browser timing/freshness review.
 
 ## Status and verification — 2026-11-04
 
