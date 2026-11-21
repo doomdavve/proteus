@@ -18,9 +18,10 @@ Working Harbour is the exception: it starts at noon and follows its own day/nigh
 default, so the saved LIGHTING choice does not fix that view.
 RESOLUTION (LOW or HIGH) applies to the title screen and to each new session. LOW is the plain
 320×200 scene; HIGH draws the scene at up to 1280×800 behind a HUD and title menu on a finer
-640×400 grid (half the old size). HIGH needs a GPU and looks sharpest in a window of 1280×800 or
-a whole multiple of it. EDGES chooses PIXEL or SMOOTH (the default) for the low-resolution scene;
-HIGH already replaces smoothing. Both rows also appear in the single-player setup.
+640×400 grid (half the old size), with a matching 1280×800 title backdrop. HIGH needs a GPU and
+looks sharpest in a window of 1280×800 or a whole multiple of it. EDGES chooses PIXEL or SMOOTH
+(the default) for the low-resolution scene; HIGH already replaces smoothing. Both rows also appear
+in the single-player setup.
 The soundtrack cycles A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
 cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during

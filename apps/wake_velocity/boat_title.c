@@ -20,7 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
+enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16, HIGH_UI_SCALE = 2 };
+#define TITLE_FRAME_WIDTH (WIDTH * BOAT_SCREEN_HIGH_SCALE)
+#define TITLE_FRAME_HEIGHT (HEIGHT * BOAT_SCREEN_HIGH_SCALE)
 
 typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_CREDITS, ROW_EXIT, MAIN_ROWS } MainRow;
 #if defined(__EMSCRIPTEN__)
@@ -165,9 +167,10 @@ static unsigned host_location(const BoatTitleSettings *s)
 }
 
 typedef struct {
-    Texture2D backdrop, wordmark;
+    Texture2D backdrop, backdrop_high, wordmark;
     Font ui, small; // m5x7 labels/values; m3x6 hints/footer, baked at their native 16 px em.
-    RenderTexture2D target;
+    RenderTexture2D target; // Low composition, or the transparent high-resolution UI overlay.
+    RenderTexture2D frame; // High only: the backdrop and overlay composed at 1280x800.
     BoatResolution resolution; // The target follows the saved setting.
     int ui_scale; // Target pixels per 320x200 logical pixel: 1 low, 2 high.
     Panel panel; // The multiplayer or settings panel replaces the main rows.
@@ -236,7 +239,7 @@ static Color rgb(unsigned char r, unsigned char g, unsigned char b)
 
 static int title_ui_scale(BoatResolution resolution)
 {
-    return resolution == BOAT_RESOLUTION_HIGH ? 2 : 1;
+    return resolution == BOAT_RESOLUTION_HIGH ? HIGH_UI_SCALE : 1;
 }
 
 // Layout stays in the 320x200 frame; high resolution doubles positions into a 640x400 target while
@@ -250,21 +253,43 @@ static Rectangle scaled_rect(const Title *t, Rectangle r)
     return (Rectangle) { pxf(t, r.x), pxf(t, r.y), pxf(t, r.width), pxf(t, r.height) };
 }
 
-static bool title_set_resolution(Title *t, BoatResolution resolution)
+static void unload_title_targets(Title *t)
 {
-    if (t->resolution == resolution)
-        return true;
-    int scale = title_ui_scale(resolution);
-    RenderTexture2D next = LoadRenderTexture(WIDTH * scale, HEIGHT * scale);
-    if (!IsRenderTextureValid(next))
-        return false;
-    SetTextureFilter(next.texture, TEXTURE_FILTER_POINT);
     if (IsRenderTextureValid(t->target))
         UnloadRenderTexture(t->target);
-    t->target = next;
+    if (IsRenderTextureValid(t->frame))
+        UnloadRenderTexture(t->frame);
+    t->target = (RenderTexture2D) { 0 };
+    t->frame = (RenderTexture2D) { 0 };
+}
+
+static bool title_allocate(Title *t, BoatResolution resolution)
+{
+    int ui_scale = title_ui_scale(resolution);
+    RenderTexture2D target = LoadRenderTexture(WIDTH * ui_scale, HEIGHT * ui_scale);
+    if (!IsRenderTextureValid(target))
+        return false;
+    SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
+    RenderTexture2D frame = { 0 };
+    if (resolution == BOAT_RESOLUTION_HIGH) {
+        frame = LoadRenderTexture(TITLE_FRAME_WIDTH, TITLE_FRAME_HEIGHT);
+        if (!IsRenderTextureValid(frame)) {
+            UnloadRenderTexture(target);
+            return false;
+        }
+        SetTextureFilter(frame.texture, TEXTURE_FILTER_POINT);
+    }
+    unload_title_targets(t);
+    t->target = target;
+    t->frame = frame;
     t->resolution = resolution;
-    t->ui_scale = scale;
+    t->ui_scale = ui_scale;
     return true;
+}
+
+static bool title_set_resolution(Title *t, BoatResolution resolution)
+{
+    return t->resolution == resolution || title_allocate(t, resolution);
 }
 
 // The TTF em square is 16 px; visible capitals are seven/six pixels high. Draw the
@@ -375,11 +400,14 @@ static Rectangle row_bounds(const Title *t, int row)
 {
     if (t->panel == PANEL_CREDITS)
         return (Rectangle) { 127, 171, 66, 14 };
-    if (t->panel == PANEL_MAIN)
-        return (Rectangle) { 70, (float)(109 + row * 14), 118, 13 };
+    bool compact = t->ui_scale > 1;
+    if (t->panel == PANEL_MAIN) {
+        int stride = compact ? 9 : 14;
+        return (Rectangle) { 70, (float)(109 + row * stride), 118, compact ? 8 : 13 };
+    }
     int rows = row_count(t);
-    // Eight settings rows need 13 pixels; the rest keep their roomier 16-pixel rows.
-    int height = t->panel == PANEL_SETTINGS ? 13 : ROW_HEIGHT;
+    // High resolution keeps the type native, so its rows compact to about one line of text.
+    int height = compact ? 9 : t->panel == PANEL_SETTINGS ? 13 : ROW_HEIGHT;
     int top = 86 + (5 - rows) * height / 2; // Centred on five rows' space.
     return (Rectangle) { 45, (float)(top + row * height), 230, height - 2 };
 }
@@ -583,11 +611,17 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         Rectangle row = row_bounds(t, i);
         Rectangle shown_row = scaled_rect(t, row);
         bool active = i == t->selected;
-        if (main)
-            DrawLine(px(t, 71), px(t, (int)row.y + 13), px(t, 187), px(t, (int)row.y + 13), dim);
+        if (main) {
+            int rule = (int)row.y + (t->ui_scale > 1 ? 8 : 13);
+            DrawLine(px(t, 71), px(t, rule), px(t, 187), px(t, rule), dim);
+        }
         if (active) {
             DrawRectangleRec(shown_row, boat_ui_palette().selected);
-            int x = px(t, main ? 74 : 51), y = px(t, (int)row.y + 4), arm = px(t, 5);
+            int x = px(t, main ? 74 : 51);
+            int y = (int)shown_row.y + (int)((shown_row.height - 7) / 2);
+            int arm = t->ui_scale > 1 ? 7 : 5;
+            if (t->ui_scale == 1)
+                y = (int)row.y + 4;
             for (int j = 0; j < 3; ++j)
                 DrawLine(x + j, y + j, x + j, y + arm - j, boat_ui_palette().accent);
         }
@@ -806,12 +840,8 @@ static void draw_credits(const Title *t)
     draw_text(t->ui, "< BACK", px(t, 142), px(t, 175), p.selected_text);
 }
 
-static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
+static void draw_ui(const Title *t, const BoatTitleSettings *s, const char *status)
 {
-    BeginTextureMode(t->target);
-    DrawTexturePro(t->backdrop,
-        (Rectangle) { 0, 0, (float)t->backdrop.width, (float)t->backdrop.height },
-        (Rectangle) { 0, 0, (float)px(t, WIDTH), (float)px(t, HEIGHT) }, (Vector2) { 0 }, 0, WHITE);
     draw_logo(t);
     crosshair(t, 22, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
     crosshair(t, 297, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
@@ -821,6 +851,42 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
         draw_menu(t, s, status);
     if (t->panel != PANEL_CREDITS)
         draw_footer_text(t, t->small, PROTEUS_VERSION, 8);
+}
+
+// High resolution composes the full-size backdrop with the finer 640x400 UI overlay. The overlay
+// was drawn premultiplied by boat_screen_begin_overlay, so blend it back the same way.
+static void composite_high(const Title *t)
+{
+    Texture2D backdrop = IsTextureValid(t->backdrop_high) ? t->backdrop_high : t->backdrop;
+    bool exact = backdrop.width == TITLE_FRAME_WIDTH && backdrop.height == TITLE_FRAME_HEIGHT;
+    BeginTextureMode(t->frame);
+    SetTextureFilter(backdrop, exact ? TEXTURE_FILTER_POINT : TEXTURE_FILTER_BILINEAR);
+    DrawTexturePro(backdrop, (Rectangle) { 0, 0, (float)backdrop.width, (float)backdrop.height },
+        (Rectangle) { 0, 0, TITLE_FRAME_WIDTH, TITLE_FRAME_HEIGHT }, (Vector2) { 0 }, 0, WHITE);
+    BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
+    SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
+    DrawTexturePro(t->target.texture,
+        (Rectangle) { 0, 0, (float)t->target.texture.width, -(float)t->target.texture.height },
+        (Rectangle) { 0, 0, TITLE_FRAME_WIDTH, TITLE_FRAME_HEIGHT }, (Vector2) { 0 }, 0, WHITE);
+    EndBlendMode();
+    EndTextureMode();
+}
+
+static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
+{
+    if (t->resolution == BOAT_RESOLUTION_HIGH) {
+        BeginTextureMode(t->target);
+        boat_screen_begin_overlay();
+        draw_ui(t, s, status);
+        boat_screen_end_overlay();
+        EndTextureMode();
+        return;
+    }
+    BeginTextureMode(t->target);
+    DrawTexturePro(t->backdrop,
+        (Rectangle) { 0, 0, (float)t->backdrop.width, (float)t->backdrop.height },
+        (Rectangle) { 0, 0, (float)px(t, WIDTH), (float)px(t, HEIGHT) }, (Vector2) { 0 }, 0, WHITE);
+    draw_ui(t, s, status);
     EndTextureMode();
 }
 
@@ -834,15 +900,30 @@ static void present(Title *t)
 {
     BoatScreenLayout layout
         = boat_screen_layout(t->resolution, WIDTH, HEIGHT, GetScreenWidth(), GetScreenHeight());
-    // A 640x400 target maps cleanly to even logical scales; odd ones filter instead of
-    // showing uneven nearest pixels.
-    bool filtered = t->resolution == BOAT_RESOLUTION_HIGH && layout.scale % t->ui_scale != 0;
-    SetTextureFilter(t->target.texture, filtered ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
     BeginDrawing();
     ClearBackground(boat_ui_palette().shadow);
-    DrawTexturePro(t->target.texture,
-        (Rectangle) { 0, 0, (float)t->target.texture.width, -(float)t->target.texture.height },
-        layout.destination, (Vector2) { 0 }, 0, WHITE);
+    if (t->resolution == BOAT_RESOLUTION_HIGH) {
+        Texture2D backdrop = IsTextureValid(t->backdrop_high) ? t->backdrop_high : t->backdrop;
+        bool exact = backdrop.width == (int)layout.destination.width
+            && backdrop.height == (int)layout.destination.height;
+        SetTextureFilter(backdrop, exact ? TEXTURE_FILTER_POINT : TEXTURE_FILTER_BILINEAR);
+        DrawTexturePro(backdrop,
+            (Rectangle) { 0, 0, (float)backdrop.width, (float)backdrop.height }, layout.destination,
+            (Vector2) { 0 }, 0, WHITE);
+        // The overlay is premultiplied and keeps its native pixels, so text stays crisp when the
+        // backdrop is scaled to a window other than 1280x800.
+        BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
+        SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
+        DrawTexturePro(t->target.texture,
+            (Rectangle) { 0, 0, (float)t->target.texture.width, -(float)t->target.texture.height },
+            layout.destination, (Vector2) { 0 }, 0, WHITE);
+        EndBlendMode();
+    } else {
+        SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
+        DrawTexturePro(t->target.texture,
+            (Rectangle) { 0, 0, (float)t->target.texture.width, -(float)t->target.texture.height },
+            layout.destination, (Vector2) { 0 }, 0, WHITE);
+    }
     frame_pacer_wait(&t->pacer);
     EndDrawing();
 }
@@ -861,12 +942,37 @@ static Font load_title_font(const char *asset)
     return font;
 }
 
+static void grade_river(Image *image, bool windows)
+{
+    ImageFormat(image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+#if !PROTEUS_WARM_MENU
+    Color *pixels = image->data;
+    for (int y = 0; y < image->height; ++y)
+        for (int x = 0; x < image->width; ++x) {
+            Color *p = &pixels[y * image->width + x];
+            bool water = y >= 87;
+            p->r = (unsigned char)(p->r * (water ? .43f : .22f));
+            p->g = (unsigned char)(p->g * (water ? .73f : .37f));
+            p->b = (unsigned char)(p->b * (water ? .91f : .58f));
+        }
+    // A few occupied windows in this fixed 320x200 river composition, not a star field.
+    static const Vector2 windows_at[] = { { 1, 76 }, { 4, 79 }, { 8, 76 }, { 13, 82 }, { 17, 79 },
+        { 21, 76 }, { 28, 81 }, { 31, 78 }, { 35, 82 }, { 229, 82 }, { 238, 81 }, { 244, 80 },
+        { 248, 83 }, { 255, 81 }, { 263, 82 }, { 271, 80 }, { 278, 83 }, { 285, 81 }, { 292, 80 },
+        { 299, 82 }, { 306, 79 }, { 313, 82 } };
+    if (windows && image->width == WIDTH && image->height == HEIGHT)
+        for (unsigned i = 0; i < sizeof(windows_at) / sizeof(windows_at[0]); ++i)
+            pixels[(int)windows_at[i].y * WIDTH + (int)windows_at[i].x]
+                = i % 3 ? rgb(205, 181, 119) : rgb(140, 165, 154);
+#else
+    (void)windows;
+#endif
+}
+
 static bool open_title(Title *t, BoatResolution resolution)
 {
     char path[4096];
     *t = (Title) { 0 };
-    t->resolution = resolution;
-    t->ui_scale = title_ui_scale(resolution);
     if (!boat_asset_path(path, sizeof(path), "title/river-backdrop.png"))
         return false;
     // Grade the captured river once at load, preserving its exact geometry and pixel grid.
@@ -874,30 +980,19 @@ static bool open_title(Title *t, BoatResolution resolution)
     Image image = LoadImage(path);
     if (!IsImageValid(image))
         return false;
-    ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-#if !PROTEUS_WARM_MENU
-    Color *pixels = image.data;
-    for (int y = 0; y < image.height; ++y)
-        for (int x = 0; x < image.width; ++x) {
-            Color *p = &pixels[y * image.width + x];
-            bool water = y >= 87;
-            p->r = (unsigned char)(p->r * (water ? .43f : .22f));
-            p->g = (unsigned char)(p->g * (water ? .73f : .37f));
-            p->b = (unsigned char)(p->b * (water ? .91f : .58f));
-        }
-    // A few occupied windows in this fixed 320x200 river composition, not a star field.
-    static const Vector2 windows[] = { { 1, 76 }, { 4, 79 }, { 8, 76 }, { 13, 82 }, { 17, 79 },
-        { 21, 76 }, { 28, 81 }, { 31, 78 }, { 35, 82 }, { 229, 82 }, { 238, 81 }, { 244, 80 },
-        { 248, 83 }, { 255, 81 }, { 263, 82 }, { 271, 80 }, { 278, 83 }, { 285, 81 }, { 292, 80 },
-        { 299, 82 }, { 306, 79 }, { 313, 82 } };
-    if (image.width == WIDTH && image.height == HEIGHT)
-        for (unsigned i = 0; i < sizeof(windows) / sizeof(windows[0]); ++i)
-            pixels[(int)windows[i].y * WIDTH + (int)windows[i].x]
-                = i % 3 ? rgb(205, 181, 119) : rgb(140, 165, 154);
-#endif
+    grade_river(&image, true);
     t->backdrop = LoadTextureFromImage(image);
     UnloadImage(image);
-    t->target = LoadRenderTexture(WIDTH * t->ui_scale, HEIGHT * t->ui_scale);
+    if (boat_asset_path(path, sizeof(path), "title/river-backdrop-high.png")) {
+        Image high = LoadImage(path);
+        if (IsImageValid(high)) {
+            grade_river(&high, false);
+            t->backdrop_high = LoadTextureFromImage(high);
+            UnloadImage(high);
+        }
+    }
+    if (!title_allocate(t, resolution))
+        return false;
     if (!boat_asset_path(path, sizeof(path), "title/wake-velocity.png"))
         return false;
     Image wordmark = LoadImage(path);
@@ -921,6 +1016,8 @@ static bool open_title(Title *t, BoatResolution resolution)
         return false;
     }
     SetTextureFilter(t->backdrop, TEXTURE_FILTER_POINT);
+    if (IsTextureValid(t->backdrop_high))
+        SetTextureFilter(t->backdrop_high, TEXTURE_FILTER_POINT);
     SetTextureFilter(t->wordmark, TEXTURE_FILTER_POINT);
     SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
     return true;
@@ -933,10 +1030,11 @@ static void close_title(Title *t)
         UnloadFont(t->ui);
     if (t->small.glyphs)
         UnloadFont(t->small);
-    if (IsRenderTextureValid(t->target))
-        UnloadRenderTexture(t->target);
+    unload_title_targets(t);
     if (IsTextureValid(t->backdrop))
         UnloadTexture(t->backdrop);
+    if (IsTextureValid(t->backdrop_high))
+        UnloadTexture(t->backdrop_high);
     if (IsTextureValid(t->wordmark))
         UnloadTexture(t->wordmark);
 }
@@ -1257,7 +1355,10 @@ bool boat_title_screenshot_panel(
                 boat_save_row_start(&t.save);
         }
         draw_screen(&t, settings, NULL);
-        Image image = LoadImageFromTexture(t.target.texture);
+        if (t.resolution == BOAT_RESOLUTION_HIGH)
+            composite_high(&t);
+        RenderTexture2D shown = t.resolution == BOAT_RESOLUTION_HIGH ? t.frame : t.target;
+        Image image = LoadImageFromTexture(shown.texture);
         ImageFlipVertical(&image);
         ok = ExportImage(image, path);
         UnloadImage(image);
@@ -1273,7 +1374,10 @@ bool boat_title_screenshot(const BoatTitleSettings *settings, double time, const
     if (open_title(&t, settings->resolution)) {
         t.time = time;
         draw_screen(&t, settings, NULL);
-        Image image = LoadImageFromTexture(t.target.texture);
+        if (t.resolution == BOAT_RESOLUTION_HIGH)
+            composite_high(&t);
+        RenderTexture2D shown = t.resolution == BOAT_RESOLUTION_HIGH ? t.frame : t.target;
+        Image image = LoadImageFromTexture(shown.texture);
         ImageFlipVertical(&image);
         ok = ExportImage(image, path);
         UnloadImage(image);

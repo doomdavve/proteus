@@ -33,21 +33,22 @@ the default, or PIXEL) rows in SETTINGS and the Single Player panel. `resolution
 `resolution=high` saves still load. Every launch from the title receives `--resolution high` when
 HIGH is chosen (and no `--gpu-aa`); LOW keeps `--gpu-aa` when EDGES is SMOOTH.
 
-The title screen now follows that setting. LOW keeps the 320x200 target and integer nearest
-presentation, byte-for-byte in its composition. HIGH draws into a 640x400 target: the backdrop fills
-it, layout positions double, and the m5x7/m3x6 type keeps its native pixel size, matching the
-in-game high-resolution HUD's finer grid. The target is presented into the same integer-scaled
-320x200 destination as gameplay; an odd logical scale filters bilinearly instead of showing uneven
-nearest pixels. The saved resolution chooses the initial window scale (3x low, 4x high), and
-changing the row reallocates the title target immediately. `--title --screenshot` captures 320x200
-at LOW and 640x400 at HIGH.
+The title follows that setting. LOW keeps the 320x200 target and integer nearest
+presentation, byte-for-byte in its composition. HIGH composites a separately generated 1280x800
+backdrop with a transparent 640x400 UI overlay: layout positions double, the m5x7/m3x6 type keeps
+its native pixel size, and rows compact to about one line, matching the in-game high-resolution
+HUD's finer grid. The composed frame is presented into the same integer-scaled 320x200 destination
+as gameplay; a size mismatch filters bilinearly instead of showing uneven nearest pixels. The saved
+resolution chooses the initial window scale (3x low, 4x high), and changing the row reallocates the
+title targets immediately. `--title --screenshot` captures 320x200 at LOW and 1280x800 at HIGH.
 
 Verification 2026-11-21, Apple Silicon/macOS: Debug build; `ctest --preset full` passed all 606
 enabled tests (`PROTEUS_GPU_TESTS=OFF`, optimized test builds). Captured `--title --screenshot` at
 LOW and HIGH in isolated profile directories and inspected the main menu and Single Player panels;
-the LOW composition matches the previous build's 320x200 capture above the version footer. A
-windowed HIGH title at 1280x800 was inspected on the desktop. Not checked: the windowed title at
-an odd logical scale, the browser build, physical input, and human visual acceptance.
+the LOW composition matches the previous build's 320x200 capture above the version footer, and the
+HIGH capture uses the 1280x800 backdrop generated from the same fixed view. A windowed HIGH title at
+1280x800 was inspected on the desktop. Not checked: the windowed title at an odd logical scale, the
+browser build, physical input, and human visual acceptance.
 
 ## Fixed-hour title lighting, 2026-11-08
 

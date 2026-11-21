@@ -22,17 +22,21 @@ scene time 73.350 s. No player layer or player wake is drawn. The native GPU ren
 renders at 1280×800 and downsamples to 320×200 using the ordinary game shader. The title
 uses the original bright daylight colours by default. `-DPROTEUS_WARM_MENU=OFF` retains the original dusk
 grade and occupied-window pixels. Both load the same source without moving the backdrop.
+`river-backdrop-high.png` is the same fixed view exported at 1280×800 for the HIGH title; the
+640×400 UI overlay is composited over it. Generate both together so the pair matches; rerunning the
+tool against newer scene code refreshes the pair rather than only the high-resolution copy.
 
 Regenerate from the repository root with a working desktop graphics context:
 
 ```sh
 cmake --build build --target title_backdrop
-./build/title_backdrop assets/title/river-backdrop.png
+./build/title_backdrop assets/title/river-backdrop.png assets/title/river-backdrop-high.png
 cmake --build build --target wake_velocity
 ./build/wake_velocity --title --screenshot build/title.png
 ```
 
-The second build copies the freshly rendered source into the executable's asset directory.
+The second build copies the freshly rendered sources into the executable's asset directory. The
+title capture is 320×200 at LOW and 1280×800 at HIGH.
 The original moving-boat capture and coarse title alphabets are historical; they are no
 longer the current title assets. The owning design and review status is in
 [the title plan](../../docs/TITLE_SCREEN_PLAN.md).
