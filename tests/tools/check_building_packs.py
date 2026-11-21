@@ -43,7 +43,8 @@ def main():
         assert records is not None and records, f"{name}: no building records"
         assert all(leading <= r["first"] and r["end"] <= len(triangles) for r in records)
         # No baked window triangles: facade records (wall pairs of their building) hold windows.
-        assert len(styles) == 1 and all(r["detail_first"] == r["end"] for r in records)
+        # Attached detail (balconies, canopies, trim) starts at detail_first, after walls and roof.
+        assert len(styles) == 6 and all(r["first"] <= r["detail_first"] <= r["end"] for r in records)
         facades = [f for r in records for f in r["facades"]]
         assert facades, f"{name}: no facade records"
         for r in records:

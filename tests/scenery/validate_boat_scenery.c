@@ -90,7 +90,8 @@ static bool rejected(const unsigned char *copy, size_t size)
 }
 
 // The migrated buildings of a loaded pack: records in range after the water, one role per
-// triangle, no baked window triangles, and facade records on wall pairs of their building.
+// triangle, no baked window triangles, attached detail after walls and roof, and facade records
+// on wall pairs of their building.
 static int check_migrated(const BoatMapDescription *map)
 {
     const BoatMapDescription *full = boat_scenery_of(map);
@@ -99,12 +100,15 @@ static int check_migrated(const BoatMapDescription *map)
     const BoatSceneryFacade *facade = boat_scenery_facades(map, &facades);
     const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
     const unsigned char *roles = boat_scenery_roles(map);
-    CHECK(full && list && roles && facade && style && count > 0 && facades > 0 && styles == 1);
+    CHECK(full && list && roles && facade && style && count > 0 && facades > 0 && styles == 6);
     size_t water = boat_map_leading_water(full->mesh), listed = 0;
     for (size_t b = 0; b < count; ++b) {
         CHECK(list[b].first >= water && list[b].end <= full->mesh->triangle_count);
         CHECK(list[b].min.y < list[b].max.y);
-        CHECK(list[b].detail_first == list[b].end); // Windows are generated, not baked.
+        // Windows are generated, not baked: attached detail (balconies, trim) follows walls and roof.
+        CHECK(list[b].detail_first >= list[b].first && list[b].detail_first <= list[b].end);
+        for (size_t i = list[b].detail_first; i < list[b].end; ++i)
+            CHECK(!boat_scenery_role_is_wall(roles[i]) && roles[i] != BOAT_SCENERY_ROLE_ROOF);
         for (size_t i = list[b].first; i < list[b].end; ++i)
             CHECK(roles[i] != BOAT_SCENERY_ROLE_NONE);
         for (size_t f = 0; f < list[b].facade_count; ++f, ++listed) {
@@ -228,14 +232,15 @@ int main(void)
         { "empty", B0 + 2, wall }, { "past mesh", B0 + 2, 0xFFFFFFF0u },
         { "detail past end", B0 + 3, wall + 9 }, { "duplicate id", B1, 11 },
         { "run mismatch", B0 + 4, 1 }, { "facade mismatch", B0 + 6, 1 },
-        { "bad role", RUNS + 2, 9 }, { "role none", RUNS + 5, 0 }, { "run outside", RUNS + 3, wall + 12 },
+        { "bad role", RUNS + 2, BOAT_SCENERY_ROLE_COUNT }, { "role none", RUNS + 5, 0 }, { "run outside", RUNS + 3, wall + 12 },
         { "run order", RUNS + 3, 0 }, { "wall outside building", FACADE, wall + 7 },
         { "wall not a wall", FACADE, wall + 6 }, { "wall unpaired", FACADE, wall + 1 },
         { "no bays", FACADE + 1, 3 }, { "no floors", FACADE + 2, 0 },
         { "no such style", FACADE + 2, 1 | 1u << 16 }, { "reserved byte", FACADE + 2, 1 | 1u << 24 },
         { "grid larger than the wall", FACADE + 1, 3 | 60000u << 16 },
         { "style not finite", STYLE, 0x7FC00000u }, { "style pitch", STYLE + 1, 0 },
-        { "style size", STYLE + 4, 0 } };
+        { "style size", STYLE + 4, 0 },
+        { "facade on a balcony run", RUNS + 2, BOAT_SCENERY_ROLE_BALCONY | 7 << 8 | 4096u << 16 } };
     for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
         memcpy(copy, pack, stream);
         put32(copy + 4, 3);
@@ -278,6 +283,30 @@ int main(void)
                 fprintf(stderr, "v3 case accepted: %s\n", cases[c].what);
             CHECK(rejected(copy, total));
         }
+    }
+    // The authored wall materials and attached roles load, and a facade may stand on any wall role.
+    {
+        static const unsigned char walls[] = { BOAT_SCENERY_ROLE_WALL_PLASTER,
+            BOAT_SCENERY_ROLE_WALL_BRICK, BOAT_SCENERY_ROLE_WALL_PANEL };
+        for (size_t k = 0; k < sizeof(walls); ++k) {
+            memcpy(copy, pack, stream);
+            put32(copy + 4, 3);
+            uint32_t words[WORDS];
+            memcpy(words, words0, sizeof(words));
+            words[RUNS + 2] = walls[k] | 7 << 8 | 4096u << 16;
+            words[RUNS + 5] = BOAT_SCENERY_ROLE_CANOPY | 255 << 8;
+            for (size_t i = 0; i < WORDS; ++i)
+                put32(copy + stream + 4 * i, words[i]);
+            CHECK(boat_scenery_load_bytes(&waterfront_outer_map, copy, stream + WORDS * 4));
+            const unsigned char *roles = boat_scenery_roles(boat_scenery_of(&waterfront_outer_map));
+            CHECK(roles && roles[wall] == walls[k] && boat_scenery_role_is_wall(roles[wall + 1])
+                && roles[wall + 6] == BOAT_SCENERY_ROLE_CANOPY);
+            boat_scenery_unload();
+        }
+        CHECK(!boat_scenery_role_is_wall(BOAT_SCENERY_ROLE_BALCONY)
+            && !boat_scenery_role_is_wall(BOAT_SCENERY_ROLE_TRIM)
+            && !boat_scenery_role_is_wall(BOAT_SCENERY_ROLE_ROOF)
+            && !boat_scenery_role_is_wall(BOAT_SCENERY_ROLE_NONE));
     }
     memcpy(copy, pack, stream);
     put32(copy + 4, 3);
