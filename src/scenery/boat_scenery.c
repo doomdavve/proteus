@@ -14,7 +14,13 @@
 // allocate and wipe a 64 MB scratch buffer per call; the pack states its exact size instead.
 extern int sinflate(void *out, int cap, const void *in, int size);
 
-enum { PACK_MAGIC = 0x4E435350, PACK_VERSION_1 = 1, PACK_VERSION = 3, PACK_HEADER = 32 };
+enum {
+    PACK_MAGIC = 0x4E435350,
+    PACK_VERSION_1 = 1,
+    PACK_VERSION_3 = 3, // the record block stored raw
+    PACK_VERSION = 4, // the record block deflated: u32 raw size, u32 crc32, one DEFLATE stream
+    PACK_HEADER = 32
+};
 enum {
     BUILDING_MAGIC = 0x444C4250,
     BUILDING_HEAD = 20,
@@ -143,6 +149,47 @@ static bool wall_pair(const Scenery *s, uint32_t wall, float *length, float *hei
     *length = hypotf(b.x - a.x, b.z - a.z);
     *height = c.y - a.y;
     return isfinite(*length) && isfinite(*height) && *length > 0;
+}
+
+static uint32_t crc32_of(const unsigned char *p, size_t size)
+{
+    uint32_t crc = 0xFFFFFFFFu;
+    for (size_t i = 0; i < size; ++i) {
+        crc ^= p[i];
+        for (int bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+    }
+    return ~crc;
+}
+
+// Version 4 stores each record array byte-plane first (tools/map_pack.py shuffle_block), which
+// deflates to half the size; restore the records in place. False when the head's counts do not
+// fit SIZE.
+static bool unshuffle_records(unsigned char *p, size_t size)
+{
+    if (size < BUILDING_HEAD || u32(p) != BUILDING_MAGIC)
+        return false;
+    uint64_t counts[3] = { u32(p + 4), u32(p + 8), u32(p + 12) };
+    const size_t sizes[3] = { BUILDING_SIZE, RUN_SIZE, FACADE_SIZE };
+    uint64_t total = BUILDING_HEAD + (uint64_t)u32(p + 16) * STYLE_SIZE;
+    for (int i = 0; i < 3; ++i)
+        total += counts[i] * sizes[i];
+    if (total != size)
+        return false;
+    unsigned char *copy = malloc(size);
+    if (!copy)
+        return false;
+    size_t at = BUILDING_HEAD;
+    for (int i = 0; i < 3; ++i) {
+        size_t n = (size_t)counts[i];
+        for (size_t row = 0; row < n; ++row)
+            for (size_t column = 0; column < sizes[i]; ++column)
+                copy[at + row * sizes[i] + column] = p[at + column * n + row];
+        at += n * sizes[i];
+    }
+    memcpy(p + BUILDING_HEAD, copy + BUILDING_HEAD, at - BUILDING_HEAD);
+    free(copy);
+    return true;
 }
 
 // Parse the version 3 record block (exactly SIZE bytes) into S, checking the contract of
@@ -285,7 +332,8 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
     uint64_t expected
         = (uint64_t)vertices * sizeof(Vector3) + (uint64_t)triangles * sizeof(Triangle3D);
     uint32_t version = u32(h + 4);
-    if (u32(h) != PACK_MAGIC || (version != PACK_VERSION_1 && version != PACK_VERSION)
+    if (u32(h) != PACK_MAGIC
+        || (version != PACK_VERSION_1 && version != PACK_VERSION_3 && version != PACK_VERSION)
         || payload != expected || payload > INT32_MAX || packed > size - PACK_HEADER
         || water > bridge || bridge > triangles || !water)
         return false;
@@ -293,9 +341,11 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
     unsigned char *out = malloc(payload ? payload : 1);
     if (!out)
         return false;
-    // Version 1 ends with its stream; version 2 continues with exactly the record block.
+    // Version 1 ends with its stream; the others continue with exactly the record block (version 4:
+    // deflated, behind its raw size).
     size_t tail = size - PACK_HEADER - packed;
-    if ((version == PACK_VERSION_1 && tail) || (version == PACK_VERSION && tail < BUILDING_HEAD)
+    if ((version == PACK_VERSION_1 && tail) || (version == PACK_VERSION_3 && tail < BUILDING_HEAD)
+        || (version == PACK_VERSION && tail < 8 + 2)
         || sinflate(out, (int)payload, h + PACK_HEADER, (int)packed) != (int)payload) {
         free(out);
         return false;
@@ -312,10 +362,27 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
         return false;
     }
     *slot = (Scenery) { .map = map, .mesh = mesh, .payload = out, .bytes = payload };
-    if (version == PACK_VERSION
+    if (version == PACK_VERSION_3
         && !read_buildings(slot, h + PACK_HEADER + packed, tail, triangles, water)) {
         scenery_free(slot);
         return false;
+    }
+    if (version == PACK_VERSION) {
+        const unsigned char *block = h + PACK_HEADER + packed;
+        uint32_t raw = u32(block);
+        // The inflater does not bound corrupt input, so a truncated or damaged stream is refused
+        // by its checksum first.
+        bool intact = crc32_of(block + 8, tail - 8) == u32(block + 4);
+        unsigned char *records
+            = intact && raw >= BUILDING_HEAD && raw <= INT32_MAX ? malloc(raw) : NULL;
+        bool read = records && sinflate(records, (int)raw, block + 8, (int)(tail - 8)) == (int)raw
+            && unshuffle_records(records, raw)
+            && read_buildings(slot, records, raw, triangles, water);
+        free(records);
+        if (!read) {
+            scenery_free(slot);
+            return false;
+        }
     }
     slot->description = (BoatMapDescription) { &slot->mesh, bridge };
     return true;

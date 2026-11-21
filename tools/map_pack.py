@@ -8,8 +8,12 @@ A bake writes two files into assets/geometry/<name>/:
   triangles, bridge first triangle, payload bytes, compressed bytes) and one raw DEFLATE stream.
   The payload holds the vertices as float32 x, y, z, then the triangles as three u32 vertex
   indices and an RGBA colour, the layout of geometry3d.h.
-  Version 3 appends, after the DEFLATE stream, an uncompressed building-record block (see
-  BUILDING_BLOCK below); version 1 packs have none and the loader still accepts them. (Version 2,
+  Version 4 appends, after the DEFLATE stream, a u32 raw size, a u32 crc32 of the second stream
+  (the loader checks it before inflating, as the inflater does not bound corrupt input) and a
+  second raw DEFLATE stream holding the building-record block (see BUILDING_BLOCK below) with its arrays byte-shuffled
+  (shuffle_block); version 3 stored that block
+  uncompressed (still read, no longer written); version 1 packs have none and the loader still
+  accepts them. (Version 2,
   which baked window triangles, was never shipped and is no longer read.) The
   header's water count and the leading water triangles are the same in both versions.
 - water.h, the compiled collision map: the leading water triangles alone, with their vertices
@@ -32,7 +36,8 @@ from pathlib import Path
 
 MAGIC = 0x4E435350  # "PSCN"
 VERSION_1 = 1
-VERSION = 3
+VERSION_3 = 3  # the record block stored raw (read, no longer written)
+VERSION = 4  # the record block deflated: u32 raw size, u32 crc32 of the stream, one raw DEFLATE stream
 HEADER = struct.Struct("<8I")
 TRIANGLE = struct.Struct("<3I4B")
 
@@ -179,6 +184,37 @@ def building_block(vertices, triangles, water, buildings, styles=()):
             + b"".join(STYLE.pack(*style) for style in styles))
 
 
+def _sections(blob):
+    """(offset, record size, record count) of the three record arrays of a block."""
+    magic, count, run_count, facade_count, _ = BUILDING_HEAD.unpack_from(blob)
+    assert magic == BUILDING_MAGIC
+    at = BUILDING_HEAD.size
+    out = []
+    for size, n in ((BUILDING.size, count), (RUN.size, run_count), (FACADE.size, facade_count)):
+        out.append((at, size, n))
+        at += size * n
+    return out
+
+
+def shuffle_block(blob):
+    """BLOB with each record array stored byte-plane first (all first bytes, then all second
+    bytes...): deflate packs the ascending triangle numbers and the repeated small fields of the
+    records far better that way (half the size). The head and the styles stay as they are."""
+    out = bytearray(blob)
+    for at, size, n in _sections(blob):
+        for column in range(size):
+            out[at + column * n:at + (column + 1) * n] = blob[at + column:at + size * n:size]
+    return bytes(out)
+
+
+def unshuffle_block(blob):
+    out = bytearray(blob)
+    for at, size, n in _sections(blob):
+        for column in range(size):
+            out[at + column:at + size * n:size] = blob[at + column * n:at + (column + 1) * n]
+    return bytes(out)
+
+
 def pack_bytes(vertices, triangles, bridge_first, buildings=None, styles=()):
     """VERTICES: float32-exact (x, y, z); TRIANGLES: [((a, b, c), (r, g, b[, alpha]))]. BUILDINGS None
     writes a version 1 pack; a list (possibly empty) writes version 3 with its records."""
@@ -192,8 +228,12 @@ def pack_bytes(vertices, triangles, bridge_first, buildings=None, styles=()):
     water = leading_water(vertices, triangles)
     head = HEADER.pack(MAGIC, VERSION_1 if buildings is None else VERSION, len(vertices),
                        len(triangles), water, bridge_first, len(payload), len(data))
-    block = b"" if buildings is None else building_block(vertices, triangles, water, buildings,
-                                                           styles)
+    block = b""
+    if buildings is not None:
+        raw = shuffle_block(building_block(vertices, triangles, water, buildings, styles))
+        packer = zlib.compressobj(9, zlib.DEFLATED, -15)
+        stream = packer.compress(raw) + packer.flush()
+        block = struct.pack("<2I", len(raw), zlib.crc32(stream)) + stream
     return head + data + block
 
 
@@ -230,7 +270,8 @@ def read_pack(path, with_buildings=False):
     records and styles (None for version 1; read_buildings' pair) when WITH_BUILDINGS."""
     blob = Path(path).read_bytes()
     magic, version, nv, nt, water, bridge, size, packed = HEADER.unpack_from(blob)
-    assert magic == MAGIC and version in (VERSION_1, VERSION), f"{path}: unknown pack version"
+    assert magic == MAGIC and version in (VERSION_1, VERSION_3, VERSION), \
+        f"{path}: unknown pack version"
     payload = zlib.decompress(blob[HEADER.size:HEADER.size + packed], -15)
     assert len(payload) == size == nv * 12 + nt * TRIANGLE.size
     vertices = [struct.unpack_from("<3f", payload, 12 * i) for i in range(nv)]
@@ -240,7 +281,12 @@ def read_pack(path, with_buildings=False):
         triangles.append((tuple(ids), (r, g, b) if a == 255 else (r, g, b, a)))
     if with_buildings:
         tail = blob[HEADER.size + packed:]
-        return vertices, triangles, water, bridge, (read_buildings(tail) if version == VERSION
+        if version == VERSION:
+            raw_size, crc = struct.unpack_from("<2I", tail)
+            assert zlib.crc32(tail[8:]) == crc
+            tail = unshuffle_block(zlib.decompress(tail[8:], -15))
+            assert len(tail) == raw_size
+        return vertices, triangles, water, bridge, (read_buildings(tail) if version != VERSION_1
                                                     else None)
     return vertices, triangles, water, bridge
 
@@ -364,6 +410,9 @@ def building_test():
         assert records[1]["facades"] == [{"wall": 5, "index": 3, "bays": 2, "floors": 1, "style": 0}]
         # Identity is the id, not the input order or the list position.
         assert pack_bytes(vertices, triangles, 8, buildings[::-1], styles) == blob
+        # The deflated block holds byte-shuffled arrays; shuffling is its own inverse step.
+        raw = building_block(vertices, triangles, 2, buildings, styles)
+        assert shuffle_block(raw) != raw and unshuffle_block(shuffle_block(raw)) == raw
         # A version 1 pack carries no block and reads as before.
         v1 = pack_bytes(vertices, triangles, 8)
         path.write_bytes(v1)
