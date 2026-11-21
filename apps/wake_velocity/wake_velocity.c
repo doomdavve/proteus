@@ -193,6 +193,7 @@ static void usage(void)
     cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; outer 12)");
     cli_usage_line(stdout, "--camera-height N", "4..36 (default 14; outer 6)");
     cli_usage_line(stdout, "--fixed-fov", "Hold the 55-degree view instead of widening with speed");
+    cli_usage_line(stdout, "--no-audio", "Disable all music and sound effects for this run");
     cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
     cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
@@ -426,6 +427,7 @@ static NetHost net_host; // The room this session started with --host, if any.
 
 // The steering mode a session ended in, so the title remembers changes made in game.
 static bool study_mouse_steering;
+static bool study_no_audio;
 // The latest session launch's diagnostic, for the title's message line.
 static char study_failure[192];
 
@@ -1581,12 +1583,13 @@ static int study(int argc, char **argv)
             SetTextureFilter(minimap_textures[mode], TEXTURE_FILTER_POINT);
         }
     }
-    boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
+    if (!study_no_audio)
+        boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     char music_path[4096];
     const BoatMusic *track = boat_music(soundtrack);
-    if (track->asset && !boat_asset_path(music_path, sizeof(music_path), track->asset))
+    if (!study_no_audio && track->asset && !boat_asset_path(music_path, sizeof(music_path), track->asset))
         goto cleanup;
-    if (IsAudioDeviceReady() && track->asset) {
+    if (!study_no_audio && IsAudioDeviceReady() && track->asset) {
         music = LoadMusicStream(music_path);
         music_ready = IsMusicValid(music);
         if (music_ready && !xm_music_start_at(&music, music_path, 0)) {
@@ -2982,6 +2985,17 @@ static int title_join(BoatTitleSettings *settings, bool host)
 // session. Explicit options enter their session directly, keeping scripted checks unchanged.
 int main(int argc, char **argv)
 {
+    // Apply to every entry path, including sessions launched from the title.
+    for (int i = 1; i < argc;) {
+        if (strcmp(argv[i], "--no-audio") != 0) {
+            ++i;
+            continue;
+        }
+        study_no_audio = true;
+        for (int j = i; j < argc; ++j)
+            argv[j] = argv[j + 1];
+        --argc;
+    }
 #if !defined(__EMSCRIPTEN__)
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
@@ -3053,7 +3067,8 @@ int main(int argc, char **argv)
         CloseWindow();
         return ok ? 0 : 1;
     }
-    wake_app_title_open();
+    if (!study_no_audio)
+        wake_app_title_open();
     wake_servers_start();
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
@@ -3075,7 +3090,8 @@ int main(int argc, char **argv)
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
     wake_servers_stop();
-    wake_app_title_close();
+    if (!study_no_audio)
+        wake_app_title_close();
     CloseWindow();
     return 0;
 }

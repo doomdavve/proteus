@@ -1,5 +1,23 @@
 # Gothenburg boating playground
 
+## Graphics-only audio switch — 2026-11-21
+
+Status: implemented locally; verification below. No open implementation items.
+Done when: `--no-audio` disables music and effects across direct and title-launched sessions.
+Next: user review; no PR authorized. Existing Open loops in the index remain deferred.
+
+The runtime contract is in [command-line options](COMMAND_LINE.md); [music](MUSIC.md) explains the distinction from soundtrack Off.
+AGENTS.md requires the switch for graphics-only checks. It skips audio initialization and
+music asset loading without saving a preference. No renderer or audio-mix changes are made.
+
+Verification on macOS, 2026-11-21: Debug build passed; CLI help and muted CPU screenshot
+at simulated time 3 passed, and the frame was inspected. The muted native GPU demo completed
+120 frames with desktop access. The sandboxed attempt stalled with macOS desktop-service
+errors and was stopped. No human listening review or browser qualification is claimed.
+Title capture could not initialize the GLFW platform in this desktop environment; that path
+is implemented but not runtime-qualified. All 597 CTests passed with desktop/network access
+(full preset, 48.57 s); the sandboxed full run failed socket/process checks.
+
 Direction update, 2026-11-06: the [free ride sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) proposes
 cargo/crane handling, useful changes to harbour places, Creative and Working Harbour rules,
 then boat ownership, earnings and fuel. No sandbox features are implemented. Next is a small

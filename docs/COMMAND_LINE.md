@@ -314,6 +314,10 @@ multiplier once with ordinary flat shading, so basin captures from earlier dayti
 differ intentionally. T2c readability/performance limits and T3's fixed-hour title controls are
 recorded in the [lighting plan](SUNSET_PLAN.md#t3-implementation-2026-11-08).
 
+`--no-audio` disables all music and sound effects for the entire run, including sessions
+started from `--title`. Use it for graphics-only demos and captures; it does not change saved
+soundtrack preferences. `--soundtrack off` disables only music.
+
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
 320×200 pixel grid and integer-scaled desktop presentation. It does not select a location
