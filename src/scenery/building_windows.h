@@ -25,7 +25,7 @@
 // Within this horizontal distance a window also has real relief (building_window_reveal): a
 // surround and returns that project from the wall around the glass. The wall is a flat quad
 // pair, not cut, so the opening reads as sunken by the glass sitting behind a projecting frame.
-#define BUILDING_WINDOW_DEEP_RANGE 80.0f
+#define BUILDING_WINDOW_DEEP_RANGE 40.0f
 // Everything a window adds lies within this distance of its wall (surround depth and rim, with a
 // margin): callers grow wall and cell bounds by it.
 #define BUILDING_WINDOW_MARGIN 0.3f

@@ -62,7 +62,7 @@ a light sill (8% of the height, glass mixed half with stone). Each face's alpha 
 night window light (occupied glass 255, lintel 77, jamb 153, sill 0). This is the impression the
 whole near range (430 m) draws, and `window_mask` in `assets/shaders/waterfront_city.fs` repeats
 the same bands beyond, settling toward a slightly darker mean once a window is about a pixel.
-Within `BUILDING_WINDOW_DEEP_RANGE` (80 m) `building_window_reveal` adds real relief: sill,
+Within `BUILDING_WINDOW_DEEP_RANGE` (40 m, cut from 80 m at the user's request, 2026-11-21: the camera must be close to see the relief) `building_window_reveal` adds real relief: sill,
 lintel and jamb returns 16 cm deep, a 7 cm rim over the lintel and under the sill on the outer
 plane and, on ground-floor windows 1.8 m or wider, a mullion (7 faces at most, none behind the
 wall plane; a fuller frame of 9 faces at 120 m cost about +0.8 ms gpu p50 at the quay row, this
@@ -70,7 +70,7 @@ one none measurable). The wall is a
 flat quad pair that the window does not cut, so the glass is sunken by a surround that projects
 from the wall rather than by a hole in it; callers grow wall and cell bounds by
 `BUILDING_WINDOW_MARGIN` (0.3 m). The GPU keeps one merged relief mesh set of the facades whose wall is
-within the deep range of the followed boat (a facade leaves it 40 m beyond), rebuilt when that set
+within the deep range of the followed boat (a facade leaves it 20 m beyond), rebuilt when that set
 changes, so the pass adds a few submissions however many facades are near.
 
 Seeds depend on identity only: the facade seed is `crc32("<id>/<facade number>")` (computed by

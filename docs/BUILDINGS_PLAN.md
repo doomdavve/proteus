@@ -656,3 +656,8 @@ User feedback: balconies on every bay are unrealistic; windows look like sticker
 - For the user: are fewer balconies (clearance) acceptable or should balconies over a street
   polygon at floor 2 and above be allowed; is the projecting-surround reveal convincing, or is a
   cut wall (a real hole) wanted for B3.
+
+Relief range 2026-11-21: the user viewed the rework ("Looks good!", hi-res, outer) and asked for the
+relief range to be cut from 80 m to about 40 m: `BUILDING_WINDOW_DEEP_RANGE` is 40 m, release
+hysteresis 20 m. The shaded lintel/jamb/sill bands are unchanged out to 430 m. Quick stills at 30,
+50 and 100 m only; no perf pass (fewer relief faces than the measured 80 m state).

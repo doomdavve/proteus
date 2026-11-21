@@ -1534,7 +1534,7 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
         if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE) {
             scene->window_reveal_ready[i] = 1;
             changed = true;
-        } else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 40.0f) {
+        } else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 20.0f) {
             scene->window_reveal_ready[i] = 0;
             changed = true;
         }
