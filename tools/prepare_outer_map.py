@@ -701,9 +701,10 @@ def main():
     objects, lifts = drape_objects(objects, model, overlay.owner)
     fort = next(Point(m["east_north"]) for m in survey.features(osm, frame)[1]
                 if m["label"] == "Nya Älvsborg")
-    buildings, dressing, dressed, building_records = outer_dressing.dress(osm, frame, region, crop, water,
-                                             geo_land(region, water), model, fort,
-                                             survey.multipolygon, outer_landmarks.SKIP)
+    compositions = building_kit.load_compositions(map_name="outer")
+    buildings, dressing, dressed, building_records, building_data = outer_dressing.dress(
+        osm, frame, region, crop, water, geo_land(region, water), model, fort,
+        survey.multipolygon, outer_landmarks.SKIP, compositions)
     dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS,
                    landmarks=landmark_stats, canal_bridges=bridge_stats)
     dressing = dressing + landmarks + canal_bridges
@@ -723,6 +724,10 @@ def main():
                    height_max_m=round(stats["height_max"], 2))
     write(args.output or ROOT / "assets/geometry/outer", vertices, triangles, stats, region,
           water, route, terrain, bridge_table)
+    report = building_kit.build_report(
+        "outer", building_data["emitter"], building_data["descriptions"], building_records,
+        "tools/prepare_outer_map.py")
+    building_kit.write_report(args.output or ROOT / "assets/geometry/outer/buildings.json", report)
 
 
 if __name__ == "__main__":

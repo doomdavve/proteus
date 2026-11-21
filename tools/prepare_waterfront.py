@@ -21,6 +21,7 @@ from shapely.ops import unary_union
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+import building_families  # noqa: E402
 import building_kit  # noqa: E402
 
 SOURCE = ROOT / "docs/river/osm-survey.json.gz"
@@ -286,7 +287,10 @@ def prepare(output, expanded=False):
                     p.intersection(shape), GROUND + bottom, GROUND + part_height,
                     f"way/{part['id']}"))
         descriptions.append(building_kit.BuildingDescription(
-            f"{e['type']}/{e['id']}", sections, tint, tuple(max(0, c - 30) for c in tint)))
+            f"{e['type']}/{e['id']}", sections, tint, tuple(max(0, c - 30) for c in tint),
+            facts=building_families.facts(e["tags"], shape.area, height, basis, len(sections),
+                                          sum(len(p.interiors) for p in polygons(shape))),
+            context="urban"))
         solids.append(shape)
         manifest_buildings.append({"osm": f"{e['type']}/{e['id']}", "height": height,
                                    "basis": basis, "courtyards": sum(len(p.interiors) for p in polygons(shape)),
@@ -314,6 +318,8 @@ def prepare(output, expanded=False):
         lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)],
         compositions=compositions, obstacles=obstacles)
     records = emitter.emit_all(descriptions)
+    building_report = building_kit.build_report("river", emitter, descriptions, records,
+                                                "tools/prepare_waterfront.py")
     solid_union = unary_union(solids)
     road_surface = road_union.intersection(land).difference(solid_union)
     if expanded:
@@ -396,7 +402,7 @@ def prepare(output, expanded=False):
                                      "facades": sum(len(r["facades"]) for r in records),
                                      "windows": sum(f["bays"] * f["floors"] for r in records
                                                     for f in r["facades"])},
-                "compositions": {k: {"family": compositions[k]["family"], **emitter.report.get(k, {})}
+                "compositions": {k: {"family": compositions[k].get("family", "auto"), **emitter.report.get(k, {})}
                                  for k in sorted(compositions)},
                 "buildings": manifest_buildings, "landscape": garden_manifest,
                 "building_parts": [{"osm": f"{e['type']}/{e['id']}", "height": h,
@@ -417,6 +423,7 @@ def prepare(output, expanded=False):
             "omitted_buildings_in_approach_grading": omitted_approach_buildings,
         }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    building_kit.write_report(output / "buildings.json", building_report)
     print(f"Prepared {len(manifest_buildings)} buildings, {len(vertices)} vertices, {len(triangles)} triangles")
 
 

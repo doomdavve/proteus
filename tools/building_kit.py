@@ -22,15 +22,17 @@ Emitted records are the dicts tools/map_pack.py writes: id, first, end, detail_f
 facades. A building without facade treatment (houses, stone) is all ROLE_DETAIL: drawn flat,
 no windows.
 
-Migration. Only buildings whose base id is in MIGRATED get records; every other building is
-emitted exactly as before the kit (per section: walls, then roof; no records), so the
-renderers keep classifying it by colour and geometry. The set grows with the plan (B2 pilot,
-B3 rollout); an empty set reproduces the pre-kit packs byte for byte (apart from the version).
+Migration. Every building gets records (B3). The only buildings left on the pre-kit path (per
+section: walls, then roof; no records, classified by the renderers from colour and geometry) are
+the explicit "legacy" entries of tools/building_overrides.json and descriptions built with
+migrate=False; the bake report names them.
 
-Composition. A migrated building with an entry in tools/building_overrides.json (keyed by its
+Composition. A building with an authored entry in tools/building_overrides.json (keyed by its
 stable id) is built by tools/building_compose.py's primitives: setbacks, ground band, roof edges,
-balconies and an entrance. Without an entry it is the plain fallback: its mapped sections, one wall
-role and the roof, plus windows on its exposed walls.
+balconies, doors, pitched roofs and an entrance. Without an entry tools/building_families.py picks a
+family from the source facts (the description's `facts` and `context`) and the same primitives
+build it; an `auto` entry tunes that result. A description without facts is the plain fallback: its
+mapped sections, one wall role and the roof, plus windows on its exposed walls.
 """
 import json
 import math
@@ -38,12 +40,13 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from shapely import STRtree
-from shapely.geometry import LineString, Point
+from shapely import STRtree, clip_by_rect
+from shapely.geometry import LineString, Point, box
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 import building_compose
+import building_families
 import map_pack
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,7 +57,8 @@ MIN_PIECE = .9  # exposed wall pieces narrower or lower than this are dropped
 # Window styles: (u0, pitch_u, y0, pitch_v, w0, h0, w1, h1, offset), see map_pack.py. First bay u0
 # in from the wall start, a bay every pitch_u; first floor y0 above the wall's base, a floor every
 # pitch_v; ground floor windows w0 x h0, upper w1 x h1; the glass stands offset off the wall.
-STYLE_LEGACY, STYLE_BALCONY, STYLE_RIBBON, STYLE_PUNCHED, STYLE_SHOP, STYLE_LOBBY = range(6)
+(STYLE_LEGACY, STYLE_BALCONY, STYLE_RIBBON, STYLE_PUNCHED, STYLE_SHOP, STYLE_LOBBY, STYLE_COTTAGE,
+ STYLE_HALL) = range(8)
 STYLES = [
     (2.5, 4.0, 1.5, 3.2, 2.2, 1.9, 1.5, 1.5, .035),  # the legacy grid (fallback buildings)
     (1.5, 4.0, 1.0, 3.2, 1.7, 1.9, 1.7, 1.9, .035),  # balcony block: doors and windows on a 4 m bay
@@ -62,24 +66,24 @@ STYLES = [
     (1.4, 3.0, 1.0, 3.2, 1.2, 1.8, 1.2, 1.8, .035),  # punched: narrow, tall, close together
     (1.4, 4.4, .35, 3.2, 3.2, 2.9, 3.2, 2.9, .035),  # shopfront: broad glazing in a ground band
     (1.2, 3.4, .35, 3.2, 2.6, 3.0, 2.6, 3.0, .035),  # lobby/ground glazing
+    (1.0, 3.0, 1.1, 2.8, 1.0, 1.1, 1.0, 1.1, .035),  # cottage: small windows in a house wall
+    (2.0, 5.0, 4.6, 5.0, 2.2, 1.3, 2.2, 1.3, .035),  # hall: a high row of windows above the doors
 ]
+PITCHED_GLASS = (118, 152, 170)  # the glazed faces of a sawtooth roof
 WINDOW_END_MARGIN = .3  # clear wall between the last window and the corner, metres
 WINDOW_TOP_MARGIN = .5  # and between the top window and the wall's top
 OVERRIDE_KEYS = {"wall", "roof", "windows"}
-# Source ids (without a "#piece" suffix) emitted with records. B1 pilot, to exercise the pipeline:
-# the Eriksberg quay row and its neighbours (river crop), and a few blocks and halls upstream
-# (outer dressing, terrain adapter). B2 adds the compositions' neighbours.
-MIGRATED = frozenset(f"way/{n}" for n in (
-    164963584, 164963867, 164963869, 164963897, 164964585, 303925538, 303925539, 282574762,
-    115318537, 503087601, 503087593, 88426613, 1204511650, 1204511655, 1204511659, 1204511647,
-    164963868, 164964582))
 CONTEXT_TOLERANCE = .3  # a neighbour's wall this close to ours counts as a shared wall
 ROLE_FOR_MATERIAL = {"plaster": map_pack.ROLE_WALL_PLASTER, "brick": map_pack.ROLE_WALL_BRICK,
                      "panel": map_pack.ROLE_WALL_PANEL}
 
 
-def migrated(ident):
-    return ident.partition("#")[0] in MIGRATED
+def is_legacy(d, compositions):
+    """True for an explicit unmigrated fallback: a description migrated off, or an entry of the
+    override file with "legacy": true (the only way a real building stays on the pre-kit path)."""
+    if d.migrate is not None:
+        return not d.migrate
+    return bool((compositions or {}).get(base_id(d.id), {}).get("legacy"))
 
 
 def base_id(ident):
@@ -105,7 +109,10 @@ class BuildingDescription:
     roof: tuple
     facade: bool = True  # False: all detail, drawn flat (houses, stone).
     override: str = None  # Key into the overrides table given to the Emitter.
-    migrate: bool = None  # None: by MIGRATED.
+    migrate: bool = None  # None: migrated unless the id is an explicit legacy fallback (LEGACY).
+    facts: dict = None  # Source facts for the automatic family (tools/building_families.py); None
+    # gives the plain fallback.
+    context: str = None  # Districts: "urban", "industrial", "coastal" or None (the adapter's call).
     extra: dict = field(default_factory=dict)  # Provenance; never read by the emitter.
 
 
@@ -170,7 +177,7 @@ def validate(descriptions, overrides=None, compositions=None):
         _rgb(d.roof, d.id)
         if d.override is not None and d.override not in overrides:
             raise ValueError(f"{d.id}: unknown override {d.override!r}")
-        if not (migrated(d.id) if d.migrate is None else d.migrate):
+        if is_legacy(d, compositions):
             continue  # Legacy buildings are emitted as they always were.
         for s in d.sections:
             if not (math.isfinite(s.bottom) and math.isfinite(s.top) and s.bottom < s.top):
@@ -187,9 +194,9 @@ def validate(descriptions, overrides=None, compositions=None):
         d = bases.get(ident)
         if d is None:
             raise ValueError(f"composition {ident}: no such building in this bake")
-        if not (migrated(d.id) if d.migrate is None else d.migrate):
+        if d.migrate is False:
             raise ValueError(f"composition {ident}: the building is not migrated")
-        if not d.facade:
+        if not d.facade and not compositions[ident].get("legacy"):
             raise ValueError(f"composition {ident}: the building takes no facade treatment")
         if any(base_id(o.id) == ident and o is not d for o in descriptions):
             raise ValueError(f"composition {ident}: the building was split into pieces")
@@ -211,7 +218,9 @@ class Emitter:
         self.obstacles = obstacles if obstacles is not None else None
         self.context = list(context or [])
         self._tree = None
+        self._obstacle_tree = None
         self.report = {}  # id -> counts and rejected features, for the manifest
+        self.assignments = {}  # id -> {family, basis, why[, roof]}: the author-readable report
 
     def emit_all(self, descriptions):
         """Emit every description in stable-id order; returns the records of the migrated ones."""
@@ -282,11 +291,13 @@ class Emitter:
     # -- emission ---------------------------------------------------------------------------
 
     def emit(self, d):
-        if not (migrated(d.id) if d.migrate is None else d.migrate):
+        if is_legacy(d, self.compositions):
+            self.assignments[d.id] = {"family": None, "basis": "legacy",
+                                      "why": "explicit unmigrated fallback (override file)"}
             return self.emit_legacy(d)
         over = self.overrides.get(d.override, {})
         wall, roof = over.get("wall", d.wall), over.get("roof", d.roof)
-        comp = self.compositions.get(base_id(d.id)) if d.facade else None
+        comp = self.resolve(d) if d.facade else None
         windows = d.facade and over.get("windows", True)
         sections = d.sections
         if comp:
@@ -331,7 +342,14 @@ class Emitter:
         # Roofs: each section's top, less what other sections of the building stand on it.
         roof_role = map_pack.ROLE_ROOF if d.facade else map_pack.ROLE_DETAIL
         roof_shapes = []
+        pitched = self.pitched(d, comp, sections)
         for s in sections:
+            if pitched and s is sections[0]:
+                corners, kind, rise = pitched
+                for points, color in building_compose.pitched_roof(
+                        corners, s.top, kind, rise, roof, wall, PITCHED_GLASS):
+                    self.triangle(points, color)
+                continue
             above = [o.shape for o in sections
                      if o.bottom <= s.top + 1e-6 and o.top > s.top + 1e-6 and o.shape is not s.shape]
             shape = s.shape.difference(unary_union(above)) if above else s.shape
@@ -339,7 +357,11 @@ class Emitter:
             for poly in polygons(shape):
                 if poly.area < .05:
                     continue
-                for t in self.triangulate(poly):
+                triangles = building_compose.Detail(self.triangulate, map_pack_clockwise)._triangles(poly)
+                if triangles is None:
+                    self.report.setdefault(base_id(d.id), {})["roof_skipped"] = True
+                    continue
+                for t in triangles:
                     self.triangle([(x, s.top, z) for x, z in map_pack_clockwise(t)], roof)
         roof_end = self.count()
         if roof_end > walls_end:
@@ -349,6 +371,59 @@ class Emitter:
         return {"id": d.id, "first": first, "end": self.count(), "detail_first": roof_end,
                 "runs": [r for r in runs if r[1] > r[0]], "facades": facades}
 
+    def resolve(self, d):
+        """The composition of building D, or None for the plain fallback. Order: an authored
+        entry of the override file (a full composition), else the automatic family from the source
+        facts (tools/building_families.py), tuned by an `auto` entry's keys. The choice, its basis
+        and the reason are recorded in `self.assignments`."""
+        base = base_id(d.id)
+        explicit = self.compositions.get(base)
+        entry = {"family": None, "basis": "plain", "why": "no source facts"}
+        comp = None
+        if explicit and not explicit.get("auto"):
+            comp = explicit
+            entry = {"family": explicit["family"], "basis": "override", "why": "authored entry"}
+        elif d.facts is not None:
+            try:
+                got = building_families.assign(d, force_family=(explicit or {}).get("family"))
+                comp = got["comp"]
+                entry = {k: got[k] for k in ("family", "basis", "why")}
+                if explicit:
+                    tuned = {k: v for k, v in explicit.items() if k not in ("auto", "map")}
+                    comp = building_compose.validate_params(
+                        base, {**{k: v for k, v in comp.items() if k != "map"},
+                               **{k: v for k, v in tuned.items()}, "map": "river"})
+                    entry["basis"], entry["why"] = "override+auto", "tuned: " + ", ".join(sorted(tuned))
+            except ValueError as error:  # The safe fallback: a plain building, never a failed bake.
+                comp, entry = None, {"family": None, "basis": "fallback", "why": f"rejected: {error}"}
+        self.assignments[d.id] = entry
+        return comp
+
+    def pitched(self, d, comp, sections):
+        """(corners, kind, rise) of a pitched roof for the building, or None for a flat one. Only a
+        single section over a near-rectangular footprint (the ratio below) is roofed; anything
+        else (courtyards, parts, irregular outlines) keeps its flat roof and the assignment says so."""
+        kind = (comp or {}).get("roof_shape", "flat")
+        if kind == "flat":
+            return None
+        entry = self.assignments.get(d.id, {})
+        ratio = .8 if comp["family"] in ("house", "shed") else .93
+        corners = building_compose.rectangle_of(sections[0].shape, ratio) if len(sections) == 1 \
+            else None
+        if corners is None:
+            entry["roof"] = f"flat ({kind} wanted: irregular footprint or several sections)"
+            return None
+        long_side, short = math.dist(corners[0], corners[1]), math.dist(corners[1], corners[2])
+        if kind == "sawtooth":
+            if short < 12 or long_side < 16:
+                kind = "gable"
+            rise = min(2.6, max(1.4, short * .1)) if kind == "sawtooth" else None
+        if kind == "gable":
+            rise = min(4.0, max(1.5, short * .35)) if comp["family"] in ("house", "shed") \
+                else min(3.4, max(1.2, short * .14))
+        entry["roof"] = kind
+        return corners, kind, rise
+
     # -- composition ------------------------------------------------------------------------
 
     def compose_rects(self, d, rects, sections, comp, wall):
@@ -356,17 +431,19 @@ class Emitter:
         building: the ground band is split from the walls above it and the entrance interval is
         cut out of the best-facing ground piece. Returns (pieces, entrance or None)."""
         family = comp["family"]
-        material = comp.get("material", {"balcony": "plaster", "stepped": "panel",
-                                         "brick": "brick"}[family])
-        style = STYLE_NAMES.index(comp.get("style", {"balcony": "balcony", "stepped": "ribbon",
-                                                     "brick": "punched"}[family]))
+        default_material, default_style = building_compose.FAMILY_DEFAULTS[family]
+        material = comp.get("material", default_material)
+        style = STYLE_NAMES.index(comp.get("style", default_style))
+        windowed = comp.get("windows", True)
+        # The lowest wall that takes windows: a house's two small floors, a hall's high row.
+        floor_min = {"house": 2.6, "shed": 2.6, "warehouse": 5.5}.get(family, 3.2)
         ground_y = min(s.bottom for s in sections)
         g = comp.get("ground")
         pieces = []
         for r in rects:
             r = dict(r)
             upper = dict(r, role=ROLE_FOR_MATERIAL[material], color=wall, style=style,
-                         min_wall=3.2, windows=True)
+                         min_wall=floor_min, windows=windowed)
             if g is None or r["y0"] > ground_y + 1e-6:
                 pieces.append(upper)
                 continue
@@ -374,7 +451,7 @@ class Emitter:
             low = dict(r, role=ROLE_FOR_MATERIAL[g.get("material", material)],
                        color=g.get("wall", wall), min_wall=3.0, ground=True,
                        style=STYLE_NAMES.index(g.get("style", "shop")),
-                       windows=g["windows"])
+                       windows=g["windows"] and windowed)
             if r["y1"] <= band + 1.0:
                 pieces.append(low)
             else:
@@ -412,13 +489,24 @@ class Emitter:
         pieces = [p for p in pieces if p["u1"] - p["u0"] >= MIN_PIECE and p["y1"] - p["y0"] >= .5]
         return pieces, entrance
 
+    def obstacles_near(self, bounds):
+        """The parts of the obstacles (water, streets) inside BOUNDS (minx, minz, maxx, maxz),
+        clipped to it: the whole obstacle shape is far too big to union per building."""
+        if self.obstacles is None or self.obstacles.is_empty:
+            return []
+        if self._obstacle_tree is None:
+            self._obstacle_parts = polygons(self.obstacles)
+            self._obstacle_tree = STRtree(self._obstacle_parts)
+        found = self._obstacle_tree.query(box(*bounds))
+        return [clip_by_rect(self._obstacle_parts[i], *bounds) for i in sorted(found)]
+
     def emit_detail(self, d, comp, sections, rects, roof_shapes, trim, entrance, runs):
         detail = building_compose.Detail(self.triangulate, map_pack_clockwise)
         own = unary_union([s.shape for s in sections])
-        report = self.report.setdefault(base_id(d.id), {"balconies": 0, "rejected": 0})
+        report = self.report.setdefault(base_id(d.id), {})
         probe = own.buffer(3)
         near = [(sh, lo, hi) for sh, lo, hi, _ in self._neighbours(d.id, probe)]
-        blocked = unary_union(([self.obstacles] if self.obstacles is not None else [])
+        blocked = unary_union(self.obstacles_near(own.buffer(7).bounds)
                               + [sh.buffer(.25) for sh, _, _ in near])
         for s, roof_shape, above in roof_shapes:
             if roof_shape.is_empty:
@@ -449,6 +537,8 @@ class Emitter:
                 # centred in it, vertically aligned. A stack is all or nothing: if any level is
                 # blocked the whole stack is dropped, so no column is left ragged.
                 for k in range(b["offset"], bays // b["unit"], b["every"]):
+                    if report.get("stacks", 0) >= b["max_stacks"]:
+                        break
                     bay = k * b["unit"] + (b["unit"] - b["span"]) // 2
                     ua = r["u0"] + u0s + bay * pitch_u - .5
                     ub = r["u0"] + u0s + (bay + b["span"] - 1) * pitch_u + w1 + .5
@@ -467,11 +557,11 @@ class Emitter:
                             break
                         stack.append(top)
                     if clash or not stack:
-                        report["rejected"] += 1
+                        report["rejected"] = report.get("rejected", 0) + 1
                         continue
                     report["stacks"] = report.get("stacks", 0) + 1
                     for top in stack:
-                        report["balconies"] += 1
+                        report["balconies"] = report.get("balconies", 0) + 1
                         building_compose.balcony_boxes(detail, wall, (ua, ub), top, b["depth"],
                                                        slab, front, map_pack.ROLE_BALCONY)
         if entrance:
@@ -525,6 +615,9 @@ class Emitter:
                 detail.prism(rect(lo - .8, hi + .8, canopy - .12, canopy), y + band - .75,
                              y + band - .2, e.get("canopy_color", trim), map_pack.ROLE_CANOPY,
                              bottom=False)
+        doors = comp.get("doors")
+        if doors:
+            emit_doors_into(detail, rects, ground_y, doors, trim, report)
         for role in (map_pack.ROLE_TRIM, map_pack.ROLE_BALCONY, map_pack.ROLE_CANOPY,
                      map_pack.ROLE_DETAIL):
             triangles = detail.by_role.get(role)
@@ -534,6 +627,101 @@ class Emitter:
             for points, color in triangles:
                 self.triangle(points, color)
             runs.append((start, self.count(), role, map_pack.NO_FACADE, 0))
+
+
+REPORT_COLUMNS = ["family", "basis", "context", "why", "roof", "building", "area_m2", "height_m",
+                  "height_basis", "facades", "windows", "triangles", "detail"]
+
+
+def build_report(map_name, emitter, descriptions, records, generator):
+    """The author-readable report of a bake (assets/geometry/<map>/buildings.json): per source id
+    the family, why it was chosen and how sure the source facts are, plus a summary of family
+    counts, fallback reasons and legacy buildings. `basis` is override, override+auto, tags,
+    inferred, fallback (no usable tags, a plain block), plain (no source facts) or legacy."""
+    by_id = {r["id"]: r for r in records}
+    buildings, families, bases, contexts, reasons, legacy = {}, {}, {}, {}, {}, []
+    roofs = {}
+    totals = {"buildings": 0, "facades": 0, "windows": 0, "triangles": 0}
+    for d in sorted(descriptions, key=lambda d: sort_key(d.id)):
+        a = emitter.assignments.get(d.id, {"family": None, "basis": "plain", "why": "no assignment"})
+        r = by_id.get(d.id)
+        facts = d.facts or {}
+        family = a.get("family") or ("stone" if not d.facade else "plain")
+        if not d.facade:
+            a = {**a, "basis": "inferred", "why": "near the fort: stone, no windows"}
+        facades = len(r["facades"]) if r else 0
+        windows = sum(f["bays"] * f["floors"] for f in r["facades"]) if r else 0
+        detail = {k: v for k, v in emitter.report.get(base_id(d.id), {}).items()}
+        buildings[d.id] = [family, a["basis"], d.context, a["why"], a.get("roof"),
+                           facts.get("tags", {}).get("building"), facts.get("area"),
+                           facts.get("height"), facts.get("basis"), facades, windows,
+                           r["end"] - r["first"] if r else None, detail or None]
+        totals["buildings"] += 1
+        totals["facades"] += facades
+        totals["windows"] += windows
+        totals["triangles"] += (r["end"] - r["first"]) if r else 0
+        families[family] = families.get(family, 0) + 1
+        bases[a["basis"]] = bases.get(a["basis"], 0) + 1
+        contexts[d.context] = contexts.get(d.context, 0) + 1
+        if a["basis"] in ("fallback", "plain", "legacy"):
+            reasons[f"{a['basis']}: {a['why']}"] = reasons.get(f"{a['basis']}: {a['why']}", 0) + 1
+        if a["basis"] == "legacy":
+            legacy.append(d.id)
+        if a.get("roof"):
+            roofs[a["roof"]] = roofs.get(a["roof"], 0) + 1
+    return {"map": map_name, "generator": generator, "columns": REPORT_COLUMNS,
+            "summary": {**totals, "families": dict(sorted(families.items())),
+                        "basis": dict(sorted(bases.items())),
+                        "contexts": dict(sorted(contexts.items(), key=lambda kv: str(kv[0]))),
+                        "roofs": dict(sorted(roofs.items())),
+                        "fallback_reasons": dict(sorted(reasons.items())), "legacy": legacy},
+            "buildings": buildings}
+
+
+def write_report(path, report):
+    """REPORT as JSON with one building per line (small diffs, greppable by source id)."""
+    head = {k: v for k, v in report.items() if k != "buildings"}
+    lines = [json.dumps(head, ensure_ascii=False)[:-1] + ', "buildings": {']
+    items = list(report["buildings"].items())
+    for i, (ident, entry) in enumerate(items):
+        lines.append(f"{json.dumps(ident)}: {json.dumps(entry, ensure_ascii=False, separators=(',', ':'))}"
+                     + ("," if i + 1 < len(items) else ""))
+    lines.append("}}")
+    Path(path).write_text("\n".join(lines) + "\n")
+
+
+def emit_doors_into(detail, rects, ground_y, doors, trim, report):
+    """DOORS (count, width, height, colour): big doors on the longest exposed ground-level wall
+    (the next longest when it is too short), spread evenly: a dark leaf and a lintel, flat on the
+    wall (4 triangles each). A building without a wall long enough gets none."""
+    width, height = doors["width"], doors["height"]
+    ground = [r for r in rects if r["y0"] <= ground_y + .05 and r["y1"] - r["y0"] > height + .6
+              and r["u1"] - r["u0"] >= width + 2.4]
+    ground.sort(key=lambda r: (-(r["u1"] - r["u0"]), r["a"], r["u0"]))
+    placed = 0
+    for r in ground:
+        if placed >= doors["count"]:
+            break
+        take = min(doors["count"] - placed, max(1, int((r["u1"] - r["u0"]) // (width + 3))))
+        a, b = r["a"], r["b"]
+        length = math.hypot(b[0] - a[0], b[1] - a[1])
+        tx, tz = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+        nx, nz = r["normal"]
+        for k in range(take):
+            centre = r["u0"] + (k + 1) * (r["u1"] - r["u0"]) / (take + 1)
+            for (ua, ub, ya, yb, color) in (
+                    (centre - width / 2, centre + width / 2, r["y0"], r["y0"] + height,
+                     doors.get("color", (66, 72, 80))),
+                    (centre - width / 2 - .25, centre + width / 2 + .25, r["y0"] + height,
+                     r["y0"] + height + .3, trim)):
+                pa = (a[0] + tx * ua + nx * .04, ya, a[1] + tz * ua + nz * .04)
+                pb = (a[0] + tx * ub + nx * .04, ya, a[1] + tz * ub + nz * .04)
+                pc = (pb[0], yb, pb[2])
+                pe = (pa[0], yb, pa[2])
+                detail.add(map_pack.ROLE_DETAIL, [pa, pc, pb], color)
+                detail.add(map_pack.ROLE_DETAIL, [pa, pe, pc], color)
+            placed += 1
+    report["doors"] = placed
 
 
 def exposed(probe, length, y0, y1, covers):
@@ -705,8 +893,11 @@ def self_test():
     assert len(rec6[0]["facades"]) == 7  # 8 walls: the low block's wall at x = 10 is buried
     assert len(shared) == 1 and shared[0][1][1] == 20  # only the tall block's wall keeps windows
     # A legacy building has no record and is walls then roof per section; migration is by id.
-    old = BuildingDescription("way/50", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1), (2, 2, 2))
-    assert not migrated("way/50") and migrated("way/164963584#2")
+    old = BuildingDescription("way/50", [Section(box(0, 0, 10, 10), 3.5, 12)], (1, 1, 1), (2, 2, 2),
+                              migrate=False)
+    unset = BuildingDescription("way/7", a.sections, a.wall, a.roof)
+    assert is_legacy(old, None) and not is_legacy(a, None) and not is_legacy(unset, None)
+    assert is_legacy(unset, {"way/7": {"legacy": True}})
     out5, rec5 = build([old])
     assert rec5 == [] and len(out5) == 8 + 2 and out5[-1][1] == (2, 2, 2) and out5[0][1] == (1, 1, 1)
     # Overrides: a known reference applies, an unknown one is refused.
@@ -951,8 +1142,7 @@ def compose_test():
             continue
         raise AssertionError("composition reference not validated")
     # The shipped file validates and every entry names a pilot building.
-    shipped = load_compositions()
-    assert shipped and all(migrated(i) for i in shipped)
+    assert load_compositions() and load_compositions(map_name="outer") is not None
 
 
 def _normal(a, b, c):
