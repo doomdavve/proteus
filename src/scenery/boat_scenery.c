@@ -136,7 +136,7 @@ static bool wall_pair(const Scenery *s, uint32_t wall, float *length, float *hei
     const Triangle3D *t = &s->mesh.triangles[wall], *u = &s->mesh.triangles[wall + 1];
     Vector3 a = s->mesh.vertices[t->vertices[0]], c = s->mesh.vertices[t->vertices[1]];
     Vector3 b = s->mesh.vertices[t->vertices[2]];
-    if (s->roles[wall] != BOAT_SCENERY_ROLE_WALL || s->roles[wall + 1] != BOAT_SCENERY_ROLE_WALL
+    if (!boat_scenery_role_is_wall(s->roles[wall]) || s->roles[wall] != s->roles[wall + 1]
         || u->vertices[0] != t->vertices[0] || u->vertices[2] != t->vertices[1] || a.y != b.y
         || c.x != b.x || c.z != b.z || !(c.y > a.y))
         return false;

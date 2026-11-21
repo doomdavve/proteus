@@ -111,8 +111,8 @@ static int check_migrated(const BoatMapDescription *map)
             const BoatSceneryFacade *w = &facade[list[b].facade_first + f];
             CHECK(w->id_hash == list[b].id_hash && w->bays > 0 && w->floors > 0);
             CHECK(w->wall >= list[b].first && w->wall + 2 <= list[b].end);
-            CHECK(roles[w->wall] == BOAT_SCENERY_ROLE_WALL
-                && roles[w->wall + 1] == BOAT_SCENERY_ROLE_WALL);
+            CHECK(boat_scenery_role_is_wall(roles[w->wall])
+                && roles[w->wall + 1] == roles[w->wall]);
         }
     }
     CHECK(listed == facades);

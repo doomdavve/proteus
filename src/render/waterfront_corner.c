@@ -46,7 +46,7 @@ bool waterfront_facade_role(unsigned char role, Vector3 a, Vector3 b, Vector3 c,
         return waterfront_facade_triangle(a, b, c, color);
     Vector3 normal
         = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
-    return role == BOAT_SCENERY_ROLE_WALL && fabsf(normal.y) < .15f;
+    return boat_scenery_role_is_wall(role) && fabsf(normal.y) < .15f;
 }
 
 bool waterfront_building_roof(Color color)

@@ -1020,8 +1020,8 @@ static bool is_water_triangle(const Triangle3D *triangle)
         && triangle->color.b == WATER_COLOR.b;
 }
 
-static bool builder_facade_triangle(
-    MeshBuilder *builder, Vector3 a, Vector3 b, Vector3 c, Color source, unsigned facade)
+static bool builder_facade_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, Vector3 c,
+    Color source, unsigned char role, unsigned facade)
 {
     // Generated wall pairs are a,c,b and a,d,c: vertex zero is the same lower
     // corner, and the last vertex reaches the other end in both triangles. Texture rows start
@@ -1031,15 +1031,23 @@ static bool builder_facade_triangle(
     if (length < .001f)
         return false;
     Vector3 along = Vector3Scale(edge, 1 / length);
-    // The retained palette is stable per building (including its mapped parts).
-    // Artistic material assignments, not claims about surveyed facade finishes.
+    // A migrated building names its material by role and its colour by its triangles. Legacy
+    // buildings keep the retained palette stable per building (including its mapped parts):
+    // artistic material assignments, not claims about surveyed facade finishes.
     Color color = { 208, 198, 175, WATERFRONT_FACADE_PLASTER };
-    if (source.r == 185)
+    if (role == BOAT_SCENERY_ROLE_WALL_BRICK) {
+        color = (Color) { source.r, source.g, source.b, WATERFRONT_FACADE_BRICK };
+    } else if (role == BOAT_SCENERY_ROLE_WALL_PANEL) {
+        color = (Color) { source.r, source.g, source.b, WATERFRONT_FACADE_PANEL };
+    } else if (role == BOAT_SCENERY_ROLE_WALL_PLASTER) {
+        color = (Color) { source.r, source.g, source.b, WATERFRONT_FACADE_PLASTER };
+    } else if (source.r == 185) {
         color = (Color) { 170, 104, 77, WATERFRONT_FACADE_BRICK };
-    else if (source.r == 190)
+    } else if (source.r == 190) {
         color = (Color) { 183, 154, 108, WATERFRONT_FACADE_BRICK };
-    else if (source.r == 154)
+    } else if (source.r == 154) {
         color = (Color) { 147, 165, 174, WATERFRONT_FACADE_PANEL };
+    }
     if (!builder_triangle(builder, a, b, c, color))
         return false;
     Vector3 points[] = { a, b, c };
@@ -1131,7 +1139,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
                 facade_id = (unsigned)next_record + 1;
         }
         bool ok = surface == CITY_SURFACE_FACADE
-            ? builder_facade_triangle(builder, a, b, c, triangle->color, facade_id)
+            ? builder_facade_triangle(builder, a, b, c, triangle->color, role, facade_id)
             : builder_triangle(builder, a, b, c, triangle->color);
         if (!ok)
             goto failed;

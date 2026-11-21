@@ -22,11 +22,24 @@
 // window triangles, only facade records that building_windows.h expands.
 typedef enum {
     BOAT_SCENERY_ROLE_NONE = 0, // No record: legacy colour/geometry classification.
-    BOAT_SCENERY_ROLE_WALL, // Facade wall in the generated pair order; no generic windows.
+    BOAT_SCENERY_ROLE_WALL, // Plaster facade wall in the generated pair order; no generic windows.
     BOAT_SCENERY_ROLE_ROOF,
     BOAT_SCENERY_ROLE_DETAIL, // Anything else of the building: drawn flat.
+    BOAT_SCENERY_ROLE_BALCONY, // Balcony slabs and fronts, flat in the run's own colour.
+    BOAT_SCENERY_ROLE_CANOPY, // Canopies, awnings and entrance roofs, flat.
+    BOAT_SCENERY_ROLE_TRIM, // Plinths, cornices, parapets, piers and frames, flat.
+    BOAT_SCENERY_ROLE_WALL_PLASTER, // Authored walls: the material is the role, the colour the run's.
+    BOAT_SCENERY_ROLE_WALL_BRICK,
+    BOAT_SCENERY_ROLE_WALL_PANEL,
     BOAT_SCENERY_ROLE_COUNT
 } BoatSceneryRole;
+
+// True for the roles of facade walls (they take facade records and window grids).
+static inline bool boat_scenery_role_is_wall(unsigned char role)
+{
+    return role == BOAT_SCENERY_ROLE_WALL || role == BOAT_SCENERY_ROLE_WALL_PLASTER
+        || role == BOAT_SCENERY_ROLE_WALL_BRICK || role == BOAT_SCENERY_ROLE_WALL_PANEL;
+}
 
 typedef struct {
     uint32_t id_hash; // crc32 of the stable source id ("way/123").

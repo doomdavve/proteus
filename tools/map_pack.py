@@ -66,8 +66,14 @@ BUILDING = struct.Struct("<8I6f")
 RUN = struct.Struct("<3I")
 FACADE = struct.Struct("<I3HBB")
 STYLE = struct.Struct("<9f")
-ROLE_NONE, ROLE_WALL, ROLE_ROOF, ROLE_DETAIL = range(4)
-ROLE_COUNT = 4
+# Wall roles take facade records (windows). ROLE_WALL is the fallback building's wall: the
+# renderers pick its material from its tint (the retained palette). PLASTER, BRICK and PANEL name
+# the material of an authored composition and draw the run's own colour. BALCONY, CANOPY and TRIM
+# are attached architecture drawn flat in their own colour.
+(ROLE_NONE, ROLE_WALL, ROLE_ROOF, ROLE_DETAIL, ROLE_BALCONY, ROLE_CANOPY, ROLE_TRIM,
+ ROLE_WALL_PLASTER, ROLE_WALL_BRICK, ROLE_WALL_PANEL) = range(10)
+ROLE_COUNT = 10
+WALL_ROLES = (ROLE_WALL, ROLE_WALL_PLASTER, ROLE_WALL_BRICK, ROLE_WALL_PANEL)
 NO_FACADE = 255
 
 
@@ -380,7 +386,7 @@ def building_test():
            lambda b: b[0].update(detail_first=9),
            lambda b: b[0].update(id="way/1"),  # duplicate id
            lambda b: b[0]["runs"].append((2, 3, ROLE_WALL, 0, 0)),  # overlapping run
-           lambda b: b[0]["runs"].__setitem__(0, (2, 4, 9, 0, 0)),  # bad role
+           lambda b: b[0]["runs"].__setitem__(0, (2, 4, 10, 0, 0)),  # bad role
            lambda b: b[0]["runs"].__setitem__(0, (2, 4, ROLE_WALL, 0, 70000)),
            lambda b: b[0]["facades"].__setitem__(0, {**wall, "wall": 4}),  # pair leaves the building
            lambda b: b[0]["facades"].__setitem__(0, {**wall, "bays": 0}),
