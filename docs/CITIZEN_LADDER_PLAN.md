@@ -53,8 +53,46 @@ Rules for the ladder:
   handling differs in feel (planing, wake, load response), chosen by taste and errand.
 - **Always a way back.** A starter boat stays available; a stuck or wrecked player is re-lent a
   boat. No debt spiral, as in the sandbox plan's recovery rules.
-- **Errands come from plugin data.** The errand board, rewards and unlock conditions are package
-  content; native code keeps mechanics and validation (the plan's content/mechanics split).
+- **Errands come from plugin data.** See [Plugin first](#plugin-first-decided-2026-11-21): the
+  errand board, rewards, unlock conditions and boat catalogue are package content; native code
+  keeps mechanics and validation.
+
+## Plugin first (decided 2026-11-21)
+
+Decision (the user, 2026-11-21): while building the ladder, **extend the plugin system freely;
+do not add C because it is easier.** Anything that makes sense as plugin content or rules is a
+plugin, and a missing plugin capability is a reason to grow the API, not to hard-code in C.
+This widens the [sandbox plan's split](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c),
+which stays the baseline: native code keeps mechanics, safety and validation; everything else is
+package data or plugin rules.
+
+| Plugin (package data or rules) | Native C |
+| --- | --- |
+| Errand board, errand definitions, chaining, standing and unlock conditions | Delivery detection and the events it emits (exists, S1c) |
+| Progression rules: what standing unlocks, the first-boat offer, later prices and payouts | Exactly-once transaction commit, save format and migration, file I/O |
+| Boat catalogue: which hulls exist, their class, speed within the class, appearance and livery, where they are moored | Solver, contact and support geometry, and the bounded envelope a hull definition must fit |
+| Hull handling parameters, declared within validated ranges (see below) | Validation of those ranges and the physics revision they run under |
+| Reaches, chart marks, quays and berths; which boat a site lends | Placement, clearance and navigation validation |
+| The precision-speed rule (threshold, speed) and fuel numbers when S4 arrives | Applying a speed cap and the fuel tick deterministically |
+| HUD text and errand notices | Drawing, input, cameras |
+
+Consequences:
+
+- **Every step names its plugin surface.** A CL step that needs a new grant, event, command or
+  descriptor field says so, and the contract goes in [PLUGIN_API](PLUGIN_API.md) with the
+  roadmap in [PLUGIN_PLAN](PLUGIN_PLAN.md), in the same step. Reviewing a step asks "could this
+  be a plugin?" before accepting C.
+- **Hull handling as data is now in scope.** The earlier guardrail ("presets, not raw tuning")
+  protected the solver's tested envelope. The way to keep that protection while moving content
+  out is bounded, validated declarations: a package declares a hull's handling within native
+  ranges, and invalid values fail at staging, as invalid work sites do. CL0 decides the exact
+  boundary; the default is plugin-declared with native range checks, not registered native presets.
+- **Progression state is plugin-shaped, committed natively.** Rules and definitions live in the
+  package; the save stores stable IDs and counters and commits transactions exactly once.
+- **Native solo first** still holds: rooms, replays and browser imports reject new grants until
+  qualified, as for `scene.define` and the working-harbour grant.
+- **Package identity and reload:** a changed package that removes an owned boat or errand needs a
+  stated policy (keep, rename or re-lend), decided in CL3 with the save migration.
 
 ## Boat switching (decided 2026-11-21)
 
@@ -130,7 +168,7 @@ Playable steps need the user to play; the plan never infers acceptance.
 
 | Step | Result | Needs |
 | --- | --- | --- |
-| CL0 | Specify the R0 rowing boat (see [R0 boat](#r0-boat-decided-2026-11-21)), the sheltered reach and a parcel hand-off; write the progression state sketch | | None; decisions made |
+| CL0 | Name the plugin surface each step needs and settle the hull-handling-as-data boundary; specify the R0 rowing boat (see [R0 boat](#r0-boat-decided-2026-11-21)), the sheltered reach and a parcel hand-off; write the progression state sketch | | None; decisions made |
 | CL1 | The working harbour becomes the default new-player path (title/menu), still reachable and still leaving free ride untouched; first-run flow lands on R0 with no HUD help text over the screen | CL0 |
 | CL2 | The errand board: three to five varied R0/R1 errands as package data, a local standing counter, errand chaining that reuses S1's delivery events; free, no money | CL1 |
 | CL3 | Progression state in the save (versioned, migrating the existing S1 save): standing, owned boats, unlocked reaches, completed projects; exactly-once for rewards; autosaves as today | CL2 |
