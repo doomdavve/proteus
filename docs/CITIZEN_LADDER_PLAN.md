@@ -98,7 +98,7 @@ CL0, not yet designed:
   teens, to be tuned by driving), a weak wake and strong sensitivity to waves and passing
   ferries. This is the playable-hull work in [HARBOR_BOATS](HARBOR_BOATS.md#future-playable-boats)
   (separate handling data, support dimensions from the hull, a physics revision bump).
-- Rowing is **only the look** (decided 2026-11-21): no oar mode, animation or separate handling.
+- Rowing is **only the look** (decided 2026-11-21): no oar mode, no oar animation and no separate rowing handling.
   A near-empty tank instead allows a "precision" speed: a slow, steady, still-controllable
   pace, so an empty tank never strands the player (the no-debt-spiral rule). Realism is not a
   goal. Fuel itself is S4; CL0 only reserves the precision-speed hook in the R0 handling data, and
