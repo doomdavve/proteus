@@ -856,6 +856,33 @@ def compose_test():
         assert v0 + (f["floors"] - 1) * pv + (h0 if f["floors"] == 1 else h1) \
             <= y1 - y0 - WINDOW_TOP_MARGIN + 1e-9
         assert y0 in levels and y1 in levels  # never across a band, setback or roof level
+    # Orientation: wall triangles face away from the material at their height, roofs and slab tops
+    # face up, and no triangle is degenerate.
+    parts = building_compose.apply_setbacks(block.sections, comp["way/164963867"], Section)
+
+    def material(y):
+        return unary_union([q.shape for q in parts if q.bottom - 1e-6 <= y <= q.top + 1e-6])
+
+    for i in range(first, end):
+        pts = out[i][0]
+        n = _normal(*pts)
+        size = math.sqrt(sum(v * v for v in n))
+        assert size > 1e-6, "degenerate triangle"
+        if roles[i] in map_pack.WALL_ROLES:
+            mid = [sum(p[k] for p in pts) / 3 for k in range(3)]
+            norm = math.hypot(n[0], n[2])
+            assert abs(n[1]) < 1e-6 * size and norm > 0
+            ring = material(mid[1])
+            assert not ring.contains(Point(mid[0] + n[0] / norm * .15, mid[2] + n[2] / norm * .15))
+            assert ring.buffer(.02).contains(Point(mid[0] - n[0] / norm * .15, mid[2] - n[2] / norm * .15))
+        elif roles[i] == map_pack.ROLE_ROOF:
+            assert n[1] > .99 * size
+    # Balcony slabs have a top facing up and an underside facing down, so they read from below.
+    ups = sum(1 for i in range(first, end) if roles[i] == map_pack.ROLE_BALCONY
+              and _normal(*out[i][0])[1] > 1e-6)
+    downs = sum(1 for i in range(first, end) if roles[i] == map_pack.ROLE_BALCONY
+                and _normal(*out[i][0])[1] < -1e-6)
+    assert ups > 0 and downs > 0
     # The upper volume recedes: no wall above the setback stands on the ground footprint's edge.
     upper = [t for t in (out[i][0] for i in range(first, detail) if roles[i] in map_pack.WALL_ROLES)
              if t[0][1] == 3.5 + 21.5 and t[0][1] == t[2][1]]

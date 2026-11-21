@@ -16,9 +16,14 @@ which baked a quad of triangles per window, was never shipped; the loader reject
   `[first, end)`, `detail_first` (attached detail starts there; walls and roof come before it,
   and a migrated building has none yet), its run and facade table slices and the bounds of its
   triangles.
-- Per run: a triangle range with a role (`wall`, `roof`, `detail`), a facade index and the
-  facade's outward heading, so triangles can be grouped by orientation.
-- Per facade (a wall that takes windows): the first triangle of its wall pair, its number in the
+- Per run: a triangle range with a role, a facade index and the facade's outward heading, so
+  triangles can be grouped by orientation. Roles (`BoatSceneryRole`): `wall` (the fallback building's
+  wall; the renderers pick its material from its tint), `wall_plaster`, `wall_brick`, `wall_panel`
+  (walls of an authored composition: the role is the material, the colour is the run's own), `roof`,
+  `balcony`, `canopy`, `trim` (attached architecture, drawn flat in its own colour) and `detail`
+  (anything else, flat). `boat_scenery_role_is_wall` names the four wall roles; only they take
+  facade records.
+- Per facade (a wall rectangle that takes windows): the first triangle of its wall pair, its number in the
   building, bay and floor counts and a window style. Origin, length, base and top y and heading
   come from the pair's vertices, so draping and rebakes cannot disagree with the mesh. No window
   triangles are stored: the runtime generator expands the grid (see
@@ -78,17 +83,28 @@ entry. Descriptions are emitted in stable-id order, so input order does not matt
 - Ids: `way/N` or `relation/N`; a footprint clipped to the dressing area gets `#K` for its K-th
   piece. The river crop's buildings carry the bare id.
 - Migration: only ids in `building_kit.MIGRATED` (B1: 16 pilot buildings, 11 in the river crop and
-  5 upstream) are emitted with records. Every other building is emitted exactly as before the kit
-  and has no record. With an empty set the packs equal the pre-kit packs.
-- A migrated building emits all its walls (the bake's pairs `a, c, b` and `a, d, c`, outward for
-  exterior rings and into courtyards), then the roofs. Roles: one wall run and one roof run;
-  `detail_first` is the building's end. A building with `facade=False` (stone) is all `detail`.
+  5 upstream; B2 adds two river neighbours, 164963868 and 164964582) are emitted with records. Every
+  other building is emitted exactly as before the kit and has no record. With an empty set the packs
+  equal the pre-kit packs.
+- A migrated building emits the exposed rectangles of its walls (below), then its roofs, then its
+  attached detail. Roles: wall runs (one per change of role), one roof run, one run per detail role
+  (`trim`, `balcony`, `canopy`, `detail`); `detail_first` is where the attached detail starts. A
+  building with `facade=False` (stone) is all `detail`.
+- Exposed wall intervals. Each wall edge of each section is cut into the rectangles (u0..u1 along
+  the wall, y0..y1) that no solid buries: other sections of the same building (as far as they
+  reach, 2 cm tolerance) and neighbouring buildings of the same bake (as far as they reach, 30 cm
+  tolerance: a shared or party wall). Only exposed rectangles become wall triangles (the bake's pair
+  `a, c, b` and `a, d, c` per rectangle) and only they take facade records, so an opening never
+  stands on a buried wall nor crosses a part, ground band or roof boundary. Pieces under 0.9 m are
+  dropped. A section's roof is its footprint minus the volumes standing on it. A building emitted on
+  its own (the outer adapter) has no neighbours; only its own sections bury walls.
 - Windows are facade records, not triangles. Window style 0 is the legacy grid (first bay 2.5 m
   in, a bay every 4 m; floors from 1.5 m every 3.2 m; ground floor windows 2.2 x 1.9 m, upper 1.5
-  x 1.5 m; glass 3.5 cm off the wall). A wall gets a record when it is at least 5.5 m high and
-  `grid()` fits at least one window clear of the corners (0.3 m) and the top (0.5 m), and it is
-  not buried: its outside is not covered by another section of the same building that is as tall.
-  The facade number counts every wall in emission order, windowless ones included.
+  x 1.5 m; glass 3.5 cm off the wall). A rectangle of the fallback gets a record when it is at least
+  5.5 m high and `grid()` fits at least one window clear of the corners (0.3 m) and the top (0.5 m).
+  The facade number counts every rectangle in emission order, windowless ones included. A composed
+  building uses one of the five further styles by family and band (below); its rectangles take
+  records from 3 m high.
 - Draping into the outer map (`prepare_outer_map.py`): `Overlay` keeps each river triangle's pack
   index and building record. A recorded building is one solid for draping (lowest terrain under
   its base footprint), so raised parts and detached features follow it; other solids are grouped
@@ -96,10 +112,72 @@ entry. Descriptions are emitted in stable-id order, so input order does not matt
 
 ```sh
 # needs docs/adventure/requirements.txt (shapely, pyproj, numpy)
-python tools/building_kit.py                           # kit fixtures
+python tools/building_kit.py                           # kit and composition fixtures
 python -I tools/prepare_waterfront.py                  # river pack; do this first
 python -I tools/prepare_outer_map.py                   # outer pack (reads the river pack)
 ```
+
+## Compositions (B2)
+
+`tools/building_overrides.json` holds authored compositions keyed by stable source id; the bake reads
+the entries whose `map` is its own (default `river`). `building_kit.load_compositions` validates them
+(`tools/building_compose.validate_params`): unknown keys, non-finite or out-of-range numbers, bad
+colours, ascending setback levels, an entrance without a ground band and ids that are not
+`way/N` or `relation/N` are refused, and the emitter refuses an id that names no building of the bake,
+a building that is not in `MIGRATED`, a stone building or one split into pieces. A building without
+an entry is the plain fallback and is built as in B1. All lengths are metres, heights above the
+building's lowest base.
+
+```json
+"way/164963867": {
+  "family": "balcony", "wall": [238, 226, 196], "roof": [112, 116, 124], "trim": [244, 240, 232],
+  "ground": {"band": 4.0, "wall": [182, 150, 112], "style": "lobby"},
+  "setbacks": [{"above": 21.5, "inset": 2.2}], "parapet": 0.8, "cornice": 0.35,
+  "balconies": {"sides": ["west", "north", "south"], "span": 1, "every": 1, "depth": 1.7,
+                "slab": [222, 218, 210], "front": [190, 92, 62]},
+  "entrance": {"side": "west", "at": 0.5, "width": 3.0, "canopy": 2.0, "canopy_color": [190, 92, 62]}
+}
+```
+
+- `family` (`balcony`, `stepped`, `brick`) chooses the default material (plaster, panel, brick) and
+  window style (`balcony` 1.7 x 1.9 m on a 4 m bay, `ribbon` 2.6 x 1.5 m piers 1.4 m, `punched` 1.2 x 1.8
+  m on 3 m); `material` and `style` override them. `ground` splits a band off the bottom of every
+  wall (own colour, material and a `shop` or `lobby` glazing style of 3 m windows). Colours are the
+  wall (`wall`), roof (`roof`) and trim (`trim`: cornice, parapet, piers, fascia).
+- `setbacks` recede the part above a level: `inset` all round or `cut` away from one side
+  (`west`, `east`, `south`, `north` of the pack axes, `depth` metres, cumulative). The section splits at the
+  level; footprints only shrink (checked by a fixture), so the ground footprint never grows. The
+  terrace left by a setback is its lower section's roof; its parapet is drawn on the exposed roof
+  edge only.
+- `parapet` (height of a 0.32 m wall on the roof edge, role `trim`) and `cornice` (a 0.55 m band
+  projecting from the wall below the roof, cut back where it would touch a neighbour, water or a
+  vehicle street).
+- `balconies`: on exposed rectangles facing a listed `side`, a balcony `span` bays wide on every
+  `every`-th bay (from bay `offset`) on floors `from_floor` to `to_floor` (negative counts from
+  the top) of the window grid. A balcony is a slab, a solid front panel and two side panels (role
+  `balcony`, `slab` and `front` colours), 40 triangles. Each is rejected, and counted in the bake
+  manifest, when its footprint (grown 10 cm) touches the building's own footprint, a neighbour that
+  reaches that height, water (grown 0.5 m) or a vehicle street (6 m wide ways; footways may pass under).
+- `entrance`: on the ground piece best facing `side` and long enough, an interval `width` wide at
+  fraction `at` of the wall has no window. It gets piers and a lintel (`trim`), a door leaf
+  (`detail`), a step, and a canopy (role `canopy`) `canopy` metres deep that shrinks in 0.4 m steps
+  until it clears the same obstacles, or is dropped; `fascia` adds a signboard band over the whole
+  ground floor of that wall.
+- The bake records per composed building the balconies placed and rejected and the canopy depth in
+  `manifest.json` (`compositions`).
+
+Clearances come from geometry the bake knows: the river water and vehicle streets (obstacles) and
+the other buildings of the bake (their footprints as far as they rise). Authored attached
+architecture does not read the street furniture, which is generated at run time; the generic
+frontage and forecourt passes (`waterfront_corner.c`) skip walls with an authored wall role, and
+their `space()` test already treats any horizontal surface above the quay (balcony slabs, canopies,
+roof edges) as occupied, so benches and planters are not placed under them. The minimap
+ignores `balcony`, `canopy` and `trim` triangles, which would otherwise fatten a footprint.
+
+B2 compositions on the Eriksberg quay row (ids and colours in the file): brick shopfront block
+164963584 with its brick wing 164963868 and yellow-brick 164963897; balcony blocks 164963867 (cream,
+terracotta fronts) and 164964582 (grey-blue, ochre fronts), both with a recessed top storey; pale
+stepped block 164963869 (two terraces receding from the quay end, glazed lobby) and 164964585.
 
 ## Rendering consumers
 
@@ -107,6 +185,13 @@ Both renderers read roles through `boat_scenery_roles` and never classify a migr
 triangles by colour or geometry (`waterfront_facade_role` in `src/render/waterfront_corner.[ch]`),
 and take its windows from the generator (`building_windows.h`) only:
 
+- Materials: the GPU facade builder takes the wall material from the role for authored walls
+  (`wall_plaster`, `wall_brick`, `wall_panel`) and their own colour from the triangles; a `wall`
+  role keeps the retained palette chosen from the tint. `roof` goes to the roof mesh; `balcony`,
+  `canopy`, `trim` and `detail` go to the flat mesh in their colours, so shadow and reflection
+  passes (which draw the same static meshes) include them. Tile, cell and record bounds come from the
+  vertices of the triangles in them, so projecting detail is inside them (checked by `boat_scenery`);
+  the 0.1 m growth only matters for window quads 3.5 cm off a wall.
 - Generic windows (the `waterfront_window_wall` grid, seeded by triangle index) are skipped for
   every triangle with a role, in the CPU windows pass and in the GPU `build_windows`, so a migrated
   wall never gets two window sets. Unmigrated buildings and packs without records keep the legacy
@@ -134,6 +219,17 @@ and take its windows from the generator (`building_windows.h`) only:
   indices and the window seeds of unmigrated buildings use them too. With the kit emitting walls
   and roofs only, the river kit is again 7944 boxes with the pre-kit digest; B2 moves the
   frontages to facade runs.
+
+### Rebaking and reviewing the Eriksberg group
+
+```sh
+# needs docs/adventure/requirements.txt (shapely, pyproj, numpy)
+python -I tools/prepare_waterfront.py && python -I tools/prepare_outer_map.py
+build/ambient_bake --map river --out assets/geometry/river/ambient.bin
+build/ambient_bake --map outer --out assets/geometry/outer/ambient.bin
+# Look at the quay row in a window (GPU), from the basin:
+./build/wake_velocity --location outer --start -5,80,200 --demo-idle
+```
 
 ## Generated outputs and packaging
 

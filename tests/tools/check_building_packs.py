@@ -53,7 +53,37 @@ def main():
                 a, c, b = (vertices[i] for i in t)
                 assert r["first"] <= f["wall"] and f["wall"] + 2 <= r["end"]
                 assert u[0] == t[0] and u[2] == t[1] and a[1] == b[1] and c[1] > a[1]
+    check_compositions()
     print("building_packs=ok")
+
+
+def check_compositions():
+    """Every authored composition of the override file is in its bake's manifest and pack: the
+    building has a record whose runs use an authored wall role and attached detail."""
+    table = json.loads((ROOT / "tools/building_overrides.json").read_text())
+    entries = {k: v for k, v in table.items() if not k.startswith("_")}
+    assert entries, "no compositions"
+    for name in ("river",):
+        directory = ROOT / "assets/geometry" / name
+        manifest = json.loads((directory / "manifest.json").read_text())
+        _, _, _, _, block = map_pack.read_pack(directory / "scenery.bin", True)
+        records = {r["hash"]: r for r in block[0]}
+        for ident, params in entries.items():
+            if params.get("map", "river") != name:
+                continue
+            assert ident in manifest["compositions"], f"{ident}: not baked"
+            assert manifest["compositions"][ident]["family"] == params["family"]
+            record = records[map_pack.stable_id_hash(ident)]
+            roles = {run[2] for run in record["runs"]}
+            assert roles & {map_pack.ROLE_WALL_PLASTER, map_pack.ROLE_WALL_BRICK,
+                            map_pack.ROLE_WALL_PANEL}, f"{ident}: no authored wall role"
+            assert roles & {map_pack.ROLE_TRIM}, f"{ident}: no roof edge"
+            assert record["detail_first"] < record["end"], f"{ident}: no attached detail"
+            if "balconies" in params:
+                assert map_pack.ROLE_BALCONY in roles, f"{ident}: no balconies"
+            if "entrance" in params:
+                assert map_pack.ROLE_CANOPY in roles or manifest["compositions"][ident].get(
+                    "entrance_canopy") == 0, f"{ident}: no canopy"
 
 
 if __name__ == "__main__":

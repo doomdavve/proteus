@@ -123,6 +123,54 @@ static int check_migrated(const BoatMapDescription *map)
     return 0;
 }
 
+static bool in_triangle_xz(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+{
+    float d1 = (p.x - b.x) * (a.z - b.z) - (a.x - b.x) * (p.z - b.z);
+    float d2 = (p.x - c.x) * (b.z - c.z) - (b.x - c.x) * (p.z - c.z);
+    float d3 = (p.x - a.x) * (c.z - a.z) - (c.x - a.x) * (p.z - a.z);
+    bool negative = d1 < -1e-4f || d2 < -1e-4f || d3 < -1e-4f;
+    bool positive = d1 > 1e-4f || d2 > 1e-4f || d3 > 1e-4f;
+    return !(negative && positive);
+}
+
+// The authored compositions of a loaded pack: every role is present, each building's bounds hold
+// every one of its triangles (projecting balconies, cornices and canopies included, so culling
+// by building or tile bounds never drops them), and attached architecture stays out of the water
+// and inside its building's height range.
+static int check_composition(const BoatMapDescription *map)
+{
+    const BoatMapDescription *full = boat_scenery_of(map);
+    size_t count = 0;
+    const BoatSceneryBuilding *list = boat_scenery_buildings(map, &count);
+    const unsigned char *roles = boat_scenery_roles(map);
+    CHECK(full && list && roles);
+    const Mesh3D *mesh = full->mesh;
+    size_t water = boat_map_leading_water(mesh), seen[BOAT_SCENERY_ROLE_COUNT] = { 0 };
+    for (size_t b = 0; b < count; ++b)
+        for (size_t i = list[b].first; i < list[b].end; ++i) {
+            ++seen[roles[i]];
+            for (int k = 0; k < 3; ++k) {
+                Vector3 v = mesh->vertices[mesh->triangles[i].vertices[k]];
+                CHECK(v.x >= list[b].min.x && v.x <= list[b].max.x && v.y >= list[b].min.y
+                    && v.y <= list[b].max.y && v.z >= list[b].min.z && v.z <= list[b].max.z);
+                if (roles[i] != BOAT_SCENERY_ROLE_BALCONY && roles[i] != BOAT_SCENERY_ROLE_CANOPY)
+                    continue;
+                CHECK(v.y > list[b].min.y + .5f);
+                for (size_t w = 0; w < water; ++w) {
+                    const Triangle3D *t = &mesh->triangles[w];
+                    CHECK(!in_triangle_xz(v, mesh->vertices[t->vertices[0]],
+                        mesh->vertices[t->vertices[1]], mesh->vertices[t->vertices[2]]));
+                }
+            }
+        }
+    return seen[BOAT_SCENERY_ROLE_WALL_PLASTER] && seen[BOAT_SCENERY_ROLE_WALL_BRICK]
+            && seen[BOAT_SCENERY_ROLE_WALL_PANEL] && seen[BOAT_SCENERY_ROLE_BALCONY]
+            && seen[BOAT_SCENERY_ROLE_CANOPY] && seen[BOAT_SCENERY_ROLE_TRIM]
+            && seen[BOAT_SCENERY_ROLE_ROOF]
+        ? 0
+        : 1;
+}
+
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
@@ -413,6 +461,7 @@ int main(void)
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/")
         && boat_scenery_load_location(river, PROTEUS_SOURCE_DIR "/assets/"));
     CHECK(check_migrated(river->map) == 0 && check_migrated(outer->map) == 0);
+    CHECK(check_composition(river->map) == 0 && check_composition(outer->map) == 0);
     const unsigned char *river_ambient = boat_ambient_of(river->map);
     CHECK(river_ambient && boat_ambient_of(outer->map) && !boat_ambient_of(basin->map));
     const Mesh3D *river_mesh = boat_scenery_of(river->map)->mesh;

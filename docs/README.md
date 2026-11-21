@@ -51,7 +51,7 @@ The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot follo
 reusable building families across the city: distinct silhouettes, facade depth and readable
 street edges at the default resolution. The deliverable includes implementation and a
 `BUILDINGS.md` specification of the source-to-rendering construction system. B0 and B1 (shared
-foundation) are implemented locally; the Eriksberg pilot (B2) is next. Crane/landmark work and living-city actors
+foundation) and the Eriksberg pilot (B2) are implemented locally; B2 awaits visual review. Crane/landmark work and living-city actors
 remain with their existing owners. No implementation PR is authorized.
 
 ## Cloud deck — grouping and drift follow-up, 2026-11-10
