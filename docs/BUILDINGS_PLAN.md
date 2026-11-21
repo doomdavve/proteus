@@ -1,17 +1,17 @@
 # Buildings and waterfront architecture overhaul
 
 Status, 2026-11-21: B0 done. B1 and B2 implemented; the user accepted the B2 look (balcony stacks,
-projecting-surround reveal, 40 m relief range; no cut-wall holes). B3 implemented locally: every
-mapped building (river crop and outer dressing) is built from facade records through automatic
-families plus overrides, pack v4, `tools/building_report.py`; awaiting the user's review of the B3
-stills and a playtest (no PR, no user acceptance). Checks, numbers and limits:
+projecting-surround reveal, 40 m relief range; no cut-wall holes). B3 implemented: every mapped
+building is built from facade records (automatic families plus overrides, pack v4,
+`tools/building_report.py`). The user played it, accepted the frame cost and agreed that untagged
+buildings stay plain blocks (2026-11-21); PR authorized. Pausing after B3. Checks, numbers, limits:
 [B3 results](#b3-results--2026-11-21).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: B3 look in motion (user), expansion hitch and distance/motion/platform qualification (B4).
+Open: B3b window lighting by hour and district (queued), expansion hitch and qualification (B4).
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: the user's review of B3, then B4 qualification. Delivery: one local branch.
+Next: B3b, then B4 qualification. Delivery: one branch and one PR.
 
 ## Intent and boundaries
 
@@ -184,6 +184,18 @@ user's visual review separately from automated checks. Refine this group before 
 
 Acceptance: matched comparison districts show appropriate variety and complete coverage, with
 no disappeared buildings, doubled parts or obvious intersections. Next: B4 qualification.
+
+### B3b — Window lighting by hour and district (queued, user request 2026-11-21)
+
+Windows light up in the evening and dim through the night while people sleep. Proposal: a pure
+`building_window_lit(seed, hour)` beside `building_window_occupied`, mirrored bit for bit in
+`waterfront_city.fs`, fed by the lighting hour (fixed `--lighting-hour` settings and the Working
+Harbour clock). Per-window switch-on (about 16:00-20:00) and bedtime (about 22:00-01:00) offsets
+come from the seed; about 5-8% stay lit overnight; a few early risers come on around 05:00-07:00.
+The user agreed that districts differ: a schedule profile per family (residential as above;
+industrial and warehouse mostly dark in the evening with sparse shift and security lights; shop
+and office floors lit through the working evening, dark at night; boatyards and clubhouses mostly
+dark), carried in the building records. Tests drive a virtual hour. Not started.
 
 ### B4 — Distance, motion and platform qualification
 
