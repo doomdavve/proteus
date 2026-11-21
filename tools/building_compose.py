@@ -22,8 +22,10 @@ STYLE_NAMES = ("legacy", "balcony", "ribbon", "punched", "shop", "lobby")
 KEYS = {"map", "family", "wall", "roof", "trim", "material", "style", "ground", "setbacks",
         "parapet", "cornice", "balconies", "entrance", "note"}
 GROUND_KEYS = {"band", "wall", "material", "style", "windows"}
-BALCONY_KEYS = {"sides", "from_floor", "to_floor", "span", "every", "offset", "depth", "slab",
-                "front"}
+# An apartment unit is UNIT bays wide; every EVERY-th unit (from OFFSET) has one balcony stack,
+# SPAN bays wide and centred in its unit, on each floor FROM_FLOOR..TO_FLOOR.
+BALCONY_KEYS = {"sides", "from_floor", "to_floor", "unit", "span", "every", "offset", "depth",
+                "slab", "front"}
 ENTRANCE_KEYS = {"side", "at", "width", "canopy", "canopy_color", "door", "style", "fascia"}
 
 
@@ -127,12 +129,15 @@ def validate_params(ident, params):
             raise ValueError(f"{what}.balconies.sides: a non-empty list of {sorted(SIDES)}")
         out["balconies"] = {
             "sides": list(sides),
-            "from_floor": _integer(b.get("from_floor", 0), f"{what}.balconies.from_floor", 0, 60),
+            "from_floor": _integer(b.get("from_floor", 1), f"{what}.balconies.from_floor", 0, 60),
             "to_floor": _integer(b.get("to_floor", -2), f"{what}.balconies.to_floor", -60, 60),
-            "span": _integer(b.get("span", 1), f"{what}.balconies.span", 1, 4),
+            "unit": _integer(b.get("unit", 3), f"{what}.balconies.unit", 2, 4),
+            "span": _integer(b.get("span", 1), f"{what}.balconies.span", 1, 2),
             "every": _integer(b.get("every", 1), f"{what}.balconies.every", 1, 6),
             "offset": _integer(b.get("offset", 0), f"{what}.balconies.offset", 0, 5),
             "depth": _number(b.get("depth", 1.6), f"{what}.balconies.depth", .8, 2.6)}
+        if out["balconies"]["span"] > out["balconies"]["unit"]:
+            raise ValueError(f"{what}.balconies.span: wider than the unit")
         for key in ("slab", "front"):
             if key in b:
                 out["balconies"][key] = _color(b[key], f"{what}.balconies.{key}")

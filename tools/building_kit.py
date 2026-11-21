@@ -445,22 +445,32 @@ class Emitter:
                 length = math.hypot(bb[0] - a[0], bb[1] - a[1])
                 tx, tz = (bb[0] - a[0]) / length, (bb[1] - a[1]) / length
                 wall = (a, (tx, tz), (dx, dz))
-                for bay in range(b["offset"], bays - b["span"] + 1, b["every"]):
+                # Apartment units of b["unit"] bays; every b["every"]-th one has one balcony stack
+                # centred in it, vertically aligned. A stack is all or nothing: if any level is
+                # blocked the whole stack is dropped, so no column is left ragged.
+                for k in range(b["offset"], bays // b["unit"], b["every"]):
+                    bay = k * b["unit"] + (b["unit"] - b["span"]) // 2
                     ua = r["u0"] + u0s + bay * pitch_u - .5
                     ub = r["u0"] + u0s + (bay + b["span"] - 1) * pitch_u + w1 + .5
                     ua, ub = max(ua, r["u0"] + .05), min(ub, r["u1"] - .05)
+                    stack, clash = [], False
                     for f in range(b["from_floor"], min(floors - 1, last) + 1):
                         top = r["y0"] + y0s - .9 + f * pitch_v
                         foot = building_compose.Polygon(
                             [(a[0] + tx * u + dx * v, a[1] + tz * u + dz * v)
                              for u, v in ((ua, -.02), (ub, -.02), (ub, b["depth"] + .1),
                                           (ua, b["depth"] + .1))])
-                        clash = foot.intersects(own.buffer(-.04)) or foot.intersects(blocked) \
-                            or any(hi > top - .3 and lo < top + 1.2 and foot.intersects(sh.buffer(.3))
-                                   for sh, lo, hi in near)
-                        if clash:
-                            report["rejected"] += 1
-                            continue
+                        if foot.intersects(own.buffer(-.04)) or foot.intersects(blocked) \
+                                or any(hi > top - .3 and lo < top + 1.2
+                                       and foot.intersects(sh.buffer(.3)) for sh, lo, hi in near):
+                            clash = True
+                            break
+                        stack.append(top)
+                    if clash or not stack:
+                        report["rejected"] += 1
+                        continue
+                    report["stacks"] = report.get("stacks", 0) + 1
+                    for top in stack:
                         report["balconies"] += 1
                         building_compose.balcony_boxes(detail, wall, (ua, ub), top, b["depth"],
                                                        slab, front, map_pack.ROLE_BALCONY)
@@ -825,7 +835,8 @@ def compose_test():
         "family": "balcony", "wall": [238, 226, 196], "roof": [112, 116, 124],
         "ground": {"band": 4.0, "style": "lobby"}, "setbacks": [{"above": 21.5, "inset": 2.2}],
         "parapet": .8, "cornice": .35,
-        "balconies": {"sides": ["north", "south", "west"], "span": 1, "every": 1, "depth": 1.7},
+        "balconies": {"sides": ["north", "south", "west"], "unit": 3, "span": 1, "every": 1,
+                      "depth": 1.7},
         "entrance": {"side": "west", "at": .5, "width": 3.2, "canopy": 2.0}}}
     comp = validate_compositions(comp, "river")
     out, records, emitter = build([block], comp, box(-30, -40, -12, 60))
@@ -890,7 +901,10 @@ def compose_test():
                          for t in upper)
     # Balconies keep clear of the obstacle (the water box x -30..-12) and of the building itself.
     balconies = [out[i][0] for i in range(first, end) if roles[i] == map_pack.ROLE_BALCONY]
-    assert balconies and emitter.report["way/164963867"]["balconies"] > 20
+    rep = emitter.report["way/164963867"]
+    assert balconies and rep["stacks"] >= 3 and rep["balconies"] > 20
+    # Whole stacks only: every surviving stack spans the same levels, so a count divides evenly.
+    assert rep["balconies"] % rep["stacks"] == 0
     for pts in balconies:
         assert all(not (-30 < p[0] < -12 and -40 < p[2] < 60) for p in pts)
         assert all(math.isfinite(v) for p in pts for v in p)
@@ -909,6 +923,8 @@ def compose_test():
            {"family": "brick", "setbacks": [{"above": 10, "inset": 1}, {"above": 5, "inset": 1}]},
            {"family": "brick", "balconies": {"depth": 5}},
            {"family": "brick", "balconies": {"sides": ["up"]}},
+           {"family": "brick", "balconies": {"unit": 2, "span": 3}},
+           {"family": "brick", "balconies": {"unit": 5}},
            {"family": "brick", "entrance": {"side": "west"}},  # needs a ground band
            {"family": "brick", "ground": {"band": 1}}]
     for params in bad:

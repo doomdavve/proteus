@@ -18,12 +18,12 @@
   },
   "way/164963867": {
     "family": "balcony",
-    "note": "8 levels: warm plaster, a balcony on every bay, recessed top storey",
+    "note": "8 levels: warm plaster, one balcony stack per two apartments (3 bays each), none on the ground or top storey",
     "wall": [238, 226, 196], "roof": [112, 116, 124], "trim": [244, 240, 232],
     "ground": {"band": 4.0, "wall": [182, 150, 112], "material": "plaster", "style": "lobby"},
     "setbacks": [{"above": 21.5, "inset": 2.2}],
     "parapet": 0.8, "cornice": 0.35,
-    "balconies": {"sides": ["west", "north", "south"], "from_floor": 0, "to_floor": -1, "span": 1, "every": 1,
+    "balconies": {"sides": ["west", "north", "south"], "from_floor": 1, "to_floor": -1, "unit": 3, "span": 1, "every": 2,
                   "depth": 1.7, "slab": [222, 218, 210], "front": [190, 92, 62]},
     "entrance": {"side": "west", "at": 0.5, "width": 3.0, "canopy": 2.0, "canopy_color": [190, 92, 62]}
   },
@@ -45,12 +45,12 @@
   },
   "way/164964582": {
     "family": "balcony",
-    "note": "8 levels: grey-blue plaster, ochre balcony fronts, recessed top storey",
+    "note": "8 levels: grey-blue plaster, two-bay balconies on every second 4-bay apartment, none on the ground or top storey",
     "wall": [196, 210, 220], "roof": [112, 116, 124], "trim": [240, 240, 238],
     "ground": {"band": 4.0, "wall": [150, 162, 170], "material": "plaster", "style": "lobby"},
     "setbacks": [{"above": 21.5, "inset": 2.2}],
     "parapet": 0.8, "cornice": 0.35,
-    "balconies": {"sides": ["west", "north", "south"], "from_floor": 0, "to_floor": -1, "span": 2, "every": 2,
+    "balconies": {"sides": ["west", "north", "south"], "from_floor": 1, "to_floor": -1, "unit": 4, "span": 2, "every": 2,
                   "depth": 1.6, "slab": [226, 224, 216], "front": [214, 164, 72]}
   },
   "way/164964585": {
