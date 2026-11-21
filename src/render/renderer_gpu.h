@@ -108,6 +108,7 @@ typedef struct {
     // the cells expanded and released by it.
     unsigned window_cells, window_cells_expanded, window_cells_released;
     size_t window_quads;
+    size_t window_reveal_triangles; // Relief of facades within BUILDING_WINDOW_DEEP_RANGE.
 } WaterfrontGpuStats;
 
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
@@ -149,6 +150,10 @@ typedef struct {
     unsigned char *window_cell_ready; // Per detail cell: expanded.
     Vector2 window_anchor; // Renderer X/Z the mask and expansion are measured from.
     size_t window_quads; // Quads resident.
+    WaterfrontGpuTiled *window_reveals; // Per facade record; count 0 unless within the deep range.
+    unsigned char *window_reveal_ready;
+    size_t window_reveal_triangles; // Resident.
+    unsigned window_facade_total; // Length of the two per-facade arrays above.
     int window_cell_total; // Length of the per-cell arrays above.
     unsigned window_expanded, window_released; // This frame.
     WaterfrontGpuTiled corner;

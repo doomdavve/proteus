@@ -82,7 +82,7 @@ static int owners(const WaterfrontScenery *river)
     // B2: the composed Eriksberg buildings carry their own entrances, so the generic frontage
     // pass no longer dresses their walls (7944 boxes before); balcony and canopy surfaces also
     // keep street furniture out from under them.
-    CHECK(box_digest(river) == UINT64_C(0x0b9e648520029b6e) && river->count == 7635);
+    CHECK(box_digest(river) == UINT64_C(0x8feee8d848c648d0) && river->count == 7635);
     CHECK(clear_digest(river) == UINT64_C(0xeee8078b6ed97458));
     // A second river owner alive together: equal content, separate storage.
     WaterfrontScenery second = { 0 }, basin = { 0 }, other = { 0 };
@@ -117,7 +117,7 @@ static int owners(const WaterfrontScenery *river)
     waterfront_scenery_destroy(&second);
     waterfront_scenery_destroy(&second);
     CHECK(!second.ready && !second.boxes);
-    CHECK(box_digest(river) == UINT64_C(0x0b9e648520029b6e));
+    CHECK(box_digest(river) == UINT64_C(0x8feee8d848c648d0));
     const WaterfrontCornerBox *kept = other.boxes;
     CHECK(waterfront_scenery_bind(&other, &test_harbor_map) && other.boxes == kept);
     CHECK(waterfront_scenery_bind(&other, &waterfront_city_river_map) && other.river);
@@ -151,7 +151,7 @@ static int owners(const WaterfrontScenery *river)
     }
     CHECK(lifted > other.count / 2);
     CHECK(waterfront_scenery_bind(&other, NULL) && !other.count && !other.boxes);
-    CHECK(box_digest(river) == UINT64_C(0x0b9e648520029b6e));
+    CHECK(box_digest(river) == UINT64_C(0x8feee8d848c648d0));
     waterfront_scenery_destroy(&other);
     waterfront_scenery_destroy(&basin);
     printf("Scenery owners: two river owners, basin, %zu-box synthetic harbor (%d waterline), "

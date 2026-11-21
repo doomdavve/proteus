@@ -22,6 +22,14 @@
 // it the facade shader draws them (a window under about 1.5 m is then a pixel or less).
 #define BUILDING_WINDOW_NEAR_RANGE 430.0f
 
+// Within this horizontal distance a window also has real relief (building_window_reveal): a
+// surround and returns that project from the wall around the glass. The wall is a flat quad
+// pair, not cut, so the opening reads as sunken by the glass sitting behind a projecting frame.
+#define BUILDING_WINDOW_DEEP_RANGE 120.0f
+// Everything a window adds lies within this distance of its wall (surround depth and rim, with a
+// margin): callers grow wall and cell bounds by it.
+#define BUILDING_WINDOW_MARGIN 0.3f
+
 // Seeds are identity, never position or order: FACADE_SEED is crc32 of "<id>/<facade>" with the
 // id's own crc32 ID_HASH (the pack's id hash, crc32 of "way/164963584") continued over
 // "/<facade number>", and a window's seed mixes in its bay and floor with
@@ -58,6 +66,26 @@ size_t building_window_count(const BoatSceneryFacade *facade);
 // Window (BAY, FLOOR) of FACADE on WALL in STYLE; false outside the grid.
 bool building_window(const BoatSceneryFacade *facade, const BoatSceneryWindowStyle *style,
     const BuildingWall *wall, unsigned bay, unsigned floor, BuildingWindow *window);
+// One flat coloured face of a window. Color.a is the face's lit share at night: the windows pass
+// mixes the dark glass toward the window light by it (the glass of an occupied window is 255).
+typedef struct {
+    Vector3 corners[4]; // As BuildingWindow: bottom left, top left, top right, bottom right.
+    Color color;
+} BuildingWindowFace;
+
+// The window pane in the plane of the wall, as 4 faces: the glass, and an impression of the
+// reveal drawn on it, a dark band under the lintel, a mid band along the left jamb and a light
+// sill (shares of the window, shaded from its glass; assets/shaders/waterfront_city.fs draws the
+// same bands beyond the quads). Returns the face count, at most BUILDING_WINDOW_FACES_MAX.
+#define BUILDING_WINDOW_FACES_MAX 4
+size_t building_window_faces(const BuildingWindow *window, BuildingWindowFace faces[4]);
+// The relief of a window within BUILDING_WINDOW_DEEP_RANGE: sill, lintel and jamb returns, a frame
+// rim around them and, on wide ground-floor windows, a mullion. At most
+// BUILDING_WINDOW_REVEAL_MAX faces, all lit share 0; their back sides face away from the viewer.
+#define BUILDING_WINDOW_REVEAL_MAX 9
+size_t building_window_reveal(
+    const BuildingWindow *window, const BuildingWall *wall, BuildingWindowFace faces[9]);
+
 // Calls FN for every window of FACADE, floor by floor and bay by bay; returns how many.
 typedef void (*BuildingWindowFn)(const BuildingWindow *window, void *user);
 size_t building_windows(const BoatSceneryFacade *facade, const BoatSceneryWindowStyle *style,

@@ -100,17 +100,23 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
 }
 
 // Glass tinted by the window light, for a legacy seed or a generated window (colour and occupancy).
-static Color window_tint(Color glass, bool occupied, const WaterfrontLighting *lighting)
+// LIT is the share of the window light the face takes at night (0..1).
+static Color window_tint_lit(Color glass, float lit, const WaterfrontLighting *lighting)
 {
     float t = lighting->window_light;
     if (!(t > 0))
-        return glass;
+        return (Color) { glass.r, glass.g, glass.b, 255 };
     Vector3 day = { glass.r, glass.g, glass.b };
-    Vector3 night = occupied ? Vector3Scale(lighting->window_lit, 255)
-                             : Vector3Multiply(day, lighting->window_dark);
+    Vector3 night = Vector3Lerp(
+        Vector3Multiply(day, lighting->window_dark), Vector3Scale(lighting->window_lit, 255), lit);
     Vector3 c = Vector3Lerp(day, night, t);
     return (Color) { (unsigned char)roundf(Clamp(c.x, 0, 255)),
         (unsigned char)roundf(Clamp(c.y, 0, 255)), (unsigned char)roundf(Clamp(c.z, 0, 255)), 255 };
+}
+
+static Color window_tint(Color glass, bool occupied, const WaterfrontLighting *lighting)
+{
+    return window_tint_lit(glass, occupied ? 1.0f : 0.0f, lighting);
 }
 
 // Daytime glass, toward warm occupied rooms and darkened empty ones as the window light rises.
@@ -165,13 +171,31 @@ static void windows(Renderer3D *r, const BoatMapDescription *map, const unsigned
 typedef struct {
     Renderer3D *r;
     const WaterfrontLighting *lighting;
+    const BuildingWall *wall;
+    Vector3 eye;
 } WindowDraw;
 
+static void draw_face(const BuildingWindowFace *face, const WindowDraw *draw)
+{
+    glow_quad(draw->r, face->corners[0], face->corners[1], face->corners[2], face->corners[3],
+        window_tint_lit(face->color, face->color.a / 255.0f, draw->lighting));
+}
+
+// A window: its pane and the reveal bands on it, and within the deep range its relief too, from
+// the shared generator (scenery/building_windows.h) the GPU expands the same way.
 static void draw_window(const BuildingWindow *w, void *user)
 {
     const WindowDraw *draw = user;
-    glow_quad(draw->r, w->corners[0], w->corners[1], w->corners[2], w->corners[3],
-        window_tint(w->glass, w->occupied, draw->lighting));
+    BuildingWindowFace faces[BUILDING_WINDOW_REVEAL_MAX];
+    size_t n = building_window_faces(w, faces);
+    for (size_t i = 0; i < n; ++i)
+        draw_face(&faces[i], draw);
+    float dx = draw->eye.x - w->corners[0].x, dz = draw->eye.z - w->corners[0].z;
+    if (dx * dx + dz * dz <= BUILDING_WINDOW_DEEP_RANGE * BUILDING_WINDOW_DEEP_RANGE) {
+        n = building_window_reveal(w, draw->wall, faces);
+        for (size_t i = 0; i < n; ++i)
+            draw_face(&faces[i], draw);
+    }
 }
 
 // Windows of the migrated buildings (their facade records, scenery/building_windows.h) near the
@@ -197,8 +221,9 @@ static void facade_windows(
         float dx = fmaxf(fmaxf(building->min.x - eye.x, eye.x - building->max.x), 0);
         float dz = fmaxf(fmaxf(building->min.z - eye.z, eye.z - building->max.z), 0);
         if (dx * dx + dz * dz > range * range
-            || !renderer3d_box_visible(r, Vector3SubtractValue(building->min, .1f),
-                Vector3AddValue(building->max, .1f)))
+            || !renderer3d_box_visible(r,
+                Vector3SubtractValue(building->min, BUILDING_WINDOW_MARGIN),
+                Vector3AddValue(building->max, BUILDING_WINDOW_MARGIN)))
             continue;
         for (size_t f = 0; f < building->facade_count; ++f) {
             const BoatSceneryFacade *facade = &facades[building->facade_first + f];
@@ -208,7 +233,7 @@ static void facade_windows(
                 || Vector3Distance(eye, wall.origin) > range)
                 continue;
             const BoatSceneryWindowStyle *style = &styles[facade->style];
-            WindowDraw draw = { r, lighting };
+            WindowDraw draw = { r, lighting, &wall, eye };
             building_windows(facade, style, &wall, draw_window, &draw);
         }
     }

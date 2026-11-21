@@ -148,6 +148,45 @@ static int synthetic(void)
             differing += p.occupied != q.occupied || p.glass.r != q.glass.r;
         }
     CHECK(differing > 0);
+    // The pane's faces tile the window exactly (their areas add up to its area), lie in its plane
+    // and face outward; the reveal projects outward only, within the margin, deterministically.
+    for (unsigned floor = 0; floor < 3; ++floor)
+        for (unsigned bay = 0; bay < 4; ++bay) {
+            BuildingWindow p;
+            CHECK(building_window(&facade, &LEGACY, &wall, bay, floor, &p));
+            BuildingWindowFace faces[BUILDING_WINDOW_FACES_MAX], again[BUILDING_WINDOW_FACES_MAX];
+            size_t n = building_window_faces(&p, faces);
+            CHECK(n == 4 && building_window_faces(&p, again) == n
+                && memcmp(faces, again, sizeof(faces[0]) * n) == 0);
+            float area = 0, whole = Vector3Length(Vector3Subtract(p.corners[3], p.corners[0]))
+                * (p.corners[1].y - p.corners[0].y);
+            for (size_t i = 0; i < n; ++i) {
+                Vector3 e1 = Vector3Subtract(faces[i].corners[1], faces[i].corners[0]);
+                Vector3 e2 = Vector3Subtract(faces[i].corners[2], faces[i].corners[1]);
+                Vector3 cross = Vector3CrossProduct(e1, e2);
+                CHECK(Vector3DotProduct(cross, wall.normal) > 0);
+                area += Vector3Length(cross);
+                for (int k = 0; k < 4; ++k)
+                    CHECK(fabsf(faces[i].corners[k].z - p.corners[0].z) < 1e-5f);
+            }
+            CHECK(fabsf(area - whole) < 1e-3f * whole);
+            BuildingWindowFace relief[BUILDING_WINDOW_REVEAL_MAX];
+            size_t m = building_window_reveal(&p, &wall, relief);
+            CHECK(m == (floor == 0 && Vector3Distance(p.corners[0], p.corners[3]) >= 1.8f ? 9u : 8u));
+            for (size_t i = 0; i < m; ++i) {
+                CHECK(relief[i].color.a == 0);
+                Vector3 e1 = Vector3Subtract(relief[i].corners[1], relief[i].corners[0]);
+                Vector3 e2 = Vector3Subtract(relief[i].corners[2], relief[i].corners[1]);
+                CHECK(Vector3Length(Vector3CrossProduct(e1, e2)) > 1e-4f);
+                for (int k = 0; k < 4; ++k) {
+                    // Out of the wall plane (z = 0 here, outward -Z) by at most the margin, never
+                    // behind the wall.
+                    float out = -relief[i].corners[k].z;
+                    CHECK(out >= -1e-5f && out <= BUILDING_WINDOW_MARGIN);
+                    CHECK(fabsf(relief[i].corners[k].x - 20) < 11 && relief[i].corners[k].y > 4.9f);
+                }
+            }
+        }
     // A wall that is not the generated pair is refused.
     BoatSceneryFacade bad = facade;
     bad.wall = 1;

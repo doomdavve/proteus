@@ -222,9 +222,29 @@ float window_mask(out vec3 color)
     float lit = float(((((seed ^ (seed >> 15)) * 2654435761u) >> 29) < 3u));
     glass = mix(glass, palette, settle);
     lit = mix(lit, 0.375, settle);
-    color = glass;
+    // The reveal bands building_window_faces draws on the pane: a dark band under the lintel, a mid
+    // one on the left jamb and a light sill, each with its lit share. Beyond a pixel per window
+    // they settle toward the mean (a little darker than the glass), like the cover.
+    float sill = 1.0 - step(size.y * 0.08, local.y);
+    float lintel = step(size.y * (1.0 - 0.14), local.y);
+    float jamb = step(local.x, size.x * 0.08);
+    vec3 band = glass;
+    float share = lit;
+    if (sill > 0.0) {
+        band = (glass + vec3(232.0, 228.0, 218.0) / 255.0) * 0.5;
+        share = 0.0;
+    } else if (lintel > 0.0) {
+        band = glass * 0.4;
+        share = lit * 77.0 / 255.0;
+    } else if (jamb > 0.0) {
+        band = glass * 0.7;
+        share = lit * 153.0 / 255.0;
+    }
+    band = mix(band, glass * 0.88, settle);
+    share = mix(share, lit * 0.85, settle);
+    color = band;
     if (windowLight > 0.0)
-        color = mix(glass, mix(glass * windowDark, windowLit, lit), windowLight);
+        color = mix(band, mix(band * windowDark, windowLit, share), windowLight);
     return cover;
 }
 

@@ -1,5 +1,7 @@
 #include "scenery/building_windows.h"
 
+#include "raymath.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -105,9 +107,8 @@ static bool window_at(const BoatSceneryFacade *facade, const BoatSceneryWindowSt
 bool building_window(const BoatSceneryFacade *facade, const BoatSceneryWindowStyle *style,
     const BuildingWall *wall, unsigned bay, unsigned floor, BuildingWindow *window)
 {
-    return window_at(
-        facade, style, wall, building_window_facade_seed(facade->id_hash, facade->index), bay,
-        floor, window);
+    return window_at(facade, style, wall,
+        building_window_facade_seed(facade->id_hash, facade->index), bay, floor, window);
 }
 
 size_t building_windows(const BoatSceneryFacade *facade, const BoatSceneryWindowStyle *style,
@@ -125,4 +126,108 @@ size_t building_windows(const BoatSceneryFacade *facade, const BoatSceneryWindow
             }
         }
     return count;
+}
+
+// Shares of a window's width and height of the bands drawn on the glass, and their shading
+// (kept in step with window_mask in assets/shaders/waterfront_city.fs).
+#define BAND_TOP 0.14f
+#define BAND_SIDE 0.08f
+#define BAND_SILL 0.08f
+
+static Color shade(Color glass, float factor, unsigned char lit)
+{
+    return (Color) { (unsigned char)(glass.r * factor), (unsigned char)(glass.g * factor),
+        (unsigned char)(glass.b * factor), lit };
+}
+
+// Point (S, T) of the window in metres along and up from its bottom left corner, D out of the wall.
+typedef struct {
+    Vector3 origin, along, up, normal;
+    float width, height;
+} Frame;
+
+static Frame frame_of(const BuildingWindow *window, const BuildingWall *wall)
+{
+    Frame f = { .origin = window->corners[0],
+        .along = wall->along,
+        .up = { 0, 1, 0 },
+        .normal = wall->normal };
+    f.width = Vector3Distance(window->corners[0], window->corners[3]);
+    f.height = window->corners[1].y - window->corners[0].y;
+    return f;
+}
+
+static Vector3 at(const Frame *f, float s, float t, float d)
+{
+    return (Vector3) { f->origin.x + f->along.x * s + f->normal.x * d, f->origin.y + t,
+        f->origin.z + f->along.z * s + f->normal.z * d };
+}
+
+// A rectangle (S0..S1 along, T0..T1 up, at depth D) in the faces' order seen from outside.
+static void flat(BuildingWindowFace *face, const Frame *f, float s0, float s1, float t0, float t1,
+    float d, Color color)
+{
+    *face = (BuildingWindowFace) {
+        { at(f, s0, t0, d), at(f, s0, t1, d), at(f, s1, t1, d), at(f, s1, t0, d) }, color
+    };
+}
+
+// A face with the given quad whose visible side is toward NORMAL: the corner order is flipped
+// when the quad winds the other way.
+static void oriented(BuildingWindowFace *face, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3,
+    Vector3 normal, Color color)
+{
+    Vector3 turn = Vector3CrossProduct(Vector3Subtract(p1, p0), Vector3Subtract(p2, p1));
+    if (Vector3DotProduct(turn, normal) >= 0)
+        *face = (BuildingWindowFace) { { p0, p1, p2, p3 }, color };
+    else
+        *face = (BuildingWindowFace) { { p0, p3, p2, p1 }, color };
+}
+
+size_t building_window_faces(const BuildingWindow *window, BuildingWindowFace faces[4])
+{
+    Vector3 along = Vector3Subtract(window->corners[3], window->corners[0]);
+    float width = Vector3Length(along);
+    float height = window->corners[1].y - window->corners[0].y;
+    BuildingWall wall = { .along = Vector3Scale(along, 1 / width),
+        .normal = { along.z / width, 0, -along.x / width } };
+    Frame f = frame_of(window, &wall);
+    Color glass = window->glass;
+    unsigned char lit = window->occupied ? 255 : 0;
+    float sill = height * BAND_SILL, top = height * (1 - BAND_TOP), side = width * BAND_SIDE;
+    flat(&faces[0], &f, 0, width, 0, sill, 0,
+        (Color) { (glass.r + 232) / 2, (glass.g + 228) / 2, (glass.b + 218) / 2, 0 });
+    flat(&faces[1], &f, 0, width, top, height, 0, shade(glass, .4f, window->occupied ? 77 : 0));
+    flat(&faces[2], &f, 0, side, sill, top, 0, shade(glass, .7f, window->occupied ? 153 : 0));
+    flat(&faces[3], &f, side, width, sill, top, 0, (Color) { glass.r, glass.g, glass.b, lit });
+    return 4;
+}
+
+size_t building_window_reveal(
+    const BuildingWindow *window, const BuildingWall *wall, BuildingWindowFace faces[9])
+{
+    const float depth = 0.16f, rim = 0.07f, mullion = 0.04f;
+    Frame f = frame_of(window, wall);
+    const float w = f.width, h = f.height;
+    const Vector3 up = { 0, 1, 0 };
+    size_t n = 0;
+    // Returns: lintel underside, sill top, jambs.
+    oriented(&faces[n++], at(&f, 0, h, 0), at(&f, w, h, 0), at(&f, w, h, depth),
+        at(&f, 0, h, depth), Vector3Negate(up), (Color) { 70, 68, 70, 0 });
+    oriented(&faces[n++], at(&f, 0, 0, 0), at(&f, w, 0, 0), at(&f, w, 0, depth),
+        at(&f, 0, 0, depth), up, (Color) { 226, 222, 212, 0 });
+    oriented(&faces[n++], at(&f, 0, 0, 0), at(&f, 0, h, 0), at(&f, 0, h, depth),
+        at(&f, 0, 0, depth), wall->along, (Color) { 130, 126, 122, 0 });
+    oriented(&faces[n++], at(&f, w, 0, 0), at(&f, w, h, 0), at(&f, w, h, depth),
+        at(&f, w, 0, depth), Vector3Negate(wall->along), (Color) { 130, 126, 122, 0 });
+    // The rim: a frame around the opening on the outer plane.
+    const Color trim = { 232, 228, 218, 0 };
+    flat(&faces[n++], &f, -rim, w + rim, h, h + rim, depth, trim);
+    flat(&faces[n++], &f, -rim, w + rim, -rim, 0, depth, trim);
+    flat(&faces[n++], &f, -rim, 0, 0, h, depth, trim);
+    flat(&faces[n++], &f, w, w + rim, 0, h, depth, trim);
+    if (window->floor == 0 && w >= 1.8f)
+        flat(&faces[n++], &f, w / 2 - mullion, w / 2 + mullion, 0, h, depth * .5f,
+            (Color) { 210, 206, 198, 0 });
+    return n;
 }

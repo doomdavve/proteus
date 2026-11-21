@@ -552,25 +552,25 @@ static int cached_location(Shader shader, const char *name)
 
 static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
     "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "windowMask", "windowMaskAnchor",
-    "windowMaskRange", "facadeData", "reflectionPass", "ambientColor",
-    "ambientOcclusion", "directionalColor", "directionalDirection", "directionalIntensity",
-    "shadowsEnabled", "lightViewProjection", "shadowMap", "farShadowsEnabled",
-    "farLightViewProjection", "farShadowMap", "farShadowTexel", "localLightCount",
-    "localLightPositionRadius[0]", "localLightColorIntensity[0]", "localLightDirection[0]",
-    "localLightCone[0]", "cameraPosition", "fogColor", "fogStart", "fogEnd", "fogOpacity",
-    "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife", "physicalWaves", "radialOrigin",
-    "radialMotion", "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion",
-    "vesselShape", "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
-    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
-    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
-    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
-    "reflectionTexture", "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward",
-    "skyRight", "skyUp", "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled",
-    "stampField", "stampRect", "stampOutsideCount", "historyEnabled", "historyField", "historyRect",
-    "historySlopeGain", "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass",
-    "windowLight", "windowLit", "windowDark", "waterLight", "waterShadowFloor", "glintColor",
-    "highlightTint", "glintSheen", "glintSparkle", "lightClusterMode", "lightClusters",
-    "lightClusterCount", "lightClusterLayout", "emissiveGain", "reflectionTexel", NULL };
+    "windowMaskRange", "facadeData", "reflectionPass", "ambientColor", "ambientOcclusion",
+    "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
+    "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
+    "farShadowMap", "farShadowTexel", "localLightCount", "localLightPositionRadius[0]",
+    "localLightColorIntensity[0]", "localLightDirection[0]", "localLightCone[0]", "cameraPosition",
+    "fogColor", "fogStart", "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled",
+    "objectWakeLife", "physicalWaves", "radialOrigin", "radialMotion", "stormArea", "stormPhase",
+    "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape", "wakeAmplitude", "wakeOffset",
+    "objectWakePlayerCount", "objectWakeTrafficLife", "objectWakeData", "playerWakeCount",
+    "playerWakeOrigins[0]", "playerWakeParameters[0]", "waterfrontWater", "wavePatch",
+    "waveParameters[0]", "sunDirection", "reflectionViewProjection", "crossingWakeTime",
+    "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled", "reflectionTexture",
+    "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
+    "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
+    "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
+    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
+    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
+    "emissiveGain", "reflectionTexel", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -1299,9 +1299,13 @@ static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuSce
     scene->window_cell_facades = malloc(count * sizeof(*scene->window_cell_facades));
     scene->window_cells = calloc(cells, sizeof(*scene->window_cells));
     scene->window_cell_ready = calloc(cells, 1);
+    scene->window_reveals = calloc(count, sizeof(*scene->window_reveals));
+    scene->window_reveal_ready = calloc(count, 1);
+    scene->window_facade_total = (unsigned)count;
     unsigned *cell_of = malloc(count * sizeof(*cell_of));
     if (!scene->window_cell_start || !scene->window_cell_facades || !scene->window_cells
-        || !scene->window_cell_ready || !cell_of) {
+        || !scene->window_cell_ready || !scene->window_reveals || !scene->window_reveal_ready
+        || !cell_of) {
         free(cell_of);
         return false;
     }
@@ -1339,10 +1343,10 @@ static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuSce
         const BoatSceneryWindowStyle *st = &style[f->style];
         uint32_t seed = building_window_facade_seed(f->id_hash, f->index);
         float *t = &texels[((i / FACADE_ROW) * FACADE_ROW * 3 + (i % FACADE_ROW) * 3) * 4];
-        memcpy(t, (float[]) { (float)(seed & 0xFFFF), (float)(seed >> 16), (float)f->bays,
-                    (float)f->floors, st->first_bay, st->bay_pitch, st->first_floor,
-                    st->floor_pitch, st->ground_width, st->ground_height, st->upper_width,
-                    st->upper_height },
+        memcpy(t,
+            (float[]) { (float)(seed & 0xFFFF), (float)(seed >> 16), (float)f->bays,
+                (float)f->floors, st->first_bay, st->bay_pitch, st->first_floor, st->floor_pitch,
+                st->ground_width, st->ground_height, st->upper_width, st->upper_height },
             12 * sizeof(float));
     }
     Image image = { texels, FACADE_ROW * 3, (int)rows, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
@@ -1365,11 +1369,73 @@ typedef struct {
 static void add_window_quad(const BuildingWindow *w, void *user)
 {
     WindowQuads *quads = user;
-    Color color = w->glass; // Alpha carries occupancy to the windows pass, which draws opaque.
-    color.a = w->occupied ? 255 : 0;
-    quads->ok = quads->ok
-        && builder_quad(
-            quads->builder, w->corners[0], w->corners[1], w->corners[2], w->corners[3], color);
+    // The pane and its reveal bands; alpha carries each face's lit share to the windows pass,
+    // which draws opaque.
+    BuildingWindowFace faces[BUILDING_WINDOW_FACES_MAX];
+    size_t n = building_window_faces(w, faces);
+    for (size_t i = 0; i < n; ++i)
+        quads->ok = quads->ok
+            && builder_quad(quads->builder, faces[i].corners[0], faces[i].corners[1],
+                faces[i].corners[2], faces[i].corners[3], faces[i].color);
+}
+
+typedef struct {
+    MeshBuilder *builder;
+    const BuildingWall *wall;
+    bool ok;
+} RevealQuads;
+
+static void add_reveal(const BuildingWindow *w, void *user)
+{
+    RevealQuads *quads = user;
+    BuildingWindowFace faces[BUILDING_WINDOW_REVEAL_MAX];
+    size_t n = building_window_reveal(w, quads->wall, faces);
+    for (size_t i = 0; i < n; ++i)
+        quads->ok = quads->ok
+            && builder_quad(quads->builder, faces[i].corners[0], faces[i].corners[1],
+                faces[i].corners[2], faces[i].corners[3], faces[i].color);
+}
+
+static void reveal_release(WaterfrontGpuScene *scene, unsigned facade)
+{
+    for (int i = 0; i < scene->window_reveals[facade].count; ++i)
+        scene->window_reveal_triangles
+            -= (size_t)scene->window_reveals[facade].meshes[i].triangleCount;
+    tiled_destroy(&scene->window_reveals[facade]);
+    scene->window_reveal_ready[facade] = 0;
+}
+
+// The relief (building_window_reveal) of every window of one facade, as one mesh.
+static bool reveal_expand(WaterfrontGpuScene *scene, unsigned facade)
+{
+    const BoatMapDescription *map = scene->window_map;
+    size_t count = 0, styles = 0;
+    const BoatSceneryFacade *facades = boat_scenery_facades(map, &count);
+    const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
+    BuildingWall wall;
+    if (!building_wall(map->mesh, &facades[facade], &wall))
+        return false;
+    TiledBuilder one = { 0 };
+    if (!tiled_builder_init(&one, 1))
+        return false;
+    RevealQuads quads = { &one.tiles[0], &wall, true };
+    building_windows(&facades[facade], &style[facades[facade].style], &wall, add_reveal, &quads);
+    if (!quads.ok) {
+        tiled_builder_destroy(&one);
+        return false;
+    }
+    WaterfrontGpuGeometry saved = scene->geometry;
+    binding_scene = scene;
+    bool ok = tiled_builder_finish(&one, &scene->window_reveals[facade], STATIC_UNLIT);
+    binding_scene = NULL;
+    scene->geometry = saved;
+    for (int i = 0; ok && i < scene->window_reveals[facade].count; ++i)
+        scene->window_reveal_triangles
+            += (size_t)scene->window_reveals[facade].meshes[i].triangleCount;
+    scene->window_reveal_ready[facade] = ok;
+    if (!ok)
+        tiled_destroy(&scene->window_reveals[facade]);
+    return ok;
 }
 
 static void window_cell_release(WaterfrontGpuScene *scene, int cell)
@@ -1420,6 +1486,7 @@ static bool window_cell_expand(WaterfrontGpuScene *scene, int cell)
 // Once per frame, before any pass: the cells within the near range (and a prefetch margin) of
 // ANCHOR hold quads, the ones beyond twice the range do not. Without the mask texture every cell
 // expands once and stays.
+static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor);
 static void window_select(WaterfrontGpuScene *scene, Vector3 anchor)
 {
     scene->window_anchor = (Vector2) { anchor.x, anchor.z };
@@ -1427,13 +1494,15 @@ static void window_select(WaterfrontGpuScene *scene, Vector3 anchor)
     if (!scene->window_map)
         return;
     bool all = scene->facade_data.id == 0;
+    reveal_select(scene, anchor);
     int cells = scene->detail_columns * scene->detail_rows;
     for (int z = 0; z < scene->detail_rows; ++z) {
         float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
         float dz = fmaxf(fmaxf(low_z - anchor.z, anchor.z - low_z - scene->detail_cell), 0);
         for (int x = 0; x < scene->detail_columns; ++x) {
             int cell = z * scene->detail_columns + x;
-            if (cell >= cells || scene->window_cell_start[cell] == scene->window_cell_start[cell + 1])
+            if (cell >= cells
+                || scene->window_cell_start[cell] == scene->window_cell_start[cell + 1])
                 continue;
             float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
             float dx = fmaxf(fmaxf(low_x - anchor.x, anchor.x - low_x - scene->detail_cell), 0);
@@ -1445,6 +1514,30 @@ static void window_select(WaterfrontGpuScene *scene, Vector3 anchor)
                 && distance > 2 * BUILDING_WINDOW_NEAR_RANGE)
                 window_cell_release(scene, cell);
         }
+    }
+}
+
+// Facades whose wall lies within the deep range of ANCHOR hold their relief; those beyond a margin
+// past it do not.
+static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
+{
+    size_t count = 0;
+    const BoatSceneryFacade *facades = boat_scenery_facades(scene->window_map, &count);
+    for (unsigned i = 0; i < scene->window_facade_total && i < count; ++i) {
+        BuildingWall wall;
+        if (!building_wall(scene->window_map->mesh, &facades[i], &wall))
+            continue;
+        // Horizontal distance from the anchor to the wall segment.
+        float ex = wall.end.x - wall.origin.x, ez = wall.end.z - wall.origin.z;
+        float t = ((anchor.x - wall.origin.x) * ex + (anchor.z - wall.origin.z) * ez)
+            / (ex * ex + ez * ez);
+        t = fminf(fmaxf(t, 0), 1);
+        float dx = anchor.x - (wall.origin.x + ex * t), dz = anchor.z - (wall.origin.z + ez * t);
+        float distance = sqrtf(dx * dx + dz * dz);
+        if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE)
+            reveal_expand(scene, i);
+        else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 40.0f)
+            reveal_release(scene, i);
     }
 }
 
@@ -1691,6 +1784,15 @@ static void unbind_map(WaterfrontGpuScene *scene)
     if (scene->window_cells)
         for (int cell = 0; cell < scene->window_cell_total; ++cell)
             tiled_destroy(&scene->window_cells[cell]);
+    if (scene->window_reveals)
+        for (unsigned i = 0; i < scene->window_facade_total; ++i)
+            tiled_destroy(&scene->window_reveals[i]);
+    free(scene->window_reveals);
+    free(scene->window_reveal_ready);
+    scene->window_reveals = NULL;
+    scene->window_reveal_ready = NULL;
+    scene->window_reveal_triangles = 0;
+    scene->window_facade_total = 0;
     free(scene->window_cells);
     free(scene->window_cell_ready);
     free(scene->window_cell_start);
@@ -3316,7 +3418,8 @@ static void set_window_mask_uniforms(const WaterfrontGpuScene *scene)
     float range = BUILDING_WINDOW_NEAR_RANGE;
     SetShaderValue(shader, cached_location(shader, "windowMaskAnchor"), &scene->window_anchor,
         SHADER_UNIFORM_VEC2);
-    SetShaderValue(shader, cached_location(shader, "windowMaskRange"), &range, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(
+        shader, cached_location(shader, "windowMaskRange"), &range, SHADER_UNIFORM_FLOAT);
     int slot = 7;
     rlEnableShader(shader.id);
     rlActiveTextureSlot(slot);
@@ -3348,6 +3451,17 @@ static void draw_windows(const WaterfrontGpuScene *scene, Material material)
         if (!scene->window_cell_ready[cell])
             continue;
         const WaterfrontGpuTiled *tiled = &scene->window_cells[cell];
+        for (int i = 0; i < tiled->count; ++i) {
+            if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
+                submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
+            else if (counting)
+                ++counting->tiles_culled[counting_pass];
+        }
+    }
+    for (unsigned f = 0; f < scene->window_facade_total; ++f) {
+        if (!scene->window_reveal_ready[f])
+            continue;
+        const WaterfrontGpuTiled *tiled = &scene->window_reveals[f];
         for (int i = 0; i < tiled->count; ++i) {
             if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
                 submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
@@ -3718,13 +3832,13 @@ bool waterfront_gpu_scene_draw(
     if (!waterfront_gpu_scene_bind_harbor(scene, &frame->harbor))
         return false;
     if (!frame->boating_basin) {
-        window_select(
-            scene, frame->player_active ? frame->camera.target : frame->camera.position);
+        window_select(scene, frame->player_active ? frame->camera.target : frame->camera.position);
         for (int cell = 0; cell < scene->window_cell_total; ++cell)
             scene->stats.window_cells += scene->window_cell_ready[cell];
         scene->stats.window_cells_expanded = scene->window_expanded;
         scene->stats.window_cells_released = scene->window_released;
         scene->stats.window_quads = scene->window_quads;
+        scene->stats.window_reveal_triangles = scene->window_reveal_triangles;
     }
     counting = &scene->stats;
     drawing_scene = scene;
