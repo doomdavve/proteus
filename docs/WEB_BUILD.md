@@ -3,22 +3,24 @@
 ## Current status
 
 The browser enters the shared Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER
-opens PLACE (GOTHENBURG HARBOUR by default, BASIN, BASIN TRIAL), WAVES, PICTURE (SMOOTHING before
-graphics G5a) and START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
+opens PLACE (GOTHENBURG HARBOUR by default, BASIN, BASIN TRIAL), WAVES, RESOLUTION, EDGES and
+START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
 start from the title: the title passed free-boating options the course rejects.) SETTINGS
 remembers name, single-player boat livery,
-steering, soundtrack, PICTURE and LIGHTING. LIGHTING cycles 27 fixed choices—DAY (default),
-SUNSET, DUSK, then 00:00 through 23:00—for your own view in new solo and multiplayer sessions
-and persists through IndexedDB. The choice saves exact legacy names or `hour-v1:HH`; malformed
-values and unknown versions fall back to Day.
-The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
-single-player and multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
+steering, soundtrack, RESOLUTION, EDGES and LIGHTING. LIGHTING cycles 27 fixed choices—DAY
+(default), SUNSET, DUSK, then 00:00 through 23:00—for your own view in new solo and multiplayer
+sessions and persists through IndexedDB. The choice saves exact legacy names or `hour-v1:HH`;
+malformed values and unknown versions fall back to Day.
+The saved RESOLUTION (LOW or HIGH) applies to the title and to
+single-player and multiplayer. LOW is the 320×200 scene; HIGH renders the scene and title at up
+to 1280×800 on a finer 640×400 HUD/menu grid. EDGES (PIXEL or SMOOTH, the default) applies to the
+low-resolution scene; HIGH replaces smoothing. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
 without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The HTML launcher shows the screenshot and PLAY; the title, version, repository link and map
 attribution sit in its footer. PLAY starts in the browser tab; fullscreen is controlled in-game.
 Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
-outer-river/waves/picture defaults; saves naming the retired `river` location fall back to
+outer-river/waves/resolution/edges defaults; saves naming the retired `river` location fall back to
 GOTHENBURG HARBOUR. IndexedDB denial still permits play without durable settings.
 
 Browser multiplayer now uses a JavaScript WebRTC transport and the existing C protocol,
@@ -339,9 +341,11 @@ with socket access passed.
 
 ## High resolution and HDR, 2026-11-03
 
-Graphics [G5a](GRAPHICS_OVERHAUL_PLAN.md#g5a--optional-high-resolution-and-restrained-hdr) turns
+Graphics [G5a](GRAPHICS_OVERHAUL_PLAN.md#g5a--optional-high-resolution-and-restrained-hdr) turned
 the title's SMOOTHING row into PICTURE: PIXEL (`smooth_edges=off`), SMOOTH (`smooth_edges=on`,
-the default) or HIGH RES (`resolution=high`, which launches `--resolution high`). A HIGH RES
+the default) or HIGH RES (`resolution=high`, which launches `--resolution high`). The 2026-11-21
+title update split that row into RESOLUTION and EDGES and renders the title itself at the saved
+resolution. A HIGH RES
 session sizes the canvas buffer to the high scene's scale (4× the logical frame, less for tall
 mobile frames so no side exceeds 2,048), renders the scene there with a 4× reflection and
 composites the logical HUD over it. HDR and its bloom need float render targets with blending

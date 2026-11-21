@@ -5,7 +5,9 @@
 3 px letter spacing and a 10 px word space. Diagonals are rasterized directly at the final
 pixel grid. A one-pixel cyan edge and two-pixel coral depth complete the 256×26 RGBA image.
 The warm/cartoon build remaps the title interior to a single sunny yellow ink,
-with a dark navy edge and shadow; the cyan build uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1; the window's final integer scaling enlarges the whole screen.
+with a dark navy edge and shadow; the cyan build uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1 at LOW resolution and 2× at
+HIGH, where the menu keeps its native type size; the window's final integer scaling enlarges the
+whole screen.
 
 Regenerate the wordmark using a Python environment with Pillow installed:
 

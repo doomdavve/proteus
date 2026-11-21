@@ -50,6 +50,7 @@ typedef enum {
     ROW_BOAT,
     ROW_MOUSE,
     ROW_MUSIC,
+    ROW_RESOLUTION,
     ROW_EDGES,
     ROW_LIGHTING,
     ROW_DONE,
@@ -60,6 +61,7 @@ typedef enum {
     ROW_SOLO_CONTENT,
     ROW_SOLO_SAVE,
     ROW_SOLO_WATER,
+    ROW_SOLO_RESOLUTION,
     ROW_SOLO_EDGES,
     ROW_SOLO_START,
     ROW_SOLO_BACK,
@@ -166,6 +168,8 @@ typedef struct {
     Texture2D backdrop, wordmark;
     Font ui, small; // m5x7 labels/values; m3x6 hints/footer, baked at their native 16 px em.
     RenderTexture2D target;
+    BoatResolution resolution; // The target follows the saved setting.
+    int ui_scale; // Target pixels per 320x200 logical pixel: 1 low, 2 high.
     Panel panel; // The multiplayer or settings panel replaces the main rows.
     int selected;
     char *editing; // The text field being typed into, if any.
@@ -230,6 +234,39 @@ static Color rgb(unsigned char r, unsigned char g, unsigned char b)
     return (Color) { r, g, b, 255 };
 }
 
+static int title_ui_scale(BoatResolution resolution)
+{
+    return resolution == BOAT_RESOLUTION_HIGH ? 2 : 1;
+}
+
+// Layout stays in the 320x200 frame; high resolution doubles positions into a 640x400 target while
+// the bitmap fonts keep their native pixel size, like the in-game high-resolution HUD.
+static int px(const Title *t, int value) { return value * t->ui_scale; }
+
+static float pxf(const Title *t, float value) { return value * (float)t->ui_scale; }
+
+static Rectangle scaled_rect(const Title *t, Rectangle r)
+{
+    return (Rectangle) { pxf(t, r.x), pxf(t, r.y), pxf(t, r.width), pxf(t, r.height) };
+}
+
+static bool title_set_resolution(Title *t, BoatResolution resolution)
+{
+    if (t->resolution == resolution)
+        return true;
+    int scale = title_ui_scale(resolution);
+    RenderTexture2D next = LoadRenderTexture(WIDTH * scale, HEIGHT * scale);
+    if (!IsRenderTextureValid(next))
+        return false;
+    SetTextureFilter(next.texture, TEXTURE_FILTER_POINT);
+    if (IsRenderTextureValid(t->target))
+        UnloadRenderTexture(t->target);
+    t->target = next;
+    t->resolution = resolution;
+    t->ui_scale = scale;
+    return true;
+}
+
 // The TTF em square is 16 px; visible capitals are seven/six pixels high. Draw the
 // native atlas 1:1 and align its capital top, rather than shrinking it to a nominal 7 px.
 static int text_width(Font font, const char *text)
@@ -246,14 +283,17 @@ static void draw_text(Font font, const char *text, int x, int y, Color ink)
 // Native bitmap wordmark: common cap height, stroke width and optical spacing.
 static void draw_logo(const Title *t)
 {
-    DrawTexture(t->wordmark, (WIDTH - t->wordmark.width) / 2, 20, WHITE);
+    int width = t->wordmark.width * t->ui_scale;
+    DrawTextureEx(t->wordmark, (Vector2) { (float)((px(t, WIDTH) - width) / 2), (float)px(t, 20) },
+        0, (float)t->ui_scale, WHITE);
 }
 
-static void crosshair(int x, int y, Color ink)
+static void crosshair(const Title *t, int x, int y, Color ink)
 {
-    DrawLine(x - 4, y, x + 5, y, ink);
-    DrawLine(x, y - 4, x, y + 5, ink);
-    DrawPixel(x, y, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(188, 255, 243)));
+    int cx = px(t, x), cy = px(t, y), arm = px(t, 4);
+    DrawLine(cx - arm, cy, cx + arm + 1, cy, ink);
+    DrawLine(cx, cy - arm, cx, cy + arm + 1, ink);
+    DrawPixel(cx, cy, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(188, 255, 243)));
 }
 
 // A SOLO row is shown unless it is the content row off the outer location, the SAVE row off
@@ -337,8 +377,10 @@ static Rectangle row_bounds(const Title *t, int row)
         return (Rectangle) { 127, 171, 66, 14 };
     if (t->panel == PANEL_MAIN)
         return (Rectangle) { 70, (float)(109 + row * 14), 118, 13 };
-    int height = t->panel == PANEL_SETTINGS ? 14 : ROW_HEIGHT;
-    int top = 86 + (5 - row_count(t)) * height / 2; // Centred on five rows' space.
+    int rows = row_count(t);
+    // Eight settings rows need 13 pixels; the rest keep their roomier 16-pixel rows.
+    int height = t->panel == PANEL_SETTINGS ? 13 : ROW_HEIGHT;
+    int top = 86 + (5 - rows) * height / 2; // Centred on five rows' space.
     return (Rectangle) { 45, (float)(top + row * height), 230, height - 2 };
 }
 
@@ -358,20 +400,8 @@ static const char *fit(Font font, const char *text, int width)
     return text;
 }
 
-// PICTURE: plain low resolution, its 4x supersampling, or high resolution.
-static const char *const pictures[] = { "PIXEL", "SMOOTH", "HIGH RES" };
-
-static int picture(const BoatTitleSettings *s)
-{
-    return s->high_resolution ? 2 : s->smooth_edges ? 1 : 0;
-}
-
-static void turn_picture(BoatTitleSettings *s, int turn)
-{
-    int next = (picture(s) + 3 + turn) % 3;
-    s->smooth_edges = next == 1;
-    s->high_resolution = next == 2;
-}
+static const char *const resolutions[BOAT_RESOLUTIONS] = { "LOW", "HIGH" };
+static const char *const edges[] = { "PIXEL", "SMOOTH" };
 
 static void row_text(const Title *t, const BoatTitleSettings *s, int row, const char **label,
     char *value, size_t size)
@@ -380,7 +410,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     value[0] = 0;
     if (t->panel == PANEL_SINGLE) {
         static const char *labels[SOLO_ROWS]
-            = { "PLACE", "CONTENT", "SAVE", "WAVES", "PICTURE", "START", "BACK" };
+            = { "PLACE", "CONTENT", "SAVE", "WAVES", "RESOLUTION", "EDGES", "START", "BACK" };
         int logical = solo_row(t, row);
         *label = labels[logical];
         if (logical == ROW_SOLO_PLACE)
@@ -393,13 +423,15 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             boat_save_row_text(&t->save, value, size);
         else if (logical == ROW_SOLO_WATER)
             snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
+        else if (logical == ROW_SOLO_RESOLUTION)
+            snprintf(value, size, "< %s >", resolutions[s->resolution]);
         else if (logical == ROW_SOLO_EDGES)
-            snprintf(value, size, "< %s >", pictures[picture(s)]);
+            snprintf(value, size, "< %s >", edges[s->smooth_edges]);
         return;
     }
     if (t->panel == PANEL_SETTINGS) {
-        static const char *labels[SETTINGS_ROWS]
-            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "PICTURE", "LIGHTING", "BACK" };
+        static const char *labels[SETTINGS_ROWS] = { "NAME", "BOAT", "STEERING", "SOUNDTRACK",
+            "RESOLUTION", "EDGES", "LIGHTING", "BACK" };
         *label = labels[row];
         if (row == ROW_NAME)
             snprintf(value, size, "%s", s->name);
@@ -411,8 +443,10 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             snprintf(value, size, "< %s >", s->mouse_steering ? "MOUSE" : "KEYBOARD");
         else if (row == ROW_MUSIC)
             snprintf(value, size, "%s", boat_music(s->soundtrack)->label);
+        else if (row == ROW_RESOLUTION)
+            snprintf(value, size, "< %s >", resolutions[s->resolution]);
         else if (row == ROW_EDGES)
-            snprintf(value, size, "< %s >", pictures[picture(s)]);
+            snprintf(value, size, "< %s >", edges[s->smooth_edges]);
         else if (row == ROW_LIGHTING) {
             int hour = boat_title_lighting_hour(s->lighting);
             if (hour >= 0) {
@@ -521,9 +555,10 @@ static const char *lan_hint(const Title *t, char *out, size_t size)
 static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *status)
 {
     Rectangle first = row_bounds(t, 0), last = row_bounds(t, row_count(t) - 1);
-    int top = (int)first.y - 5, height = (int)(last.y + last.height - first.y) + 10;
+    int top_l = (int)first.y - 5, height_l = (int)(last.y + last.height - first.y) + 10;
+    int top = px(t, top_l), height = px(t, height_l);
     bool main = t->panel == PANEL_MAIN;
-    int left = main ? 66 : 37, width = main ? 126 : 246;
+    int left = px(t, main ? 66 : 37), width = px(t, main ? 126 : 246);
     Color cyan = boat_ui_palette().edge, dim = boat_ui_palette().border;
     DrawRectangle(left, top, width, height, boat_ui_palette().panel);
     // Fine rules with brighter open corner brackets.
@@ -531,47 +566,49 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     for (int side = 0; side < 2; ++side)
         for (int end = 0; end < 2; ++end) {
             int x = left + side * (width - 1), y = top + end * (height - 1);
-            DrawRectangle(side ? x - 4 : x, y, 5, 1, cyan);
-            DrawRectangle(x, end ? y - 4 : y, 1, 5, cyan);
+            int bracket = px(t, 5), offset = px(t, 4);
+            DrawRectangle(side ? x - offset : x, y, bracket, 1, cyan);
+            DrawRectangle(x, end ? y - offset : y, 1, bracket, cyan);
         }
     if (main) {
-        DrawLine(left - 6, top - 3, left - 6, top + height + 4, dim);
-        DrawLine(left - 9, top + height + 3, left + width + 9, top + height + 3, dim);
-        for (int y = top + 7; y < top + height; y += 7)
-            DrawLine(left - 7, y, left - 4, y, dim);
-        crosshair(left - 6, top - 3, cyan);
-        crosshair(left + width + 6, top + height + 3, cyan);
+        DrawLine(left - px(t, 6), top - px(t, 3), left - px(t, 6), top + height + px(t, 4), dim);
+        DrawLine(left - px(t, 9), top + height + px(t, 3), left + width + px(t, 9),
+            top + height + px(t, 3), dim);
+        for (int y = top + px(t, 7); y < top + height; y += px(t, 7))
+            DrawLine(left - px(t, 7), y, left - px(t, 4), y, dim);
+        crosshair(t, 66 - 6, top_l - 3, cyan);
+        crosshair(t, 66 + 126 + 6, top_l + height_l + 3, cyan);
     }
     for (int i = 0; i < row_count(t); ++i) {
         Rectangle row = row_bounds(t, i);
+        Rectangle shown_row = scaled_rect(t, row);
         bool active = i == t->selected;
-        int label_x = main ? 84 : 72;
         if (main)
-            DrawLine(71, (int)row.y + 13, 187, (int)row.y + 13, dim);
+            DrawLine(px(t, 71), px(t, (int)row.y + 13), px(t, 187), px(t, (int)row.y + 13), dim);
         if (active) {
-            Rectangle highlight = row;
-            highlight.x = row.x;
-            highlight.width = row.x + row.width - highlight.x;
-            DrawRectangleRec(highlight, boat_ui_palette().selected);
-            int x = main ? 74 : 51, y = (int)row.y + 4;
+            DrawRectangleRec(shown_row, boat_ui_palette().selected);
+            int x = px(t, main ? 74 : 51), y = px(t, (int)row.y + 4), arm = px(t, 5);
             for (int j = 0; j < 3; ++j)
-                DrawLine(x + j, y + j, x + j, y + 5 - j, boat_ui_palette().accent);
+                DrawLine(x + j, y + j, x + j, y + arm - j, boat_ui_palette().accent);
         }
         Color ink = active ? boat_ui_palette().selected_text : boat_ui_palette().text;
         const char *label;
         char value[96];
         row_text(t, s, i, &label, value, sizeof(value));
         // The web's longer BACK TO LAUNCHER label also fits the compact main panel.
-        draw_text(t->ui, label, label_x, (int)row.y + 3, ink);
+        // The 320x200 layout keeps its original text offset; the finer grid centres the caps.
+        int text_y = (int)shown_row.y + (t->ui_scale == 1 ? 3 : (int)((shown_row.height - 7) / 2));
+        draw_text(t->ui, label, px(t, main ? 84 : 72), text_y, ink);
         if (value[0]) {
-            int value_x = t->panel == PANEL_JOIN && i == ROW_ADDRESS ? 122
-                : t->panel == PANEL_SETTINGS && i == ROW_MUSIC       ? 154
-                                                                     : 142;
-            const char *shown = fit(t->ui, value, 268 - value_x);
-            draw_text(t->ui, shown, value_x, (int)row.y + 3, ink);
+            int value_x = px(t,
+                t->panel == PANEL_JOIN && i == ROW_ADDRESS         ? 122
+                    : t->panel == PANEL_SETTINGS && i == ROW_MUSIC ? 154
+                                                                   : 142);
+            const char *shown = fit(t->ui, value, px(t, 268) - value_x);
+            draw_text(t->ui, shown, value_x, text_y, ink);
             bool typing = t->editing && active;
             if (typing && fmod(t->time, .8) < .5)
-                DrawRectangle(value_x + 1 + text_width(t->ui, shown), (int)row.y + 3, 3, 7, ink);
+                DrawRectangle(value_x + 1 + text_width(t->ui, shown), text_y, 3, 7, ink);
         }
     }
     const char *hint = status;
@@ -588,10 +625,20 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
+    if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_RESOLUTION)
+        hint = "REMEMBERED; HIGH RES NEEDS THE GPU";
+    if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_EDGES)
+        hint = s->resolution == BOAT_RESOLUTION_HIGH ? "HIGH RES REPLACES SMOOTHING"
+                                                     : "SMOOTH SUPERSAMPLES THE LOW-RES SCENE";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_LIGHTING)
         hint = "REMEMBERED; WORKING HARBOUR CYCLES";
     char work_text[96];
     int solo = t->panel == PANEL_SINGLE ? solo_row(t, t->selected) : -1;
+    if (!hint && solo == ROW_SOLO_RESOLUTION)
+        hint = "REMEMBERED; HIGH RES NEEDS THE GPU";
+    if (!hint && solo == ROW_SOLO_EDGES)
+        hint = s->resolution == BOAT_RESOLUTION_HIGH ? "HIGH RES REPLACES SMOOTHING"
+                                                     : "SMOOTH SUPERSAMPLES THE LOW-RES SCENE";
     if (!hint && t->solo_save && (solo == ROW_SOLO_SAVE || solo == ROW_SOLO_START))
         hint = work_hint(t, work_text, sizeof(work_text));
     if (!hint && solo == ROW_SOLO_CONTENT)
@@ -635,24 +682,26 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         }
     }
     if (hint) {
-        const char *shown = fit(t->small, hint, WIDTH - 12);
-        int x = (WIDTH - text_width(t->small, shown)) / 2;
-        int y = main ? top - 15 : top + height + 3;
-        DrawRectangle(x - 3, y - 1, text_width(t->small, shown) + 6, 9, boat_ui_palette().shadow);
+        const char *shown = fit(t->small, hint, px(t, WIDTH - 12));
+        int width = text_width(t->small, shown);
+        int x = (px(t, WIDTH) - width) / 2;
+        int y = main ? px(t, top_l - 15) : px(t, top_l + height_l + 3);
+        DrawRectangle(x - 3, y - 1, width + 6, 9, boat_ui_palette().shadow);
         draw_text(t->small, shown, x, y + 1, status ? rgb(255, 236, 175) : boat_ui_palette().hint);
     }
 }
 
-static void draw_footer_text(Font font, const char *label, int x)
+static void draw_footer_text(const Title *t, Font font, const char *label, int x)
 {
-    draw_text(font, label, x + 1, 191, (Color) { 10, 45, 65, 130 });
-    draw_text(
-        font, label, x, 190, (PROTEUS_WARM_MENU ? boat_ui_palette().edge : rgb(162, 219, 217)));
+    int y = px(t, 190);
+    draw_text(font, label, px(t, x) + 1, y + 1, (Color) { 10, 45, 65, 130 });
+    draw_text(font, label, px(t, x), y,
+        (PROTEUS_WARM_MENU ? boat_ui_palette().edge : rgb(162, 219, 217)));
 }
 
 // Coverage antialiasing for the credits water only. Keep fractional positions until
 // rasterization so slow movement fades between pixels instead of jumping whole rows.
-static void credits_water_line(Vector2 a, Vector2 b, Color ink)
+static void credits_water_line(const Title *t, Vector2 a, Vector2 b, Color ink)
 {
     bool steep = fabsf(b.y - a.y) > fabsf(b.x - a.x);
     if (steep) {
@@ -668,7 +717,7 @@ static void credits_water_line(Vector2 a, Vector2 b, Color ink)
         return;
     float slope = (b.y - a.y) / (b.x - a.x);
     int first = (int)fmaxf(0, ceilf(a.x));
-    int limit = (int)fminf(steep ? HEIGHT : WIDTH, ceilf(b.x));
+    int limit = (int)fminf((float)px(t, steep ? HEIGHT : WIDTH), ceilf(b.x));
     for (int x = first; x < limit; ++x) {
         float y = a.y + (x - a.x) * slope;
         int base = (int)floorf(y);
@@ -687,7 +736,7 @@ static void draw_credits(const Title *t)
     BoatUiPalette p = boat_ui_palette();
     double elapsed = t->time - t->credits_started;
     float phase = (float)elapsed;
-    DrawRectangle(0, 58, WIDTH, 129, p.shadow);
+    DrawRectangle(0, px(t, 58), px(t, WIDTH), px(t, 129), p.shadow);
     // A receding water grid, with travelling crests instead of a space/star effect.
     for (int z = 0; z < 13; ++z) {
         float depth = (float)fmod(z + elapsed * .6, 13.0) / 13;
@@ -696,16 +745,17 @@ static void draw_credits(const Title *t)
         for (int x = 0; x < WIDTH; x += 4) {
             float dy = sinf(x * .035f + phase * 1.8f + z) * depth * 3;
             float next = sinf((x + 4) * .035f + phase * 1.8f + z) * depth * 3;
-            credits_water_line(
-                (Vector2) { (float)x, y + dy }, (Vector2) { (float)x + 4, y + next }, ink);
+            credits_water_line(t, (Vector2) { pxf(t, (float)x), pxf(t, y + dy) },
+                (Vector2) { pxf(t, (float)x + 4), pxf(t, y + next) }, ink);
         }
     }
     for (int x = -320; x <= 640; x += 64)
-        credits_water_line((Vector2) { 160 + (x - 160) / 8.0f, 73 }, (Vector2) { (float)x, 185 },
-            Fade(p.border, .2f));
+        credits_water_line(t, (Vector2) { pxf(t, 160 + (x - 160) / 8.0f), pxf(t, 73) },
+            (Vector2) { pxf(t, (float)x), pxf(t, 185) }, Fade(p.border, .2f));
     const char *heading = "CREDITS";
-    DrawRectangle(119, 49, 82, 14, p.panel);
-    draw_text(t->ui, heading, (WIDTH - text_width(t->ui, heading)) / 2, 52, p.selected);
+    DrawRectangle(px(t, 119), px(t, 49), px(t, 82), px(t, 14), p.panel);
+    draw_text(
+        t->ui, heading, (px(t, WIDTH) - text_width(t->ui, heading)) / 2, px(t, 52), p.selected);
     // A movie-style roll: one font, centred lines and a quiet gap between sections.
     static const struct {
         const char *text;
@@ -738,37 +788,39 @@ static void draw_credits(const Title *t)
     int count = (int)(sizeof(lines) / sizeof(lines[0]));
     int period = count * 14 + 112;
     int origin = 98 - (int)fmod(elapsed * 10, period);
-    DrawLine(24, 64, 296, 64, p.border);
-    DrawLine(24, 165, 296, 165, p.border);
-    // Scissor coordinates are in the title's native 320x200 render target.
-    BeginScissorMode(24, 66, 272, 97);
+    DrawLine(px(t, 24), px(t, 64), px(t, 296), px(t, 64), p.border);
+    DrawLine(px(t, 24), px(t, 165), px(t, 296), px(t, 165), p.border);
+    // Scissor coordinates follow the target grid; text keeps its native size.
+    BeginScissorMode(px(t, 24), px(t, 66), px(t, 272), px(t, 97));
     for (int copy = 0; copy < 2; ++copy)
         for (int i = 0; i < count; ++i) {
             int y = origin + copy * period + i * 14;
             if (y < 59 || y >= 163 || !lines[i].text[0])
                 continue;
-            int x = (WIDTH - text_width(t->ui, lines[i].text)) / 2;
-            draw_text(t->ui, lines[i].text, x + 1, y + 1, p.shadow);
-            draw_text(t->ui, lines[i].text, x, y, lines[i].heading ? p.selected : p.text);
+            int x = (px(t, WIDTH) - text_width(t->ui, lines[i].text)) / 2;
+            draw_text(t->ui, lines[i].text, x + 1, px(t, y) + 1, p.shadow);
+            draw_text(t->ui, lines[i].text, x, px(t, y), lines[i].heading ? p.selected : p.text);
         }
     EndScissorMode();
-    DrawRectangleRec(row_bounds(t, 0), p.selected);
-    draw_text(t->ui, "< BACK", 142, 175, p.selected_text);
+    DrawRectangleRec(scaled_rect(t, row_bounds(t, 0)), p.selected);
+    draw_text(t->ui, "< BACK", px(t, 142), px(t, 175), p.selected_text);
 }
 
 static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
 {
     BeginTextureMode(t->target);
-    DrawTexture(t->backdrop, 0, 0, WHITE);
+    DrawTexturePro(t->backdrop,
+        (Rectangle) { 0, 0, (float)t->backdrop.width, (float)t->backdrop.height },
+        (Rectangle) { 0, 0, (float)px(t, WIDTH), (float)px(t, HEIGHT) }, (Vector2) { 0 }, 0, WHITE);
     draw_logo(t);
-    crosshair(22, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
-    crosshair(297, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
+    crosshair(t, 22, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
+    crosshair(t, 297, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
     if (t->panel == PANEL_CREDITS)
         draw_credits(t);
     else
         draw_menu(t, s, status);
     if (t->panel != PANEL_CREDITS)
-        draw_footer_text(t->small, PROTEUS_VERSION, 8);
+        draw_footer_text(t, t->small, PROTEUS_VERSION, 8);
     EndTextureMode();
 }
 
@@ -780,13 +832,17 @@ static int scale(void)
 
 static void present(Title *t)
 {
-    int k = scale();
-    Rectangle destination = { (float)((GetScreenWidth() - WIDTH * k) / 2),
-        (float)((GetScreenHeight() - HEIGHT * k) / 2), (float)(WIDTH * k), (float)(HEIGHT * k) };
+    BoatScreenLayout layout
+        = boat_screen_layout(t->resolution, WIDTH, HEIGHT, GetScreenWidth(), GetScreenHeight());
+    // A 640x400 target maps cleanly to even logical scales; odd ones filter instead of
+    // showing uneven nearest pixels.
+    bool filtered = t->resolution == BOAT_RESOLUTION_HIGH && layout.scale % t->ui_scale != 0;
+    SetTextureFilter(t->target.texture, filtered ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
     BeginDrawing();
     ClearBackground(boat_ui_palette().shadow);
-    DrawTexturePro(t->target.texture, (Rectangle) { 0, 0, WIDTH, -HEIGHT }, destination,
-        (Vector2) { 0 }, 0, WHITE);
+    DrawTexturePro(t->target.texture,
+        (Rectangle) { 0, 0, (float)t->target.texture.width, -(float)t->target.texture.height },
+        layout.destination, (Vector2) { 0 }, 0, WHITE);
     frame_pacer_wait(&t->pacer);
     EndDrawing();
 }
@@ -805,10 +861,12 @@ static Font load_title_font(const char *asset)
     return font;
 }
 
-static bool open_title(Title *t)
+static bool open_title(Title *t, BoatResolution resolution)
 {
     char path[4096];
     *t = (Title) { 0 };
+    t->resolution = resolution;
+    t->ui_scale = title_ui_scale(resolution);
     if (!boat_asset_path(path, sizeof(path), "title/river-backdrop.png"))
         return false;
     // Grade the captured river once at load, preserving its exact geometry and pixel grid.
@@ -839,7 +897,7 @@ static bool open_title(Title *t)
 #endif
     t->backdrop = LoadTextureFromImage(image);
     UnloadImage(image);
-    t->target = LoadRenderTexture(WIDTH, HEIGHT);
+    t->target = LoadRenderTexture(WIDTH * t->ui_scale, HEIGHT * t->ui_scale);
     if (!boat_asset_path(path, sizeof(path), "title/wake-velocity.png"))
         return false;
     Image wordmark = LoadImage(path);
@@ -924,7 +982,7 @@ static bool finish_edit(Title *t, bool keep)
 BoatTitleChoice boat_title_run(BoatTitleSettings *s)
 {
     Title t;
-    if (!open_title(&t)) {
+    if (!open_title(&t, s->resolution)) {
         close_title(&t);
         return BOAT_TITLE_EXIT;
     }
@@ -1015,8 +1073,11 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                         work_action = boat_save_row_press(&t.save);
                 } else if (sel == ROW_SOLO_WATER && turn)
                     s->waves = !s->waves;
+                else if (sel == ROW_SOLO_RESOLUTION && turn)
+                    s->resolution = (BoatResolution)((s->resolution + BOAT_RESOLUTIONS + turn)
+                        % BOAT_RESOLUTIONS);
                 else if (sel == ROW_SOLO_EDGES && turn)
-                    turn_picture(s, turn);
+                    s->smooth_edges = !s->smooth_edges;
                 activate = false;
             }
         }
@@ -1035,14 +1096,18 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         bool settings = t.panel == PANEL_SETTINGS && !t.editing;
         if (settings
             && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC
-                || t.selected == ROW_EDGES || t.selected == ROW_LIGHTING)) {
+                || t.selected == ROW_RESOLUTION || t.selected == ROW_EDGES
+                || t.selected == ROW_LIGHTING)) {
             int turn = (in.right || activate) - in.left;
             if (t.selected == ROW_BOAT)
                 s->skin = (s->skin + BOAT_SKIN_COUNT + turn) % BOAT_SKIN_COUNT;
             else if (t.selected == ROW_MUSIC)
                 s->soundtrack = (s->soundtrack + BOAT_MUSIC_COUNT + turn) % BOAT_MUSIC_COUNT;
+            else if (t.selected == ROW_RESOLUTION && turn)
+                s->resolution = (BoatResolution)((s->resolution + BOAT_RESOLUTIONS + turn)
+                    % BOAT_RESOLUTIONS);
             else if (t.selected == ROW_EDGES && turn)
-                turn_picture(s, turn);
+                s->smooth_edges = !s->smooth_edges;
             else if (t.selected == ROW_LIGHTING)
                 s->lighting
                     = (s->lighting + BOAT_TITLE_LIGHTING_COUNT + turn) % BOAT_TITLE_LIGHTING_COUNT;
@@ -1050,6 +1115,10 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 s->mouse_steering = !s->mouse_steering;
             activate = false;
         }
+        // A resolution change reallocates the title target immediately; if it fails, keep the
+        // previous one and the setting that matches it.
+        if (s->resolution != t.resolution && !title_set_resolution(&t, s->resolution))
+            s->resolution = t.resolution;
         if (activate) {
             s->message[0] = 0;
             if (t.panel == PANEL_CREDITS) {
@@ -1174,7 +1243,7 @@ bool boat_title_screenshot_panel(
 {
     Title t;
     bool ok = false;
-    if (open_title(&t)) {
+    if (open_title(&t, settings->resolution)) {
         t.time = time;
         if (cap->solo || cap->ask) {
             t.panel = PANEL_SINGLE;
@@ -1201,7 +1270,7 @@ bool boat_title_screenshot(const BoatTitleSettings *settings, double time, const
 {
     Title t;
     bool ok = false;
-    if (open_title(&t)) {
+    if (open_title(&t, settings->resolution)) {
         t.time = time;
         draw_screen(&t, settings, NULL);
         Image image = LoadImageFromTexture(t.target.texture);
@@ -1229,7 +1298,8 @@ void boat_title_defaults(BoatTitleSettings *s)
         .host_location = BOAT_LOCATION_OUTER,
         .location = BOAT_LOCATION_OUTER,
         .waves = true,
-        .smooth_edges = true };
+        .smooth_edges = true,
+        .resolution = BOAT_RESOLUTION_LOW };
 #if defined(__EMSCRIPTEN__)
     snprintf(s->address, sizeof(s->address), "ws://127.0.0.1:24682");
 #else
@@ -1276,7 +1346,7 @@ void boat_title_load(BoatTitleSettings *s)
         else if (!strcmp(line, "smooth_edges"))
             s->smooth_edges = !strcmp(value, "on");
         else if (!strcmp(line, "resolution"))
-            s->high_resolution = !strcmp(value, "high");
+            boat_resolution_parse(value, &s->resolution);
         else if (!strcmp(line, "outer_content")) {
             for (unsigned i = 0; i < content_count(); ++i)
                 if (!strcmp(value, outer_contents[i].name))
@@ -1311,7 +1381,7 @@ void boat_title_save(const BoatTitleSettings *s)
         s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
         s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
         boat_title_outer_content(s->outer_content));
-    fprintf(file, "resolution=%s\n", s->high_resolution ? "high" : "low");
+    fprintf(file, "resolution=%s\n", boat_resolution_name(s->resolution));
     fprintf(file, "lighting=%s\n", boat_title_lighting(s->lighting));
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,

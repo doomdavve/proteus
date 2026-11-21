@@ -2877,7 +2877,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     }
     if (!working_harbour && settings->waves)
         arguments[count++] = "--waves";
-    if (settings->high_resolution) {
+    if (settings->resolution == BOAT_RESOLUTION_HIGH) {
         arguments[count++] = "--resolution";
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
@@ -2964,7 +2964,7 @@ static int title_join(BoatTitleSettings *settings, bool host)
     }
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
-    if (settings->high_resolution) {
+    if (settings->resolution == BOAT_RESOLUTION_HIGH) {
         arguments[count++] = "--resolution";
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
@@ -3058,7 +3058,8 @@ int main(int argc, char **argv)
     }
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(wake_app_window_flags(capture));
-    InitWindow(320 * 3, 200 * 3, "Wake Velocity");
+    int title_scale = boat_resolution_window_scale(settings.resolution);
+    InitWindow(320 * title_scale, 200 * title_scale, "Wake Velocity");
     if (!IsWindowReady())
         return 1;
     if (capture) {

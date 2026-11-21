@@ -1424,7 +1424,10 @@ implementation stays with SUNSET_PLAN.md.
   (`waterfront_gpu_scene_set_reflection_size`). `waterfront_grade` evaluates a neutral grade per
   daylight phase from the lighting frame's phase; no second clock. The user option is the title's
   PICTURE row (PIXEL, SMOOTH, HIGH RES, saved as `smooth_edges` and `resolution`) and the CLI's
-  `--resolution low|high` and `--hdr on|off`; high replaces `--gpu-aa`. The scene renders at the
+  `--resolution low|high` and `--hdr on|off`; high replaces `--gpu-aa`. (The 2026-11-21 title update
+  split PICTURE into RESOLUTION and EDGES and renders the title at the saved resolution; see the
+  [title plan](TITLE_SCREEN_PLAN.md#resolution-setting-and-high-res-title-2026-11-21).) The scene
+  renders at the
   window's own scale, so a 960×600 window gets a 960×600 scene. The mirror and supersampling
   stay 8-bit.
 - Decision for review: no current light exceeds 1 (measured: day/sunset/dusk peaks 0.96–1.00 in
