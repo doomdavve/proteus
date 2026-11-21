@@ -340,6 +340,11 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
 {
     const Boat *boat = &view->boat;
     gpu->failed = false;
+    if (world->water.object_sample) {
+        // A local CPU adapter has no matching shader recipe. Refuse a mismatched surface.
+        gpu->failed = true;
+        return;
+    }
     bool mapped = world->definition->mapped;
     const BoatMapDescription *map = world->definition->map;
     if (mapped && gpu->scene.map != map

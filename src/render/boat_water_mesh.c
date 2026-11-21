@@ -530,6 +530,8 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
     ambient.wake_amplitude = 0;
     ambient.player_wake_enabled = false;
     ambient.objects = NULL;
+    ambient.object_sample = NULL;
+    ambient.object_context = NULL;
     ambient.traffic_objects = NULL;
     ambient.vessel.height = 0;
     for (size_t i = 0; i < s->count; ++i) {
@@ -549,7 +551,7 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
         BoatVesselWakeSample vessel = boat_vessel_wake_query(water.vessel, point, time);
         float wake_height = q.height - storm.height - vessel.height;
         float crest = 0;
-        if (water.objects || water.traffic_objects)
+        if (water.objects || water.object_sample || water.traffic_objects)
             crest = .65f * Clamp(q.crest_foam - Clamp(storm.height / .8f, 0, 1), 0, 1)
                 * Clamp(wake_height / .3f, 0, 1);
         else if (water.wake_amplitude > 0 || water.player_wake_enabled)

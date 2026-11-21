@@ -32,7 +32,8 @@ Use `--time` equal to `tick / 120` for handoff views: 119/120/121 s-ticks around
 departs), 1679/1680 (visitor moors), 1919/1920 (visitor leaves), 2999/3000 (tender re-moors).
 Hull colours show from above through `deck`; the `hull` colour is the side.
 
-Not covered: serviced vessels have no visual wake, a parked visitor and repeat are deferred, and
+Serviced boats leave cosmetic trails from their historical hull poses, without physical waves.
+Not covered: a parked visitor and repeat are deferred, and
 depth is not surveyed. The [API](../../docs/PLUGIN_API.md) owns the fields. A service timetable
 edit needs held Apply and restarts the session; Undo restores the previous one.
 [Dated evidence](../../docs/evidence/marina-m4/2026-11-15/README.md).

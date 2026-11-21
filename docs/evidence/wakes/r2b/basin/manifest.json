@@ -1,0 +1,349 @@
+{
+  "date": "2026-11-19",
+  "measurement_date": "2026-11-17",
+  "base_revision": "b9e8306",
+  "branch": "plan/wake-research",
+  "artifact_root": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin",
+  "decision": "Experimental CPU trial only; handling preservation failed; geometry unselected.",
+  "sources": {
+    "CMakeLists.txt": "0cdd48b477cc94a349d0c27322e34b9c0fd0f6a2133ddf10d2e87a263d73fe58",
+    "tests/tools/tests.cmake": "be1c251e80dcfbaeecfa049811e5a4cce67f8cd5e2adf589014d4f5c2f63a576",
+    "tests/tools/test_wake_transport_basin.py": "303d7f35cfb1396b5eddbdaabdbd022cad70dcf6500f83f10d7d14315b03c6f8",
+    "src/core/boat.c": "99a7e798b2eafbc4828926c39e549e559ae3fbe511fb85338f3e3243c9a78100",
+    "src/core/boat_water.c": "573a9de72000639edd8d39b35f3835a7b24890ea0e984eaf1565d7d09629dfb2",
+    "src/core/boat_water.h": "b9b0cbb450c847e258dcd86fe8af8db13e9a7be02c5d5e1319bf34c06ce321f2",
+    "src/render/boat_gpu.c": "23ef3f68f3c49d01e8a88b63f3fd37e41e779f5a113191655f6a9895d73fef2a",
+    "src/render/boat_water_mesh.c": "a4182820066c4d109dbabe9e910f83390cb1c3b360cf6915391411aff8669e83",
+    "tools/wake_geometry.c": "86ec59d59f7be262a940532e37f5d570a971bb2ba0df05700f75bba307573f9f",
+    "tools/wake_geometry.h": "b99a536180120a0a8340e1f718f164f190fb4172558e953356e0960ceb39808f",
+    "tools/wake_capture.c": "d4f4850408c2938317d4cc2d53b0bffbaa516effef15d25b1f09a7b394b5754a",
+    "tools/wake_capture.h": "9c0b335bffea8684aa5ffbd760fddb270bed08a2b13ef2c7b530a0b286a3177b",
+    "tools/wake_transport.c": "17d4a625be624352d29d6b2458078bfaff9097418eca0c9e1ca85548f4d29d0b",
+    "tools/wake_transport.h": "27bd0aa16762a3763448b815c15996bbf037b8a367b827e567ef9bd005baf417",
+    "tools/wake_transport_review.c": "2122f247930a801124b94ff023a21c3ad641ade38d2a83c32a6777b9c508791c",
+    "tools/wake_transport_basin.c": "16d10fae19c478443529bbc3071cbf57c12955c6bc2699a733aa371ae93b3764",
+    "tools/wake_transport_basin_media.py": "55358b288cae377cfaf2f93d734b12a973ee5251ca70a9475f464871298e54c2",
+    "tools/wake_transport_hull_report.py": "cdb0347a5908c5a8fcbb08c86db7239cdffb2057b06fa5a2e466dc8392b6061e",
+    "tools/wake_transport_profile.py": "483f0449e68ea12221442808db5cb05dff2a7e27c630d22d135ce738a08e4cc4",
+    "tools/wake_transport.py": "9b654cfaa90e25e3cf8d2c0f73bdc8056c29f70edf98ce771544d45c8954cba6",
+    "tools/wake_transport_report.py": "a0aee3f233ee6590ede3c71d2550af74bd5241e436a0a3f9743abccb443f1425",
+    "tools/wake_geometry.py": "ffd796d1702ce00dc5f8faeba0ca72b7fd6fb902c4e76425309ff821bc36bc84"
+  },
+  "reports": {
+    "baseline-profile.json": "bd5ca28f42fc48fd6d79a587f146dab7dc9351d2ab0f079c6f8caa7e3841e3e4",
+    "hulls-summary.json": "a05e4d172f30607c86c1537de5570b30b602713303b906708a0e943e7793375f",
+    "README.md": "ce2ec7d97fa911660e3b59f22f74f720bdbed14f2388dd49544094d20b3e811f",
+    "spread-profile.json": "9bdb9850d9ea4db42b1d93bad427630e5a1c0acf7d5c72f5b13617d68d51f136",
+    "optimization.json": "a4a7dee3c39e5cd1efe3db4a8ef7aabc7c15bbccaf2e8031c4c274a341e00a08"
+  },
+  "raw_artifacts": {
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/build-debug.log": "ea8557853a7cf40c5ecfd48977b2c12998c3e928c8345546d1ded58a06538875",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/build-trial-final.log": "1e507aaa44770b6d5f7176cd473460756935a25a1a8778e057a480d8cf11231c",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/trial-contract-final.log": "2e8b3ad4c4b4f994b089f2796bb5bb9ca3aac4d40121f1de2240ffe4589c51f8",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/hulls-final.csv": "abe440d5a0b24b3e78e9e06238563be21c3e4571bf6497ab949383386131ab94",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/hull-report.json": "f8d61824b538d3a9fcef0862c045ec87a357856c2077f59d6f5e67b95de74af3",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/ctest.log": "c4b707594fd55b2442f3a1b75851c47e1ec8c1a1fff8ea90eceaa45decfb6033",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/sanitize-final.log": "2e8b3ad4c4b4f994b089f2796bb5bb9ca3aac4d40121f1de2240ffe4589c51f8",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/visible-demo.log": "8ddb76c69639531d710531fb39e5b74c1e581c8d1e597e26c20432564d638479",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/profile-preopt.json": "dc80a9288a619bfc1cc9e3c1b972c4608ff16d1818bed344aca435c886bb1609",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/baseline-samples.xml": "1c433393c4413beed2e6b0207452f4251a2976ee27c5f968948ef2b4ef89d5a2",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/spread-samples.xml": "204866dd2eeded96ccd7fa668a570883f856f4a7fb26f3b0e646d3a60ecab9ab"
+  },
+  "profiling": {
+    "duration_seconds_each": 15,
+    "record_exit_codes": [
+      54,
+      54
+    ],
+    "exports_succeeded": true,
+    "traces": [
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/baseline-preopt.trace",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/spread-preopt.trace"
+    ],
+    "binary": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/wake_transport-preopt",
+    "binary_sha256": "544382c0fba78c4a63d87e17c3559e662b2ee0a996ee82369aa9c384aa773893",
+    "sources": {
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_capture.c": "d4f4850408c2938317d4cc2d53b0bffbaa516effef15d25b1f09a7b394b5754a",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_capture.h": "9c0b335bffea8684aa5ffbd760fddb270bed08a2b13ef2c7b530a0b286a3177b",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_geometry.c": "86ec59d59f7be262a940532e37f5d570a971bb2ba0df05700f75bba307573f9f",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_geometry.h": "b99a536180120a0a8340e1f718f164f190fb4172558e953356e0960ceb39808f",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_geometry.py": "ffd796d1702ce00dc5f8faeba0ca72b7fd6fb902c4e76425309ff821bc36bc84",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_transport.c": "6f62e7f6513bf0be45ae0fcfe45e62699f722bd7de8cffc4d6885471fe7848bb",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_transport.h": "27bd0aa16762a3763448b815c15996bbf037b8a367b827e567ef9bd005baf417",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_transport.py": "9b654cfaa90e25e3cf8d2c0f73bdc8056c29f70edf98ce771544d45c8954cba6",
+      "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/preopt-sources/wake_transport_review.c": "2122f247930a801124b94ff023a21c3ad641ade38d2a83c32a6777b9c508791c"
+    }
+  },
+  "optimized_cpu": {
+    "manifest": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/cpu-opt/manifest.json",
+    "sha256": "659fd14626355671afa72b2f6a4fc7f01a328bd09342cb88ddf4453fe4358f37",
+    "binary": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/wake_transport-opt-measured",
+    "binary_sha256": "ae1a38501fd443d0e3dd8ee8879ad03998c201a145a3a51803491ecf8eba5f91",
+    "runs": 72,
+    "no_individual_provisional_limit_exceedance": true
+  },
+  "paired_optimization": {
+    "manifest": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/paired-optimization/manifest.json",
+    "sha256": "49beefec92fa05b053f636a53a493b87fce63b5be1373eeb87a648874cf22309",
+    "runs": 18
+  },
+  "field_neutrality": {
+    "arrivals.csv": {
+      "pre": "b8f6f69a567064881deacc50cd65a40ba4765aa6aa99cf531eda41b41e57fd8a",
+      "post": "b8f6f69a567064881deacc50cd65a40ba4765aa6aa99cf531eda41b41e57fd8a"
+    },
+    "concentration.csv": {
+      "pre": "a3e461d1e52089b0b658961a6248f02c0f4fa2aefdf5b440fafdbcefc260af20",
+      "post": "a3e461d1e52089b0b658961a6248f02c0f4fa2aefdf5b440fafdbcefc260af20"
+    },
+    "crossings.csv": {
+      "pre": "6b2580dc7619dea6b46dd93c60d02f9658453c5b56e96ba8874a5b32ff3b28b3",
+      "post": "6b2580dc7619dea6b46dd93c60d02f9658453c5b56e96ba8874a5b32ff3b28b3"
+    },
+    "derivatives.csv": {
+      "pre": "8bc66c4b31510edc93c11ccb58f680a102bb37469232d13ede3689b5b2622ea3",
+      "post": "8bc66c4b31510edc93c11ccb58f680a102bb37469232d13ede3689b5b2622ea3"
+    },
+    "straight.csv": {
+      "pre": "9dd37a77e04386d146e76a310f574041a36b8be3c773575259c3554d5716e7ce",
+      "post": "9dd37a77e04386d146e76a310f574041a36b8be3c773575259c3554d5716e7ce"
+    },
+    "turns.csv": {
+      "pre": "be9825da4a6ccae3e679cd923ed759c84acb51c147d05c30ec2336c065e25392",
+      "post": "be9825da4a6ccae3e679cd923ed759c84acb51c147d05c30ec2336c065e25392"
+    }
+  },
+  "qualification": {
+    "full_ctest_passed": 622,
+    "gpu_labelled": 36,
+    "full_ctest_seconds": 108.35,
+    "sanitizer": "fully instrumented ASan/UBSan private check passed",
+    "visible_demo": {
+      "frames": 600,
+      "ticks": 1200,
+      "live_records": 19,
+      "landings": 0,
+      "exit_code": 0
+    },
+    "human_steering_accepted": false,
+    "handling_preservation_passed": false,
+    "geometry_selected": false,
+    "multi_source_coupled_qualified": false,
+    "gpu_transform_qualified": false
+  },
+  "review": "Astra final code/outcome/prose review: no handoff blocker. Experimental CPU trial only; handling-preservation failed and human acceptance remains open.",
+  "commands": [
+    "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug",
+    "cmake --build build -j 8",
+    "cmake --build build-release --target wake_transport_basin -j 8",
+    "./build-release/wake_transport_basin --check",
+    "./build-release/wake_transport_basin --screen build-release/wake-r2b/basin/hulls-final.csv",
+    "python3 tools/wake_transport_hull_report.py build-release/wake-r2b/basin/hulls-final.csv build-release/wake-r2b/basin/hull-report.json",
+    "python3 tools/wake_transport_basin_media.py --binary build-release/wake_transport_basin --output build-release/wake-r2b/basin/media-reviewed",
+    "caffeinate -di ctest --preset full",
+    "cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_SANITIZE=address,undefined -DFETCHCONTENT_SOURCE_DIR_RAYLIB=/Users/davve/src/proteus/build/_deps/raylib-src -DFETCHCONTENT_SOURCE_DIR_ENET=/Users/davve/src/proteus/build/_deps/enet-src",
+    "cmake --build build-sanitize --target wake_transport_basin -j 8",
+    "./build-sanitize/wake_transport_basin --check",
+    "./build-release/wake_transport_basin --demo --frames 600",
+    "xcrun xctrace record --template 'Time Profiler' --time-limit 15s --output build-release/wake-r2b/basin/baseline-preopt.trace --launch -- ./build-release/wake_transport --profile circle 0",
+    "xcrun xctrace export --input build-release/wake-r2b/basin/baseline-preopt.trace --xpath '/trace-toc/run[@number=\"1\"]/data/table[@schema=\"time-profile\"]' --output build-release/wake-r2b/basin/baseline-samples.xml",
+    "python3 tools/wake_transport_profile.py build-release/wake-r2b/basin/baseline-samples.xml build-release/wake-r2b/basin/baseline-profile.json",
+    "xcrun xctrace record --template 'Time Profiler' --time-limit 15s --output build-release/wake-r2b/basin/spread-preopt.trace --launch -- ./build-release/wake_transport --profile circle 1",
+    "xcrun xctrace export --input build-release/wake-r2b/basin/spread-preopt.trace --xpath '/trace-toc/run[@number=\"1\"]/data/table[@schema=\"time-profile\"]' --output build-release/wake-r2b/basin/spread-samples.xml",
+    "python3 tools/wake_transport_profile.py build-release/wake-r2b/basin/spread-samples.xml build-release/wake-r2b/basin/spread-profile.json"
+  ],
+  "media": {
+    "manifest": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-reviewed/manifest.json",
+    "sha256": "afa6bf42271203ebfd812c88f809287c814ce8c3077f081c3992a40c85afd2f6",
+    "movies": [
+      {
+        "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-reviewed/self-paired.mp4",
+        "sha256": "36a4ebf66b2a4c0e1725b347f909143877d3f7c8c58629e2d0f5373906449407",
+        "frames": 100,
+        "fps": 10,
+        "command": [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/self-baseline/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/self-spread/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/banner.png",
+          "-filter_complex",
+          "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v]crop=1280:32:0:0[caption];[caption][body]vstack[v]",
+          "-map",
+          "[v]",
+          "-c:v",
+          "libx264",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-frames:v",
+          "100",
+          "build-release/wake-r2b/basin/media-reviewed/self-paired.mp4"
+        ]
+      },
+      {
+        "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-reviewed/gap12-paired.mp4",
+        "sha256": "df524ffdd1138f1fb485b9c8ed31c2b32936862b1674d5512cf07e2f7cc8c6dc",
+        "frames": 20,
+        "fps": 10,
+        "command": [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/gap12-baseline/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/gap12-spread/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/banner.png",
+          "-filter_complex",
+          "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v]crop=1280:32:0:0[caption];[caption][body]vstack[v]",
+          "-map",
+          "[v]",
+          "-c:v",
+          "libx264",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-frames:v",
+          "20",
+          "build-release/wake-r2b/basin/media-reviewed/gap12-paired.mp4"
+        ]
+      },
+      {
+        "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-reviewed/gap50-paired.mp4",
+        "sha256": "4f5d341d46dd633ab59def2216c982c3e97b401f24b8512d4a24b8355f3ca7d9",
+        "frames": 20,
+        "fps": 10,
+        "command": [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/gap50-baseline/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/gap50-spread/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/banner.png",
+          "-filter_complex",
+          "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v]crop=1280:32:0:0[caption];[caption][body]vstack[v]",
+          "-map",
+          "[v]",
+          "-c:v",
+          "libx264",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-frames:v",
+          "20",
+          "build-release/wake-r2b/basin/media-reviewed/gap50-paired.mp4"
+        ]
+      },
+      {
+        "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-reviewed/eight-trough-paired.mp4",
+        "sha256": "fd1759c9e842ca93ea5305ae12131c3b7367f326cb871b0d5e20349f4bf11619",
+        "frames": 20,
+        "fps": 10,
+        "command": [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/eight-trough-baseline/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/eight-trough-spread/%04d.png",
+          "-framerate",
+          "10",
+          "-i",
+          "build-release/wake-r2b/basin/media-reviewed/banner.png",
+          "-filter_complex",
+          "[0:v]scale=640:400:flags=neighbor[a];[1:v]scale=640:400:flags=neighbor[b];[a][b]hstack[body];[2:v]crop=1280:32:0:0[caption];[caption][body]vstack[v]",
+          "-map",
+          "[v]",
+          "-c:v",
+          "libx264",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-frames:v",
+          "20",
+          "build-release/wake-r2b/basin/media-reviewed/eight-trough-paired.mp4"
+        ]
+      }
+    ],
+    "source_frames": 320,
+    "binary_sha256": "7fca975319515bca66bfb574d5153a4803783610b22a2f86b65e526bc82121e4",
+    "help_format_neutral_png_pairs": 320
+  },
+  "playback": [
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-final/self-paired.mp4",
+      "sha256": "36a4ebf66b2a4c0e1725b347f909143877d3f7c8c58629e2d0f5373906449407",
+      "exit_code": 0
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-final/gap12-paired.mp4",
+      "sha256": "df524ffdd1138f1fb485b9c8ed31c2b32936862b1674d5512cf07e2f7cc8c6dc",
+      "exit_code": 0
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-final/gap50-paired.mp4",
+      "sha256": "4f5d341d46dd633ab59def2216c982c3e97b401f24b8512d4a24b8355f3ca7d9",
+      "exit_code": 0
+    },
+    {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/media-final/eight-trough-paired.mp4",
+      "sha256": "fd1759c9e842ca93ea5305ae12131c3b7367f326cb871b0d5e20349f4bf11619",
+      "exit_code": 0
+    }
+  ],
+  "final_checks": {
+    "focused_checks": 3,
+    "passed": 3,
+    "log": "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/ctest-trial-qualified.log",
+    "sha256": "84f04498672a6422508c418724c90fbd9bb30f41615c80ab89b5c1f05a371fc2",
+    "scope": "Trial contract, specific GPU refusal and CI lane after help/label-only edits."
+  },
+  "contact_sheets": {
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/self-sheet.png": "5dac69ddabfc1b1794ac321c0a7179f06636aeda3a71665df4992590a3bab3ab",
+    "/private/tmp/proteus-wake-research/build-release/wake-r2b/basin/gap50-sheet.png": "c4014ad4ed67085a81c191e746c24a7e0d39551418761f9f7d317d7c3548c3e3"
+  }
+}

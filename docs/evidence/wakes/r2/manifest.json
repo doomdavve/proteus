@@ -1,0 +1,431 @@
+{
+  "schema": 1,
+  "checkpoint": "R2a complete; all candidates rejected; production unchanged",
+  "base_revision": "69bd70b037ada02accd2a57bf5d510c472a0d563",
+  "artifact_root": "/private/tmp/proteus-wake-research/build-release/wake-r2",
+  "sources": {
+    "docs/README.md": "43d6d9e37afd31c017950e3621175de0b9f1be8a2f6be871d13b0b1b00b73426",
+    "docs/TESTING.md": "a8ccc023596bf9a48c760c0cd4827e7a99a2edf4894a11138783da9a315b9d20",
+    "docs/WAKE_RESEARCH_PLAN.md": "1192d2faa7e356eeb3367cc4f74932823a5fdafd9a791526138b988731162b67",
+    "docs/evidence/wakes/r2/README.md": "254dc9f368d2295f1b7b0c2353391410bb26e4423409e4472e0f2518e71b0c9c",
+    "docs/evidence/wakes/r2/arrivals.csv": "87eeb713b3c463021ec974f1bd79d45a43e580b05d076b6ee83eb4be08ffe5eb",
+    "docs/evidence/wakes/r2/concentration.csv": "2cd628c4110c2d131a99c559771be3248527116b3247910f644fab720026be9b",
+    "docs/evidence/wakes/r2/derivatives.csv": "da75912b893a1a986ee0e521de80a86efd6057b4c64ff79f785b30b0f6641af6",
+    "docs/evidence/wakes/r2/r0-turns.csv": "5cf7c67ca782fca33a8d0ed65181fd66bb285ccb6cc1cf06c00f35279d331bcd",
+    "docs/evidence/wakes/r2/straight.csv": "c1bec986930548673ed2392d1c49c0a597b18d0d0eddf69b623bf17ee32aef3f",
+    "docs/evidence/wakes/r2/timings.csv": "2b113db8b891cf70227bbe14596e4951e944680947e450d110610330aa88c684",
+    "docs/evidence/wakes/r2/turns.csv": "c2ec9ea43f9531bcd9a88d9382290602ea01c9e8afa65b88496de254ed5d0adb",
+    "tests/tools/tests.cmake": "ddde2f6dd10fce16ad65fcea742eee143747fdc2b34d2d93c85c3786cb51adbd",
+    "tools/wake_geometry.c": "8ce4396ce064234bbda348234591ec2d0fa6d99fe2faffbb84fcbcd2f951e5b1",
+    "tools/wake_geometry.h": "dfd6342b840950794dfa810ac8ec4942a5a47e8f7f30010c92f2c2d94746b1d0",
+    "tools/wake_geometry.py": "ffd796d1702ce00dc5f8faeba0ca72b7fd6fb902c4e76425309ff821bc36bc84",
+    "tools/wake_geometry_review.c": "4002566e300cf56030b0521a5f6f445f829e154f14b0c82a4144a67eb2c30bdb"
+  },
+  "artifacts": {
+    "build-debug.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/build-debug.log",
+      "sha256": "8c1d27a468f2917103d3084637174a247694d813a72731825b8c62013cfebd84"
+    },
+    "build-release-measured.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/build-release-measured.log",
+      "sha256": "bd6bd557e6a9bbc6e1b56f222e69364dc548d9e83774bca9ae505a0fba4cf317"
+    },
+    "build-release-verification.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/build-release-verification.log",
+      "sha256": "bd6bd557e6a9bbc6e1b56f222e69364dc548d9e83774bca9ae505a0fba4cf317"
+    },
+    "candidate.patch": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/candidate.patch",
+      "sha256": "0b2c414e17e2ce0f9bdc0c1396a704bc545601447dc3f309f53ea2a68ca47d29"
+    },
+    "cpu-final/manifest.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/cpu-final/manifest.json",
+      "sha256": "2a6655f7be894842a829b7dee0ff406df763bd24e7891405c208e1ccafee24c3"
+    },
+    "cpu.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/cpu.log",
+      "sha256": "437309d9dbe1b6818a557e03ef8a78cec455d8e425aee754e505a07039ae1048"
+    },
+    "ctest.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/ctest.log",
+      "sha256": "21a4bea5da45d62b9e46e4c08b5d34f4dfcecceda34d2208068ca3b547a2336a"
+    },
+    "media-final/angle45-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/angle45-banner.png",
+      "sha256": "6ff4a019d2e0c9a5e0062ba53e404ff2441e0878aba3ed545acd4afa1cc0b3ff"
+    },
+    "media-final/circle-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-detail-angle45-paired.mp4",
+      "sha256": "cdaf7ade0c390b03cb3a79474a12c79241da723346a18900ac200ef492d1bec1"
+    },
+    "media-final/circle-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-detail-open-paired.mp4",
+      "sha256": "9e9379ec896a40aad59664a6db66f038a1de9e3488e16b406791ecf8e3e82caa"
+    },
+    "media-final/circle-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-detail-short-paired.mp4",
+      "sha256": "14724733c6e222bb12ce77f1c5f4734d4820420da2e03ad72c6531d60ec36057"
+    },
+    "media-final/circle-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-detail-short_matched-paired.mp4",
+      "sha256": "58c422c37c137ecb4743ed08cd47b19627c9263729d0100f6c9053b4a04b5328"
+    },
+    "media-final/circle-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-wide-angle45-paired.mp4",
+      "sha256": "2636c1f3c53f36ebd7e0b7193fcfa7856276af14d31c722e4f7772cc928ae13b"
+    },
+    "media-final/circle-wide-open-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-wide-open-contact.png",
+      "sha256": "86e3906483df0fd8dd9b652b0cf30bc0eb9fb47ab85ae89aa0445d0a9cf5ca2b"
+    },
+    "media-final/circle-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-wide-open-paired.mp4",
+      "sha256": "183329d268dab9581775128d6beee40080db4a5302b4a1768349ff8e79f179d8"
+    },
+    "media-final/circle-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-wide-short-paired.mp4",
+      "sha256": "f6158b42fa59a327d228a0aa586328e3b522396e813f73dd759456f8cdfe7699"
+    },
+    "media-final/circle-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/circle-wide-short_matched-paired.mp4",
+      "sha256": "9b3c6cd5c8da7d8419d6b7247a97ac53137b149cc15996c11f4d0ec5e0b5706a"
+    },
+    "media-final/crossing-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-detail-angle45-paired.mp4",
+      "sha256": "0be9161990e4ff92975f560e647bd5c0d4cd5797f70fd515c6a9717c234baa6a"
+    },
+    "media-final/crossing-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-detail-open-paired.mp4",
+      "sha256": "6ea3b5440a935112b440ff3d54dbf67d795f608cb41cfb3933f2ae6539e4d737"
+    },
+    "media-final/crossing-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-detail-short-paired.mp4",
+      "sha256": "54be09492bcde28d83af42a6a894e7ddefa7f3b26d7b2d42ce966c2a3a63d016"
+    },
+    "media-final/crossing-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-detail-short_matched-paired.mp4",
+      "sha256": "028dfd83918d702af6c7bbdd9da4aaf513f8b5b428cbaccceb44bd84e8c82242"
+    },
+    "media-final/crossing-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-wide-angle45-paired.mp4",
+      "sha256": "ea0065e8fad8663b4db2186c77eff9e1c38eb5dd161ce5e774a7393f12cc3f09"
+    },
+    "media-final/crossing-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-wide-open-paired.mp4",
+      "sha256": "3291991e6eb6394626d782289c25e1fb0bb0fd3e571112cb7be46b10524abe97"
+    },
+    "media-final/crossing-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-wide-short-paired.mp4",
+      "sha256": "e9a685f6c9e8fd57f34a96d490b428559d2b29704f158627858ac57a04204820"
+    },
+    "media-final/crossing-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/crossing-wide-short_matched-paired.mp4",
+      "sha256": "d44fcaff72ed534e2c3ec0b29505d1a3e83b361329b969ddc1d0289edc4fe5b6"
+    },
+    "media-final/eight-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-detail-angle45-paired.mp4",
+      "sha256": "9c48633745973152df5371ebfdb343ff5ff15dfbeb0465f3324e73060178e0f1"
+    },
+    "media-final/eight-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-detail-open-paired.mp4",
+      "sha256": "895e6552bcd9c0125b2cf9863aa4f34d70af73e6011a6da20853a67f03498bf4"
+    },
+    "media-final/eight-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-detail-short-paired.mp4",
+      "sha256": "cb7b2a9cfe85c0d813a802ac99e25b6895152016b8783b2aada8541635a7c524"
+    },
+    "media-final/eight-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-detail-short_matched-paired.mp4",
+      "sha256": "8f98e98ec005bb7f0579c47806e7f111464367851f5f0870c40fa2b2a5195d8f"
+    },
+    "media-final/eight-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-wide-angle45-paired.mp4",
+      "sha256": "de2c0fa0e30b5dc560490fce133a317c30c6ae42a991ed83e2c5fbb2a320e8c0"
+    },
+    "media-final/eight-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-wide-open-paired.mp4",
+      "sha256": "5b0f4f8e2a479ea1385970d3ed1f75869ac45f25813e8ef76fabf781d73418f9"
+    },
+    "media-final/eight-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-wide-short-paired.mp4",
+      "sha256": "56e5f4bc4a61259b176e86e5f958210d6e1feba99d894d5e9ff76ede6f25dda9"
+    },
+    "media-final/eight-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/eight-wide-short_matched-paired.mp4",
+      "sha256": "9bdc171f137d4e40387aa47510e63120831bd4710296bdd9d9834d715f2c4b56"
+    },
+    "media-final/manifest.json": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/manifest.json",
+      "sha256": "2d362a0aee24db0766096d8dd4cac96ef50a37eb4a8028893654036949fffb59"
+    },
+    "media-final/open-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/open-banner.png",
+      "sha256": "fcf809593684aa06b54079db6462a440c3048ed92162012764a9edd061f168d3"
+    },
+    "media-final/reverse-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-detail-angle45-paired.mp4",
+      "sha256": "5ef9520aa0da0cc747baf022dc6da9478c6bfa785c7c95e284760a6d25620ea2"
+    },
+    "media-final/reverse-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-detail-open-paired.mp4",
+      "sha256": "2a841f2926c4d2f888519604e56ebdde01255d09bd6949f48e3f61437c5997be"
+    },
+    "media-final/reverse-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-detail-short-paired.mp4",
+      "sha256": "e1e6488757254163b5690a5dbc3111e38d7f92a0a91f808f84a4cbba0215eb77"
+    },
+    "media-final/reverse-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-detail-short_matched-paired.mp4",
+      "sha256": "cd3e7b7868a949b2b204d93d95b8fb059315e57b0f008fc7086a735d8069d154"
+    },
+    "media-final/reverse-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-wide-angle45-paired.mp4",
+      "sha256": "e5a0c5e4ec2038a366b6c6bed893d68d2529df1baefe7931b2ef95d30badc487"
+    },
+    "media-final/reverse-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-wide-open-paired.mp4",
+      "sha256": "89b46a4709cce92371cb49292d1ac890d85afc9b8c198ce3ad1c8be3fa6f2847"
+    },
+    "media-final/reverse-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-wide-short-paired.mp4",
+      "sha256": "54d01c4e05ecd8867a5182219d718ea6001603706a7cb11ea7e2ed93afff374d"
+    },
+    "media-final/reverse-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/reverse-wide-short_matched-paired.mp4",
+      "sha256": "68f5b01dedfe74d929a6aea4f0318d1093c9539b2000005a82e612661e53d750"
+    },
+    "media-final/short-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/short-banner.png",
+      "sha256": "b4d8247fdd0f160befe8873d56bf72cf88c87d93a294c41c897e0ede96354e17"
+    },
+    "media-final/short_matched-banner.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/short_matched-banner.png",
+      "sha256": "d76f2ebee7f3985224cd1b1db29591ffcccc2f8022d94077541f9201804afdde"
+    },
+    "media-final/straight-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-angle45-paired.mp4",
+      "sha256": "5217b82bab1fc5b4d7eea2018791a791136d306ccd37e9a329e6d1afbc14e69f"
+    },
+    "media-final/straight-detail-open-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-open-contact.png",
+      "sha256": "eedc752a120cc44e03d924b5e08257743dbf5ee17a46fb8ae54eef96b1e4d63c"
+    },
+    "media-final/straight-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-open-paired.mp4",
+      "sha256": "2be4ca6c2e940a76e09bbd366b7041be720463f7d7f71c9944c38cad94be7444"
+    },
+    "media-final/straight-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-short-paired.mp4",
+      "sha256": "659eb95428d4e5e8bf06c225c5137601d16afd4a061a0aeeb1e136da6df141d4"
+    },
+    "media-final/straight-detail-short_matched-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-short_matched-contact.png",
+      "sha256": "71c5e4111edfe6735cec4924e3b978d70a8ddbdd7607a226bed6df0570db0dd7"
+    },
+    "media-final/straight-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-detail-short_matched-paired.mp4",
+      "sha256": "a29646302e2093c4c5ec83cb3ed87435f6f93e88eeeab7aced05aadec45d45d9"
+    },
+    "media-final/straight-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-wide-angle45-paired.mp4",
+      "sha256": "9d8ee6ad45b4e675f5343124e64896288e6c65d77672694ac8b1410905f02162"
+    },
+    "media-final/straight-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-wide-open-paired.mp4",
+      "sha256": "9ec44cab2fa247b49980d207983af2f396423c60b9e4582e4d8d6ca4790babfb"
+    },
+    "media-final/straight-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-wide-short-paired.mp4",
+      "sha256": "9acefad02d0967286b429d5dedeb2f36423e61b2682b5c43538b07cc275584af"
+    },
+    "media-final/straight-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/straight-wide-short_matched-paired.mp4",
+      "sha256": "fa23931b6470f95bae12e7806bc725350c8d664134dd0c01ee083fe376877535"
+    },
+    "media-final/wide-detail-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-detail-angle45-paired.mp4",
+      "sha256": "e9e0de21bf29c9a3ea4c474c0bb0027f5759190a2ee2d5a6bc53211e7bc9c3db"
+    },
+    "media-final/wide-detail-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-detail-open-paired.mp4",
+      "sha256": "7ea66acbc1e59302c877dc0ce2d18f574306809e450243706ad9a5ebc7853b64"
+    },
+    "media-final/wide-detail-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-detail-short-paired.mp4",
+      "sha256": "ed58959a4897d423e851026052454be325fe848ba2a8634231012ce36e9eb231"
+    },
+    "media-final/wide-detail-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-detail-short_matched-paired.mp4",
+      "sha256": "90f53e8172bf8be2e91c62198f2f6fbe0f197696689ebd003df649634ded59fd"
+    },
+    "media-final/wide-wide-angle45-contact.png": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-wide-angle45-contact.png",
+      "sha256": "7d4a6ab705412d87d3f429ad71dd0833e8f3d5232d666663e314cc8011fb9b6e"
+    },
+    "media-final/wide-wide-angle45-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-wide-angle45-paired.mp4",
+      "sha256": "b7489a40467ec583aa47e4975690d2e7c68c859cd3e016c159efd06da45c71eb"
+    },
+    "media-final/wide-wide-open-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-wide-open-paired.mp4",
+      "sha256": "d015ff252c60448efec8fedecb8e60dd88a03ede6f678e5ff4c6be0246049541"
+    },
+    "media-final/wide-wide-short-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-wide-short-paired.mp4",
+      "sha256": "ca54e113db54b84a5869e26eace61268003945365198716e7287a67a6a9f7d1c"
+    },
+    "media-final/wide-wide-short_matched-paired.mp4": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media-final/wide-wide-short_matched-paired.mp4",
+      "sha256": "8454c5f37ea8500eb8ccb848a40ef5da0b961d61d9112dd177839b6bb6267aa4"
+    },
+    "media.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/media.log",
+      "sha256": "5b299b91168c2f8a5a8d475bf367e6a6bbe0bea3b75ac5f947f04708876d5523"
+    },
+    "playback.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/playback.log",
+      "sha256": "169326583c281b5a303fd669571f44a254f72ccc91ad25d34aae385147c7aaaa"
+    },
+    "r0-turn-reference.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/r0-turn-reference.csv",
+      "sha256": "5cf7c67ca782fca33a8d0ed65181fd66bb285ccb6cc1cf06c00f35279d331bcd"
+    },
+    "r0-turn-reference.log": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/r0-turn-reference.log",
+      "sha256": "2709805c483096683a09b0475ecc6096fe85f7917636d1050c00c28c68c6b9c0"
+    },
+    "screen-reviewed/arrivals.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/arrivals.csv",
+      "sha256": "ac307e6592c6352d2486b87b2ca7bcb7b133903c3cbae7f7ecb1254509e5720d"
+    },
+    "screen-reviewed/concentration.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/concentration.csv",
+      "sha256": "2cd628c4110c2d131a99c559771be3248527116b3247910f644fab720026be9b"
+    },
+    "screen-reviewed/derivatives.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/derivatives.csv",
+      "sha256": "da75912b893a1a986ee0e521de80a86efd6057b4c64ff79f785b30b0f6641af6"
+    },
+    "screen-reviewed/parity.txt": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/parity.txt",
+      "sha256": "fd70f82f97178ec8a9f139f6b7de9560dfd77b5e69b635d170e92e2425459160"
+    },
+    "screen-reviewed/straight.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/straight.csv",
+      "sha256": "c1bec986930548673ed2392d1c49c0a597b18d0d0eddf69b623bf17ee32aef3f"
+    },
+    "screen-reviewed/turns.csv": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/screen-reviewed/turns.csv",
+      "sha256": "c2ec9ea43f9531bcd9a88d9382290602ea01c9e8afa65b88496de254ed5d0adb"
+    },
+    "timing-sources/wake_geometry.c": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/timing-sources/wake_geometry.c",
+      "sha256": "8ce4396ce064234bbda348234591ec2d0fa6d99fe2faffbb84fcbcd2f951e5b1"
+    },
+    "timing-sources/wake_geometry.h": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/timing-sources/wake_geometry.h",
+      "sha256": "dfd6342b840950794dfa810ac8ec4942a5a47e8f7f30010c92f2c2d94746b1d0"
+    },
+    "timing-sources/wake_geometry.py": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/timing-sources/wake_geometry.py",
+      "sha256": "736afec9dbe411a5f94e11ea32f1e16d7411bc0195c778ea6d15442854daf133"
+    },
+    "timing-sources/wake_geometry_review.c": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/timing-sources/wake_geometry_review.c",
+      "sha256": "d73485b425e6a2c5446de912c1c847699bc959a37511c43c476e22b1f656949d"
+    },
+    "verification-sources/tests.cmake": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/verification-sources/tests.cmake",
+      "sha256": "ddde2f6dd10fce16ad65fcea742eee143747fdc2b34d2d93c85c3786cb51adbd"
+    },
+    "verification-sources/wake_geometry.c": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/verification-sources/wake_geometry.c",
+      "sha256": "8ce4396ce064234bbda348234591ec2d0fa6d99fe2faffbb84fcbcd2f951e5b1"
+    },
+    "verification-sources/wake_geometry.h": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/verification-sources/wake_geometry.h",
+      "sha256": "dfd6342b840950794dfa810ac8ec4942a5a47e8f7f30010c92f2c2d94746b1d0"
+    },
+    "verification-sources/wake_geometry.py": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/verification-sources/wake_geometry.py",
+      "sha256": "ffd796d1702ce00dc5f8faeba0ca72b7fd6fb902c4e76425309ff821bc36bc84"
+    },
+    "verification-sources/wake_geometry_review.c": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/verification-sources/wake_geometry_review.c",
+      "sha256": "4002566e300cf56030b0521a5f6f445f829e154f14b0c82a4144a67eb2c30bdb"
+    },
+    "wake_geometry-measured": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/wake_geometry-measured",
+      "sha256": "07a5f91dcbda001624f2d6a9ce786a879b303e221aebfe80e10610c607b39e82"
+    },
+    "wake_geometry-verified": {
+      "path": "/private/tmp/proteus-wake-research/build-release/wake-r2/wake_geometry-verified",
+      "sha256": "c5d277b179ee1827a6d258f534152272fdc4875937cb20177aa065d6f4e5b589"
+    }
+  },
+  "commands": {
+    "screen": [
+      "./build-release/wake_geometry",
+      "--screen",
+      "build-release/wake-r2/screen-reviewed"
+    ],
+    "cpu": [
+      "python3",
+      "tools/wake_geometry.py",
+      "--binary",
+      "build-release/wake_geometry",
+      "--output",
+      "build-release/wake-r2/cpu-final",
+      "--bench"
+    ],
+    "media": [
+      "python3",
+      "tools/wake_geometry.py",
+      "--binary",
+      "build-release/wake-r2/wake_geometry-measured",
+      "--source-root",
+      "build-release/wake-r2/timing-sources",
+      "--output",
+      "build-release/wake-r2/media-final",
+      "--media"
+    ],
+    "full": [
+      "caffeinate",
+      "-diu",
+      "ctest",
+      "--preset",
+      "full"
+    ]
+  },
+  "verification": {
+    "ctest_passed": 618,
+    "gpu_labelled": 36,
+    "ctest_seconds": 112.14,
+    "cpu_runs": 288,
+    "movies": 48,
+    "frames_per_movie": 100,
+    "visible_movies": 4,
+    "visible_seconds": 40,
+    "production_parity_release": 5.33120158e-07
+  },
+  "unavailable": [
+    "candidate GPU/complete gameplay frame/stamp/fallback/CPU render preparation",
+    "candidate GPU allocation and upload/replication/authority costs",
+    "coupled hull outcomes and player acceptance",
+    "browser/slower-GPU qualification"
+  ],
+  "limits": [
+    "Private CPU query timings; baseline also advances private 256-slot allocation",
+    "Each turn ratio divides by its candidate-specific straight field",
+    "Some +/-6m inner searches can cross center and select another front",
+    "Finite sampling and +/-2.4m diagnostic color clipping",
+    "A1 aligns only mature constant-speed phase/fade; windows/birth/source averaging differ",
+    "Current verification-only guard/envelope seam additions are separate from measured executable provenance"
+  ],
+  "archive": {
+    "path": "/private/tmp/proteus-wake-research/build-release/wake-r2-review.tar.gz",
+    "sha256": "ae03d8d7d2bb551d305fc44ede1c28878ca2c5c1371eba5ed566a9b42f73ca6a",
+    "bytes": 73491278
+  },
+  "raw_checksums": "Complete raw CSV and frame paths/checksums are in archive wake-r2/artifact-manifest.json and matrix/media manifests."
+}

@@ -56,6 +56,12 @@ typedef struct {
 typedef struct {
     float amplitude, wavelength, angular_speed;
     const BoatWakeObjects *objects; // Borrowed app-owned arcade world; copies do not own it.
+    // Optional local CPU surface adapter replacing only OBJECTS. It must be a deterministic,
+    // data-only query that never mutates the sampled surface; the borrowed context outlives every
+    // water/session/view copy. Copies do not rebind it. Not serialized, and not supported by the
+    // analytic GPU renderer.
+    BoatWakeObjectSample (*object_sample)(const void *context, Vector2 position, double time);
+    const void *object_context;
     const BoatWakeObjects *traffic_objects; // Optional independent scenery pool (race trial).
     Vector2 direction;
     Vector2 current; // Uniform flow, or a compact channel when current_width > 0.

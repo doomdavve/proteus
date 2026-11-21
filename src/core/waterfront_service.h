@@ -9,7 +9,7 @@
 #include "core/boat_service.h"
 
 typedef struct {
-    bool present; // False while absent: no hull, contact, camera exclusion or wake.
+    bool present; // False while absent: no hull, contact, camera exclusion or new trail emission.
     BoatOwner owner; // MOORED at the service berth, or TRAVELLING its route.
     unsigned service; // Index of the controlling service.
     Vector3 position, velocity; // Renderer coordinates; rest waterline Y=0.

@@ -1,0 +1,209 @@
+{
+  "samples": 14986,
+  "running_weight_ms": 14986.0,
+  "leaf": [
+    {
+      "name": "r2_piece_coordinates",
+      "ms": 8967.0,
+      "percent": 59.83584679033765
+    },
+    {
+      "name": "r2_query",
+      "ms": 2163.0,
+      "percent": 14.433471239823836
+    },
+    {
+      "name": "sinf",
+      "ms": 2073.0,
+      "percent": 13.832910716668891
+    },
+    {
+      "name": "__sincosf_stret",
+      "ms": 1053.0,
+      "percent": 7.026558120912852
+    },
+    {
+      "name": "r2_advance",
+      "ms": 94.0,
+      "percent": 0.627252101961831
+    },
+    {
+      "name": "r2_source",
+      "ms": 91.0,
+      "percent": 0.6072334178566662
+    },
+    {
+      "name": "DYLD-STUB$$sinf",
+      "ms": 88.0,
+      "percent": 0.5872147337515013
+    },
+    {
+      "name": "bench",
+      "ms": 49.0,
+      "percent": 0.3269718403843587
+    },
+    {
+      "name": "_platform_strcmp$VARIANT$Base",
+      "ms": 48.0,
+      "percent": 0.3202989456826371
+    },
+    {
+      "name": "__vfprintf",
+      "ms": 43.0,
+      "percent": 0.2869344721740291
+    },
+    {
+      "name": "DYLD-STUB$$__sincosf_stret",
+      "ms": 42.0,
+      "percent": 0.2802615774723075
+    },
+    {
+      "name": "DYLD-STUB$$strcmp",
+      "ms": 41.0,
+      "percent": 0.2735886827705859
+    },
+    {
+      "name": "__sfvwrite",
+      "ms": 31.0,
+      "percent": 0.2068597357533698
+    },
+    {
+      "name": "__dtoa",
+      "ms": 28.0,
+      "percent": 0.186841051648205
+    },
+    {
+      "name": "DYLD-STUB$$_platform_strcmp",
+      "ms": 27.0,
+      "percent": 0.1801681569464834
+    },
+    {
+      "name": "r2_capture_advance",
+      "ms": 26.0,
+      "percent": 0.17349526224476178
+    },
+    {
+      "name": "mach_absolute_time",
+      "ms": 25.0,
+      "percent": 0.16682236754304017
+    },
+    {
+      "name": "r2_capture_track",
+      "ms": 19.0,
+      "percent": 0.12678499933271054
+    },
+    {
+      "name": "_platform_memmove",
+      "ms": 15.0,
+      "percent": 0.10009342052582411
+    },
+    {
+      "name": "r2_track",
+      "ms": 12.0,
+      "percent": 0.08007473642065928
+    }
+  ],
+  "inclusive": [
+    {
+      "name": "start",
+      "ms": 14986.0,
+      "percent": 100.0
+    },
+    {
+      "name": "main",
+      "ms": 14981.0,
+      "percent": 99.96663552649139
+    },
+    {
+      "name": "bench",
+      "ms": 14950.0,
+      "percent": 99.75977579073802
+    },
+    {
+      "name": "r2_query",
+      "ms": 13620.0,
+      "percent": 90.88482583744829
+    },
+    {
+      "name": "r2_piece_coordinates",
+      "ms": 12102.0,
+      "percent": 80.75537168023489
+    },
+    {
+      "name": "sinf",
+      "ms": 2073.0,
+      "percent": 13.832910716668891
+    },
+    {
+      "name": "__sincosf_stret",
+      "ms": 1053.0,
+      "percent": 7.026558120912852
+    },
+    {
+      "name": "r2_source",
+      "ms": 321.0,
+      "percent": 2.141999199252636
+    },
+    {
+      "name": "vfprintf_l",
+      "ms": 156.0,
+      "percent": 1.0409715734685707
+    },
+    {
+      "name": "fprintf",
+      "ms": 156.0,
+      "percent": 1.0409715734685707
+    },
+    {
+      "name": "__vfprintf",
+      "ms": 150.0,
+      "percent": 1.000934205258241
+    },
+    {
+      "name": "r2_capture_advance",
+      "ms": 120.0,
+      "percent": 0.8007473642065929
+    },
+    {
+      "name": "r2_advance",
+      "ms": 94.0,
+      "percent": 0.627252101961831
+    },
+    {
+      "name": "DYLD-STUB$$sinf",
+      "ms": 88.0,
+      "percent": 0.5872147337515013
+    },
+    {
+      "name": "__sfvwrite",
+      "ms": 53.0,
+      "percent": 0.35366341919124517
+    },
+    {
+      "name": "_platform_strcmp$VARIANT$Base",
+      "ms": 48.0,
+      "percent": 0.3202989456826371
+    },
+    {
+      "name": "DYLD-STUB$$__sincosf_stret",
+      "ms": 42.0,
+      "percent": 0.2802615774723075
+    },
+    {
+      "name": "__dtoa",
+      "ms": 42.0,
+      "percent": 0.2802615774723075
+    },
+    {
+      "name": "DYLD-STUB$$strcmp",
+      "ms": 41.0,
+      "percent": 0.2735886827705859
+    },
+    {
+      "name": "r2_capture_track",
+      "ms": 31.0,
+      "percent": 0.2068597357533698
+    }
+  ],
+  "input_sha256": "1c433393c4413beed2e6b0207452f4251a2976ee27c5f968948ef2b4ef89d5a2"
+}

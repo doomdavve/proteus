@@ -763,7 +763,7 @@ return {
 | `marina.services` | dense list of 0–8 records | M4: one-shot services (no repeat). A resident is moored at its berth outside its path window; a visitor is absent outside it and moored during the dock dwell. |
 | `services[i].id` | 1–23, same spelling; unique among services | Stable service identity. |
 | `services[i].vessel`, `.berth` | a vessel ID; an **empty** berth ID | The vessel must fit the berth's resolved length and beam. A berth holds one service over its reserved window; a resident reserves it forever. |
-| `services[i].route` | a `traffic.vessels` entry with `route = "open"` and no `loop` | Its path is the vessel's motion; that actor is not drawn, lit or given a wake. Each route belongs to one service. |
+| `services[i].route` | a `traffic.vessels` entry with `route = "open"` and no `loop` | Its path is the vessel's motion; that actor is hidden. The service hull supplies cosmetic trails once, without physical waves. Each route belongs to one service. |
 | `services[i].kind` | `resident` or `visitor` | Resident: the path starts and ends at the berth pose. Visitor: the path's `dock_piece` ends at the berth pose and its dwell is the stay. |
 | `services[i].dock_piece` | whole number 1–4 (visitor only) | The 1-based path piece whose dwell is the stay. A resident rejects the field. |
 | `services[i].start_tick` | whole number 0–4294967295 | 120 Hz simulation tick at which the path's tick zero occurs. Windows are half-open: the first tick travels, the tick after the last is moored (resident) or absent (visitor). |
@@ -794,6 +794,16 @@ return {
 | `flocks[i].seed`, `.phase` | seed 0–2³²−1; phase finite seconds | Deterministic per-bird phase and circling phase offset. Cues stay on session time. |
 | `flocks[i].radius`, `.height`, `.rate` | radius/height 0.5–200 m; rate ±5 turns/s and non-zero | Circling region and direction. |
 | `flocks[i].cues` | dense list of 0–16 records | Half-open `[start, stop)` 120 Hz tick intervals. `kind` is `feeding` or `alarm`; `amplitude` is 0–1; optional `fade` is bounded by the interval. Alarm outranks feeding, which outranks circling. No spawn/despawn or timer callback is created. |
+
+Serviced vessels leave cosmetic trails from their historical hull poses, using their resolved
+length and beam rather than the path actor's recipe. Trails use eight segments per side over
+5.6 seconds, require historical travelling speed and center translation above 0.3 m/s, and
+never bridge a service change, absent interval or path dwell. Existing trails can remain after
+docking or visitor disappearance until their history expires; moored hulls emit nothing.
+These kinematic routes are validated afloat by the location checker; the trail evaluator has
+no dynamic wetness sensor or map input. Player dry-stern handling remains independent.
+Authored traffic and serviced vessels have cosmetic trails only; their trails add no physical
+wave source, authoritative births or replicated wake records.
 
 The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings,
 gangway anchors and the complete route/timetable before the Lua state closes. The lift is derived
@@ -864,7 +874,7 @@ an authored open path. The contract:
 
 - **One owner per tick.** Ownership is a pure function of `(service, tick)` evaluated natively:
   *moored* (the berth owns the hull: shared wave pose, ropes, berth contact), *travelling* (the
-  path owns its pose and moving contact) or *absent* (no hull, contact, camera exclusion or wake).
+  path owns its pose and moving contact) or *absent* (no hull, contact, camera exclusion or new trail emission).
   Harbor frames, traffic frames, contacts, camera exclusion and both renderers use that one
   evaluation, so a vessel is never drawn or contacted twice and never vanishes at a handoff.
   Seeks, restarts and independent sessions agree because nothing is stored.
@@ -889,7 +899,7 @@ an authored open path. The contract:
   restarts the session, and Undo restores the previous revision under the same rule.
 - **Wire and budgets.** The staging wire is `PSTC`, the room definition v6 inside protocol v16;
   older content is refused by version. Limits: 4 vessels, 8 services, 32 hulls.
-- **Not provided.** A serviced vessel has no visual wake, depth is unsurveyed, and nothing
+- **Not provided.** Service trails are cosmetic only, depth is unsurveyed, and nothing
   chooses slips or avoids traffic reactively. The reference package is
   [`marina-berth-demo`](../plugins/marina-berth-demo/README.md); the
   [`marina-integrated-demo`](../plugins/marina-integrated-demo/README.md) example uses the

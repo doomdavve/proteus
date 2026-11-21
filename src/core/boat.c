@@ -454,7 +454,8 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
     float upright = Clamp((boat_pose_up(boat) - .5f) / .25f, 0, 1);
     guard *= (wet > 0) * upright * (boat->motion_state != BOAT_CAPSIZED);
     float acceleration = -GRAVITY, pitch_torque = 0, roll_torque = turn_moment + guard;
-    if (world->water.objects && boat->motion_state != BOAT_CAPSIZED) {
+    if ((world->water.objects || world->water.object_sample)
+        && boat->motion_state != BOAT_CAPSIZED) {
         float recovery = Clamp((boat_pose_up(boat) + .2f) / .7f, 0, 1);
         if (wet == 0) {
             // Steering retains modest yaw, but cannot command a roll. Automatic recovery

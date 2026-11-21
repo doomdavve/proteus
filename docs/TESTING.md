@@ -1452,3 +1452,228 @@ refusal to overwrite an existing recording. Its process timeouts are failure dea
 The [session recording contract](SESSION_RECORDING.md) describes what is reconstructed. These
 checks establish headless behavior; they do not qualify cross-platform bit identity, visual
 playback, a room save or human multiplayer acceptance.
+
+## Wake research baseline (R0)
+
+The opt-in research tools leave the production recipe unchanged. Run from the repository root:
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_research wake_coverage wake_encounters wake_turn_probes -j
+mkdir -p build-release/wake-r0
+python3 tools/wake_research.py --binary build-release/wake_research --output build-release/wake-r0/cpu
+python3 tools/wake_research.py --binary build-release/wake_research --output build-release/wake-r0/gpu --gpu --traffic --paths circle --emitters 1 4 --layouts dense
+./build-release/wake_research --output build-release/wake-r0/scene-check --location outer --scene plugins/marina-berth-demo --check-scene
+./build-release/wake_coverage plugins/marina-berth-demo build-release/wake-r0/coverage.csv
+./build-release/wake_encounters build-release/wake-r0/encounters
+./build-release/wake_turn_probes build-release/wake-r0/turns.csv
+python3 tools/wake_research_media.py --binary build-release/wake_research --output build-release/wake-r0/media
+```
+
+GPU/media commands need a desktop graphics context; media additionally needs `ffmpeg` with H.264 encoding. Add `--location outer --high` to the matrix command for
+1280x800 HDR. Use `--visible` on a direct `wake_research` command for paced scripted playback;
+keep it separate from uncapped measurements. A direct example is
+`./build-release/wake_research --output build-release/wake-r0/play --path circle --gpu --visible`.
+
+The matrix performs three alternating repetitions with 20 simulated seconds of preroll and
+60 measured seconds each. It writes raw CSV, per-run JSON and `summary.json` with p50/p95/p99,
+absolute/percentage deltas, checksums and unavailable counters. Aggregate timing controls expose
+the cost of phase timers; separate diagnostic runs count support passes outside the query timer.
+`wake_coverage` includes per-vessel serviced trail counts as well as the scene aggregate;
+missing counts can include initial span maturation or sub-threshold motion. The service
+validator checks history expiry, dwell rejection, resolved hull dimensions and bounded
+combined cosmetic load. The authored-scene contract checks that accepted berths and hidden service routes reach render
+frames through the same production session-view builder used for captures. The contract test
+checks deterministic neutrality, 128-record sustained occupancy, wake-off,
+slow-source suppression, and raw teleport versus explicit restart. `wake_research_encounters`
+checks signed source-off fields and finite-difference derivatives while retaining a 27-case
+calm-twin outcome table. Neither test gates on wall-clock timing.
+
+[The R0 evidence guide](evidence/wakes/r0/README.md) defines workloads, coordinates, camera rigs,
+metric limits and the proposed behavioral/performance criteria. The source-path renderer is not
+a coupled hull-driving test; existing `wake_objects_review` cases retain that role. No timing
+figure from these tools establishes human acceptance or the existing graphics budget gates.
+
+## Wake geometry screen (R2a)
+
+`wake_geometry` is a private CPU-only experiment; games, `BoatWater`, shaders, networking and
+authorities never link it. The [R2a evidence](evidence/wakes/r2/README.md) records rejected
+short-span/capsule variants and interpretation limits. A passing contract does not select a
+geometry or qualify GPU cost, gameplay encounters or production budgets.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_geometry -j
+./build-release/wake_geometry --check
+mkdir -p build-release/wake-r2/screen-new
+./build-release/wake_geometry --screen build-release/wake-r2/screen-new
+python3 tools/wake_geometry.py --binary build-release/wake_geometry --output build-release/wake-r2/cpu-new --bench
+python3 tools/wake_geometry.py --binary build-release/wake_geometry --output build-release/wake-r2/media-new --media
+```
+
+Run timing separately from screens, rendering, encoding/playback and tests. The benchmark
+uses three alternating pairs, 20 simulated seconds preroll and 60 measured seconds. Source,
+30-query batch and enclosing timing belong to the private harness, not production physics.
+The actual workspace is shared across modes; logical record requirements differ. The report
+retains occupancy/birth assertions, exact commands, hashes, raw CSV and p50/p95/p99. No test
+gates on elapsed time.
+
+Use fresh output directories. `--paths` restricts either driver (straight, circle, wide, eight,
+reverse, crossing); defaults are three timing paths and six media paths. The media driver
+requires ffmpeg/ffprobe, creates CPU signed-height/foam field pairs, checks 100 frames/movie,
+and preserves integer nearest-neighbor scaling. Wide and detail are diagnostic map views,
+not gameplay/chase cameras. Sources stop at 25 seconds; colors clip at ±2.4 m.
+`--source-root DIRECTORY` records archived sources when using a retained executable.
+
+Direct modes are 0 baseline, 1 literal short spans, 2 open capsule, 3 angular capsule,
+4 mature-straight phase/fade-aligned short control. Example direct runs:
+
+```sh
+./build-release/wake_geometry --bench circle 3 4 dense --output build-release/wake-r2/angular.csv
+mkdir -p build-release/wake-r2/angular-frames
+./build-release/wake_geometry --clip circle 3 --output build-release/wake-r2/angular-frames --detail
+```
+
+`wake_geometry_contract` compares baseline records/query components to production, finite
+derivatives at capsule/angular and central envelope seams, signed nonadjacent same-emitter
+fronts and immutable historical records through later source motion/gaps/restart. It does not
+assert a performance threshold or excuse a candidate's field-screen failure.
+
+## Wake divergence design audits (R2b)
+
+[The R2b proposal](WAKE_R2B_DESIGN.md) is supported by a standalone, standard-library Python
+algebra audit. It is not a wake evaluator, source/capture implementation, benchmark or CTest.
+
+```sh
+python3 tools/wake_divergence_design.py --output build-release/wake-r2b/algebra-new
+```
+
+Use a fresh output directory. `report.json`, `maps.csv`, `transport.csv` and `folds.csv` retain
+synthetic scalar identity/derivative, map/determinant, independent-grid moment and curved-focus
+audits with script checksums. The report includes a synthetic regional concentration
+counterexample. It takes time as a mathematical input and has no wall-clock pass condition.
+The signed synthetic profile is not the production crest/trough; no gameplay, C-float/GPU
+parity, capture/reset/restore or performance qualification is implied.
+
+
+### Private capture lifecycle (R2b)
+
+`wake_capture` is a separate capture-only CPU harness using the unchanged R2a baseline evaluator.
+No production target links it. Its CTest drives virtual ticks through source restarts, strict
+turn-domain gates, frozen descriptors, predecessor expiry, slot reuse and transactional same-build
+snapshot restoration. Continuous fixtures and dry/slow/missed-tracking fixtures compare baseline
+physical records exactly. [Capture evidence](evidence/wakes/r2b/capture/README.md) records scope,
+resources, measurements and remaining limits.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target wake_capture -j
+ctest --test-dir build -R '^wake_capture_contract$' --output-on-failure
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_capture -j
+mkdir -p build-release/wake-r2b/capture-new
+./build-release/wake_capture --bench > build-release/wake-r2b/capture-new/timings-raw.csv
+python3 tools/wake_capture_report.py build-release/wake-r2b/capture-new/timings-raw.csv build-release/wake-r2b/capture-new/timings.json
+```
+
+Run the uncapped benchmark without concurrent tests, GPU measurements or media processing. It
+alternates three baseline/capture pairs (baseline first) for one and four continuously emitting sources, each
+with 20 simulated seconds warmup and 60 measured seconds at two 120 Hz ticks per frame. Thirty
+unchanged baseline queries per frame provide a common workload and signed-height neutrality
+check. Tracking includes source evaluation/expiry/ledger work; queries include probe construction
+and accumulation. Restore validation and snapshot copies are outside timed frames. The report
+retains p50/p95/p99, p95 spread, absolute deltas and percentages only above .005 ms references.
+This is private harness overhead, not a production server or graphics budget qualification.
+
+### Private outward transport screen (R2b)
+
+`wake_transport` is the isolated p=1 outward-dilation field experiment; no production target
+links it. `wake_transport_contract` checks sampled baseline/inner identity, transformed support
+and envelope derivatives, signed mixed-curvature overlap in independent/nonadjacent emitter
+slots, unequal straight histories and same-build restored field equality. These tests do not
+qualify coupled hull response, GPU parity or gameplay acceptance.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_transport -j
+./build-release/wake_transport --check
+mkdir -p build-release/wake-r2b/field-new/screen
+./build-release/wake_transport --screen build-release/wake-r2b/field-new/screen
+python3 tools/wake_transport.py --binary build-release/wake_transport --output build-release/wake-r2b/field-new/cpu --bench
+python3 tools/wake_transport.py --binary build-release/wake_transport --output build-release/wake-r2b/field-new/media --media
+python3 tools/wake_transport_report.py --screen build-release/wake-r2b/field-new/screen --cpu build-release/wake-r2b/field-new/cpu --output build-release/wake-r2b/field-new/report
+ffplay -autoexit -an build-release/wake-r2b/field-new/media/circle-detail-spread-paired.mp4
+```
+
+Use fresh directories. Timing runs must not overlap tests, media generation or playback. The
+report command expects the default 72-run matrix and checks every raw CPU hash, then retains
+p50/p95/p99, repetition ranges, absolute/relative changes and individual-run provisional CPU
+screen exceedances. Medians do not waive per-run tails. Both modes use the same captured source
+ledger and synthetic queries; baseline mode evaluates the original geometry. Pair order reverses
+between repetitions. The metadata records source/binary/driver hashes and exact commands.
+
+`--screen` writes straight/arrival, derivative, turning, mixed signed-crossing and full-support
+concentration tables. Source-off times are relative to emission stopping, not each record's
+age; concentration rows include surviving occupancy and expanded-support bounds. Grid extrema
+are sampled diagnostics. No local baseline-zero division is used as a mechanical tolerance.
+`--media` makes twelve matched fixed wide/detail field movies over six histories. Each revision
+shows signed height and separate cosmetic foam; movies are 100 frames/10 Hz after source-off,
+with nearest-neighbor integer enlargement. They are not game/chase or coupled-hull footage.
+See [field evidence](evidence/wakes/r2b/field/README.md) for the retained results, tail failure,
+reproduction limits and the still-open selection gates.
+
+### Experimental CPU basin trial (R2b)
+
+`wake_transport_basin` is a private CPU-only tool using production session/physics/render
+libraries. An optional borrowed `BoatWater` object sampler replaces only the object contribution;
+null retains the existing path. The GPU rejects an adapted surface rather than showing a different
+wave model. Contexts outlive every borrowed world/view copy and must be rebound after owner copies.
+Normal/current composition and arcade recovery remain shared; the private target owns source ticks.
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target wake_transport_basin -j
+./build-release/wake_transport_basin --check
+./build-release/wake_transport_basin
+mkdir -p build-release/wake-r2b/basin-new
+./build-release/wake_transport_basin --screen build-release/wake-r2b/basin-new/hulls.csv
+python3 tools/wake_transport_hull_report.py build-release/wake-r2b/basin-new/hulls.csv build-release/wake-r2b/basin-new/hulls.json
+python3 tools/wake_transport_basin_media.py --binary build-release/wake_transport_basin --output build-release/wake-r2b/basin-new/media
+```
+
+The hull matrix has 252 frozen-source pairs, including 27 exact straight controls. Receivers do
+not emit. A mechanically equal calm reference is retained. Runs wait for source expiry and one
+second of stable virtual ticks after at least eight seconds, capped at 24 seconds. The report
+retains changed outcomes and ±10% screen flags, with absolute differences near zero; ratio floors
+are not new acceptance tolerances. The at-time trough matches the prior one-metre field sample
+and asserts an actual support query at its four-second source-off clock. This is not a universal
+concentration test or multi-source qualification. The handling-preservation screen fails.
+
+Media compares a ten-second closed-loop self-wake drive and two-second frozen gap12, gap50 and
+trough approaches. The gap50 case uses 24 m/s. Physics fixtures have distant walls to avoid contacts;
+short encounter clips stay within the finite rendered basin. Capture inspection and paced playback
+are distinct from human steering acceptance. The tool supports screenshots and ordinary windowed
+input; B selects the other model with a full reset. It has no GPU or network backend.
+
+For fully instrumented private checks (the first configure may fetch pinned dependencies):
+
+```sh
+cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_SANITIZE=address,undefined
+cmake --build build-sanitize --target wake_transport_basin -j
+./build-sanitize/wake_transport_basin --check
+```
+
+On macOS, profile the repeated private query workload with Instruments. `--profile PATH 0|1`
+repeats the dense-four benchmark with output discarded (0 baseline, 1 spread); it is not a CTest.
+Keep timing comparisons separate from profiling, encoding, tests and playback.
+
+```sh
+xcrun xctrace record --template 'Time Profiler' --time-limit 15s --output build-release/wake-r2b/basin-new/spread.trace --launch -- ./build-release/wake_transport --profile circle 1
+xcrun xctrace export --input build-release/wake-r2b/basin-new/spread.trace --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]' --output build-release/wake-r2b/basin-new/spread.xml
+python3 tools/wake_transport_profile.py build-release/wake-r2b/basin-new/spread.xml build-release/wake-r2b/basin-new/spread-profile.json
+```
+
+The time-profile aggregator resolves exported XML references and weights running samples;
+its leaf/inclusive percentages include warmup and harness work. Retain raw traces and exact binaries.
+The [trial evidence](evidence/wakes/r2b/basin/README.md) owns measurements, failed handling screens,
+verification and remaining CPU/GPU/platform limits. No testing result establishes user acceptance.

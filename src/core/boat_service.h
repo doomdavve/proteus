@@ -17,7 +17,7 @@ typedef enum {
 } BoatServiceKind;
 
 typedef enum {
-    BOAT_OWNER_ABSENT, // No hull, contact, camera exclusion or wake.
+    BOAT_OWNER_ABSENT, // No hull, contact, camera exclusion or new trail emission.
     BOAT_OWNER_MOORED, // The berth owns the hull: waves, ropes and berth contacts.
     BOAT_OWNER_TRAVELLING // The path owns the hull pose and moving contacts.
 } BoatOwner;
