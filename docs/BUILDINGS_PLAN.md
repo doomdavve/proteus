@@ -756,9 +756,15 @@ shapely venv so the Python tool tests ran); new `building_windows` schedule case
 minutes: no window lit by day, rising switch-on 16:00-20:00, falling bedtime past midnight, 7% and
 5% overnight and early residential shares, workplace and industrial/quiet shares, sample against
 `building_window_lit_share`), the pack profile range and a `boat_scenery` invalid-profile case;
-`building_kit`, `map_pack` self-tests. Stills (Gothenburg Harbour, `outer`, GPU 1280x800 and CPU
-320x200, hours 20-23 and 1-3): warm window pixels on the GPU 5,815 at 21:00 against 33 at 03:00;
-the CPU capture falls 100, 98, 65, 17, 17 from 20:00 to 03:00.
+`building_kit`, `map_pack` self-tests. Stills (Gothenburg Harbour, `outer`, GPU 1280x800, one
+building group, warm window pixels by hour): 19:00 232, 20:00 1,778, 21:00 1,792, 22:00 1,762,
+23:00 1,221, 00:00 602, 01:00 113, 02:00 26, 03:00 26: a spread-out switch-on and bedtime.
+
+Correction found by the user's first look: the first commit lit every window at once and put them
+all out at once, because window meshes were uploaded as `STATIC_UNLIT`, which stores no texture
+coordinates, so the shader read seed 0 for every quad. Window meshes now use `STATIC_WINDOW`
+(unlit, with coordinates). My earlier stills compared only 21:00 with 03:00 and could not show it;
+check an hour sweep, not two hours.
 
 Not verified: the shader's integer schedule against the C one beyond the shared formulas (no
 GLSL test; the stills agree in character, not bit for bit), browser/WebGL2, Windows and Linux, the

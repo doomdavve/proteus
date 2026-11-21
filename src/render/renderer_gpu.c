@@ -238,6 +238,7 @@ typedef enum {
     STATIC_FLAT, // Lit on a white 1x1 texture: the coordinates cannot change a pixel.
     STATIC_GROUND, // Lit, and coordinate x is a small WaterfrontGroundMaterial integer.
     STATIC_MAPPED, // Lit, with facade wall metres or roof texture coordinates.
+    STATIC_WINDOW, // Emissive, and the coordinates carry the window seed (builder_window_quad).
 } StaticSurface;
 
 // WebGL2 always treats index 65535 as primitive restart, so 65,535 vertices are addressable.
@@ -314,11 +315,11 @@ static int static_vertices_pack(
     const StaticVertex *vertices, int count, StaticSurface surface, unsigned char **out)
 {
     int stride = (int)(sizeof(vertices->position) + sizeof(vertices->color));
-    if (surface != STATIC_UNLIT)
+    if (surface != STATIC_UNLIT && surface != STATIC_WINDOW)
         stride += STATIC_NORMAL_BYTES;
     if (surface == STATIC_GROUND)
         stride += 4;
-    else if (surface == STATIC_MAPPED)
+    else if (surface == STATIC_MAPPED || surface == STATIC_WINDOW)
         stride += (int)sizeof(vertices->texcoord);
     *out = calloc((size_t)count, (size_t)stride);
     if (!*out)
@@ -329,7 +330,7 @@ static int static_vertices_pack(
         p += sizeof(vertices[i].position);
         memcpy(p, vertices[i].color, sizeof(vertices[i].color));
         p += sizeof(vertices[i].color);
-        if (surface != STATIC_UNLIT) {
+        if (surface != STATIC_UNLIT && surface != STATIC_WINDOW) {
             short normal[3];
             static_normal_pack(vertices[i].normal, normal, &binding_scene->geometry.normal_error);
             // A migrated facade wall is horizontal, so its normal's y short is free: it carries
@@ -344,7 +345,7 @@ static int static_vertices_pack(
         }
         if (surface == STATIC_GROUND)
             *p = (unsigned char)vertices[i].texcoord[0];
-        else if (surface == STATIC_MAPPED)
+        else if (surface == STATIC_MAPPED || surface == STATIC_WINDOW)
             memcpy(p, vertices[i].texcoord, sizeof(vertices[i].texcoord));
     }
     return stride;
@@ -380,15 +381,15 @@ static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
         RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, 4, RL_UNSIGNED_BYTE, true, stride, offset);
     rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR);
     offset += (int)sizeof(vertices->color);
-    if (surface != STATIC_UNLIT) {
+    if (surface != STATIC_UNLIT && surface != STATIC_WINDOW) {
         rlSetVertexAttribute(
             RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 4, STATIC_NORMAL_TYPE, false, stride, offset);
         rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
         offset += STATIC_NORMAL_BYTES;
     }
-    if (surface == STATIC_GROUND || surface == STATIC_MAPPED) {
+    if (surface == STATIC_GROUND || surface == STATIC_MAPPED || surface == STATIC_WINDOW) {
         rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, 2,
-            surface == STATIC_MAPPED ? RL_FLOAT : RL_UNSIGNED_BYTE, false, stride, offset);
+            surface != STATIC_GROUND ? RL_FLOAT : RL_UNSIGNED_BYTE, false, stride, offset);
         rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD);
     }
     mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]
@@ -457,13 +458,13 @@ static Mesh builder_static_chunk(
             break;
         StaticVertex vertex = static_vertex(builder, source);
         // What the surface never reads must not split a vertex.
-        if (surface != STATIC_MAPPED) {
+        if (surface != STATIC_MAPPED && surface != STATIC_WINDOW) {
             vertex.texcoord[1] = 0;
             vertex.facade = 0;
         }
         if (surface == STATIC_UNLIT || surface == STATIC_FLAT)
             vertex.texcoord[0] = 0;
-        if (surface == STATIC_UNLIT) {
+        if (surface == STATIC_UNLIT || surface == STATIC_WINDOW) {
             memset(vertex.normal, 0, sizeof(vertex.normal));
             vertex.occlusion = 0;
         }
@@ -1291,8 +1292,8 @@ static bool build_windows(
             }
         }
     }
-    bool ok = tiled_builder_finish(&tiled, mesh, STATIC_UNLIT);
-    bool far_ok = tiled_builder_finish_far(&far_tiled, far_mesh, STATIC_UNLIT);
+    bool ok = tiled_builder_finish(&tiled, mesh, STATIC_WINDOW);
+    bool far_ok = tiled_builder_finish_far(&far_tiled, far_mesh, STATIC_WINDOW);
     return ok && far_ok;
 failed:
     tiled_builder_destroy(&tiled);
@@ -1494,7 +1495,7 @@ static bool window_cell_expand(WaterfrontGpuScene *scene, int cell)
     }
     WaterfrontGpuGeometry saved = scene->geometry;
     binding_scene = scene;
-    bool ok = tiled_builder_finish(&one, &scene->window_cells[cell], STATIC_UNLIT);
+    bool ok = tiled_builder_finish(&one, &scene->window_cells[cell], STATIC_WINDOW);
     binding_scene = NULL;
     scene->geometry = saved;
     for (int i = 0; ok && i < scene->window_cells[cell].count; ++i)
