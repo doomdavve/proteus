@@ -649,10 +649,15 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `outer` (sha256) and checks that each pack's leading water is exactly its compiled water, so a
   rebake that adds or changes buildings cannot change water, collision or the content digest; it
   also checks the packs carry building records after the water, hold no baked window triangles and
-  that every facade record names a wall pair of its building. Update a pin only for a
+  that every facade record names a wall pair of its building, that a pack holds at most 32,767
+  facades (the GPU vertex format), that no building-tinted wall stands outside the records (windows
+  come only from facade records) and that the building report matches the pack. Update a pin only for a
   deliberate change to a map's water. `building_kit` (`tools/building_kit.py`) runs the kit
   fixtures (validation, determinism, outward faces, roles) and is registered only when
-  shapely, numpy and pyproj are installed (`docs/adventure/requirements.txt`).
+  shapely, numpy and pyproj are installed (`docs/adventure/requirements.txt`), as is
+  `building_families` (`tools/building_families.py`: family rules from tags, district and scale).
+  `building_report` (quick, standard library) runs `tools/building_report.py --check` on the
+  shipped reports and overrides.
 - `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `outer`
   and none for the basin, checks that both frames fit the 320×200 scene (the chart
   above the instruments), that the spawn, every voyage shelter and the destination are water

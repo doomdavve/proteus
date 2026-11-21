@@ -64,6 +64,10 @@ add_test(NAME building_packs COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/check_building_packs.py)
 set_tests_properties(building_packs PROPERTIES PASS_REGULAR_EXPRESSION "building_packs=ok"
   ENVIRONMENT PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/tools LABELS "cpu;quick")
+add_test(NAME building_report COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/building_report.py --check)
+set_tests_properties(building_report PROPERTIES
+  PASS_REGULAR_EXPRESSION "overrides naming no baked building: none" LABELS "cpu;quick")
 # The shared building kit needs the offline bake tooling (docs/adventure/requirements.txt).
 execute_process(COMMAND ${Python3_EXECUTABLE} -c "import shapely, numpy, pyproj"
   RESULT_VARIABLE PROTEUS_BAKE_TOOLS OUTPUT_QUIET ERROR_QUIET)
@@ -71,6 +75,10 @@ if(PROTEUS_BAKE_TOOLS EQUAL 0)
   add_test(NAME building_kit COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/building_kit.py)
   set_tests_properties(building_kit PROPERTIES PASS_REGULAR_EXPRESSION "building kit fixtures OK")
+  add_test(NAME building_families COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/building_families.py)
+  set_tests_properties(building_families PROPERTIES
+    PASS_REGULAR_EXPRESSION "building families OK")
 endif()
 foreach(map river outer)
   add_test(NAME water_atlas_${map} COMMAND water_atlas_bake --map ${map}
