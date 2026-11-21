@@ -212,7 +212,7 @@ static int pack(const BoatMapDescription *map, size_t min_facades, size_t min_wi
     const BoatSceneryBuilding *b = boat_scenery_buildings(map, &buildings);
     const BoatSceneryFacade *f = boat_scenery_facades(map, &facades);
     const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
-    CHECK(full && b && f && style && styles == 6 && facades >= min_facades);
+    CHECK(full && b && f && style && styles == 8 && facades >= min_facades);
     size_t windows = 0;
     uint32_t forward = 0, backward = 0;
     for (size_t k = 0; k < buildings; ++k) {
@@ -221,7 +221,7 @@ static int pack(const BoatMapDescription *map, size_t min_facades, size_t min_wi
             const BoatSceneryWindowStyle *s = &style[w->style];
             BuildingWall wall;
             CHECK(building_wall(full->mesh, w, &wall));
-            CHECK(wall.top > wall.origin.y + 2.9f); // Walls under 3 m take no windows.
+            CHECK(wall.top > wall.origin.y + 2.5f); // Walls under 2.6 m (a cottage's floor) take none.
             // No two facades share a wall (no window set twice).
             for (size_t j = 0; j < i; ++j)
                 CHECK(f[b[k].facade_first + j].wall != w->wall);
@@ -271,8 +271,8 @@ int main(void)
     CHECK(synthetic() == 0);
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
-    CHECK(pack(&waterfront_city_river_map, 150, 1500) == 0);
-    CHECK(pack(outer->map, 190, 1900) == 0);
+    CHECK(pack(&waterfront_city_river_map, 5000, 80000) == 0);
+    CHECK(pack(outer->map, 20000, 250000) == 0);
     boat_scenery_unload();
     printf("building_windows=ok\n");
     return 0;

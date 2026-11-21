@@ -37,10 +37,10 @@ SHOP_AMENITIES = {"cafe", "restaurant", "pub", "bar", "fast_food", "bank", "phar
 GABLED_ROOFS = {"gabled", "hipped", "half-hipped", "gambrel", "saltbox", "pyramidal", "gable"}
 FLAT_ROOFS = {"flat", "skillion", "round", "dome", "many", "shed"}
 
-PLASTER = [(230, 214, 170), (226, 190, 140), (206, 120, 98), (232, 228, 216), (180, 196, 178),
-           (210, 200, 176), (196, 168, 132)]
+PLASTER = [(236, 208, 130), (226, 190, 140), (206, 118, 96), (232, 226, 212), (178, 196, 176),
+           (214, 200, 168), (206, 160, 118), (166, 190, 206), (222, 148, 112)]
 BRICK = [(172, 94, 70), (164, 90, 68), (150, 84, 64), (186, 140, 92), (128, 82, 70)]
-PANEL = [(160, 170, 186), (184, 186, 192), (150, 160, 172), (196, 190, 180), (140, 150, 160)]
+PANEL = [(184, 190, 202), (204, 200, 190), (170, 180, 176), (196, 178, 156), (156, 166, 182)]
 INDUSTRIAL = [(150, 156, 160), (170, 160, 140), (130, 140, 150), (166, 124, 96), (124, 130, 134)]
 HOUSE_WALLS = [(222, 218, 205), (156, 58, 48), (214, 186, 120), (176, 182, 186), (200, 205, 196),
                (236, 232, 222), (120, 140, 160)]
@@ -155,7 +155,7 @@ def _choose(kind, tags, area, height, levels, ctx, tagged_height, ident, f):
                 and zlib.crc32(f"{ident}/bal".encode()) % 4 == 0:
             return "balcony", "tags", f"{kind}, {height:.0f} m: apartments with a balcony stack"
         brick = tags.get("building:material") in ("brick", "stone") \
-            or zlib.crc32(f"{ident}/br".encode()) % 5 < 2
+            or zlib.crc32(f"{ident}/br".encode()) % 10 < 3
         if brick:
             return "brick", "tags" if tags.get("building:material") == "brick" else "inferred", \
                 "brick block"
@@ -182,7 +182,8 @@ def _recipe(family, d, kind, tags, area, height, ctx, ident, f):
     elif family == "stepped":
         walls, roofs = PANEL, FLAT_ROOFS_RGB
     elif family == "block" and (kind in MODERN_TYPES or kind == "parking"
-                                or zlib.crc32(f"{ident}/pn".encode()) % 3 == 0):
+                                or (kind not in APARTMENT_TYPES
+                                    and zlib.crc32(f"{ident}/pn".encode()) % 4 == 0)):
         walls, roofs = PANEL, FLAT_ROOFS_RGB
         comp["material"] = "panel"
         comp["style"] = "ribbon"

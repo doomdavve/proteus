@@ -1300,10 +1300,12 @@ static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuSce
     scene->window_cells = calloc(cells, sizeof(*scene->window_cells));
     scene->window_cell_ready = calloc(cells, 1);
     scene->window_reveal_ready = calloc(count, 1);
+    scene->window_cell_reveals = calloc(cells, sizeof(*scene->window_cell_reveals));
     scene->window_facade_total = (unsigned)count;
     unsigned *cell_of = malloc(count * sizeof(*cell_of));
     if (!scene->window_cell_start || !scene->window_cell_facades || !scene->window_cells
-        || !scene->window_cell_ready || !scene->window_reveal_ready || !cell_of) {
+        || !scene->window_cell_ready || !scene->window_reveal_ready || !scene->window_cell_reveals
+        || !cell_of) {
         free(cell_of);
         return false;
     }
@@ -1513,6 +1515,8 @@ static void window_select(WaterfrontGpuScene *scene, Vector3 anchor)
     }
 }
 
+#define REVEAL_REACH 150.0f // Half the longest wall that a cell's facade list can hold, metres.
+
 // Facades whose wall lies within the deep range of ANCHOR hold their relief; those beyond a margin
 // past it do not.
 static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
@@ -1520,23 +1524,51 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
     size_t count = 0;
     const BoatSceneryFacade *facades = boat_scenery_facades(scene->window_map, &count);
     bool changed = false;
-    for (unsigned i = 0; i < scene->window_facade_total && i < count; ++i) {
-        BuildingWall wall;
-        if (!building_wall(scene->window_map->mesh, &facades[i], &wall))
-            continue;
-        // Horizontal distance from the anchor to the wall segment.
-        float ex = wall.end.x - wall.origin.x, ez = wall.end.z - wall.origin.z;
-        float t = ((anchor.x - wall.origin.x) * ex + (anchor.z - wall.origin.z) * ez)
-            / (ex * ex + ez * ez);
-        t = fminf(fmaxf(t, 0), 1);
-        float dx = anchor.x - (wall.origin.x + ex * t), dz = anchor.z - (wall.origin.z + ez * t);
-        float distance = sqrtf(dx * dx + dz * dz);
-        if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE) {
-            scene->window_reveal_ready[i] = 1;
-            changed = true;
-        } else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 20.0f) {
-            scene->window_reveal_ready[i] = 0;
-            changed = true;
+    // A facade belongs to the cell of its wall's middle, so only the cells within the deep range
+    // plus the longest walls (REVEAL_REACH) of the anchor can hold a facade within the range; the
+    // rest are cleared if they were marked. This keeps the pass off the city's whole facade list.
+    const float reach = BUILDING_WINDOW_DEEP_RANGE + 20.0f + REVEAL_REACH;
+    for (int z = 0; z < scene->detail_rows; ++z) {
+        float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
+        float dz = fmaxf(fmaxf(low_z - anchor.z, anchor.z - low_z - scene->detail_cell), 0);
+        for (int x = 0; x < scene->detail_columns; ++x) {
+            int cell = z * scene->detail_columns + x;
+            if (cell >= scene->window_cell_total
+                || scene->window_cell_start[cell] == scene->window_cell_start[cell + 1])
+                continue;
+            float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
+            float dx = fmaxf(fmaxf(low_x - anchor.x, anchor.x - low_x - scene->detail_cell), 0);
+            bool far = dx * dx + dz * dz > reach * reach;
+            if (far && !scene->window_cell_reveals[cell])
+                continue;
+            for (unsigned k = scene->window_cell_start[cell]; k < scene->window_cell_start[cell + 1];
+                 ++k) {
+                unsigned i = scene->window_cell_facades[k];
+                if (i >= count || i >= scene->window_facade_total)
+                    continue;
+                float distance = 1e9f;
+                BuildingWall wall;
+                if (!far && building_wall(scene->window_map->mesh, &facades[i], &wall)) {
+                    // Horizontal distance from the anchor to the wall segment.
+                    float ex = wall.end.x - wall.origin.x, ez = wall.end.z - wall.origin.z;
+                    float t = ((anchor.x - wall.origin.x) * ex + (anchor.z - wall.origin.z) * ez)
+                        / (ex * ex + ez * ez);
+                    t = fminf(fmaxf(t, 0), 1);
+                    float px = anchor.x - (wall.origin.x + ex * t);
+                    float pz = anchor.z - (wall.origin.z + ez * t);
+                    distance = sqrtf(px * px + pz * pz);
+                }
+                if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE) {
+                    scene->window_reveal_ready[i] = 1;
+                    ++scene->window_cell_reveals[cell];
+                    changed = true;
+                } else if (scene->window_reveal_ready[i]
+                    && distance > BUILDING_WINDOW_DEEP_RANGE + 20.0f) {
+                    scene->window_reveal_ready[i] = 0;
+                    --scene->window_cell_reveals[cell];
+                    changed = true;
+                }
+            }
         }
     }
     if (changed)
@@ -1789,6 +1821,8 @@ static void unbind_map(WaterfrontGpuScene *scene)
     tiled_destroy(&scene->window_reveal);
     free(scene->window_reveal_ready);
     scene->window_reveal_ready = NULL;
+    free(scene->window_cell_reveals);
+    scene->window_cell_reveals = NULL;
     scene->window_reveal_triangles = 0;
     scene->window_facade_total = 0;
     free(scene->window_cells);

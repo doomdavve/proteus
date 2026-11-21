@@ -152,6 +152,7 @@ typedef struct {
     size_t window_quads; // Quads resident.
     WaterfrontGpuTiled window_reveal; // The relief of the facades marked in window_reveal_ready.
     unsigned char *window_reveal_ready; // Per facade record: within the deep range.
+    unsigned short *window_cell_reveals; // Per detail cell: how many of its facades are marked.
     size_t window_reveal_triangles; // Resident.
     unsigned window_facade_total; // Length of the two per-facade arrays above.
     int window_cell_total; // Length of the per-cell arrays above.

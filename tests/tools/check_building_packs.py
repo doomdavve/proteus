@@ -44,9 +44,14 @@ def main():
         assert all(leading <= r["first"] and r["end"] <= len(triangles) for r in records)
         # No baked window triangles: facade records (wall pairs of their building) hold windows.
         # Attached detail (balconies, canopies, trim) starts at detail_first, after walls and roof.
-        assert len(styles) == 6 and all(r["first"] <= r["detail_first"] <= r["end"] for r in records)
+        assert len(styles) == 8 and all(r["first"] <= r["detail_first"] <= r["end"] for r in records)
         facades = [f for r in records for f in r["facades"]]
         assert facades, f"{name}: no facade records"
+        # The vertex format names a facade by a signed 16-bit number (renderer_gpu.c): more than
+        # 32,767 records would turn the far window mask off.
+        assert len(facades) <= 32767, f"{name}: {len(facades)} facade records"
+        check_report(name, directory, records)
+        check_no_legacy_windows(name, vertices, triangles, records)
         for r in records:
             for f in r["facades"]:
                 t, u = triangles[f["wall"]][0], triangles[f["wall"] + 1][0]
@@ -55,6 +60,51 @@ def main():
                 assert u[0] == t[0] and u[2] == t[1] and a[1] == b[1] and c[1] > a[1]
     check_compositions()
     print("building_packs=ok")
+
+
+LEGACY_TINTS = {(166, 173, 195), (185, 183, 191), (154, 166, 188), (190, 177, 163)}
+
+
+def check_no_legacy_windows(name, vertices, triangles, records):
+    """B3: every mapped building is a record, so no triangle outside the records is a wall in a
+    legacy building tint (the renderers' generic window grid would put a second window set on it).
+    Windows come only from facade records."""
+    covered = bytearray(len(triangles))
+    for r in records:
+        covered[r["first"]:r["end"]] = b"\1" * (r["end"] - r["first"])
+    stray = 0
+    for i, (ids, color) in enumerate(triangles):
+        if covered[i] or tuple(color[:3]) not in LEGACY_TINTS:
+            continue
+        a, b, c = (vertices[k] for k in ids)
+        ux, uy, uz, vx, vy, vz = (b[0] - a[0], b[1] - a[1], b[2] - a[2], c[0] - a[0], c[1] - a[1],
+                                  c[2] - a[2])
+        ny = ux * vz - uz * vx
+        length = (((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + ny ** 2) ** .5) or 1
+        height = max(p[1] for p in (a, b, c)) - min(p[1] for p in (a, b, c))
+        stray += abs(ny) / length < .15 and height >= 5.5
+    assert stray == 0, f"{name}: {stray} legacy-tinted wall triangles outside the building records"
+
+
+def check_report(name, directory, records):
+    """buildings.json (tools/building_report.py) names every record of its bake, family and basis
+    are known, and the summary adds up. The river kit's buildings are reported by the river map;
+    the outer report covers the buildings the outer bake dresses."""
+    report = json.loads((directory / "buildings.json").read_text())
+    assert report["map"] == name and report["columns"][:2] == ["family", "basis"]
+    hashes = {map_pack.stable_id_hash(i) for i in report["buildings"]}
+    assert len(hashes) == len(report["buildings"]), f"{name}: id hash collision in the report"
+    in_pack = {r["hash"] for r in records}
+    assert hashes <= in_pack, f"{name}: reported buildings missing from the pack"
+    if name == "river":
+        assert hashes == in_pack
+    s = report["summary"]
+    assert s["buildings"] == len(report["buildings"]) == sum(s["families"].values())
+    assert s["basis"].keys() <= {"override", "override+auto", "tags", "inferred", "fallback",
+                                 "plain", "legacy"}
+    assert not s["legacy"], f"{name}: unmigrated buildings {s['legacy'][:5]}"
+    assert s["facades"] == sum(e[report["columns"].index("facades")]
+                               for e in report["buildings"].values())
 
 
 def check_compositions():

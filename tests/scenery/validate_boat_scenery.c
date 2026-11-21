@@ -100,11 +100,11 @@ static int check_migrated(const BoatMapDescription *map)
     const BoatSceneryFacade *facade = boat_scenery_facades(map, &facades);
     const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
     const unsigned char *roles = boat_scenery_roles(map);
-    CHECK(full && list && roles && facade && style && count > 0 && facades > 0 && styles == 6);
+    CHECK(full && list && roles && facade && style && count > 0 && facades > 0 && styles == 8);
     size_t water = boat_map_leading_water(full->mesh), listed = 0;
     for (size_t b = 0; b < count; ++b) {
         CHECK(list[b].first >= water && list[b].end <= full->mesh->triangle_count);
-        CHECK(list[b].min.y < list[b].max.y);
+        CHECK(list[b].min.y <= list[b].max.y); // A roof alone (every wall buried) is flat.
         // Windows are generated, not baked: attached detail (balconies, trim) follows walls and roof.
         CHECK(list[b].detail_first >= list[b].first && list[b].detail_first <= list[b].end);
         for (size_t i = list[b].detail_first; i < list[b].end; ++i)
@@ -208,12 +208,12 @@ int main(void)
     CHECK(pack && size > 32);
     unsigned char *copy = malloc(size);
     CHECK(copy);
-    CHECK(rejected(pack, 31) && rejected(pack, size - 1)); // Header cut, stream cut.
+    CHECK(rejected(pack, 31) && rejected(pack, size - 64)); // Header cut, record stream cut.
     memcpy(copy, pack, size);
     copy[0] ^= 1; // Magic.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
-    put32(copy + 4, 4); // Unknown version.
+    put32(copy + 4, 5); // Unknown version.
     CHECK(rejected(copy, size));
     memcpy(copy, pack, size);
     put32(copy + 8, 1); // Vertex count no longer matches the payload size.

@@ -1,16 +1,17 @@
 # Buildings and waterfront architecture overhaul
 
-Status, 2026-11-21 (review round 2: apartment balconies and window reveals, see the end of the B2
-results): B0 done. B1 implemented and reworked to "variant 2", awaiting review. B2
-implemented locally (7 buildings of the Eriksberg quay row composed in 3 families, one shopfront
-and entrances; exposed-wall facades, new roles), awaiting the user's visual review (no PR, no user
-acceptance). Checks, numbers and limits: [B2 results](#b2-results--2026-11-21).
+Status, 2026-11-21: B0 done. B1 and B2 implemented; the user accepted the B2 look (balcony stacks,
+projecting-surround reveal, 40 m relief range; no cut-wall holes). B3 implemented locally: every
+mapped building (river crop and outer dressing) is built from facade records through automatic
+families plus overrides, pack v4, `tools/building_report.py`; awaiting the user's review of the B3
+stills and a playtest (no PR, no user acceptance). Checks, numbers and limits:
+[B3 results](#b3-results--2026-11-21).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: B2 look (user review), near range and mask look, expansion hitch (B4), rollout record size (B3).
+Open: B3 look in motion (user), expansion hitch and distance/motion/platform qualification (B4).
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: the user's review of B2 (command in the B2 results), then B3 rollout. Delivery: one local branch.
+Next: the user's review of B3, then B4 qualification. Delivery: one local branch.
 
 ## Intent and boundaries
 
