@@ -6,10 +6,11 @@ delivery job, automatic save/resume and a day/night clock, and no money, fuel, b
 progression. This plan makes the working harbour what a new player gets by default and gives it a
 ladder: start on the lowest rung with a small boat and free local errands, then earn capability
 and freedom (more places, heavier work, faster hulls).
-Open decisions: [boat switching](#boat-switching-undecided) and [the first-purchase model](#the-first-purchase-open).
+Decided 2026-11-21: [boat switching](#boat-switching-decided-2026-11-21) is at a quay, and
+[the first-purchase model](#the-first-purchase-decided-2026-11-21) is standing, then a free first boat.
 Done when: a new player lands in the harbour, completes errands without money, earns a first
 purchase, and reaches a second rung that plays differently, all surviving save/resume, with the
-user's acceptance. Next task: CL0 (decisions and prototype spike).
+user's acceptance. Next task: CL0 (R0 boat and reach, progression state sketch).
 This plan owns the player-facing ladder; the sandbox plan keeps cargo physics, S2 Creative,
 S3 economy detail and S4 fuel. It supersedes the sandbox plan's S3 wording where they differ
 (see [Relation to S0-S7](#relation-to-s0-s7)).
@@ -55,9 +56,12 @@ Rules for the ladder:
 - **Errands come from plugin data.** The errand board, rewards and unlock conditions are package
   content; native code keeps mechanics and validation (the plan's content/mechanics split).
 
-## Boat switching (undecided)
+## Boat switching (decided 2026-11-21)
 
-The user has not worked this out. Facts that constrain it:
+Decision (the user, 2026-11-21): **switch at a quay**, option 1 below. A boat is a moored
+object at the player's home quay or any quay with a berth. Switching is a menu action available
+only while moored and at rest with no cargo or tow, and keeps one active boat. Options 2-4 are
+recorded as rejected alternatives. Facts that constrained it:
 
 - Playable hull recipes need separately tuned handling data, support dimensions from the hull
   and a physics revision bump before they can be selected ([boat docs](HARBOR_BOATS.md#future-playable-boats)).
@@ -66,9 +70,9 @@ The user has not worked this out. Facts that constrain it:
   reject or resolve unresolved cargo, tow and lashing state (the sandbox plan's sale rule).
 - Saves must not duplicate boats or goods, and the day/night session persists across switches.
 
-Candidates to decide in CL0, with my recommendation first:
+Candidates considered:
 
-1. **Switch at a quay (recommended).** A boat is a moored object at the player's home quay (or any
+1. **Switch at a quay (chosen).** A boat is a moored object at the player's home quay (or any
    quay with a berth). Walk-up switching is a menu action available only while moored and at
    rest with no cargo or tow. It reuses the berth system, keeps one active boat, and makes
    physical ownership visible in the harbour. Cost: it needs moored player boats in the scene.
@@ -79,12 +83,13 @@ Candidates to decide in CL0, with my recommendation first:
 4. **A rental/borrow step first, quay ownership later.** Start as 3 to teach capability, grow into 1
    when the first purchase arrives.
 
-CL0 picks one and records it here.
+Consequence: the scene needs moored player boats, and CL4 must render and contact-test them
+through the harbour's berth system.
 
-## The first purchase (open)
+## The first purchase (decided 2026-11-21)
 
-"Free errands until the first purchase" has an unresolved mechanism: with no money, a purchase
-needs a currency or a trigger. I read the request this way and want to confirm it:
+"Free errands until the first purchase" needs a trigger when there is no money. The user
+confirmed this reading on 2026-11-21:
 
 - **Errands pay nothing visible.** Completing them records a count of finished errands per
   place ("standing"), not money.
@@ -94,9 +99,8 @@ needs a currency or a trigger. I read the request this way and want to confirm i
 - **Money starts after that**, with the first paid errand, posted prices and the S3 rules (single
   currency, fixed quoted payouts, no market).
 
-Alternative: money exists from the start but the HUD does not show it until the first
-purchase is offered. This risks reading as a hidden feature, so it is not the default. CL0
-confirms the reading with the user.
+Rejected: money that exists from the start but stays hidden, which would read as a hidden
+feature.
 
 ## Steps
 
@@ -106,7 +110,7 @@ Playable steps need the user to play; the plan never infers acceptance.
 
 | Step | Result | Needs |
 | --- | --- | --- |
-| CL0 | Decide boat switching and the first-purchase model; define R0's boat (slow, small; the 8-knot GRODAN is a candidate for its handling and a deck-less parcel hand-off) and the sheltered reach; write the progression state sketch | The user's decisions above |
+| CL0 | Define R0's boat (slow, small; the 8-knot GRODAN is a candidate for its handling and a deck-less parcel hand-off) and the sheltered reach; write the progression state sketch | None; decisions made |
 | CL1 | The working harbour becomes the default new-player path (title/menu), still reachable and still leaving free ride untouched; first-run flow lands on R0 with no HUD help text over the screen | CL0 |
 | CL2 | The errand board: three to five varied R0/R1 errands as package data, a local standing counter, errand chaining that reuses S1's delivery events; free, no money | CL1 |
 | CL3 | Progression state in the save (versioned, migrating the existing S1 save): standing, owned boats, unlocked reaches, completed projects; exactly-once for rewards; autosaves as today | CL2 |
