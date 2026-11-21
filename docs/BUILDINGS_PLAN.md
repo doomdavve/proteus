@@ -1,11 +1,11 @@
 Status, 2026-11-21: B0 to B3 merged (PR #226; the user accepted the B2 look and the B3 frame cost and
 agreed untagged buildings stay plain blocks). B3b implemented on `feat/buildings-b3b`: windows light
 by hour and district (profile per facade, pure integer schedule mirrored in the facade shader);
-awaiting the user's look at dusk and night, no PR yet. Checks, numbers, limits:
+the user saw the per-window distribution after the seed fix and said "Much better!" (in play, GPU, 2026-11-21); no PR yet. Checks, numbers, limits:
 [B3b results](#b3b-results--2026-11-21).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: the user's review of B3b, expansion hitch and qualification (B4).
+Open: expansion hitch and qualification (B4).
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
 Next: B4 qualification. Delivery: B3b and B4 share one branch (`feat/buildings-b3b`) and one PR.
