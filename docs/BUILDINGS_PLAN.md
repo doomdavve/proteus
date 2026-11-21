@@ -1,6 +1,7 @@
 # Buildings and waterfront architecture overhaul
 
-Status, 2026-11-21: B0 done. B1 implemented and reworked to "variant 2", awaiting review. B2
+Status, 2026-11-21 (review round 2: apartment balconies and window reveals, see the end of the B2
+results): B0 done. B1 implemented and reworked to "variant 2", awaiting review. B2
 implemented locally (7 buildings of the Eriksberg quay row composed in 3 families, one shopfront
 and entrances; exposed-wall facades, new roles), awaiting the user's visual review (no PR, no user
 acceptance). Checks, numbers and limits: [B2 results](#b2-results--2026-11-21).
@@ -620,3 +621,38 @@ the long sides to read at boat level; (4) accept the +0.1 to +0.5 ms gpu p50 for
 B4 finds the cause; (5) the west row and the remaining quay buildings (303912306/7 and others)
 are left as fallbacks until B3.
 
+
+### B2 review round 2 — 2026-11-21
+
+User feedback: balconies on every bay are unrealistic; windows look like stickers. Done locally
+(commits "Place balconies as whole stacks...", "Give windows a reveal...", "Rebake packs..."):
+
+- Balconies are per apartment unit (`unit` 2 to 4 bays, one balcony `span` 1 or 2 bays per
+  `every`-th unit, aligned stacks from floor 1 to below the top floor; ground and top floor plain).
+  A stack is rejected whole when any level clashes. 164963867: unit 3, span 1; 164964582: unit 4,
+  span 2. Survivors (bake manifest): 3 stacks of 4 balconies each on both buildings (12), 5 and 3
+  stacks rejected by street and neighbour clearance. That is few; the clearance rule is unchanged
+  as asked (decision below).
+- Windows: shared generator faces (`building_window_faces`: glass plus lintel/jamb/sill bands,
+  the CPU and GPU quads, and the far shader mask repeats them) and relief within 80 m
+  (`building_window_reveal`: 16 cm returns, rim over lintel and under sill, mullion on wide
+  ground windows). The wall is not cut, so the glass is "sunken" by a surround that projects.
+- Measured (Release, AC, row-quay view, 400 frames, 2 runs, short pass only; B0 gpu p50 4.56 ms):
+  first version (9 faces, 120 m) +0.8 ms (5.2 to 5.5) and +147 submissions with per-facade meshes;
+  merged mesh set fixed the submissions (306 vs 302); 7 faces at 80 m gave gpu p50 4.51 to 4.59 ms
+  (no measurable change), scene triangles 1.803M (B0) to 1.827M (+1.3%). With the deep range 0
+  (bands only) gpu p50 4.52 to 4.58. So the earlier +0.1 to +0.5 ms gpu p50 of B2 is not
+  reproduced by this version (the earlier 70 and 45 balconies per building are gone); I did not
+  bisect which of the old roles or the old balconies caused it. Limits: 2 views, 2 runs, no
+  route benchmark, no expansion-hitch measurement (the relief set rebuilds when the near facades
+  change; unwatched).
+- Skewed windows in CPU stills: the generator is exact (a CTest checks the corners form a
+  rectangle); I attribute it to perspective and pixel stepping of oblique quads in the 320x200
+  CPU view, not verified in the rasteriser. CPU dusk brick near-black look: not changed.
+- Checks: `python tools/building_kit.py`, both packs and ambient rebaked, Debug `ctest --preset
+  full` 635 of 635 (GPU tests on), city_dressing box digest repinned. Captures in
+  `build/buildings/b2/review/` (CPU and GPU, GPU high-res, block and quay views; day, and dusk for
+  the block). Not verified: motion, the 80 m relief boundary while moving, user review.
+- For the user: are fewer balconies (clearance) acceptable or should balconies over a street
+  polygon at floor 2 and above be allowed; is the projecting-surround reveal convincing, or is a
+  cut wall (a real hole) wanted for B3.

@@ -154,6 +154,13 @@ static int synthetic(void)
         for (unsigned bay = 0; bay < 4; ++bay) {
             BuildingWindow p;
             CHECK(building_window(&facade, &LEGACY, &wall, bay, floor, &p));
+            // Every window is an exact rectangle on its wall: a skewed look in a picture comes from
+            // the rasteriser (perspective, pixel stepping), not from the generator.
+            Vector3 across = Vector3Subtract(p.corners[3], p.corners[0]);
+            Vector3 upward = Vector3Subtract(p.corners[1], p.corners[0]);
+            CHECK(fabsf(Vector3DotProduct(across, upward)) < 1e-4f
+                && Vector3Distance(Vector3Add(p.corners[0], Vector3Add(across, upward)), p.corners[2])
+                    < 1e-4f);
             BuildingWindowFace faces[BUILDING_WINDOW_FACES_MAX], again[BUILDING_WINDOW_FACES_MAX];
             size_t n = building_window_faces(&p, faces);
             CHECK(n == 4 && building_window_faces(&p, again) == n
@@ -172,7 +179,7 @@ static int synthetic(void)
             CHECK(fabsf(area - whole) < 1e-3f * whole);
             BuildingWindowFace relief[BUILDING_WINDOW_REVEAL_MAX];
             size_t m = building_window_reveal(&p, &wall, relief);
-            CHECK(m == (floor == 0 && Vector3Distance(p.corners[0], p.corners[3]) >= 1.8f ? 9u : 8u));
+            CHECK(m == (floor == 0 && Vector3Distance(p.corners[0], p.corners[3]) >= 1.8f ? 7u : 6u));
             for (size_t i = 0; i < m; ++i) {
                 CHECK(relief[i].color.a == 0);
                 Vector3 e1 = Vector3Subtract(relief[i].corners[1], relief[i].corners[0]);

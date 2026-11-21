@@ -204,7 +204,7 @@ size_t building_window_faces(const BuildingWindow *window, BuildingWindowFace fa
 }
 
 size_t building_window_reveal(
-    const BuildingWindow *window, const BuildingWall *wall, BuildingWindowFace faces[9])
+    const BuildingWindow *window, const BuildingWall *wall, BuildingWindowFace faces[7])
 {
     const float depth = 0.16f, rim = 0.07f, mullion = 0.04f;
     Frame f = frame_of(window, wall);
@@ -220,12 +220,11 @@ size_t building_window_reveal(
         at(&f, 0, 0, depth), wall->along, (Color) { 130, 126, 122, 0 });
     oriented(&faces[n++], at(&f, w, 0, 0), at(&f, w, h, 0), at(&f, w, h, depth),
         at(&f, w, 0, depth), Vector3Negate(wall->along), (Color) { 130, 126, 122, 0 });
-    // The rim: a frame around the opening on the outer plane.
+    // The rim: a frame on the outer plane over the lintel and under the sill (the jambs' edges
+    // read from the returns), so the surround has a front face without 9 quads per window.
     const Color trim = { 232, 228, 218, 0 };
     flat(&faces[n++], &f, -rim, w + rim, h, h + rim, depth, trim);
     flat(&faces[n++], &f, -rim, w + rim, -rim, 0, depth, trim);
-    flat(&faces[n++], &f, -rim, 0, 0, h, depth, trim);
-    flat(&faces[n++], &f, w, w + rim, 0, h, depth, trim);
     if (window->floor == 0 && w >= 1.8f)
         flat(&faces[n++], &f, w / 2 - mullion, w / 2 + mullion, 0, h, depth * .5f,
             (Color) { 210, 206, 198, 0 });

@@ -150,8 +150,8 @@ typedef struct {
     unsigned char *window_cell_ready; // Per detail cell: expanded.
     Vector2 window_anchor; // Renderer X/Z the mask and expansion are measured from.
     size_t window_quads; // Quads resident.
-    WaterfrontGpuTiled *window_reveals; // Per facade record; count 0 unless within the deep range.
-    unsigned char *window_reveal_ready;
+    WaterfrontGpuTiled window_reveal; // The relief of the facades marked in window_reveal_ready.
+    unsigned char *window_reveal_ready; // Per facade record: within the deep range.
     size_t window_reveal_triangles; // Resident.
     unsigned window_facade_total; // Length of the two per-facade arrays above.
     int window_cell_total; // Length of the per-cell arrays above.

@@ -55,6 +55,24 @@ right, bottom right, seen from outside), glass colour and whether it is lit at n
 style's grid. Ground-floor windows have their own size. `BUILDING_WINDOW_NEAR_RANGE` (430 m) is
 the horizontal distance within which the renderers use the quads.
 
+Windows have a reveal in three tiers, all from this module so the CPU and GPU draw the same faces.
+`building_window_faces` splits the pane into four coplanar faces: the glass, a dark band under the
+lintel (14% of the height, glass x 0.4), a mid band on the left jamb (8% of the width, x 0.7) and
+a light sill (8% of the height, glass mixed half with stone). Each face's alpha is its share of the
+night window light (occupied glass 255, lintel 77, jamb 153, sill 0). This is the impression the
+whole near range (430 m) draws, and `window_mask` in `assets/shaders/waterfront_city.fs` repeats
+the same bands beyond, settling toward a slightly darker mean once a window is about a pixel.
+Within `BUILDING_WINDOW_DEEP_RANGE` (80 m) `building_window_reveal` adds real relief: sill,
+lintel and jamb returns 16 cm deep, a 7 cm rim over the lintel and under the sill on the outer
+plane and, on ground-floor windows 1.8 m or wider, a mullion (7 faces at most, none behind the
+wall plane; a fuller frame of 9 faces at 120 m cost about +0.8 ms gpu p50 at the quay row, this
+one none measurable). The wall is a
+flat quad pair that the window does not cut, so the glass is sunken by a surround that projects
+from the wall rather than by a hole in it; callers grow wall and cell bounds by
+`BUILDING_WINDOW_MARGIN` (0.3 m). The GPU keeps one merged relief mesh set of the facades whose wall is
+within the deep range of the followed boat (a facade leaves it 40 m beyond), rebuilt when that set
+changes, so the pass adds a few submissions however many facades are near.
+
 Seeds depend on identity only: the facade seed is `crc32("<id>/<facade number>")` (computed by
 continuing the pack's id hash over `/<n>`, so the pack needs no id strings) and a window's seed is
 `fmix32(facade_seed + bay * 0x9E3779B1 + floor * 0x85EBCA77)`. Glass is `seed % 7` (0 to 2 mid
@@ -133,7 +151,7 @@ building's lowest base.
   "family": "balcony", "wall": [238, 226, 196], "roof": [112, 116, 124], "trim": [244, 240, 232],
   "ground": {"band": 4.0, "wall": [182, 150, 112], "style": "lobby"},
   "setbacks": [{"above": 21.5, "inset": 2.2}], "parapet": 0.8, "cornice": 0.35,
-  "balconies": {"sides": ["west", "north", "south"], "span": 1, "every": 1, "depth": 1.7,
+  "balconies": {"sides": ["west", "north", "south"], "unit": 3, "span": 1, "every": 1, "depth": 1.7,
                 "slab": [222, 218, 210], "front": [190, 92, 62]},
   "entrance": {"side": "west", "at": 0.5, "width": 3.0, "canopy": 2.0, "canopy_color": [190, 92, 62]}
 }
@@ -152,18 +170,22 @@ building's lowest base.
 - `parapet` (height of a 0.32 m wall on the roof edge, role `trim`) and `cornice` (a 0.55 m band
   projecting from the wall below the roof, cut back where it would touch a neighbour, water or a
   vehicle street).
-- `balconies`: on exposed rectangles facing a listed `side`, a balcony `span` bays wide on every
-  `every`-th bay (from bay `offset`) on floors `from_floor` to `to_floor` (negative counts from
-  the top) of the window grid. A balcony is a slab, a solid front panel and two side panels (role
-  `balcony`, `slab` and `front` colours), 40 triangles. Each is rejected, and counted in the bake
-  manifest, when its footprint (grown 10 cm) touches the building's own footprint, a neighbour that
-  reaches that height, water (grown 0.5 m) or a vehicle street (6 m wide ways; footways may pass under).
+- `balconies`: apartments. On exposed rectangles facing a listed `side`, the window grid is cut into
+  units `unit` bays wide (2 to 4); every `every`-th unit (from unit `offset`) has one balcony,
+  `span` bays wide (1 or 2, at most the unit) and centred in its unit, in front of its glazing; the
+  other windows stay plain. A unit's balconies form one aligned stack on floors `from_floor`
+  (default 1: the ground floor has none) to `to_floor` (default -2, negative counts from the top, so
+  the top floor has none either). A balcony is a slab, a solid front panel and two side panels (role
+  `balcony`, `slab` and `front` colours), 40 triangles. A stack is kept whole or dropped whole, never
+  ragged: it is rejected when any level's footprint (grown 10 cm) touches the building's own
+  footprint, a neighbour that reaches that height, water (grown 0.5 m) or a vehicle street (6 m
+  wide ways; footways may pass under). Fewer, larger balconies also cost fewer triangles.
 - `entrance`: on the ground piece best facing `side` and long enough, an interval `width` wide at
   fraction `at` of the wall has no window. It gets piers and a lintel (`trim`), a door leaf
   (`detail`), a step, and a canopy (role `canopy`) `canopy` metres deep that shrinks in 0.4 m steps
   until it clears the same obstacles, or is dropped; `fascia` adds a signboard band over the whole
   ground floor of that wall.
-- The bake records per composed building the balconies placed and rejected and the canopy depth in
+- The bake records per composed building the balconies and stacks placed and the stacks rejected and the canopy depth in
   `manifest.json` (`compositions`).
 
 Clearances come from geometry the bake knows: the river water and vehicle streets (obstacles) and
@@ -191,7 +213,8 @@ and take its windows from the generator (`building_windows.h`) only:
   `canopy`, `trim` and `detail` go to the flat mesh in their colours, so shadow and reflection
   passes (which draw the same static meshes) include them. Tile, cell and record bounds come from the
   vertices of the triangles in them, so projecting detail is inside them (checked by `boat_scenery`);
-  the 0.1 m growth only matters for window quads 3.5 cm off a wall.
+  the 0.1 m growth only matters for window quads 3.5 cm off a wall, and the CPU view grows a building's
+  box by `BUILDING_WINDOW_MARGIN` (0.3 m) for the window relief.
 - Generic windows (the `waterfront_window_wall` grid, seeded by triangle index) are skipped for
   every triangle with a role, in the CPU windows pass and in the GPU `build_windows`, so a migrated
   wall never gets two window sets. Unmigrated buildings and packs without records keep the legacy
@@ -199,13 +222,15 @@ and take its windows from the generator (`building_windows.h`) only:
   `waterfront_window_occupied` call the generator's functions, so there is one palette.
 - CPU (`facade_windows` in `src/render/waterfront.c`): every frame, each building within
   `BUILDING_WINDOW_NEAR_RANGE` (430 m, horizontal) and in view expands its facades that face the
-  camera into glow quads tinted by the window light. Beyond the range the CPU view draws no
+  camera into glow quads tinted by the window light (the reveal bands for all, the relief within
+  `BUILDING_WINDOW_DEEP_RANGE` of the camera). Beyond the range the CPU view draws no
   windows, as for generic ones.
 - GPU (`src/render/renderer_gpu.c`, `assets/shaders/waterfront_city.*`): wall triangles with role
   `wall` join the facade mesh (the `a, c, b / a, d, c` pairing is the kit's emission order), `roof`
   the roof mesh, `detail` the flat mesh. Each frame `window_select` expands the 512 m detail cells
   within the near range plus a 96 m prefetch of the followed boat (the camera without a player)
-  into window meshes drawn by the windows pass, and releases cells beyond twice the range. Beyond
+  into window meshes drawn by the windows pass (and, per facade, the relief meshes within the deep
+  range, see Window generation), and releases cells beyond twice the range. Beyond
   430 m the facade shader draws the same grid: each wall vertex carries its facade record number
   (the y of its normal, free on a horizontal wall) and `facadeData`, a three-texel RGBA32F row per
   record, gives the shader the seed halves, counts and style. The shader repeats the generator's

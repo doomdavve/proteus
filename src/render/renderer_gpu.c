@@ -1299,13 +1299,11 @@ static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuSce
     scene->window_cell_facades = malloc(count * sizeof(*scene->window_cell_facades));
     scene->window_cells = calloc(cells, sizeof(*scene->window_cells));
     scene->window_cell_ready = calloc(cells, 1);
-    scene->window_reveals = calloc(count, sizeof(*scene->window_reveals));
     scene->window_reveal_ready = calloc(count, 1);
     scene->window_facade_total = (unsigned)count;
     unsigned *cell_of = malloc(count * sizeof(*cell_of));
     if (!scene->window_cell_start || !scene->window_cell_facades || !scene->window_cells
-        || !scene->window_cell_ready || !scene->window_reveals || !scene->window_reveal_ready
-        || !cell_of) {
+        || !scene->window_cell_ready || !scene->window_reveal_ready || !cell_of) {
         free(cell_of);
         return false;
     }
@@ -1396,45 +1394,43 @@ static void add_reveal(const BuildingWindow *w, void *user)
                 faces[i].corners[2], faces[i].corners[3], faces[i].color);
 }
 
-static void reveal_release(WaterfrontGpuScene *scene, unsigned facade)
-{
-    for (int i = 0; i < scene->window_reveals[facade].count; ++i)
-        scene->window_reveal_triangles
-            -= (size_t)scene->window_reveals[facade].meshes[i].triangleCount;
-    tiled_destroy(&scene->window_reveals[facade]);
-    scene->window_reveal_ready[facade] = 0;
-}
-
-// The relief (building_window_reveal) of every window of one facade, as one mesh.
-static bool reveal_expand(WaterfrontGpuScene *scene, unsigned facade)
+// The relief (building_window_reveal) of every facade marked active, as one mesh set, so the
+// pass costs a few submissions however many facades are near.
+static bool reveal_rebuild(WaterfrontGpuScene *scene)
 {
     const BoatMapDescription *map = scene->window_map;
     size_t count = 0, styles = 0;
     const BoatSceneryFacade *facades = boat_scenery_facades(map, &count);
     const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
-    BuildingWall wall;
-    if (!building_wall(map->mesh, &facades[facade], &wall))
-        return false;
+    for (int i = 0; i < scene->window_reveal.count; ++i)
+        scene->window_reveal_triangles -= (size_t)scene->window_reveal.meshes[i].triangleCount;
+    tiled_destroy(&scene->window_reveal);
     TiledBuilder one = { 0 };
     if (!tiled_builder_init(&one, 1))
         return false;
-    RevealQuads quads = { &one.tiles[0], &wall, true };
-    building_windows(&facades[facade], &style[facades[facade].style], &wall, add_reveal, &quads);
-    if (!quads.ok) {
+    bool any = false;
+    RevealQuads quads = { &one.tiles[0], NULL, true };
+    for (unsigned f = 0; f < scene->window_facade_total && f < count; ++f) {
+        BuildingWall wall;
+        if (!scene->window_reveal_ready[f] || !building_wall(map->mesh, &facades[f], &wall))
+            continue;
+        quads.wall = &wall;
+        building_windows(&facades[f], &style[facades[f].style], &wall, add_reveal, &quads);
+        any = true;
+    }
+    if (!quads.ok || !any) {
         tiled_builder_destroy(&one);
-        return false;
+        return quads.ok;
     }
     WaterfrontGpuGeometry saved = scene->geometry;
     binding_scene = scene;
-    bool ok = tiled_builder_finish(&one, &scene->window_reveals[facade], STATIC_UNLIT);
+    bool ok = tiled_builder_finish(&one, &scene->window_reveal, STATIC_UNLIT);
     binding_scene = NULL;
     scene->geometry = saved;
-    for (int i = 0; ok && i < scene->window_reveals[facade].count; ++i)
-        scene->window_reveal_triangles
-            += (size_t)scene->window_reveals[facade].meshes[i].triangleCount;
-    scene->window_reveal_ready[facade] = ok;
+    for (int i = 0; ok && i < scene->window_reveal.count; ++i)
+        scene->window_reveal_triangles += (size_t)scene->window_reveal.meshes[i].triangleCount;
     if (!ok)
-        tiled_destroy(&scene->window_reveals[facade]);
+        tiled_destroy(&scene->window_reveal);
     return ok;
 }
 
@@ -1523,6 +1519,7 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
 {
     size_t count = 0;
     const BoatSceneryFacade *facades = boat_scenery_facades(scene->window_map, &count);
+    bool changed = false;
     for (unsigned i = 0; i < scene->window_facade_total && i < count; ++i) {
         BuildingWall wall;
         if (!building_wall(scene->window_map->mesh, &facades[i], &wall))
@@ -1534,11 +1531,16 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
         t = fminf(fmaxf(t, 0), 1);
         float dx = anchor.x - (wall.origin.x + ex * t), dz = anchor.z - (wall.origin.z + ez * t);
         float distance = sqrtf(dx * dx + dz * dz);
-        if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE)
-            reveal_expand(scene, i);
-        else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 40.0f)
-            reveal_release(scene, i);
+        if (!scene->window_reveal_ready[i] && distance <= BUILDING_WINDOW_DEEP_RANGE) {
+            scene->window_reveal_ready[i] = 1;
+            changed = true;
+        } else if (scene->window_reveal_ready[i] && distance > BUILDING_WINDOW_DEEP_RANGE + 40.0f) {
+            scene->window_reveal_ready[i] = 0;
+            changed = true;
+        }
     }
+    if (changed)
+        reveal_rebuild(scene);
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -1784,12 +1786,8 @@ static void unbind_map(WaterfrontGpuScene *scene)
     if (scene->window_cells)
         for (int cell = 0; cell < scene->window_cell_total; ++cell)
             tiled_destroy(&scene->window_cells[cell]);
-    if (scene->window_reveals)
-        for (unsigned i = 0; i < scene->window_facade_total; ++i)
-            tiled_destroy(&scene->window_reveals[i]);
-    free(scene->window_reveals);
+    tiled_destroy(&scene->window_reveal);
     free(scene->window_reveal_ready);
-    scene->window_reveals = NULL;
     scene->window_reveal_ready = NULL;
     scene->window_reveal_triangles = 0;
     scene->window_facade_total = 0;
@@ -3458,16 +3456,12 @@ static void draw_windows(const WaterfrontGpuScene *scene, Material material)
                 ++counting->tiles_culled[counting_pass];
         }
     }
-    for (unsigned f = 0; f < scene->window_facade_total; ++f) {
-        if (!scene->window_reveal_ready[f])
-            continue;
-        const WaterfrontGpuTiled *tiled = &scene->window_reveals[f];
-        for (int i = 0; i < tiled->count; ++i) {
-            if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
-                submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
-            else if (counting)
-                ++counting->tiles_culled[counting_pass];
-        }
+    const WaterfrontGpuTiled *relief = &scene->window_reveal;
+    for (int i = 0; i < relief->count; ++i) {
+        if (scene->culling_disabled || box_in_view(view_projection, relief->bounds[i]))
+            submit(relief->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
+        else if (counting)
+            ++counting->tiles_culled[counting_pass];
     }
     enabled = 0;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
