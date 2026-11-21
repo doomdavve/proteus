@@ -44,13 +44,13 @@ typedef struct {
     // the others by window_dark.
     float window_light;
     Vector3 window_lit, window_dark;
+    // Multiplies self-coloured surfaces that are not lights, such as gulls and traffic wakes.
+    Vector3 unlit;
     // The clock behind the window light, from waterfront_lighting_hour: lit windows then follow
     // their schedule (building_window_lit) at WINDOW_MINUTE, the minute of the day. A fixed
     // daylight phase has none and lights every occupied window.
     bool window_clock;
     int window_minute;
-    // Multiplies self-coloured surfaces that are not lights, such as gulls and traffic wakes.
-    Vector3 unlit;
 } WaterfrontLighting;
 
 // The minute building_window_lit takes: the lighting's clock, or -1 without one.
