@@ -5,10 +5,10 @@ the user saw the per-window distribution after the seed fix and said "Much bette
 [B3b results](#b3b-results--2026-11-21).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: expansion hitch and qualification (B4).
+Open: B4 remainder (browser, wider platforms, human review); measurements, packaging and staleness done, see [B4 results](#b4-results--2026-11-21).
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: B4 qualification. Delivery: B3b and B4 share one branch (`feat/buildings-b3b`) and one PR.
+Next: finish B4 (browser run, then ask for the PR). Delivery: B3b and B4 share one branch (`feat/buildings-b3b`) and one PR.
 
 ## Intent and boundaries
 
@@ -771,3 +771,33 @@ GLSL test; the stills agree in character, not bit for bit), browser/WebGL2, Wind
 Working Harbour clock sweeping through an evening in motion, a district-by-district look (industrial
 and workplace profiles were not inspected on screen), human review. Known limit: `quiet` is only
 reachable by an authored `lighting` entry or a shed with windows (none today).
+
+## B4 results — 2026-11-21
+
+Machine: MacBook Pro M1 Max, macOS, AC power, Release (`-O3`). B3 = the merged build in
+`/private/tmp/proteus-buildings` (30714a7), B3b = `cd65507`. Three interleaved runs each, 600 frames
+per fixed view (`--demo-idle`) and 1,800 frames per scripted drive, `--no-vsync`, `--performance-report`.
+The B3 binary predates `--no-audio`, so only B3b ran with it. Other work was idle on the machine.
+
+- GPU cost of B3b window lighting: no measurable change. gpu p50 (ms, B3 to B3b, three runs each)
+  eriksberg-near day 4.53-4.61 to 4.16-4.65, night 4.88-5.09 to 4.54-5.08; quay day 5.19-5.38 to
+  4.85-5.22, night 5.37-5.47 to 5.23-5.48; masth drive 6.12-6.25 to 5.78-6.23. Night costs about
+  0.3 ms more than day in both builds (lit windows). render p50 is bimodal run to run (1.6 or 4.5
+  ms) in B3b and B3 alike, so gpu p50 is the figure to read.
+- Expansion hitch: none beyond the first frame. Excluding the first three frames, the worst render
+  submit in the 1,800-frame Masthugget and Lindholmen drives was 9.4-15.7 ms in both builds, with at
+  most 30 frames over 10 ms (B3 Lindholmen run 3). The first frame is 220-270 ms in both (startup
+  upload, pre-existing). Spreading cell expansion over frames is not needed; lever dropped.
+- Pack size: outer `scenery.bin` 5,899,814 to 5,901,046 B, river 981,158 to 981,382 B (profile byte
+  only); no new sidecar.
+- Packaging: macOS (`tools/macos/package.py`, `macos-boat.yml`), Windows (`windows-boat.yml`) and web
+  (`cmake/Web.cmake`, `tools/package_web.py`) already ship `ambient.bin` and `water_atlas.bin` for
+  `outer` (read from the scripts; no package was built here). The "macOS omits sidecars" hazard above is
+  stale. River sidecars are not shipped, matching the retired river location.
+- Staleness: `ambient_river` and `ambient_outer` CTest checks pass on the rebaked packs.
+- Full CTest preset at `cdf1e5a`: 611 of 611 (before the plan edits).
+
+Not verified: browser (web build not run), Windows and Linux, Instruments (no measurement warranted
+it), first-frame upload split, bounds of projecting features in shadow and reflection passes beyond
+the existing validators, human review of dusk and night in motion beyond "Much better!" on the
+window distribution.
