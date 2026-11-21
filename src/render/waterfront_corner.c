@@ -532,7 +532,15 @@ static float street_distance(Vector3 p)
     return best;
 }
 
-static void build_frontages(Builder *k, const Mesh3D *city)
+// An authored composition (tools/building_compose.py) builds its own entrances, shopfronts and
+// canopies as attached architecture, so the generic frontage and forecourt passes leave its walls
+// alone. The fallback wall role and unmigrated buildings keep them.
+static bool composed_wall(const unsigned char *roles, size_t triangle)
+{
+    return roles && roles[triangle] >= BOAT_SCENERY_ROLE_WALL_PLASTER;
+}
+
+static void build_frontages(Builder *k, const Mesh3D *city, const unsigned char *roles)
 {
     static const Color trims[] = { { 65, 112, 106, 255 }, { 113, 65, 60, 255 },
         { 64, 86, 113, 255 }, { 153, 133, 89, 255 } };
@@ -540,7 +548,8 @@ static void build_frontages(Builder *k, const Mesh3D *city)
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]], c = city->vertices[t->vertices[1]];
         Vector3 b = city->vertices[t->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12)
+        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12
+            || composed_wall(roles, i))
             continue;
         float length = Vector3Distance(a, b);
         Vector3 middle = Vector3Scale(Vector3Add(a, b), .5f);
@@ -620,7 +629,7 @@ static void garden_court(Builder *k, float v)
     }
 }
 
-static void build_forecourts(Builder *k, const Mesh3D *city)
+static void build_forecourts(Builder *k, const Mesh3D *city, const unsigned char *roles)
 {
     // Larger purposeful groups carry across a whole frame, where individual chairs
     // disappear. These are inferred uses of empty land, not surveyed businesses.
@@ -628,7 +637,8 @@ static void build_forecourts(Builder *k, const Mesh3D *city)
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]], c = city->vertices[t->vertices[1]];
         Vector3 b = city->vertices[t->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12)
+        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12
+            || composed_wall(roles, i))
             continue;
         float length = Vector3Distance(a, b);
         Vector3 p = Vector3Scale(Vector3Add(a, b), .5f);
@@ -782,11 +792,13 @@ bool waterfront_scenery_init_tiled(
     Builder *k = &builder;
     // On a kit ground the layout comes from the river map, whose flat 3.5 m ground the kit's
     // placement rules read; the boxes are set on the ground afterwards.
+    const unsigned char *roles = boat_scenery_roles(scenery->full);
     if (scenery->ground) {
         const BoatMapDescription *river = boat_scenery_of(&waterfront_city_river_map);
         if (!river)
             goto failed;
         city = river->mesh;
+        roles = boat_scenery_roles(river);
     }
     k->surfaces = calloc(city->triangle_count, sizeof(*k->surfaces));
     if (!k->surfaces)
@@ -807,9 +819,9 @@ bool waterfront_scenery_init_tiled(
         build_cafe(k);
         build_streets(k);
     }
-    build_frontages(k, city);
+    build_frontages(k, city, roles);
     build_quays(k, city);
-    build_forecourts(k, city);
+    build_forecourts(k, city, roles);
     free(k->surfaces);
     k->surfaces = NULL;
     surface_grid_destroy(k);

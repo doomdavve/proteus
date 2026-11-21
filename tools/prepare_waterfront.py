@@ -291,11 +291,7 @@ def prepare(output, expanded=False):
         manifest_buildings.append({"osm": f"{e['type']}/{e['id']}", "height": height,
                                    "basis": basis, "courtyards": sum(len(p.interiors) for p in polygons(shape)),
                                    "parts": [key for _, _, key in matching]})
-    records = building_kit.Emitter(
-        triangle, lambda: len(triangles),
-        lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)]).emit_all(descriptions)
-    solid_union = unary_union(solids)
-    roads = []
+    roads, streets = [], []
     for e in elements:
         tags = e.get("tags", {})
         if "highway" not in tags or tags.get("bridge") == "yes" or tags.get("tunnel") == "yes":
@@ -303,9 +299,22 @@ def prepare(output, expanded=False):
         pts = coordinates(e.get("geometry", []))
         if len(pts) < 2:
             continue
-        width = 2 if tags["highway"] in {"path", "footway", "steps", "cycleway"} else 6
-        roads.append(LineString(pts).buffer(width / 2, cap_style=2, join_style=2))
+        footway = tags["highway"] in {"path", "footway", "steps", "cycleway"}
+        road = LineString(pts).buffer((2 if footway else 6) / 2, cap_style=2, join_style=2)
+        roads.append(road)
+        if not footway:
+            streets.append(road)
     road_union = unary_union(roads)
+    # Attached architecture (balconies, canopies, cornices) must stay out of the water and clear
+    # of vehicle streets; footways may pass under it.
+    obstacles = unary_union([water.buffer(.5)] + streets)
+    compositions = building_kit.load_compositions(map_name="river")
+    records = building_kit.Emitter(
+        triangle, lambda: len(triangles),
+        lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)],
+        compositions=compositions, obstacles=obstacles)
+    records = records.emit_all(descriptions)
+    solid_union = unary_union(solids)
     road_surface = road_union.intersection(land).difference(solid_union)
     if expanded:
         road_surface = road_surface.difference(approach_footprint)
