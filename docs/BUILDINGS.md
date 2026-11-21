@@ -1,8 +1,32 @@
 # Buildings
 
-Specification of the building data contract as implemented. It grows with the
-[buildings plan](BUILDINGS_PLAN.md); sections for source schema, families and facade
-construction are added when they exist. Nothing here describes unimplemented behaviour.
+Specification of how buildings go from mapped source to screen, as implemented: the pack
+records, window generation and lighting, the shared kit, authored compositions, automatic
+families, the report and override mechanism, the renderers' consumption and the generated
+outputs. It is the contract; the history, measurements and decisions are in the
+[buildings plan](BUILDINGS_PLAN.md) (done 2026-11-21). Nothing here describes unimplemented
+behaviour. To trace one building from source to screen, start at the
+[source and coordinates](#source-coordinates-and-heights) section, then follow
+[the report](#the-report-and-one-way-to-override-a-building).
+
+## Source, coordinates and heights
+
+Footprints, heights and tags come from the OpenStreetMap crop that `tools/prepare_waterfront.py`
+reads (the river crop, X -1500..950, Z -1600..800 m; see `3D.md`) and from the outer map's
+dressing source read by `tools/outer_dressing.py` (everything else on `outer`). Pack coordinates are
+metres in the pack's axes; the simulation's x is minus the pack's x (heading 0 faces -Z). A
+building is a stable source id (`way/N`, `relation/N`, `#K` for the K-th piece of a footprint
+clipped to the bake area), one or more sections (footprint polygon, bottom and top) and tags.
+Heights: the `height` tag, else `building:levels` times 3 m plus 1 m, else a footprint-scale
+estimate the report marks as `fallback`; parts partition their parent by height (highest overlapping
+part wins). The river crop stands on a flat 3.5 m quay; the outer map drapes each building on the
+lowest terrain under its footprint (`prepare_outer_map.py`), so raised parts follow it. Provenance
+of each choice is in `buildings.json` (see the report below).
+
+Boundaries: the collision data, the water, `water.h` and the digests ignore buildings, so a rebake
+of building geometry never changes simulation (CTest `building_packs`). Fallbacks, in order:
+override entry, supported facts, inference, plain block; a geometry element the triangulator
+refuses is left out, never a failed bake.
 
 ## Scenery pack v4 building records
 
@@ -124,12 +148,30 @@ the crc string so that the facade shader can repeat the formula exactly. Moving,
 adding other buildings never changes a window; changing a building's id or the number of a wall
 (an extra wall before it in the footprint ring) does.
 
-## Commands
+## Commands and tests
 
 ```sh
 python -I tools/map_pack.py --self-test        # writer, round trip, invalid records, v1
 build/validate_boat_scenery                    # loader cases (CTest: boat_scenery)
+build/validate_building_windows                # generator, schedules (CTest: building_windows)
 ```
+
+Other entry points (all in `ctest --preset full`; the Python ones need the tool dependencies):
+`building_kit` and `building_families` (fixtures of the emitters and the family rules),
+`building_packs` (shipped packs: the 32,767 facade limit, water and digest unchanged), `building_report` (every override names a baked building), `ambient_river` and
+`ambient_outer` (ambient occlusion matches the pack), `waterfront_lighting` (the window clock stays
+out of the blend). Tests drive a virtual minute, never the wall clock.
+
+### Adding a family or a window style safely
+
+1. Add the recipe to `tools/building_families.py` (a choice rule from facts, then a build) and its
+   fixture in the same file; a family only changes colour, material, window style, roof shape,
+   doors and cheap setbacks, never invents a shop or an entrance.
+2. A new window style is a row in `STYLES` of `tools/building_kit.py` and a name in
+   `building_compose.STYLE_NAMES`; the loader validates the grid, and `validate_building_windows` pins the generator.
+3. Rebake both packs, then `ambient_bake` for both maps, then `python3 tools/building_report.py
+   --check`; the pack-size and facade-count budgets are checked by `building_packs`.
+4. Look at it (CPU capture and GPU, day, dusk and night) before trusting the numbers.
 
 ## Shared building kit (`tools/building_kit.py`)
 
@@ -394,4 +436,4 @@ fails when stale). `water.h` and the water atlas are unchanged by a rebake (CTes
 `building_packs`). The macOS package and the Windows workflow ship the outer map's
 `water_atlas.bin` and `ambient.bin` next to its pack (they were missing from them before B1); the
 web build preloads the river pack and serves the outer pack with both sidecars lazily, by
-globbing `assets/geometry/*/*.bin`, so a version 2 pack needs no list change.
+globbing `assets/geometry/*/*.bin`, so a new pack version needs no list change.

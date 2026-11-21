@@ -1,14 +1,16 @@
-Status, 2026-11-21: B0 to B3 merged (PR #226; the user accepted the B2 look and the B3 frame cost and
-agreed untagged buildings stay plain blocks). B3b implemented on `feat/buildings-b3b`: windows light
-by hour and district (profile per facade, pure integer schedule mirrored in the facade shader);
-the user saw the per-window distribution after the seed fix and said "Much better!" (in play, GPU, 2026-11-21); no PR yet. Checks, numbers, limits:
-[B3b results](#b3b-results--2026-11-21).
+Status, 2026-11-21: done. B0 to B4 merged (#226, #228) and the contract is the
+[buildings spec](BUILDINGS.md); this plan is history. The user accepted the B2 look, the B3 frame
+cost and plain untagged buildings, and the B3b window distribution in play ("Much better!").
+Open items (not scheduled): browser run of the building packs and window lighting (no Emscripten
+here; web packaging checked by reading only), Windows and Linux visual and Release checks (CI
+passes the CTest lane only), dusk and night in motion through the full day cycle, balconies over
+streets that only touch the 6 m street polygon, a deeper stepped-block cut, spreading cell
+expansion over frames (dropped: no hitch measured), a GLSL-versus-C bit test of `window_lit`,
+the Gotaverken sheds at boat level. Deferred elsewhere: crane and landmark work and living-city
+actors keep their owners.
+Done when: met (spec written, packs verified, user accepted the visuals listed above).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: B4 remainder (browser, wider platforms, human review); measurements, packaging and staleness done, see [B4 results](#b4-results--2026-11-21).
-Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
-specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: finish B4 (browser run, then ask for the PR). Delivery: B3b and B4 share one branch (`feat/buildings-b3b`) and one PR.
 
 ## Intent and boundaries
 
@@ -217,7 +219,7 @@ is a B4 candidate if a hitch is measured.
 Acceptance: measured budgets hold, required automated checks pass and review artifacts expose
 motion/pop/shadow/reflection behaviour. Automated demo exit is not human acceptance. Next: B5.
 
-### B5 — Close with the implemented specification
+### B5 — Close with the implemented specification (done 2026-11-21)
 
 - Finish BUILDINGS.md as the source-to-rendering spec: source/provenance and coordinates;
   identities and parts; terrain/height policy; recipe selection and override precedence;
