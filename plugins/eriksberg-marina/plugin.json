@@ -1,0 +1,11 @@
+{
+  "id": "proteus.eriksberg-marina",
+  "name": "Eriksberg marina",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "modules": ["eriksberg_pontoons"],
+  "location": "outer",
+  "capabilities": ["voyage.define", "scene.define"],
+  "state_version": 1
+}

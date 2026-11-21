@@ -37,11 +37,11 @@ NAME_RULE = ("must be 1-3 dot-separated names of a-z, 0-9 and '_', each starting
 V1_MESSAGE = "version 1 bundles are not supported; re-export"
 
 
-OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
+OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "map", "capture", "export",
               "import", "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
               "live-undo", "live-discard", "live-console", "sync-shared", "init", "check", "status",
               "stage", "apply", "undo", "discard", "console", "play"]
-WORKSPACE_OPERATIONS = ("init", "check", "status", "stage", "apply", "undo", "discard", "console",
+WORKSPACE_OPERATIONS = ("init", "check", "map", "status", "stage", "apply", "undo", "discard", "console",
                         "play")
 LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard", "console")
 RESPONSE_MAX = 32768
@@ -521,6 +521,41 @@ def workspace_write(directory, filename, content, expected_bundle):
     return result
 
 
+MAP_PROBES = 24
+MAP_CELLS = 4096
+
+
+def map_args_checked(request):
+    """Worker arguments for a map request: {"probe": [(x, z)...]} or {"box": (x0, z0, x1, z1),
+    "step": metres}. The worker re-checks every limit; this keeps bad input out of argv."""
+    if not isinstance(request, dict):
+        raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
+    if request.get("hulls"):
+        return ["hulls"]
+    if request.get("probe"):
+        points = request["probe"]
+        if len(points) > MAP_PROBES:
+            raise ValueError(f"map takes at most {MAP_PROBES} probes")
+        return ["probe"] + [repr(float(v)) for point in points for v in point]
+    box = request.get("box")
+    if not box or len(box) != 4:
+        raise ValueError("map needs --probe X,Z (repeatable) or --box X0,Z0,X1,Z1 [--step M]")
+    step = float(request.get("step", 1.0))
+    if not 0.25 <= step <= 8:
+        raise ValueError(f"map step {step:g} m is outside 0.25..8 m")
+    x0, x1 = sorted((float(box[0]), float(box[2])))
+    z0, z1 = sorted((float(box[1]), float(box[3])))
+    cols, rows = math.ceil((x1 - x0) / step) + 1, math.ceil((z1 - z0) / step) + 1
+    if cols * rows > MAP_CELLS:
+        fit = next((s for s in (0.25, 0.5, 1, 2, 4, 8) if
+                    (math.ceil((x1 - x0) / s) + 1) * (math.ceil((z1 - z0) / s) + 1) <= MAP_CELLS),
+                   None)
+        advice = (f"use --step {fit:g}" if fit else "split the box into smaller boxes")
+        raise ValueError(f"map box is {cols} x {rows} = {cols * rows} cells at {step:g} m; the "
+                         f"limit is {MAP_CELLS}. {advice}")
+    return ["box"] + [repr(float(v)) for v in box] + [repr(step)]
+
+
 class ValidationJob:
     """One immutable request. Caller supplies monotonic NOW; poll never runs Lua or waits.
 
@@ -529,8 +564,11 @@ class ValidationJob:
     """
 
     def __init__(self, worker, payload, base_revision, now, timeout=5.0,
-                 expected_bundle=None, operation="validate", ticks=360):
-        if (operation not in ("validate", "preview") or type(ticks) is not int
+                 expected_bundle=None, operation="validate", ticks=360, map_args=None):
+        if operation == "map":
+            ticks = 0
+            self.map_args = map_args_checked(map_args)
+        if (operation not in ("validate", "preview", "map") or type(ticks) is not int
                 or not 0 <= ticks <= 72000):
             raise ValueError("preview ticks must be an integer in [0, 72000]")
         self.operation = operation
@@ -555,6 +593,8 @@ class ValidationJob:
             command = [str(Path(worker).resolve())]
             if operation == "preview":
                 command += ["--preview", str(ticks)]
+            elif operation == "map":
+                command += ["--map"] + self.map_args
             self.process = subprocess.Popen(command, stdin=self.input,
                                             stdout=self.output, stderr=subprocess.DEVNULL,
                                             close_fds=True)
@@ -592,9 +632,9 @@ class ValidationJob:
         if code is None:
             return None
         self.output.seek(0)
-        data = self.output.read(8193)
+        data = self.output.read(16385)
         try:
-            if len(data) > 8192 or code not in (0, 1):
+            if len(data) > (16384 if self.operation == "map" else 8192) or code not in (0, 1):
                 raise ValueError("invalid worker exit/output")
             evidence = json.loads(data)
             if not isinstance(evidence, dict) or not isinstance(evidence.get("status"), str):
@@ -617,6 +657,19 @@ class ValidationJob:
         self.cancel()
 
 
+def map_request(args):
+    try:
+        if args.hulls:
+            return {"hulls": True}
+        if args.probe:
+            return {"probe": [tuple(float(v) for v in text.split(",", 1)) for text in args.probe]}
+        if args.box:
+            return {"box": tuple(float(v) for v in args.box.split(",")), "step": args.step}
+    except ValueError:
+        raise ValueError("map coordinates are numbers: --probe X,Z or --box X0,Z0,X1,Z1") from None
+    return None
+
+
 def anchors():
     with open(LAYOUT["anchors"], encoding="utf-8") as stream:
         return json.load(stream)
@@ -627,6 +680,22 @@ def find_anchor(name):
         if anchor["id"] == name:
             return anchor
     raise ValueError(f"unknown anchor {name}; see the anchors operation")
+
+
+def capture_anchor(args):
+    """The named anchor, or the ad-hoc pose --pose X,Z,DEGREES (outer; heading 0 faces -z)."""
+    if getattr(args, "anchor", None) and getattr(args, "pose", None):
+        raise ValueError("use --anchor or --pose, not both")
+    if getattr(args, "pose", None):
+        try:
+            x, z, heading = (float(v) for v in args.pose.split(","))
+        except ValueError:
+            raise ValueError("--pose is X,Z,DEGREES") from None
+        if not all(math.isfinite(v) for v in (x, z, heading)) or abs(x) > 20000 or abs(z) > 20000:
+            raise ValueError("--pose values must be finite and within 20000 m")
+        return {"id": f"pose:{x:g},{z:g},{heading:g}", "location": "outer", "x": x, "z": z,
+                "heading_degrees": heading}
+    return find_anchor(args.anchor) if args.anchor else None
 
 
 def png_size(frame):
@@ -940,6 +1009,14 @@ def main():
     parser.add_argument("--check", action="store_true", help="sync-shared: report drift only")
     parser.add_argument("--game", type=Path, default=LAYOUT["game"])
     parser.add_argument("--anchor")
+    parser.add_argument("--pose", metavar="X,Z,DEGREES",
+                        help="capture/check: an ad-hoc boat pose on outer water instead of --anchor")
+    parser.add_argument("--probe", action="append", metavar="X,Z",
+                        help="map: a point to query (repeatable, at most 24)")
+    parser.add_argument("--box", metavar="X0,Z0,X1,Z1", help="map: a grid over this box")
+    parser.add_argument("--hulls", action="store_true",
+                        help="map: the hull recipes and the berth envelope rule")
+    parser.add_argument("--step", type=float, default=1.0, help="map: grid cell metres, 0.25..8")
     parser.add_argument("--time", type=float, default=1.0)
     parser.add_argument("--camera-distance", type=float)
     parser.add_argument("--camera-height", type=float)
@@ -1022,12 +1099,13 @@ def main():
             camera = {key: value for key, value in (("distance", args.camera_distance),
                       ("height", args.camera_height)) if value is not None}
             job = CaptureJob(args.game, snapshot(args.directory), offline_base,
-                             time.monotonic(), find_anchor(args.anchor) if args.anchor else None,
+                             time.monotonic(), capture_anchor(args),
                              args.time, camera, args.timeout or 20, args.expect_bundle)
         else:
             job = ValidationJob(args.worker, snapshot(args.directory), offline_base,
                                 time.monotonic(), args.timeout or 5, args.expect_bundle,
-                                args.operation, args.ticks)
+                                args.operation, args.ticks,
+                                map_request(args) if args.operation == "map" else None)
         while (result := job.poll(time.monotonic())) is None:
             time.sleep(.01)
         if args.operation == "capture" and result["status"] == "ok":

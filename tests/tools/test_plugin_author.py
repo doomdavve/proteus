@@ -621,6 +621,84 @@ class AgentWorkspace(unittest.TestCase):
         self.assertIn(str(self.server.pid), result["message"])
 
 
+class MapQuery(unittest.TestCase):
+    """`map` answers from the compiled outer water with the draft overlaid (docs/PLUGIN_API.md,
+    Eriksberg marina layout). It is exact, deterministic and bounded."""
+
+    def run_map(self, directory, **request):
+        job = author.ValidationJob(WORKER, author.snapshot(directory), 0, 0, timeout=20,
+                                   operation="map", map_args=request)
+        try:
+            job.process.wait()  # Virtual clock: the deadline can never pass at now = 0.
+            return job.poll(0)
+        finally:
+            job.close()
+
+    def test_fixture_probes(self):
+        points = [(34.1, 161.5), (21.175, 161.5), (38, 173), (13, 151), (4, 140), (-300, 0)]
+        result = self.run_map(ROOT / "plugins/harbor-life", probe=points)
+        self.assertEqual(result["status"], "ok")
+        probes = result["evidence"]["map"]["probes"]
+        self.assertTrue(result["evidence"]["map"]["overlay"])
+        self.assertEqual([p["surface"] for p in probes],
+                         ["land", "water", "land", "water", "water", probes[5]["surface"]])
+        self.assertEqual(probes[0]["occupied_by"], [{"id": "ramp", "kind": "gangway"}])
+        self.assertIn("ground_m", probes[2])
+        self.assertEqual(probes[2]["occupied_by"][0]["kind"], "quay_deck")
+        self.assertEqual(probes[3]["occupied_by"], [{"id": "runabout", "kind": "berth"}])
+        self.assertTrue(probes[4]["in_entrance"])
+        self.assertGreater(probes[4]["clear_water_m"], 0)
+
+    def test_grid_is_deterministic_and_marks_the_draft(self):
+        box = (-30, 140, 45, 182)
+        first = self.run_map(ROOT / "plugins/harbor-life", box=box, step=1.0)
+        again = self.run_map(ROOT / "plugins/harbor-life", box=box, step=1.0)
+        self.assertEqual(first, again)
+        grid = first["evidence"]["map"]["grid"]
+        self.assertEqual((grid["cols"], grid["rows"]), (76, 43))
+        self.assertEqual(len(grid["rows_text"]), 43)
+        text = "".join(grid["rows_text"])
+        for glyph in "~#+=QBE":
+            self.assertIn(glyph, text)
+        # Column 0 is the largest x: the quay deck at x = 38 lies on the west (left) edge.
+        row = grid["rows_text"][grid["rows"] - 1 - (173 - 140)]
+        self.assertEqual(row[45 - 38], "Q")
+
+    def test_hulls_traffic_and_clear_errors(self):
+        hulls = self.run_map(ROOT / "plugins/harbor-life", hulls=True)["evidence"]["map"]["hulls"]
+        recipes = {r["recipe"]: r for r in hulls["recipes"]}
+        self.assertEqual(set(recipes), {"skiff", "runabout", "sailboat", "cruiser", "speedboat",
+                                        "sailboat_7m", "workboat"})
+        for recipe in recipes.values():
+            self.assertAlmostEqual(recipe["envelope_length_m"], recipe["length_m"] + 1.8, 2)
+            self.assertAlmostEqual(recipe["envelope_beam_m"], recipe["beam_m"] + .9, 2)
+        grid = self.run_map(ROOT / "plugins/harbor-life", box=(-46, 130, 26, 210), step=2.0)
+        grid = grid["evidence"]["map"]
+        self.assertEqual([t["id"] for t in grid["traffic"]][:2], ["passing", "ferry"])
+        self.assertIn("t", "".join(grid["grid"]["rows_text"]))
+        with self.assertRaises(ValueError) as caught:
+            self.run_map(ROOT / "plugins/harbor-life", box=(-46, 110, 26, 200), step=1.0)
+        self.assertIn("6643 cells", str(caught.exception))
+        self.assertIn("--step 2", str(caught.exception))
+
+    def test_rejected_draft_still_maps_without_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "pkg"
+            shutil.copytree(ROOT / "plugins/langedrag", directory)
+            (directory / "main.lua").write_bytes(b"this is not lua")
+            result = self.run_map(directory, probe=[(0, 0)])
+        self.assertEqual(result["status"], "rejected")
+        self.assertFalse(result["evidence"]["map"]["overlay"])
+
+    def test_limits_are_refused(self):
+        for request in ({"probe": [(0, 0)] * 25}, {}, {"box": (0, 0, 1)}):
+            with self.assertRaises(ValueError):
+                self.run_map(ROOT / "plugins/langedrag", **request)
+        for box, step in (((0, 0, 100, 100), 1.0), ((0, 0, 10, 10), 0.1), ((0, 0, 10, 10), 9.0)):
+            with self.assertRaises(ValueError):
+                self.run_map(ROOT / "plugins/langedrag", box=box, step=step)
+
+
 class Modules(unittest.TestCase):
     """M5 W4: packages with modules through snapshot, drafts, version 2 bundles and the worker."""
 

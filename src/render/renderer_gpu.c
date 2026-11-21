@@ -3389,6 +3389,7 @@ static void draw_scene(
 bool waterfront_gpu_scene_bind_harbor(WaterfrontGpuScene *scene, const WaterfrontHarborFrame *frame)
 {
     WaterfrontHarborModels candidate;
+    scene->harbor_models.mirror_lettering = true; // As the CPU path: the glyphs read left to right.
     if (!waterfront_harbor_models_prepare(&candidate, &scene->harbor_models, frame))
         return false;
     Mesh replacement[BOAT_SCENE_BERTHS];
