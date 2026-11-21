@@ -36,7 +36,7 @@ before the next is started (the sandbox plan's rule). Names are working names.
 
 | Rung | Boat and tools | New capability | Errands and places | Freedom |
 | --- | --- | --- | --- | --- |
-| R0 Dockhand | Small, slow open boat; no crane | Carry a parcel by hand-off at a quay; learn mooring | Free local errands between two or three sheltered quays near Eriksberg | The sheltered reach only, advised by chart marks; no hard walls |
+| R0 Dockhand | Rowing boat with a small attached outboard; no crane | Carry a parcel by hand-off at a quay; learn mooring | Free local errands between two or three sheltered quays near Eriksberg | The sheltered reach only, advised by chart marks; no hard walls |
 | R1 Deckhand | Flat-deck workboat, the shipped crane and crate | Crane loading and lashing, as S1 | The existing landing, quay and jetty deliveries as a few varied errands | The river reach and the marina |
 | R2 Hauler | Faster launch within the cargo class, plus a tow fitting (T0) | Tow a disabled craft to shelter | Casualty errands, parcels with deadlines but no countdown penalty | Open river up to the bridges |
 | R3 Skipper | Crane-equipped tug or heavy workboat | Barges and heavy loads, work away from a crane | Projects that change places (a finger pier, a repaired landing) | The whole `outer` map in suitable conditions |
@@ -86,6 +86,24 @@ Candidates considered:
 Consequence: the scene needs moored player boats, and CL4 must render and contact-test them
 through the harbour's berth system.
 
+## R0 boat (decided 2026-11-21)
+
+Decision (the user, 2026-11-21): R0 is **a rowing boat with a small attached motor**. Notes for
+CL0, not yet designed:
+
+- The visual starting point is the existing `BOAT_MODEL_SKIFF` recipe (4.5 x 1.9 m, open hull and
+  benches), whose `engines` field allows one outboard; no new mesh family is needed to try it.
+  Oars and a rowing animation would be new work and are not assumed.
+- Handling is new data: slow, light and responsive, with a small motor (a few knots to low
+  teens, to be tuned by driving), a weak wake and strong sensitivity to waves and passing
+  ferries. This is the playable-hull work in [HARBOR_BOATS](HARBOR_BOATS.md#future-playable-boats)
+  (separate handling data, support dimensions from the hull, a physics revision bump).
+- Open for CL0: whether rowing is a playable mode (oars when the motor is off or out of fuel) or
+  only the look. A rowing fallback would suit the no-debt-spiral rule (an empty tank still
+  moves you, slowly) but is a mechanic, so decide it explicitly before S4 fuel.
+- Parcels are small enough to hand over at a quay without the crane; the workboat and crane
+  arrive at R1 as capability, so R0 teaches mooring and reading the harbour.
+
 ## The first purchase (decided 2026-11-21)
 
 "Free errands until the first purchase" needs a trigger when there is no money. The user
@@ -110,7 +128,7 @@ Playable steps need the user to play; the plan never infers acceptance.
 
 | Step | Result | Needs |
 | --- | --- | --- |
-| CL0 | Define R0's boat (slow, small; the 8-knot GRODAN is a candidate for its handling and a deck-less parcel hand-off) and the sheltered reach; write the progression state sketch | None; decisions made |
+| CL0 | Specify the R0 rowing boat (see [R0 boat](#r0-boat-decided-2026-11-21)), the sheltered reach and a parcel hand-off; write the progression state sketch | | None; decisions made |
 | CL1 | The working harbour becomes the default new-player path (title/menu), still reachable and still leaving free ride untouched; first-run flow lands on R0 with no HUD help text over the screen | CL0 |
 | CL2 | The errand board: three to five varied R0/R1 errands as package data, a local standing counter, errand chaining that reuses S1's delivery events; free, no money | CL1 |
 | CL3 | Progression state in the save (versioned, migrating the existing S1 save): standing, owned boats, unlocked reaches, completed projects; exactly-once for rewards; autosaves as today | CL2 |
