@@ -4,15 +4,15 @@
   "way/164963584": {
     "family": "brick",
     "note": "Eriksberg quay row, 6 levels: dark red brick block with a shopfront and teal canopy toward the basin quay",
-    "wall": [150, 78, 58], "roof": [74, 70, 72], "trim": [64, 54, 50],
+    "wall": [172, 94, 70], "roof": [98, 94, 96], "trim": [88, 72, 66],
     "ground": {"band": 4.2, "wall": [122, 110, 100], "material": "plaster", "style": "shop"},
     "parapet": 1.0, "cornice": 0.6,
-    "entrance": {"side": "west", "at": 0.5, "width": 3.4, "canopy": 2.4, "canopy_color": [38, 104, 100]}
+    "entrance": {"side": "west", "at": 0.5, "width": 3.6, "canopy": 2.6, "canopy_color": [30, 120, 112], "fascia": [30, 120, 112]}
   },
   "way/164963868": {
     "family": "brick",
     "note": "Low wing east of 164963584, same brick",
-    "wall": [142, 74, 56], "roof": [74, 70, 72], "trim": [64, 54, 50],
+    "wall": [164, 90, 68], "roof": [98, 94, 96], "trim": [88, 72, 66],
     "ground": {"band": 4.2, "wall": [122, 110, 100], "material": "plaster", "style": "shop"},
     "parapet": 0.9, "cornice": 0.5
   },
@@ -24,7 +24,8 @@
     "setbacks": [{"above": 21.5, "inset": 2.2}],
     "parapet": 0.8, "cornice": 0.35,
     "balconies": {"sides": ["west", "north", "south"], "from_floor": 0, "to_floor": -1, "span": 1, "every": 1,
-                  "depth": 1.7, "slab": [222, 218, 210], "front": [190, 92, 62]}
+                  "depth": 1.7, "slab": [222, 218, 210], "front": [190, 92, 62]},
+    "entrance": {"side": "west", "at": 0.5, "width": 3.0, "canopy": 2.0, "canopy_color": [190, 92, 62]}
   },
   "way/164963869": {
     "family": "stepped",
@@ -38,7 +39,7 @@
   "way/164963897": {
     "family": "brick",
     "note": "8 levels: yellow brick block with a strong cornice",
-    "wall": [198, 164, 96], "roof": [92, 84, 78], "trim": [86, 66, 52],
+    "wall": [206, 172, 102], "roof": [104, 96, 90], "trim": [104, 80, 62],
     "ground": {"band": 4.2, "wall": [96, 84, 76], "material": "plaster", "style": "shop"},
     "parapet": 1.0, "cornice": 0.6
   },

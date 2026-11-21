@@ -58,7 +58,7 @@ STYLE_LEGACY, STYLE_BALCONY, STYLE_RIBBON, STYLE_PUNCHED, STYLE_SHOP, STYLE_LOBB
 STYLES = [
     (2.5, 4.0, 1.5, 3.2, 2.2, 1.9, 1.5, 1.5, .035),  # the legacy grid (fallback buildings)
     (1.5, 4.0, 1.0, 3.2, 1.7, 1.9, 1.7, 1.9, .035),  # balcony block: doors and windows on a 4 m bay
-    (1.0, 4.0, 1.0, 3.2, 3.0, 1.5, 3.0, 1.5, .035),  # ribbon: wide glazing, narrow piers
+    (1.0, 4.0, 1.0, 3.2, 2.6, 1.5, 2.6, 1.5, .035),  # ribbon: wide glazing, narrow piers
     (1.4, 3.0, 1.0, 3.2, 1.2, 1.8, 1.2, 1.8, .035),  # punched: narrow, tall, close together
     (1.4, 4.4, .35, 3.2, 3.2, 2.9, 3.2, 2.9, .035),  # shopfront: broad glazing in a ground band
     (1.2, 3.4, .35, 3.2, 2.6, 3.0, 2.6, 3.0, .035),  # lobby/ground glazing
@@ -489,6 +489,12 @@ class Emitter:
             else:
                 canopy = 0
             report["entrance_canopy"] = round(canopy, 2)
+            if "fascia" in e:
+                # A signboard band along the whole ground floor of the entrance wall.
+                for g in rects:
+                    if g.get("ground") and g["a"] == a and g["b"] == bb and g["windows"] is not None:
+                        detail.prism(rect(g["u0"], g["u1"], -.05, .2), g["y1"] - .95, g["y1"] - .12,
+                                     e["fascia"], map_pack.ROLE_TRIM, hide=[line])
             centre = entrance["centre"]
             band = door["y1"] - y
             pier = trim

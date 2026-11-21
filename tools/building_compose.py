@@ -24,7 +24,7 @@ KEYS = {"map", "family", "wall", "roof", "trim", "material", "style", "ground", 
 GROUND_KEYS = {"band", "wall", "material", "style", "windows"}
 BALCONY_KEYS = {"sides", "from_floor", "to_floor", "span", "every", "offset", "depth", "slab",
                 "front"}
-ENTRANCE_KEYS = {"side", "at", "width", "canopy", "canopy_color", "door", "style"}
+ENTRANCE_KEYS = {"side", "at", "width", "canopy", "canopy_color", "door", "style", "fascia"}
 
 
 def polygons(shape):
@@ -145,7 +145,7 @@ def validate_params(ident, params):
             "side": e["side"], "at": _number(e.get("at", .5), f"{what}.entrance.at", .1, .9),
             "width": _number(e.get("width", 3.2), f"{what}.entrance.width", 1.6, 8),
             "canopy": _number(e.get("canopy", 2.0), f"{what}.entrance.canopy", 0, 3.5)}
-        for key in ("canopy_color", "door"):
+        for key in ("canopy_color", "door", "fascia"):
             if key in e:
                 out["entrance"][key] = _color(e[key], f"{what}.entrance.{key}")
         if "style" in e:

@@ -100,12 +100,12 @@
   "playable_boundary_m": 5165.3,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 365630,
-  "triangles": 626060,
+  "vertices": 365700,
+  "triangles": 626162,
   "water_triangles": 3731,
   "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings (A3.5a; since A3.5f before the authored range, with windows), container cranes, port masts, channel marks and trees (A3.5a)",
   "dressing": {
-    "first_triangle": 549199,
+    "first_triangle": 549301,
     "buildings": 4766,
     "gabled": 1350,
     "skipped_small": 91,
@@ -352,7 +352,7 @@
   },
   "river_overlay": {
     "source": "assets/geometry/river/scenery.bin",
-    "triangles": 137296,
+    "triangles": 137398,
     "bridge_triangles": 4388,
     "river_ground_m": 3.5,
     "placement": "roads and garden beds paint the terrain; each other solid moves by the lowest terrain under it less river_ground_m; the bridge is unchanged",
@@ -365,8 +365,8 @@
   },
   "building_records": {
     "count": 18,
-    "facades": 195,
-    "windows": 1954,
+    "facades": 197,
+    "windows": 1981,
     "contract": "docs/BUILDINGS.md; ids are the stable source ids, '#N' for pieces of a footprint clipped to the dressing area"
   },
   "land_triangles": 330908,
@@ -382,6 +382,6 @@
     "rows": 601,
     "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "scenery_sha256": "afd386302e7b333c0fdba67ba5671afda72c4739c8780c52c6f7a926f71f694f",
+  "scenery_sha256": "341843e19d67b99f9bcdf632e8b612e35f8e12d33a804a7304da996205e87d8f",
   "water_sha256": "a721eb87ca72f679c9a6bfe9e5628e1e3a146de9f018fbb2daa505b9299a114c"
 }

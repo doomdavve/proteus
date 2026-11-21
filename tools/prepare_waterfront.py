@@ -309,11 +309,11 @@ def prepare(output, expanded=False):
     # of vehicle streets; footways may pass under it.
     obstacles = unary_union([water.buffer(.5)] + streets)
     compositions = building_kit.load_compositions(map_name="river")
-    records = building_kit.Emitter(
+    emitter = building_kit.Emitter(
         triangle, lambda: len(triangles),
         lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)],
         compositions=compositions, obstacles=obstacles)
-    records = records.emit_all(descriptions)
+    records = emitter.emit_all(descriptions)
     solid_union = unary_union(solids)
     road_surface = road_union.intersection(land).difference(solid_union)
     if expanded:
@@ -396,6 +396,8 @@ def prepare(output, expanded=False):
                                      "facades": sum(len(r["facades"]) for r in records),
                                      "windows": sum(f["bays"] * f["floors"] for r in records
                                                     for f in r["facades"])},
+                "compositions": {k: {"family": compositions[k]["family"], **emitter.report.get(k, {})}
+                                 for k in sorted(compositions)},
                 "buildings": manifest_buildings, "landscape": garden_manifest,
                 "building_parts": [{"osm": f"{e['type']}/{e['id']}", "height": h,
                                     "min_height": bottom} for e, _, h, bottom in parts]}
