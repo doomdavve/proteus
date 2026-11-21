@@ -10,6 +10,9 @@ reset does not clear; reusing that state would play only the first sound. The XM
 covers that loader sequence and backward seeking as well as full-song decoding. Call the
 helper only while the audio stream is stopped.
 
+For graphics-only runs, pass `--no-audio` to disable both music and sound effects without
+changing saved preferences. `--soundtrack off` disables music alone.
+
 ## Boating background loop
 
 `wake_velocity` defaults to [A little boat](../assets/music/a-little-boat.xm): an

@@ -102,14 +102,19 @@ Run the game from the repository root so its relative asset paths resolve:
 ./build/wake_velocity
 ```
 
+For graphics-only checks, always pass `--no-audio` to `wake_velocity`, including windowed
+`--demo` / `--frames` runs and title checks. It disables music and all sound effects for the
+whole run without changing saved soundtrack preferences. Omit it only when testing audio.
+For example: `./build/wake_velocity --no-audio --demo --frames 120`.
+
 For deterministic CPU visual verification, render and inspect representative frames without opening
 a window. `wake_velocity` defaults to GPU and therefore needs a graphics context; select
 `--renderer cpu` for display-free captures. `--time` is the simulated seconds of the scripted
 screenshot drive.
 
 ```sh
-./build/wake_velocity --renderer cpu --screenshot build/basin.png --time 3
-./build/wake_velocity --renderer cpu --location outer --screenshot build/outer.png --time 3
+./build/wake_velocity --no-audio --renderer cpu --screenshot build/basin.png --time 3
+./build/wake_velocity --no-audio --renderer cpu --location outer --screenshot build/outer.png --time 3
 ```
 
 On macOS, deeper CPU profiling can use Xcode's Instruments command-line tools when full Xcode is the
