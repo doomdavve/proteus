@@ -142,6 +142,36 @@ static void check_missing_and_old(void)
     CHECK(!strcmp(settings.name, "legacy"));
 }
 
+static void check_resolution(void)
+{
+    BoatTitleSettings settings;
+    boat_title_defaults(&settings);
+    CHECK(settings.resolution == BOAT_RESOLUTION_LOW);
+    CHECK(settings.smooth_edges);
+
+    load_text(&settings, "name=figure\nresolution=high\n");
+    CHECK(settings.resolution == BOAT_RESOLUTION_HIGH);
+    load_text(&settings, "name=figure\nresolution=low\n");
+    CHECK(settings.resolution == BOAT_RESOLUTION_LOW);
+    load_text(&settings, "name=figure\nresolution=ultra\n");
+    CHECK(settings.resolution == BOAT_RESOLUTION_LOW);
+
+    settings.resolution = BOAT_RESOLUTION_HIGH;
+    settings.smooth_edges = false;
+    boat_title_save(&settings);
+    CHECK(file_contains("resolution=high\n"));
+    CHECK(file_contains("smooth_edges=off\n"));
+    BoatTitleSettings again;
+    boat_title_load(&again);
+    CHECK(again.resolution == BOAT_RESOLUTION_HIGH);
+    CHECK(!again.smooth_edges);
+
+    // Legacy high-resolution saves keep working after PICTURE became two rows.
+    load_text(&settings, "name=legacy\nsmooth_edges=on\nresolution=high\n");
+    CHECK(settings.resolution == BOAT_RESOLUTION_HIGH);
+    CHECK(settings.smooth_edges);
+}
+
 static void check_legacy_and_hours(void)
 {
     static const char *const preset_names[] = { "day", "sunset", "dusk" };
@@ -257,7 +287,7 @@ static void check_other_fields(void)
     saved.location = BOAT_LOCATION_BASIN;
     saved.waves = false;
     saved.smooth_edges = false;
-    saved.high_resolution = true;
+    saved.resolution = BOAT_RESOLUTION_HIGH;
     saved.outer_content = BOAT_TITLE_OUTER_GRODAN;
     saved.lighting = BOAT_TITLE_LIGHTING_HOURS + 17;
     saved.host_mode = BOAT_TITLE_HOST_RACE;
@@ -274,7 +304,7 @@ static void check_other_fields(void)
     CHECK(loaded.location == BOAT_LOCATION_BASIN);
     CHECK(!loaded.waves);
     CHECK(!loaded.smooth_edges);
-    CHECK(loaded.high_resolution);
+    CHECK(loaded.resolution == BOAT_RESOLUTION_HIGH);
     CHECK(loaded.outer_content == BOAT_TITLE_OUTER_GRODAN);
     CHECK(loaded.lighting == BOAT_TITLE_LIGHTING_HOURS + 17);
     CHECK(boat_title_lighting_hour(loaded.lighting) == 17);
@@ -292,6 +322,7 @@ int main(int argc, char **argv)
     remove(settings_file);
 
     check_missing_and_old();
+    check_resolution();
     check_legacy_and_hours();
     check_rejected();
     check_invalid_enum();

@@ -11,15 +11,18 @@ Native first-launch details: [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md
 For a source build, run `./build/wake_velocity` from the repository root so assets resolve.
 
 The title offers SINGLE PLAYER, MULTIPLAYER, SETTINGS and CREDITS. SETTINGS remembers your
-name, boat livery, steering mode, soundtrack, PICTURE and LIGHTING. LIGHTING cycles DAY
+name, boat livery, steering mode, soundtrack, RESOLUTION, EDGES and LIGHTING. LIGHTING cycles DAY
 (the default), SUNSET, DUSK, then 00:00 through 23:00 with Left/Right, Enter or a click.
 It sets your view in each new solo or multiplayer session; other players keep their own choice.
 Working Harbour is the exception: it starts at noon and follows its own day/night clock by
 default, so the saved LIGHTING choice does not fix that view.
-PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
-SMOOTH (the default) supersamples it,
-and HIGH RES draws the scene at up to 1280×800 behind a HUD drawn on a finer 640×400 grid (half the size); it needs a GPU
-and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
+RESOLUTION (LOW or HIGH) applies to the title screen and to each new session. LOW is the plain
+320×200 scene; HIGH draws the scene at up to 1280×800 behind a HUD and title menu on a finer
+640×400 grid (half the old size), with a matching 1280×800 title backdrop. HIGH needs a GPU and
+looks sharpest in a window of 1280×800 or a whole multiple of it. EDGES chooses PIXEL or SMOOTH
+(the default) for the low-resolution scene; HIGH already replaces smoothing. Both rows also appear
+in the single-player setup.
+The soundtrack cycles A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
 cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during
 solo free boating, and the GRODAN is a slow 15 m open canal tour boat (about 8 knots, with

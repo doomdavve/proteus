@@ -20,9 +20,35 @@ with “Works” on 2026-11-08; exact hours, night and platform coverage remain 
 Harbour session clock is also implemented locally and ignores the saved LIGHTING choice by
 default, using noon as its new-session start. Remaining limits are owned by the
 [sunset plan](SUNSET_PLAN.md#t3-implementation-2026-11-08). The title backdrop keeps its existing
-palette, and gameplay lighting remains separate from these title-only colour treatments. Next:
+palette, and gameplay lighting remains separate from these title-only colour treatments. A saved
+RESOLUTION now also shapes the title's own 640x400 target (2026-11-21). Next:
 physical input/playback review; native/browser package qualification remains outstanding.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Resolution setting and high-res title, 2026-11-21
+
+The title's PICTURE row is now separate RESOLUTION (LOW, the default, or HIGH) and EDGES (SMOOTH,
+the default, or PIXEL) rows in SETTINGS and the Single Player panel. `resolution=low|high` and
+`smooth_edges=on|off` persist in native `title.txt` and the browser's IndexedDB save; existing
+`resolution=high` saves still load. Every launch from the title receives `--resolution high` when
+HIGH is chosen (and no `--gpu-aa`); LOW keeps `--gpu-aa` when EDGES is SMOOTH.
+
+The title follows that setting. LOW keeps the 320x200 target and integer nearest
+presentation, byte-for-byte in its composition. HIGH composites a separately generated 1280x800
+backdrop with a transparent 640x400 UI overlay: layout positions double, the m5x7/m3x6 type keeps
+its native pixel size, and rows compact to about one line, matching the in-game high-resolution
+HUD's finer grid. The composed frame is presented into the same integer-scaled 320x200 destination
+as gameplay; a size mismatch filters bilinearly instead of showing uneven nearest pixels. The saved
+resolution chooses the initial window scale (3x low, 4x high), and changing the row reallocates the
+title targets immediately. `--title --screenshot` captures 320x200 at LOW and 1280x800 at HIGH.
+
+Verification 2026-11-21, Apple Silicon/macOS: Debug build; `ctest --preset full` passed all 606
+enabled tests (`PROTEUS_GPU_TESTS=OFF`, optimized test builds). Captured `--title --screenshot` at
+LOW and HIGH in isolated profile directories and inspected the main menu and Single Player panels;
+the LOW composition matches the previous build's 320x200 capture above the version footer, and the
+HIGH capture uses the 1280x800 backdrop generated from the same fixed view. A windowed HIGH title at
+1280x800 was inspected on the desktop. Not checked: the windowed title at an odd logical scale, the
+browser build, physical input, and human visual acceptance.
 
 ## Fixed-hour title lighting, 2026-11-08
 
@@ -414,9 +440,9 @@ they do not describe the current logo, footer or selected-row appearance.
 
 | Entry | Current behavior | Later work |
 | --- | --- | --- |
-| Single Player | Opens River, Basin or Basin trial plus waves/PICTURE setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
+| Single Player | Opens River, Basin or Basin trial plus waves/RESOLUTION/EDGES setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
 | Multiplayer | Public server selection, native LAN/host flow and manual address joining; browser WebRTC joining. | Broader platform/network qualification remains owned by the multiplayer plans. |
-| Settings | Name, boat, steering, soundtrack, PICTURE (PIXEL, SMOOTH or HIGH RES) and LIGHTING (27 fixed choices: DAY, SUNSET, DUSK, then 00:00–23:00). | Volume and further display controls remain deferred. |
+| Settings | Name, boat, steering, soundtrack, RESOLUTION (LOW or HIGH), EDGES (SMOOTH or PIXEL) and LIGHTING (27 fixed choices: DAY, SUNSET, DUSK, then 00:00–23:00). | Volume and further display controls remain deferred. |
 | Credits | Vertical roll: Thanks to, fonts, map data, libraries and Proteus, over an animated water grid; BACK or Escape returns to the main menu. | Physical navigation and browser qualification remain open. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
 
@@ -474,8 +500,10 @@ nick, pick a livery where supported, and enter an address to join. Everything el
 the menu table above remains a later proposal.
 
 - `apps/wake_velocity/boat_title.[ch]` owns the title: the prototype's bowed logo, footer and
-  `assets/title/river-backdrop.png`, drawn at 320x200 and integer-scaled. Rows: SINGLE
-  PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / SOUNDTRACK / BACK
+  `assets/title/river-backdrop.png`, drawn on a 320x200 logical grid and integer-scaled (a 640x400
+  target at HIGH, with type at its native size). Rows: SINGLE
+  PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / SOUNDTRACK /
+  RESOLUTION / EDGES / LIGHTING / BACK
   (2026-10-24; NAME and BOAT were main rows before). STEERING picks KEYBOARD or MOUSE for the
   start of each session, passed as `--mouse-steering`. SOUNDTRACK cycles A LITTLE BOAT /
   ACID WAKE / OFF with Left/Right, Enter or a click, passed as `--soundtrack` to single
