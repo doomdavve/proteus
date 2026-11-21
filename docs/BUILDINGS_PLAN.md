@@ -666,3 +666,68 @@ User review 2026-11-21 (windowed, hi-res, outer): the user noticed the switch fr
 when looking for it at the 40 m range and approved it as a good trade-off. This accepts the
 40 m relief range and the lintel/jamb/sill bands only; the balcony-stack density, the
 projecting-surround reveal and the rest of B2 remain unreviewed.
+
+## B3 results — 2026-11-21
+
+Implemented locally on `feat/buildings` (commits "B3 1" to "B3 5"); no PR, no user acceptance.
+
+What changed: every mapped building (river crop 1,498 records; outer 6,264 records for 4,766 source
+ids, gabled houses and courtyards included) is built through the kit and has facade records. The
+generic windows no longer touch any building: `building_packs` finds no legacy-tinted wall outside
+the records, and the report lists no `legacy` entry. Families, districts, the report and the
+override workflow: [BUILDINGS.md](BUILDINGS.md#families-districts-and-the-building-report-b3).
+Pack v4 deflates the record block (crc32 checked before inflating). The reveal selection in
+`renderer_gpu.c` now visits only the detail cells within reach of the camera instead of all
+facade records each frame. The frontage/forecourt pass (`waterfront_corner.c`) skips only buildings
+with authored detail (it skipped every record building), so the cafe-style entrances survive.
+
+Families (outer / river): house 1,525 / 309, shed 1,271 / 604, block 1,251 / 427, brick 368 / 94,
+warehouse 216 / 4 (8 sawtooth), balcony 117 / 55, stepped 8 / 5, stone 10 / 0. Basis (outer): tags
+2,265, inferred 2,147, fallback 354 ("no usable tags: plain block"; river 150). Flat roofs where a
+pitched roof was wanted (irregular footprint or several sections): 329 outer, 41 river.
+
+Budgets (Release, M1 Max, one run per side, other worktrees running tests on the machine, so
+frame times are indicative only):
+
+| Item | B0 | B3 | Budget |
+| --- | --- | --- | --- |
+| river / outer `scenery.bin` | 852,701 / 5,370,005 B | 981,158 (+15.1%) / 5,899,814 (+9.9%) | <= +20% |
+| river / outer `ambient.bin` | 79,603 / 772,854 B | 93,346 (+17.3%) / 816,347 (+5.6%) | <= +20% |
+| facades (outer) | n/a | 25,994 | <= 32,767 |
+| outer static GPU triangles | 1,367,735 | 734,293 | <= +15% |
+| outer static GPU vertex+index bytes | 80.7 MB | 57.9 MB | <= +10% |
+| outer map submissions (benchmark route p50) | 144 | 102 | n/a |
+
+The static triangle drop is the removed baked legacy window class (652,766 triangles in B0); windows
+are now expanded per detail cell near the camera (scene triangles in the views below include them).
+
+Frame time, p50 render ms / gpu ms (B0 to B3): Eriksberg near 1.52/3.32 to 3.27/4.36, Eriksberg mid
+2.00/3.48 to 3.59/4.31, quay row 3.72/4.46 to 3.53/5.02, Masthugget 3.50/3.89 to 3.02/5.23,
+Lindholmen 2.99/2.71 to 3.46/3.38, Langedrag 3.69/4.46 to 3.65/4.70; the benchmark route
+(`boat_water_review --benchmark --scenario outer`): frame p50 1.97 to 1.48, gpu p50 1.38 to 1.05.
+Scripted drives from Masthugget and Lindholmen (1,800 frames): render p50 3.56 to 3.58 and 3.29 to
+3.65, gpu p50 5.16 to 5.80 and 3.08 to 3.62, worst render frame 275 to 253 ms and 277 to 239 ms
+(the first frame, which is startup in both). The render budget (+0.15 ms) and the gpu budget
+(+0.4 ms in near/mid views) are not met in the static near and mid views (render up to +1.75 ms,
+gpu up to +1.0 ms), while the benchmark route improves. The extra cost follows the runtime window
+quads of the many more migrated buildings in range (scene triangles +0.2 to +0.7 M in these
+views). The expansion hitch beyond the startup frame was not isolated (no frame above the startup
+spike in either drive), and first-frame upload was not measured separately; both stay with B4.
+
+Checks run: `ctest --preset full` with GPU tests (632 of 635 passed; the three failures were stale pins
+of the new packs, `boat_outer_map` dressing triangles 66,764 to 67,234 and the river query digest and
+water count in `boat_map.owners`/`boat_map.resources`, whose grid spans the pack's bounds, which grew
+about 2 m; repinned and the three, with the building, ambient and scenery tests, passed on rerun; the
+whole preset was not rerun afterwards), `building_packs` (water.h pins unchanged), `building_kit`,
+`building_families`, `building_report`, `map_pack`; matched stills in
+`build/buildings/b3/cmp/` (9 views, day/dusk/night, CPU and GPU, default resolution).
+
+Visual assessment (stills only, mine): the river row, Lindholmen warehouses (brick, doors, high
+window row, sawtooth) and Langedrag houses (plaster walls, gables) read as different districts;
+Masthugget gains panel and balcony blocks. Known weak spots: many 4 to 6 storey blocks are still
+plain plaster/brick boxes with windows only; irregular footprints keep flat roofs; the 150 and 354
+untagged buildings are plain blocks by design; the shop surrounds of the cafe were not inspected up
+close. Nothing was seen disappearing or doubling, but only nine camera positions were compared.
+
+Not verified: browser build and load time, other platforms, motion/pop and the shadow pass in
+motion, the minimap, human review. Next: the user's review of the stills and a playtest, then B4.

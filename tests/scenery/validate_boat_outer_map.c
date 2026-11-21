@@ -25,7 +25,7 @@
 #define ENVELOPE 8.0f
 #define WATER_TRIANGLES 3731 // The manifest's water_triangles.
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
-#define DRESSING_TRIANGLES 66764 // The manifest's dressing.triangles (cranes, masts, marks, trees).
+#define DRESSING_TRIANGLES 67234 // The manifest's dressing.triangles (cranes, masts, marks, trees).
 #define LANDMARK_TRIANGLES 2773 // A3.5j: baked landmarks, excluding the runtime lift span.
 #define CANAL_BRIDGE_TRIANGLES 7324 // GH2: the manifest's dressing.canal_bridges.triangles.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },

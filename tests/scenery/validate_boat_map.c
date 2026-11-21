@@ -25,9 +25,11 @@
     } while (0)
 
 // Recorded at 413460d from boat_map_water_contact() before the A1.1 ownership change; re-recorded
-// once floating-point contraction was disabled on every platform.
-#define RIVER_QUERY_DIGEST UINT64_C(0x2cb7d1c44dfa671a)
-#define RIVER_QUERY_WATER 20356
+// once floating-point contraction was disabled on every platform. Buildings track B3: the query
+// grid spans the pack's vertex bounds, which grew by about 2 m at two corners when every building
+// went through the kit (roof overhang past the crop); the compiled water is unchanged.
+#define RIVER_QUERY_DIGEST UINT64_C(0xa861f6ce13d829ac)
+#define RIVER_QUERY_WATER 20330
 
 // Synthetic 10 m square of water in map east/Z, with one raised land triangle after it.
 static const Vector3 square_vertices[]
