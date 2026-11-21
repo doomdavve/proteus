@@ -46,14 +46,13 @@ empty rooms after ten seconds while keeping connections and maintenance alive. I
 locally; the Debug build and all 571 CTests passed on macOS on 2026-11-15, including real-ENet
 pause/resume checks. Winterfell CPU and native/browser qualification remain after release.
 
-## Building architecture overhaul — 2026-11-11
+## Building architecture overhaul — done 2026-11-21
 
-The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot followed by
-reusable building families across the city: distinct silhouettes, facade depth and readable
-street edges at the default resolution. The deliverable includes implementation and a
-`BUILDINGS.md` specification of the source-to-rendering construction system. B0 and B1 (shared
-foundation) and the Eriksberg pilot (B2) are implemented locally; B2 awaits visual review. Crane/landmark work and living-city actors
-remain with their existing owners. No implementation PR is authorized.
+Eriksberg pilot, reusable families across the outer city and per-window lighting by hour and
+district shipped (B0 to B4, #226 and #228). The contract is the [buildings spec](BUILDINGS.md);
+the [plan](BUILDINGS_PLAN.md) is history and lists the open items (browser, Windows and Linux
+visuals, dusk and night in motion). Crane/landmark work and living-city actors remain with their
+existing owners.
 
 ## Cloud deck — grouping and drift follow-up, 2026-11-10
 
