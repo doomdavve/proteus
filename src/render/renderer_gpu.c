@@ -154,6 +154,25 @@ static bool builder_quad(
     return builder_triangle(builder, a, b, c, color) && builder_triangle(builder, a, c, d, color);
 }
 
+// A window face for the windows pass, which decides at draw time whether it is lit (the schedule
+// building_window_lit repeats in assets/shaders/waterfront_city.fs): the texture coordinates carry
+// the window seed (low and high 16 bits) and the alpha the face's lit share in 6 bits over the
+// facade's lighting profile in 2.
+static bool builder_window_quad(
+    MeshBuilder *builder, const BuildingWindowFace *face, uint32_t seed, unsigned profile)
+{
+    Color color = face->color;
+    color.a = (unsigned char)(((color.a * 63u + 127u) / 255u) << 2 | (profile & 3u));
+    if (!builder_quad(
+            builder, face->corners[0], face->corners[1], face->corners[2], face->corners[3], color))
+        return false;
+    for (int i = 1; i <= 6; ++i) {
+        builder->texcoords[(builder->count - i) * 2] = (float)(seed & 0xFFFFu);
+        builder->texcoords[(builder->count - i) * 2 + 1] = (float)(seed >> 16);
+    }
+    return true;
+}
+
 static bool builder_box(MeshBuilder *builder, Vector3 a, Vector3 b, float width, float depth)
 {
     Vector3 direction = Vector3Normalize(Vector3Subtract(b, a));
@@ -567,10 +586,11 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
     "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
     "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
-    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
-    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
-    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
-    "emissiveGain", "reflectionTexel", NULL };
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowMinute",
+    "windowMean", "windowLight", "windowLit", "windowDark", "waterLight", "waterShadowFloor",
+    "glintColor", "highlightTint", "glintSheen", "glintSparkle", "lightClusterMode",
+    "lightClusters", "lightClusterCount", "lightClusterLayout", "emissiveGain", "reflectionTexel",
+    NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -1173,7 +1193,8 @@ failed:
 typedef struct {
     Vector3 low, high;
     float area;
-    int r, g, b, occupied, count;
+    int r, g, b, count;
+    uint32_t seed; // The first window's: the block lights as one window.
 } WindowBlock;
 
 static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3 along)
@@ -1187,10 +1208,11 @@ static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3
     p.y = q.y = center.y - side * .5f;
     Vector3 up = { 0, side, 0 };
     Color color = { (unsigned char)(block->r / block->count),
-        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count),
-        (unsigned char)(255 * block->occupied / block->count) };
+        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count), 255 };
+    uint32_t seed = block->seed;
     *block = (WindowBlock) { 0 };
-    return builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
+    BuildingWindowFace face = { { p, Vector3Add(p, up), Vector3Add(q, up), q }, color };
+    return builder_window_quad(builder, &face, seed, BUILDING_PROFILE_RESIDENTIAL);
 }
 
 // Windows join the fine cell of the wall triangle they are derived from, in both levels.
@@ -1237,9 +1259,7 @@ static bool build_windows(
                         ++column) {
                         unsigned int seed = waterfront_window_seed(i, column, floor);
                         Color color = waterfront_window_glass(seed);
-                        // Alpha carries occupancy to the windows pass, which draws opaque.
-                        bool occupied = waterfront_window_occupied(seed);
-                        color.a = occupied ? 255 : 0;
+                        color.a = 255;
                         Vector3 p = Vector3Add(
                             Vector3Add(a, Vector3Scale(along, 2.5f + (float)column * 4)),
                             Vector3Scale(normal, .035f));
@@ -1247,8 +1267,10 @@ static bool build_windows(
                         float width = floor == 0 ? 2.2f : 1.5f, height = floor == 0 ? 1.9f : 1.5f;
                         Vector3 q = Vector3Add(p, Vector3Scale(along, width));
                         Vector3 up = { 0, height, 0 };
-                        if (!builder_quad(
-                                builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color))
+                        BuildingWindowFace face
+                            = { { p, Vector3Add(p, up), Vector3Add(q, up), q }, color };
+                        if (!builder_window_quad(
+                                builder, &face, seed, BUILDING_PROFILE_RESIDENTIAL))
                             goto failed;
                         Vector3 top = Vector3Add(q, up);
                         block.low = block.count ? Vector3Min(block.low, Vector3Min(p, top))
@@ -1259,7 +1281,8 @@ static bool build_windows(
                         block.r += color.r;
                         block.g += color.g;
                         block.b += color.b;
-                        block.occupied += occupied;
+                        if (!block.count)
+                            block.seed = seed;
                         ++block.count;
                     }
                 }
@@ -1345,8 +1368,9 @@ static bool build_window_data(const WaterfrontScenery *scenery, WaterfrontGpuSce
         float *t = &texels[((i / FACADE_ROW) * FACADE_ROW * 3 + (i % FACADE_ROW) * 3) * 4];
         memcpy(t,
             (float[]) { (float)(seed & 0xFFFF), (float)(seed >> 16), (float)f->bays,
-                (float)f->floors, st->first_bay, st->bay_pitch, st->first_floor, st->floor_pitch,
-                st->ground_width, st->ground_height, st->upper_width, st->upper_height },
+                (float)(f->floors | (unsigned)f->profile << 16), st->first_bay, st->bay_pitch,
+                st->first_floor, st->floor_pitch, st->ground_width, st->ground_height,
+                st->upper_width, st->upper_height },
             12 * sizeof(float));
     }
     Image image = { texels, FACADE_ROW * 3, (int)rows, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
@@ -1372,11 +1396,12 @@ static void add_window_quad(const BuildingWindow *w, void *user)
     // The pane and its reveal bands; alpha carries each face's lit share to the windows pass,
     // which draws opaque.
     BuildingWindowFace faces[BUILDING_WINDOW_FACES_MAX];
-    size_t n = building_window_faces(w, faces);
+    BuildingWindow potential = *w;
+    potential.occupied = true; // The lit share of every face; the shader applies the schedule.
+    size_t n = building_window_faces(&potential, faces);
     for (size_t i = 0; i < n; ++i)
-        quads->ok = quads->ok
-            && builder_quad(quads->builder, faces[i].corners[0], faces[i].corners[1],
-                faces[i].corners[2], faces[i].corners[3], faces[i].color);
+        quads->ok
+            = quads->ok && builder_window_quad(quads->builder, &faces[i], w->seed, w->profile);
 }
 
 typedef struct {
@@ -1541,8 +1566,8 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
             bool far = dx * dx + dz * dz > reach * reach;
             if (far && !scene->window_cell_reveals[cell])
                 continue;
-            for (unsigned k = scene->window_cell_start[cell]; k < scene->window_cell_start[cell + 1];
-                 ++k) {
+            for (unsigned k = scene->window_cell_start[cell];
+                k < scene->window_cell_start[cell + 1]; ++k) {
                 unsigned i = scene->window_cell_facades[k];
                 if (i >= count || i >= scene->window_facade_total)
                     continue;
@@ -2724,6 +2749,14 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene, const WaterfrontLig
         = { lighting->window_dark.x, lighting->window_dark.y, lighting->window_dark.z };
     SetShaderValue(scene->shader, cached_location(scene->shader, "windowLight"),
         &lighting->window_light, SHADER_UNIFORM_FLOAT);
+    int window_minute = waterfront_window_minute(lighting);
+    SetShaderValue(scene->shader, cached_location(scene->shader, "windowMinute"), &window_minute,
+        SHADER_UNIFORM_INT);
+    float window_mean[BUILDING_PROFILE_COUNT];
+    for (unsigned i = 0; i < BUILDING_PROFILE_COUNT; ++i)
+        window_mean[i] = building_window_lit_share(i, window_minute);
+    SetShaderValue(scene->shader, cached_location(scene->shader, "windowMean"), window_mean,
+        SHADER_UNIFORM_VEC4);
     SetShaderValue(scene->shader, cached_location(scene->shader, "windowLit"), window_lit,
         SHADER_UNIFORM_VEC3);
     SetShaderValue(scene->shader, cached_location(scene->shader, "windowDark"), window_dark,

@@ -120,6 +120,22 @@ polygons = building_compose.polygons
 STYLE_NAMES = building_compose.STYLE_NAMES
 
 
+def window_profile(d, comp, style):
+    """The window lighting schedule (map_pack.PROFILES index) of one facade: an authored `lighting`
+    key wins; shop, lobby and ribbon windows are workplaces; warehouses and sheds are industrial
+    and quiet; any other building of an industrial district is industrial; the rest residential."""
+    if comp and "lighting" in comp:
+        return building_compose.LIGHTING.index(comp["lighting"])
+    family = (comp or {}).get("family")
+    if STYLE_NAMES[style] in ("shop", "lobby", "ribbon"):
+        return map_pack.PROFILES.index("workplace")
+    if family == "shed":
+        return map_pack.PROFILES.index("quiet")
+    if family == "warehouse" or (family != "house" and d.context == "industrial"):
+        return map_pack.PROFILES.index("industrial")
+    return map_pack.PROFILES.index("residential")
+
+
 def sort_key(ident):
     kind, number = ident.split("/")
     number, _, piece = number.partition("#")
@@ -336,7 +352,8 @@ class Emitter:
                                     r["min_wall"])
                 if bays and floors:
                     facades.append({"wall": wall_first, "index": index, "bays": bays,
-                                    "floors": floors, "style": r["style"]})
+                                    "floors": floors, "style": r["style"],
+                                    "profile": window_profile(d, comp, r["style"])})
                     r["grid"] = (bays, floors)
         walls_end = self.count()
         # Roofs: each section's top, less what other sections of the building stand on it.
@@ -1117,7 +1134,10 @@ def compose_test():
            {"family": "brick", "balconies": {"unit": 2, "span": 3}},
            {"family": "brick", "balconies": {"unit": 5}},
            {"family": "brick", "entrance": {"side": "west"}},  # needs a ground band
-           {"family": "brick", "ground": {"band": 1}}]
+           {"family": "brick", "ground": {"band": 1}},
+           {"family": "brick", "lighting": "disco"}]
+    assert building_compose.validate_params("way/9", {"family": "brick", "lighting": "quiet"})[
+        "lighting"] == "quiet"
     for params in bad:
         try:
             validate_compositions({"way/1": params}, "river")

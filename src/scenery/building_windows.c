@@ -53,6 +53,55 @@ bool building_window_occupied(uint32_t seed)
     return ((seed ^ (seed >> 15)) * 2654435761u) >> 29 < 3;
 }
 
+typedef struct {
+    uint16_t on_base, on_span, off_base, off_span; // Minutes: evening on and off windows.
+    uint8_t evening, night, early; // Of 16 occupied windows: evening, all-night and early risers.
+} Schedule;
+
+static const Schedule SCHEDULES[BUILDING_PROFILE_COUNT] = {
+    [BUILDING_PROFILE_RESIDENTIAL] = { 16 * 60, 240, 22 * 60, 180, 16, 3, 2 },
+    [BUILDING_PROFILE_WORKPLACE] = { 7 * 60, 120, 18 * 60, 240, 16, 1, 0 },
+    [BUILDING_PROFILE_INDUSTRIAL] = { 7 * 60, 120, 21 * 60, 120, 4, 1, 1 },
+    [BUILDING_PROFILE_QUIET] = { 7 * 60, 120, 19 * 60, 120, 4, 0, 0 },
+};
+
+// An occupied window with schedule ROLE (0..15), and offsets A and B (0..255), at minute M.
+static bool scheduled(const Schedule *s, unsigned role, unsigned a, unsigned b, unsigned m)
+{
+    unsigned on = s->on_base + s->on_span * a / 256, off = s->off_base + s->off_span * b / 256;
+    if (role < s->night)
+        return m >= on || m < 300;
+    if (role < s->night + s->early && m >= 300 + 120 * a / 256 && m < 480)
+        return true;
+    if (role >= s->evening)
+        return false;
+    return (m >= on && m < off) || (off > 1440 && m < off - 1440);
+}
+
+bool building_window_lit(unsigned profile, uint32_t seed, int minute)
+{
+    if (!building_window_occupied(seed))
+        return false;
+    if (minute < 0)
+        return true;
+    uint32_t r = fmix32(seed + 0x7F4A7C15u);
+    return scheduled(&SCHEDULES[profile < BUILDING_PROFILE_COUNT ? profile : 0], r & 15,
+        (r >> 8) & 255, (r >> 16) & 255, (unsigned)minute % 1440);
+}
+
+float building_window_lit_share(unsigned profile, int minute)
+{
+    if (minute < 0)
+        return 3.0f / 8;
+    const Schedule *s = &SCHEDULES[profile < BUILDING_PROFILE_COUNT ? profile : 0];
+    unsigned lit = 0;
+    for (unsigned role = 0; role < 16; ++role)
+        for (unsigned a = 8; a < 256; a += 16)
+            for (unsigned b = 8; b < 256; b += 16)
+                lit += scheduled(s, role, a, b, (unsigned)minute % 1440);
+    return 3.0f / 8 * (float)lit / (16 * 16 * 16);
+}
+
 bool building_wall(const Mesh3D *mesh, const BoatSceneryFacade *facade, BuildingWall *wall)
 {
     if (!mesh || !facade || (size_t)facade->wall + 2 > mesh->triangle_count)
@@ -99,6 +148,8 @@ static bool window_at(const BoatSceneryFacade *facade, const BoatSceneryWindowSt
     window->corners[3] = q;
     window->glass = building_window_glass(seed);
     window->occupied = building_window_occupied(seed);
+    window->seed = seed;
+    window->profile = facade->profile;
     window->bay = bay;
     window->floor = floor;
     return true;

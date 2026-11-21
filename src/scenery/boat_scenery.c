@@ -3,6 +3,7 @@
 #include "core/waterfront_outer.h"
 #include "scenery/boat_ambient.h"
 #include "scenery/boat_water_atlas.h"
+#include "scenery/building_windows.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -241,7 +242,8 @@ static bool read_buildings(
         const unsigned char *bp = p + BUILDING_HEAD + i * BUILDING_SIZE;
         BoatSceneryBuilding *b = &s->buildings[i];
         *b = (BoatSceneryBuilding) { u32(bp), u32(bp + 4), u32(bp + 8), u32(bp + 12), u32(bp + 16),
-            u32(bp + 20), u32(bp + 24), u32(bp + 28), { f32le(bp + 32), f32le(bp + 36), f32le(bp + 40) },
+            u32(bp + 20), u32(bp + 24), u32(bp + 28),
+            { f32le(bp + 32), f32le(bp + 36), f32le(bp + 40) },
             { f32le(bp + 44), f32le(bp + 48), f32le(bp + 52) } };
         if (b->first < previous_end || b->end <= b->first || b->end > triangles
             || b->detail_first < b->first || b->detail_first > b->end || b->run_first != next_run
@@ -271,9 +273,9 @@ static bool read_buildings(
             const unsigned char *q = fp + (b->facade_first + j) * FACADE_SIZE;
             BoatSceneryFacade *f = &s->facades[b->facade_first + j];
             *f = (BoatSceneryFacade) { b->id_hash, u32(q), u16(q + 4), u16(q + 6), u16(q + 8),
-                q[10] };
+                q[10], q[11] };
             float length, height;
-            if (q[11] != 0 || f->wall < b->first || f->wall + 2 > b->end
+            if (q[11] >= BUILDING_PROFILE_COUNT || f->wall < b->first || f->wall + 2 > b->end
                 || (int)f->index <= previous_index || f->bays == 0 || f->floors == 0
                 || f->style >= styles || !wall_pair(s, f->wall, &length, &height))
                 return false;

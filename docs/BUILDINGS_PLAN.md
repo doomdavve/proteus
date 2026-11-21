@@ -1,17 +1,14 @@
-# Buildings and waterfront architecture overhaul
-
-Status, 2026-11-21: B0 done. B1 and B2 implemented; the user accepted the B2 look (balcony stacks,
-projecting-surround reveal, 40 m relief range; no cut-wall holes). B3 implemented: every mapped
-building is built from facade records (automatic families plus overrides, pack v4,
-`tools/building_report.py`). The user played it, accepted the frame cost and agreed that untagged
-buildings stay plain blocks (2026-11-21); PR authorized. Pausing after B3. Checks, numbers, limits:
-[B3 results](#b3-results--2026-11-21).
+Status, 2026-11-21: B0 to B3 merged (PR #226; the user accepted the B2 look and the B3 frame cost and
+agreed untagged buildings stay plain blocks). B3b implemented on `feat/buildings-b3b`: windows light
+by hour and district (profile per facade, pure integer schedule mirrored in the facade shader);
+awaiting the user's look at dusk and night, no PR yet. Checks, numbers, limits:
+[B3b results](#b3b-results--2026-11-21).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: B3b window lighting by hour and district (queued), expansion hitch and qualification (B4).
+Open: the user's review of B3b, expansion hitch and qualification (B4).
 Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
 specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: B3b, then B4 qualification. Delivery: one branch and one PR.
+Next: B4 qualification. Delivery: B3b and B4 share one branch (`feat/buildings-b3b`) and one PR.
 
 ## Intent and boundaries
 
@@ -185,17 +182,13 @@ user's visual review separately from automated checks. Refine this group before 
 Acceptance: matched comparison districts show appropriate variety and complete coverage, with
 no disappeared buildings, doubled parts or obvious intersections. Next: B4 qualification.
 
-### B3b — Window lighting by hour and district (queued, user request 2026-11-21)
+### B3b — Window lighting by hour and district (implemented 2026-11-21, user request)
 
-Windows light up in the evening and dim through the night while people sleep. Proposal: a pure
-`building_window_lit(seed, hour)` beside `building_window_occupied`, mirrored bit for bit in
-`waterfront_city.fs`, fed by the lighting hour (fixed `--lighting-hour` settings and the Working
-Harbour clock). Per-window switch-on (about 16:00-20:00) and bedtime (about 22:00-01:00) offsets
-come from the seed; about 5-8% stay lit overnight; a few early risers come on around 05:00-07:00.
-The user agreed that districts differ: a schedule profile per family (residential as above;
-industrial and warehouse mostly dark in the evening with sparse shift and security lights; shop
-and office floors lit through the working evening, dark at night; boatyards and clubhouses mostly
-dark), carried in the building records. Tests drive a virtual hour. Not started.
+Windows light up in the evening and dim through the night while people sleep, by district. A pure
+`building_window_lit(profile, seed, minute)` beside `building_window_occupied`, mirrored bit for
+bit in `waterfront_city.fs`, fed by the lighting hour (fixed `--lighting-hour` and the Working
+Harbour clock). Four profiles in the facade record (residential, workplace, industrial, quiet);
+details in [BUILDINGS.md](BUILDINGS.md#window-lighting). Tests drive a virtual minute.
 
 ### B4 — Distance, motion and platform qualification
 
@@ -743,3 +736,32 @@ close. Nothing was seen disappearing or doubling, but only nine camera positions
 
 Not verified: browser build and load time, other platforms, motion/pop and the shadow pass in
 motion, the minimap, human review. Next: the user's review of the stills and a playtest, then B4.
+
+## B3b results — 2026-11-21
+
+Implemented locally on `feat/buildings-b3b` (from main after PR #226); no PR, no user acceptance.
+
+What changed: the facade record's spare byte is the lighting profile (pack version unchanged, both
+packs rebaked: 5,331 / 19,044 residential, 899 / 2,382 workplace, 32 / 4,718 industrial facades in
+river / outer, none quiet). `tools/building_kit.py` assigns it from style, family and district and
+an authored `lighting` key overrides it. `building_window_lit` and `building_window_lit_share` are
+in `src/scenery/building_windows.[ch]`; `WaterfrontLighting` carries the clock; the CPU renderer
+evaluates per window, the GPU shader per fragment (quads: seed in the texture coordinates, profile
+and lit share in the vertex alpha; mask: profile in the facade texel, `windowMean` uniform), so a
+changing hour rebuilds nothing. Far merged generic windows now light as their first window (they
+were a mean before).
+
+Checks run (2026-11-21, macOS, Debug, display awake): `ctest --preset full` 611 of 611 (with the
+shapely venv so the Python tool tests ran); new `building_windows` schedule cases (virtual
+minutes: no window lit by day, rising switch-on 16:00-20:00, falling bedtime past midnight, 7% and
+5% overnight and early residential shares, workplace and industrial/quiet shares, sample against
+`building_window_lit_share`), the pack profile range and a `boat_scenery` invalid-profile case;
+`building_kit`, `map_pack` self-tests. Stills (Gothenburg Harbour, `outer`, GPU 1280x800 and CPU
+320x200, hours 20-23 and 1-3): warm window pixels on the GPU 5,815 at 21:00 against 33 at 03:00;
+the CPU capture falls 100, 98, 65, 17, 17 from 20:00 to 03:00.
+
+Not verified: the shader's integer schedule against the C one beyond the shared formulas (no
+GLSL test; the stills agree in character, not bit for bit), browser/WebGL2, Windows and Linux, the
+Working Harbour clock sweeping through an evening in motion, a district-by-district look (industrial
+and workplace profiles were not inspected on screen), human review. Known limit: `quiet` is only
+reachable by an authored `lighting` entry or a shed with windows (none today).
