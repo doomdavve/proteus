@@ -835,8 +835,8 @@ saves. Other modes keep their fixed choices and Day default. Browser work remain
 behind the no-Lua guard; supported Web packaging and non-work render smoke passed, and no
 browser work cycle is claimed.
 
-The bounded developer review tools are `--work-clock-report FILE` and `--work-review-pose
-swing|deck|approach`. The report requires `--work` and `--frames` in a visible native window and
+(Superseded 2026-11-17: these two options are now the console requests `/work clock-report FILE|stop` and `/work pose NAME`; see [the command line](COMMAND_LINE.md).) The bounded developer review tools were `--work-clock-report FILE` and `--work-review-pose
+swing|deck|approach`. The report required `--work` and `--frames` in a visible native window and
 rejects `--screenshot` or `--performance-report`; it records up to 18,000 CSV rows with actual
 native GL sky `sunDirection` and sky-mask upload spies, a positive control, and blank GPU times
 when unavailable. The pose option only drives bounded work captures/runs through the real cargo

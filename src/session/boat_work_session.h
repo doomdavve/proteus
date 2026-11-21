@@ -68,6 +68,10 @@ void boat_work_job_tick(BoatWorkSession *e);
 // A fresh session. The world form leaves the job alone; both keep the package's scene.
 void boat_work_session_reset_world(BoatWorkSession *e);
 void boat_work_session_reset(BoatWorkSession *e);
+// A package change's restart: the cargo, sites and job start over at the new definition, while a
+// boat that is under way (not moored, mooring or capsized) keeps its pose and motion, stays in the
+// helm view, and the presentation clock keeps its hour. Otherwise the same as boat_work_session_reset.
+void boat_work_session_restart(BoatWorkSession *e);
 
 // One 120 Hz tick of the boat, crane motors and cargo, then the job. Each physical tick also
 // advances the daylight clock by exactly one tick, so the caller's paused/focused tick loop owns

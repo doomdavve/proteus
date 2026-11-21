@@ -18,7 +18,7 @@ Working Harbour is the exception: it starts at noon and follows its own day/nigh
 default, so the saved LIGHTING choice does not fix that view.
 PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
 SMOOTH (the default) supersamples it,
-and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
+and HIGH RES draws the scene at up to 1280×800 behind a HUD drawn on a finer 640×400 grid (half the size); it needs a GPU
 and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
 cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during
@@ -135,7 +135,7 @@ whose pad holds the next crate. Carry that one east along the river to the new j
 a crate in the water to its latest starting pad, and R restarts everything.
 The same working harbour also runs inside the game (experimental). On the native build, choose
 SINGLE PLAYER, PLACE GOTHENBURG HARBOUR, CONTENT < WORKING HARBOUR > (or launch
-`./build/wake_velocity --location outer --work`). It keeps the game's camera and keys, adds the
+`./build/wake_velocity --package proteus.outer-work`). It keeps the game's camera and keys, adds the
 crane controls, and saves itself automatically: there is no save key, and the menu, losing focus and
 quitting save too. The SAVE row under CONTENT finds your save by itself: < CONTINUE > (the default)
 resumes it, < NEW > starts over after a `START OVER? YES / NO` question (the old save stays as a

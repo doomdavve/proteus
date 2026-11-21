@@ -112,6 +112,9 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
     const char *file = r.manifest.entry;
     if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
         return fail(d, BOAT_PLUGIN_LIMIT, file, "", "source exceeds the host limit");
+    status = boat_plugin_check_source(&r.manifest, bundle->source, bundle->source_size, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
     BoatPluginRaceData data;
     status = boat_plugin_lua_race(bundle->source, bundle->source_size, file, limits, &data, d);
     if (status != BOAT_PLUGIN_OK)

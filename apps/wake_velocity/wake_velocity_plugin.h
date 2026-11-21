@@ -76,6 +76,9 @@ _Static_assert(sizeof(WakePlugin) <= (5u << 18), "plugin native owner exceeds 1.
 
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
 const BoatWorldDefinition *wake_plugin_location(const char *directory);
+// The same, also accepting a free package whose objective is a working harbour's job (the caller
+// has checked that it declares work sites).
+const BoatWorldDefinition *wake_plugin_location_work(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
@@ -86,6 +89,9 @@ bool wake_plugin_open_catalog(
 // Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
 // evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session);
+// A live tool bridge is attached: saved files no longer stage on their own, so a tool edits the
+// directory freely and stages by request. F5 and bridge stages still read it.
+void wake_plugin_hold_saves(WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.
 bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision

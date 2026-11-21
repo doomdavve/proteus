@@ -20,7 +20,7 @@ navigation and repeated-session cleanup, and records native costs on Linux and W
 browser qualification is now [manual-only](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30);
 relevant PRs retain Node contracts and Wasm compilation/packaging.
 P4.9 adds a bounded objective wire protocol, reusable isolated Wasm evaluator and asynchronous
-init/update/migration/Undo with host-owned in-session state. There is no in-game agent. The agreed direction
+init/update/migration/Undo with host-owned in-session state. There is no in-game agent, and P6 now means [external agent authoring](AGENT_AUTHORING.md). The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
@@ -28,12 +28,12 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Marina M3 routes, bounded clearance and C1–C4 qualification/closure are complete; next marina task: [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**All five marina milestones are complete (M4 merged #209; M5 modules and the integrated example merged #211); the module contract is in the [Plugin API](PLUGIN_API.md#package-modules-m5) and the open items are in the [marina plan](MARINA_AUTHORING_PLAN.md#closing-leftovers--2026-11-15).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 The [P5 plan](PLUGIN_P5_PLAN.md), scheduled by the user 2026-11-07, owns authority
-objectives and revisions (P5a–P5f, merged), P5g headless session recording/reconstruction
-(locally implemented), and the next task, P5h four-player/impairment/browser qualification.
+objectives and revisions, headless session recording/reconstruction and the four-player/
+impairment/browser qualification (P5a–P5i, done 2026-11-14; follow-ups are Open loops rows).
 Round-boundary revisions use protocol v14. Client objective commands remain deferred. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
 are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
@@ -48,7 +48,8 @@ scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
 twelve-berth/two-row package, M2 boat appearance and M3 routes/clearance (#201); M3 agent visual
-evidence, native/browser/Wasm qualification and closure are complete; M4 occupancy is next. The
+evidence, native/browser/Wasm qualification and closure are complete, as are M4 vessel services
+and M5 package-local modules (done 2026-11-15). The
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
 sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are
@@ -1762,25 +1763,33 @@ virtual time. Verify mixed native/browser clients with matching content and expl
 of old clients. Recheck resource/page limits and four-player load; human multiplayer play is
 its own acceptance gate. Seamless mid-round source swaps are not required for this milestone.
 
-### P6 — in-game asynchronous agent
+### P6 — external agent authoring instead of an in-game agent
 
-The [live console step](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) of the
-plugins-by-default plan supplies this milestone's command layer and live-apply policy. PC's
-`apps/wake_velocity/wake_command.[ch]` is now the dispatcher: the agent submits the same edit and `/` command
-lines as a player, appears in the console, is undone the same way and cannot move the boat.
+Decision 2026-11-15 (user): the plan's original goal was an in-game agent. Provided an external
+agent can author as powerfully, do not build one in-game now. The PC command layer
+(`apps/wake_velocity/wake_command.[ch]`), the P4 tools and the live tool bridge already give an
+outside agent the same path a player has, with no provider code in the game.
 
-**Deliverable:** an optional in-game conversation can use the proven P4 authoring tools to
-make and test a supported change, show its result and apply it under the current authoring
-policy. Begin in a solo development session; shared/public-room editing is a separate host
-permission and protocol feature.
+**Deliverable:** [Authoring plugins with an external agent](AGENT_AUTHORING.md): `plugin_author.py
+init` scaffolds a plugin directory an agent is launched in, with a `./wv` wrapper (check, stage,
+apply, undo, discard, status, console) that pins every live request from the game, and a bridge
+that holds saved files so the agent edits in place and stages when ready ([API](PLUGIN_API.md#agent-workspaces)).
+The only game change is that hold. The bridge, pins and staging already make stale results
+impossible to apply and keep model latency out of the tick. Implemented 2026-11-15 and checked by
+automated tests; a re-run of the trial and a human play check are owed.
 
-Keep a provider adapter and tool dispatcher outside Lua and outside the fixed tick. The
-adapter handles asynchronous requests, streaming UI, cancellation, bounded retries, token/
-cost limits and offline/provider errors. Start with Claude if desired while keeping requests,
-tools and artifacts provider-independent. Model latency never pauses simulation or becomes
-simulation time. A completed request supplies candidate bytes; the existing staging pipeline
-chooses the commit tick. Discard responses for stale session/base revisions unless rebased
-and tested explicitly.
+**Deferred, not dropped:** an in-game conversation, its provider adapter and streaming UI,
+credential storage, cost limits and offline/provider errors, and agent editing of rooms or the
+browser. Reopen only if the trial shows a gap that cannot be closed outside the game (for example
+players without an agent installed, or a need for in-game history). The adapter design notes below
+are kept for that case. Shared-room editing remains a separate host permission and protocol
+feature.
+
+**Original design (unscheduled).** Keep a provider adapter and tool dispatcher outside Lua and
+outside the fixed tick, handling asynchronous requests, cancellation, bounded retries and cost
+limits, with provider-independent requests and artifacts. A completed request supplies candidate
+bytes and the existing staging pipeline chooses the commit tick; stale base revisions are
+discarded.
 
 Credentials belong to the native host's appropriate credential storage or an explicit
 session-only path, never `plugin.json`, Lua globals, tool transcripts, screenshots or exported
@@ -1820,7 +1829,7 @@ craft, a retained ferry with an edited dwell, the retained schooner/lift depende
 authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
 records the historical seven-berth counts and gaps; the marina plan and current API supersede
 its structures/appearance/routes limits.
-M1 structures, M2 boat appearance and M3 routes are complete; the next marina work is [M4 occupancy](MARINA_AUTHORING_PLAN.md#m4-occupancy-residents-and-visitors); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
+M1 structures, M2 boat appearance, M3 routes, M4 occupancy and M5 modules are complete (see the [marina plan](MARINA_AUTHORING_PLAN.md)); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 
@@ -2526,8 +2535,8 @@ The package README now separates the authored recipe from the missing native cap
   there is no floating platform/arbitrary mesh; capacity is seven berths/four modules with four
   module kinds; hulls use seven fixed recipes with no per-berth colour/dimension/mast/name;
   berth occupancy has no arrival/departure schedule; traffic routes are presets; gameplay
-  lighting is fixed daylight; people/trams/seals need native actors; and `harbor-room` duplicates
-  the scene because there is no composition/include. The
+  lighting is fixed daylight; people/trams/seals need native actors; and `harbor-room` duplicated
+  the scene (since M5 W5 both carry the shared `eriksberg_marina` module copy). The
   [package README](../plugins/harbor-life/README.md#what-the-scene-api-cannot-express-yet) owns
   the detailed list.
 
@@ -2795,7 +2804,7 @@ generation are not prerequisites for that loop.
 | P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. P3.3b adds live schema migration, resource retirement/composition and native inspection/seek. P3.4 adds native storage/budget/latency qualification and retains synchronous trusted edits; imported/background isolation is a P4 gate. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
-| P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |
+| P6 | Deferred with the in-game agent (2026-11-15): provider/key UX, native versus browser agent support and autonomy policy. The external agent uses the same host tools and workspace; keep provider/secret work entirely outside plugins. |
 
 ## Verification and known limits of this planning change (history)
 

@@ -58,7 +58,7 @@ multiplayer propagation, other browsers/devices and platform coverage remain ope
 [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08) records complete evidence,
 remaining limits and the unrelated generic web all-targets build failure.
 
-T4 is native-only: Working Harbour and its `--work` clock stay behind the no-Lua browser guard.
+T4 is native-only: Working Harbour and its package clock stay behind the no-Lua browser guard.
 Supported Web packaging and Chrome/ANGLE Metal non-work render smoke passed for this slice. No browser work cycle, saved
 work clock or night-cargo behavior is claimed; the
 [lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the native contract.
@@ -569,7 +569,7 @@ The arcade object default and D3 selector share the existing browser launcher.
 
 Add `?author` to the browser client URL to reveal the opt-in **PLUGIN VOYAGE** panel
 (for example, `http://localhost:8000/?author`). It imports/exports
-version-1 JSON source bundles, loads the Långedrag example, validates in a disposable Web Worker
+version-2 JSON source bundles (with package modules; version 1 is refused), loads the Långedrag example, validates in a disposable Web Worker
 and launches solo voyages, free boating or the basin time trial. Live edits use Stage/reload,
 explicit Apply and Undo; opening the panel pauses solo input. Normal PLAY still opens the shared
 title, which now starts the same build-time package catalog as native, including Harbor life.
@@ -591,7 +591,7 @@ the linked output for Lua parser/VM strings and uses `plugin_stage.wasm` as the 
 `BOAT_PLUGIN_WIRE_VERSION`. Normal sessions create no worker.
 
 Desktop browsers with a physical keyboard get the live console (grave or F2). Edits and `= queries`
-use the same isolated worker; `/save DIR` downloads a version-1 source bundle. Touch-only phones
+use the same isolated worker; `/save DIR` downloads a version-2 source bundle. Touch-only phones
 do not expose the console.
 Cancellation/deadline/late results cannot install a revision. Each UI and game reload lane
 owns at most one job; the descriptor transport caps total entries at two. Objectives use a

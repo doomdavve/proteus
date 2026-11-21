@@ -60,11 +60,20 @@
       "status": "not_acquired",
       "product": "Lantmäteriet Markhöjdmodell Nedladdning (1 m grid)",
       "url": "https://geotorget.lantmateriet.se/dokument/projects/markhoejdmodell-nedladdning/released/1/",
-      "reason": "Download requires an authenticated Geotorget STAC account; no credentials were available for this task and none were created.",
-      "access_dependency": "A Geotorget user account and product access for the STAC download service.",
+      "reason": "Full terrain files not acquired. On 2026-11-15, existing product entitlement was verified with Basic authentication: catalogue HTTP 200 and a 32-byte Vinga ground-TIFF request HTTP 206. Raster contents and full-corridor coverage remain unverified.",
+      "access_dependency": "Existing Geotorget product entitlement and private-account Basic credentials; API portal access is not required for the verified path.",
       "fallback": "Author simplified island relief by hand from OSM coastline/rock/peak features and photographs until a terrain sample is obtained.",
       "licence_when_acquired": "CC BY 4.0 product terms with product/source credit and processing statement",
-      "order": "Access ordered on STAC-hojd 2026-10-26; approval pending."
+      "order": "Access ordered on STAC-hojd 2026-10-26. Product entitlement and Basic access verified 2026-11-15; full terrain acquisition remains pending.",
+      "access_verified_2026_11_15": {
+        "collection": "dtm-cog",
+        "item": "639_29",
+        "asset": "https://dl1.lantmateriet.se/hojd/data/grid/mhm/63_2/m639_29.tif",
+        "bytes": 15854247,
+        "resolution_m": 1,
+        "crs": "EPSG:5845",
+        "evidence": "Authenticated catalogue and 32-byte TIFF signature probe only; no full raster inspection."
+      }
     },
     "smhi_vinga_a": {
       "status": "acquired",

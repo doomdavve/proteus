@@ -1,0 +1,14 @@
+{
+  "id": "proteus.marina-integrated-demo",
+  "name": "Marina integrated demo",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "modules": ["eriksberg_marina", "marina", "guests.routes", "guests.services"],
+  "location": "outer",
+  "capabilities": [
+    "voyage.define",
+    "scene.define"
+  ],
+  "state_version": 1
+}

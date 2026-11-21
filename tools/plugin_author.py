@@ -24,11 +24,25 @@ SOURCE_MAX = 65536
 ROOT = Path(__file__).resolve().parent.parent
 FRAME_MAX = 4 << 20
 LOG_MAX = 16384
+BUNDLE_MAX = 200000
+MODULES_MAX = 8
+MODULE_NAME_MAX = 32
+ENTRY = "main.lua"
+# The source image of src/plugins/boat_plugin_image.h; the browser packs the same bytes
+# (web/plugin_author.js) and tests/support/fixtures/plugin_image_golden.hex pins all three.
+IMAGE_MAGIC = b"\0PMI\x01"
+MODULE_NAME = re.compile(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,2}\Z")
+NAME_RULE = ("must be 1-3 dot-separated names of a-z, 0-9 and '_', each starting with a letter, "
+             f"in at most {MODULE_NAME_MAX} bytes")
+V1_MESSAGE = "version 1 bundles are not supported; re-export"
 
 
 OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
-              "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
-              "live-undo", "live-discard", "live-console"]
+              "import", "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
+              "live-undo", "live-discard", "live-console", "sync-shared", "init", "check", "status",
+              "stage", "apply", "undo", "discard", "console", "play"]
+WORKSPACE_OPERATIONS = ("init", "check", "status", "stage", "apply", "undo", "discard", "console",
+                        "play")
 LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard", "console")
 RESPONSE_MAX = 32768
 
@@ -69,6 +83,49 @@ def load_layout():
 LAYOUT = load_layout()
 
 
+SHARED = "_shared"
+
+
+def shared_modules(plugins):
+    """name -> bytes of each module file in PLUGINS/_shared (module names as in manifests).
+    The directory is a source of copies, never a package: it has no plugin.json."""
+    base = Path(plugins) / SHARED
+    if not base.is_dir():
+        raise ValueError(f"{base}: no shared module directory (run from a source checkout)")
+    found = {}
+    for path in sorted(base.rglob("*.lua")):
+        name = ".".join(path.relative_to(base).with_suffix("").parts)
+        if module_valid(name) and name != "main" and not path.is_symlink():
+            found[name] = read_regular(path, SOURCE_MAX)
+    return found
+
+
+def sync_shared(plugins, check=False):
+    """Make every package's copy of a shared module equal to PLUGINS/_shared's. A copy is a
+    module file whose name exists in _shared: declared in plugin.json, or merely present under
+    the package's modules directory. Returns {"checked", "drifted", "changed"} (package-relative
+    paths, sorted); with CHECK nothing is written and "changed" is empty."""
+    plugins = Path(plugins)
+    shared = shared_modules(plugins)
+    checked, drifted = 0, []
+    for package in sorted(p for p in plugins.iterdir()
+                          if p.is_dir() and not p.name.startswith(("_", "."))
+                          and (p / "plugin.json").is_file()):
+        names = set(declared_modules((package / "plugin.json").read_bytes()))
+        names |= {name for name in shared if (package / module_file(name)).exists()}
+        for name in sorted(names & set(shared)):
+            checked += 1
+            target = package / module_file(name)
+            if target.is_symlink():
+                raise ValueError(f"{package.name}/{module_file(name)}: symbolic links are unsupported")
+            if not target.exists() or target.read_bytes() != shared[name]:
+                drifted.append(f"{package.name}/{module_file(name)}")
+                if not check:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(shared[name])
+    return {"checked": checked, "drifted": drifted, "changed": [] if check else drifted}
+
+
 def capabilities():
     layout = {"kind": LAYOUT["kind"]}
     if LAYOUT["kind"] == "package":
@@ -105,6 +162,7 @@ def capabilities():
                       "cue_kinds": ["feeding", "alarm"],
                       "traffic_wakes": "visual only"},
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
+                       "modules": MODULES_MAX, "module_name_bytes": MODULE_NAME_MAX,
                        "lua_bytes": 2097152, "entry_instructions": 1000000,
                        "callback_instructions": 100000, "migration_instructions": 500000},
             "api_document": LAYOUT["api_document"], "anchors": LAYOUT["anchors_name"],
@@ -114,11 +172,14 @@ def capabilities():
             "browser": {"capabilities": ["voyage.define", "free.define", "course.define",
                                          "scene.define"],
                         "locations": ["basin", "outer"],
-                        "bundle_format": "wake-velocity-plugin", "bundle_version": 1,
+                        "bundle_format": "wake-velocity-plugin", "bundle_version": 2,
                         "result_bytes": 16384},
+            "workspace": {"kinds": ["voyage", "free"],
+                          "check": {"voyage": ["validate", "preview"], "free": ["validate"]}},
             "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,
                         "width": 320, "height": 200, "format": "png"},
-            "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage"],
+            "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage", "free"],
+                     "free_requires": "scene.work (a working harbour)",
                      "transport": "private local directory mailbox; per-launch token",
                      "actions": list(LIVE_ACTIONS), "pins": {
                          "stage": ["base_revision", "base_epoch", "expect_bundle"],
@@ -142,56 +203,306 @@ def read_regular(path, limit):
     return data
 
 
-def snapshot(directory):
-    """API 1 has exactly plugin.json and main.lua; the native parser checks the manifest."""
+def module_valid(name):
+    return isinstance(name, str) and len(name) <= MODULE_NAME_MAX and bool(MODULE_NAME.match(name))
+
+
+def module_file(name):
+    """modules/a/b.lua for the module a.b."""
+    return "modules/" + name.replace(".", "/") + ".lua"
+
+
+def image_is(source):
+    return source.startswith(IMAGE_MAGIC)
+
+
+def pack_image(files):
+    """FILES is [(name, bytes)], the entry first; the bytes boat_plugin_image_pack writes."""
+    if not 1 <= len(files) <= MODULES_MAX + 1:
+        raise ValueError("package image needs 1-9 files")
+    out = bytearray(IMAGE_MAGIC + bytes([len(files)]))
+    names = set()
+    for name, data in files:
+        raw = name.encode("utf-8")
+        if not 1 <= len(raw) <= MODULE_NAME_MAX or name in names or len(data) > SOURCE_MAX:
+            raise ValueError(f"package image file {name} cannot be packed")
+        names.add(name)
+        out += bytes([len(raw)]) + raw + struct.pack("<I", len(data)) + data
+        if len(out) > SOURCE_MAX:
+            raise ValueError("package image exceeds the 64 KiB source budget")
+    return bytes(out)
+
+
+def unpack_image(image):
+    """The inverse of pack_image; anything pack could not have written is refused."""
+    bad = ValueError("malformed package source image")
+    if not image_is(image) or len(image) > SOURCE_MAX or len(image) < len(IMAGE_MAGIC) + 1:
+        raise bad
+    count = image[len(IMAGE_MAGIC)]
+    if not 1 <= count <= MODULES_MAX + 1:
+        raise bad
+    at, files, seen = len(IMAGE_MAGIC) + 1, [], set()
+    for index in range(count):
+        if at >= len(image):
+            raise bad
+        n = image[at]
+        at += 1
+        if not 1 <= n <= MODULE_NAME_MAX or len(image) - at < n + 4:
+            raise bad
+        try:
+            name = image[at:at + n].decode("utf-8")
+        except UnicodeError:
+            raise bad from None
+        at += n
+        size = struct.unpack("<I", image[at:at + 4])[0]
+        at += 4
+        if size > len(image) - at or (index and not module_valid(name)) or name in seen:
+            raise bad
+        seen.add(name)
+        files.append((name, image[at:at + size]))
+        at += size
+    if at != len(image):
+        raise bad
+    return files
+
+
+def declared_modules(manifest):
+    """The module names plugin.json declares, in order, with the native parser's refusals. The
+    native parser stays the authority: a manifest that is not JSON declares none here."""
+    try:
+        data = json.loads(manifest)
+    except ValueError:
+        return []
+    if not isinstance(data, dict) or "modules" not in data:
+        return []
+    names = data["modules"]
+    if not isinstance(names, list) or len(names) > MODULES_MAX:
+        raise ValueError(f"plugin.json modules must be an array of at most {MODULES_MAX} "
+                         "module names")
+    for i, name in enumerate(names):
+        if not module_valid(name):
+            raise ValueError(f"plugin.json modules[{i + 1}] {NAME_RULE}")
+        if name == "main":
+            raise ValueError(f"plugin.json modules[{i + 1}] must not be \"main\", the "
+                             "entry's own name")
+        if names.index(name) != i:
+            raise ValueError(f"plugin.json modules[{i + 1}] repeats modules[{names.index(name) + 1}]")
+    return names
+
+
+def budget_message(label, room):
+    return (f"{label} is larger than the {room} bytes left of the {SOURCE_MAX}-byte source "
+            "budget (entry, modules and framing share it)")
+
+
+def package_source(manifest, entry, modules):
+    """The source the native side holds for MANIFEST (bytes): the entry bytes, or an image of the
+    entry and MODULES (a dict of name to bytes) in the manifest's order. Entry, modules and
+    framing share SOURCE_MAX, as boat_plugin_read counts it."""
+    names = declared_modules(manifest)
+    for name in modules:
+        if name not in names:
+            raise ValueError(f'bundle modules holds "{name}", which plugin.json does not declare')
+    for name in names:
+        if name not in modules:
+            raise ValueError(f'plugin.json declares module "{name}" but {module_file(name)} '
+                             "is missing")
+    if not names:
+        if len(entry) > SOURCE_MAX:
+            raise ValueError(f"{ENTRY}: exceeds {SOURCE_MAX} bytes")
+        return entry
+    used = len(IMAGE_MAGIC) + 1
+    for name, data in [(ENTRY, entry)] + [(n, modules[n]) for n in names]:
+        framing = 1 + len(name) + 4
+        if used + framing > SOURCE_MAX or len(data) > SOURCE_MAX - used - framing:
+            raise ValueError(budget_message(
+                ENTRY if name == ENTRY else module_file(name), max(0, SOURCE_MAX - used - framing)))
+        used += framing + len(data)
+    return pack_image([(ENTRY, entry)] + [(n, modules[n]) for n in names])
+
+
+def split_source(manifest, source):
+    """The inverse for a snapshot: (entry bytes, {name: bytes}) from the manifest and source."""
+    names = declared_modules(manifest)
+    if not image_is(source):
+        if names:
+            raise ValueError(f"plugin.json declares {len(names)} module"
+                             f"{'' if len(names) == 1 else 's'} but the package source is not "
+                             "a module image")
+        return source, {}
+    files = unpack_image(source)
+    if not names:
+        raise ValueError("plugin.json declares no modules but the package source is a module "
+                         "image")
+    if files[0][0] != ENTRY:
+        raise ValueError("plugin.json entry is not the entry file the module image carries")
+    if [name for name, _ in files[1:]] != names:
+        raise ValueError("plugin.json modules do not match the modules in the package source "
+                         "image (names and order must agree)")
+    return files[0][1], dict(files[1:])
+
+
+def read_modules(directory, names, used):
+    """Declared module files under DIRECTORY/modules, regular files only and no links on the
+    way, within what is left of the shared source budget (USED bytes already taken)."""
+    modules = {}
+    for name in names:
+        path = Path(directory)
+        for part in module_file(name).split("/"):
+            path = path / part
+            if path.is_symlink():
+                raise ValueError(f"{module_file(name)}: symbolic links are unsupported")
+        room = max(0, SOURCE_MAX - used - (1 + len(name) + 4))
+        try:
+            modules[name] = read_regular(path, room)
+        except ValueError as error:
+            if "exceeds" in str(error):
+                raise ValueError(budget_message(module_file(name), room)) from None
+            raise
+        except FileNotFoundError:
+            raise ValueError(f"{module_file(name)}: missing") from None
+        except NotADirectoryError:
+            raise ValueError(f"{module_file(name)}: expected a regular file") from None
+        used += 1 + len(name) + 4 + len(modules[name])
+    return modules
+
+
+def read_package(directory):
+    """(manifest, entry, modules) bytes of the package in DIRECTORY."""
     directory = Path(directory)
     manifest = read_regular(directory / "plugin.json", MANIFEST_MAX)
-    source = read_regular(directory / "main.lua", SOURCE_MAX)
+    names = declared_modules(manifest)
+    entry = read_regular(directory / ENTRY, SOURCE_MAX)
+    used = len(IMAGE_MAGIC) + 1 + 1 + len(ENTRY) + 4 + len(entry)
+    return manifest, entry, read_modules(directory, names, used)
+
+
+def snapshot(directory):
+    """The manifest and the source (the entry, or an image when modules are declared), framed
+    for the worker; the native parser checks the manifest."""
+    manifest, entry, modules = read_package(directory)
+    source = package_source(manifest, entry, modules)
     return struct.pack(">II", len(manifest), len(source)) + manifest + source
 
 
-def export_bundle(directory):
+def split_snapshot(payload):
+    """(manifest, entry, modules) of a snapshot payload."""
+    manifest_size, _ = struct.unpack(">II", payload[:8])
+    manifest, source = payload[8:8 + manifest_size], payload[8 + manifest_size:]
+    entry, modules = split_source(manifest, source)
+    return manifest, entry, modules
+
+
+def write_package(directory, manifest, entry, modules):
+    """Write plugin.json, the entry and each module under DIRECTORY (created if missing)."""
     directory = Path(directory)
-    return {"format": "wake-velocity-plugin", "version": 1,
-            "manifest": read_regular(directory / "plugin.json", MANIFEST_MAX).decode("utf-8"),
-            "source": read_regular(directory / "main.lua", SOURCE_MAX).decode("utf-8")}
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "plugin.json").write_bytes(manifest)
+    (directory / ENTRY).write_bytes(entry)
+    for name, data in modules.items():
+        path = directory / module_file(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+
+def export_bundle(directory):
+    """The version 2 bundle of a package directory: {format, version, manifest, source,
+    modules}; modules is {} without any."""
+    manifest, entry, modules = read_package(directory)
+    package_source(manifest, entry, modules)  # The shared limits, as the native read applies.
+    return {"format": "wake-velocity-plugin", "version": 2, "manifest": manifest.decode("utf-8"),
+            "source": entry.decode("utf-8"),
+            "modules": {name: data.decode("utf-8") for name, data in modules.items()}}
+
+
+def bundle_package(text):
+    """(manifest, entry, modules) bytes of a bundle's JSON text, refusing what the browser and
+    the native read refuse. Version 1 bundles are not supported."""
+    if len(text.encode("utf-8")) > BUNDLE_MAX:
+        raise ValueError("Bundle exceeds the 200 KB import limit")
+    data = json.loads(text)
+    if isinstance(data, dict) and data.get("format") == "wake-velocity-plugin" \
+            and data.get("version") == 1:
+        raise ValueError(V1_MESSAGE)
+    if (not isinstance(data, dict) or data.get("format") != "wake-velocity-plugin"
+            or data.get("version") != 2
+            or sorted(data) != ["format", "manifest", "modules", "source", "version"]):
+        raise ValueError("Expected a Wake Velocity version 2 plugin bundle")
+    modules = data["modules"]
+    if (not isinstance(data["manifest"], str) or not isinstance(data["source"], str)
+            or not isinstance(modules, dict)
+            or not all(isinstance(value, str) for value in modules.values())):
+        raise ValueError("Expected source text")
+    manifest, entry = data["manifest"].encode("utf-8"), data["source"].encode("utf-8")
+    if len(manifest) > MANIFEST_MAX:
+        raise ValueError("Package exceeds the 4 KiB manifest or 64 KiB source limit")
+    modules = {name: value.encode("utf-8") for name, value in modules.items()}
+    package_source(manifest.decode("utf-8"), entry, modules)
+    names = declared_modules(manifest.decode("utf-8"))
+    return manifest, entry, {name: modules[name] for name in names}
+
+
+def import_bundle(text, directory):
+    """Write a bundle's package into DIRECTORY, which must not exist yet."""
+    manifest, entry, modules = bundle_package(text)
+    if os.path.lexists(directory):
+        raise ValueError(f"{directory} already exists")
+    write_package(directory, manifest, entry, modules)
 
 
 def workspace_read(directory):
-    """Read the two selected draft files using the validation snapshot encoding."""
+    """Read the draft files using the validation snapshot encoding."""
     return workspace_result(snapshot(directory))
 
 
 def workspace_result(payload):
-    manifest_size, _ = struct.unpack(">II", payload[:8])
+    manifest, entry, modules = split_snapshot(payload)
+    files = {"plugin.json": manifest.decode("utf-8"), ENTRY: entry.decode("utf-8")}
+    for name, data in modules.items():
+        files[module_file(name)] = data.decode("utf-8")
     return {"protocol": 1, "operation": "workspace-read", "status": "ok",
-            "bundle_id": hashlib.sha256(payload).hexdigest(), "draft": True,
-            "files": {"plugin.json": payload[8:8 + manifest_size].decode("utf-8"),
-                      "main.lua": payload[8 + manifest_size:].decode("utf-8")}}
+            "bundle_id": hashlib.sha256(payload).hexdigest(), "draft": True, "files": files}
+
+
+def draft_target(directory, filename, manifest):
+    """The file a workspace-write may replace: plugin.json, main.lua or a declared module."""
+    if filename in ("plugin.json", ENTRY):
+        return directory / filename, SOURCE_MAX if filename == ENTRY else MANIFEST_MAX
+    for name in declared_modules(manifest.decode("utf-8")):
+        if filename == module_file(name):
+            return directory / filename, SOURCE_MAX
+    raise ValueError("workspace file must be plugin.json, main.lua or a module declared in "
+                     "plugin.json")
 
 
 def workspace_write(directory, filename, content, expected_bundle):
-    """Replace one draft file, with an optimistic pin; never evaluate or install Lua."""
-    if filename not in ("plugin.json", "main.lua"):
-        raise ValueError("workspace file must be plugin.json or main.lua")
+    """Replace one draft file, with an optimistic pin; never evaluate or install Lua. Adding or
+    removing a module is a plugin.json edit over a module file that already exists."""
     if not expected_bundle:
         raise ValueError("workspace-write requires --expect-bundle")
-    limit = MANIFEST_MAX if filename == "plugin.json" else SOURCE_MAX
+    directory = Path(directory).resolve(strict=True)
+    before = snapshot(directory)
+    manifest, entry, modules = split_snapshot(before)
+    target, limit = draft_target(directory, filename, manifest)
     if len(content) > limit:
         raise ValueError(f"{filename}: exceeds {limit} bytes")
     content.decode("utf-8")
-    directory = Path(directory).resolve(strict=True)
-    before = snapshot(directory)
-    manifest_size, _ = struct.unpack(">II", before[:8])
-    before[8:8 + manifest_size].decode("utf-8")
-    before[8 + manifest_size:].decode("utf-8")
     if hashlib.sha256(before).hexdigest() != expected_bundle:
         raise ValueError("bundle changed since the expected snapshot")
-    target = directory / filename
+    if filename == "plugin.json":
+        # A new manifest must still pair with the module files that exist, within the budget.
+        manifest = content
+        modules = read_modules(directory, declared_modules(content.decode("utf-8")),
+                               len(IMAGE_MAGIC) + 2 + len(ENTRY) + 4 + len(entry))
+    elif filename == ENTRY:
+        entry = content
+    else:
+        modules[next(n for n in modules if module_file(n) == filename)] = content
+    source = package_source(manifest.decode("utf-8"), entry, modules)
     mode = stat.S_IMODE(target.stat().st_mode)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(dir=directory, prefix=".plugin-draft-",
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".plugin-draft-",
                                          delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(content)
@@ -204,8 +515,6 @@ def workspace_write(directory, filename, content, expected_bundle):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    manifest = content if filename == "plugin.json" else before[8:8 + manifest_size]
-    source = content if filename == "main.lua" else before[8 + manifest_size:]
     result = workspace_result(struct.pack(">II", len(manifest), len(source)) + manifest + source)
     result.update(operation="workspace-write", previous_bundle_id=expected_bundle,
                   changed_file=filename)
@@ -370,8 +679,7 @@ class CaptureJob:
         try:
             package = Path(self.directory.name) / "package"
             package.mkdir()
-            (package / "plugin.json").write_bytes(payload[8:8 + manifest_size])
-            (package / "main.lua").write_bytes(payload[8 + manifest_size:])
+            write_package(package, *split_snapshot(payload))
             self.package = str(package)
             self.output = Path(self.directory.name) / "frame.png"
             command = [str(Path(game).resolve()), "--renderer", "cpu", "--plugin", self.package,
@@ -626,15 +934,20 @@ def main():
     parser.add_argument("--bridge", type=Path, help="the game's --plugin-bridge directory")
     parser.add_argument("--expect-bundle")
     parser.add_argument("--line", help="one console line for live-console")
-    parser.add_argument("--file", choices=["plugin.json", "main.lua"])
+    parser.add_argument("--file", help="plugin.json, main.lua or modules/NAME.lua for workspace-write")
     parser.add_argument("--ticks", type=int, default=360)
     parser.add_argument("--timeout", type=float)
+    parser.add_argument("--check", action="store_true", help="sync-shared: report drift only")
     parser.add_argument("--game", type=Path, default=LAYOUT["game"])
     parser.add_argument("--anchor")
     parser.add_argument("--time", type=float, default=1.0)
     parser.add_argument("--camera-distance", type=float)
     parser.add_argument("--camera-height", type=float)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--json", action="store_true",
+                        help="init: print the result object even on a terminal")
+    parser.add_argument("--from", dest="source", metavar="PLUGIN",
+                        help="init (required): the shipped package name or plugin directory to copy")
     args = parser.parse_args()
     if args.operation == "capabilities":
         print(json.dumps(capabilities(), sort_keys=True))
@@ -645,6 +958,28 @@ def main():
     if args.operation == "anchors":
         print(json.dumps(anchors(), sort_keys=True))
         return 0
+    if args.operation == "sync-shared":
+        try:
+            result = sync_shared(args.directory or ROOT / "plugins", args.check)
+        except (OSError, ValueError) as error:
+            print(json.dumps({"protocol": 1, "operation": "sync-shared", "status": "input_error",
+                              "message": str(error)}, sort_keys=True))
+            return 1
+        status = "drift" if args.check and result["drifted"] else "ok"
+        print(json.dumps({"protocol": 1, "operation": "sync-shared", "status": status,
+                          **result}, sort_keys=True))
+        return 0 if status == "ok" else 1
+    if args.operation in WORKSPACE_OPERATIONS:
+        import plugin_workspace  # Agent workspaces take their pins from the game itself.
+        result = plugin_workspace.run(sys.modules[__name__], args)
+        if args.operation == "init" and not args.json and sys.stdout.isatty():
+            if result.get("status") == "ok":
+                print(plugin_workspace.welcome(result))
+            else:
+                print(f"init could not finish: {result.get('message', result.get('status'))}")
+            return 0 if result.get("status") == "ok" else 1
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result.get("status") == "ok" else 1
     offline_base = args.base_revision or 0  # Correlation only; live pins must be explicit.
     job = None
     try:
@@ -666,9 +1001,16 @@ def main():
                 raise ValueError("export requires a plugin directory")
             encoded = (json.dumps(export_bundle(args.directory), ensure_ascii=False, indent=2)
                        + "\n").encode("utf-8")
-            if len(encoded) > 200000:
+            if len(encoded) > BUNDLE_MAX:
                 raise ValueError("bundle exceeds the 200000-byte import limit")
             sys.stdout.buffer.write(encoded)
+            return 0
+        if args.operation == "import":
+            if not args.directory:
+                raise ValueError("import requires a new plugin directory")
+            import_bundle(sys.stdin.buffer.read(BUNDLE_MAX + 1).decode("utf-8"), args.directory)
+            print(json.dumps({"protocol": 1, "operation": "import", "status": "ok",
+                              "directory": str(args.directory)}, sort_keys=True))
             return 0
         if args.operation.startswith("live-"):
             job = live_job(args)

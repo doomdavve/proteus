@@ -1,6 +1,7 @@
 #include "wake_velocity/wake_command.h"
 
 #include "core/boat_scene_definition.h"
+#include "plugins/boat_plugin_image.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -80,6 +81,18 @@ static bool prepare_base(WakeCommand *command, WakePlugin *plugin, bool edit)
         emit(command, "THE ACTIVE PACKAGE HAS NO SOURCE TO EDIT");
         return false;
     }
+    // A package with modules is a source image: the console wraps its entry and keeps its modules.
+    if (boat_plugin_image_is(text, size)) {
+        BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+        unsigned count;
+        if (!boat_plugin_image_unpack(text, size, files, &count)
+            || files[0].size > sizeof(command->base)) {
+            emit(command, "THE ACTIVE PACKAGE HAS NO SOURCE TO EDIT");
+            return false;
+        }
+        text = files[0].data;
+        size = files[0].size;
+    }
     memcpy(command->base, text, size);
     command->base_size = size;
     command->base_ready = true;
@@ -87,6 +100,29 @@ static bool prepare_base(WakeCommand *command, WakePlugin *plugin, bool edit)
     command->counts_known[1] = true;
     command->last_revision = 1;
     return true;
+}
+
+// The staged form of WRAPPED, an edited entry: itself for a single-file package, otherwise the
+// active image with that entry in place of its own (the modules are never edited here).
+static size_t stage_form(
+    const WakePlugin *plugin, const char *wrapped, size_t wrapped_size, char *out, size_t capacity)
+{
+    const char *active;
+    size_t active_size = wake_plugin_source(plugin, &active);
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count;
+    if (!boat_plugin_image_is(active, active_size)) {
+        if (wrapped_size > capacity)
+            return 0;
+        memcpy(out, wrapped, wrapped_size);
+        return wrapped_size;
+    }
+    size_t written;
+    if (!boat_plugin_image_unpack(active, active_size, files, &count))
+        return 0;
+    files[0].data = wrapped;
+    files[0].size = wrapped_size;
+    return boat_plugin_image_pack(files, count, out, capacity, &written) ? written : 0;
 }
 
 static bool submit_edit(
@@ -121,9 +157,16 @@ static bool submit_edit(
         emit(command, "SOURCE LIMIT (%d BYTES) REACHED; /undo OR /save", BOAT_PLUGIN_SOURCE_MAX);
         return false;
     }
+    static char staged[BOAT_PLUGIN_SOURCE_MAX];
+    size = stage_form(plugin, source, size, staged, sizeof(staged));
+    if (!size) {
+        --command->chunk_count;
+        emit(command, "SOURCE LIMIT (%d BYTES) REACHED; /undo OR /save", BOAT_PLUGIN_SOURCE_MAX);
+        return false;
+    }
     command->chunk = command->chunk_count;
     command->pending = true;
-    wake_plugin_stage_source(plugin, session, source, size, now);
+    wake_plugin_stage_source(plugin, session, staged, size, now);
     if (!plugin->staging) {
         command->pending = false;
         --command->chunk_count;
@@ -150,7 +193,10 @@ static bool submit_query(
     static char source[BOAT_PLUGIN_SOURCE_MAX];
     size_t size
         = wake_command_source(command, command->base, command->base_size, source, sizeof(source));
-    if (!size || !wake_plugin_query_begin(plugin, source, size, expression, now)) {
+    static char staged[BOAT_PLUGIN_SOURCE_MAX];
+    if (size)
+        size = stage_form(plugin, source, size, staged, sizeof(staged));
+    if (!size || !wake_plugin_query_begin(plugin, staged, size, expression, now)) {
         emit(command, "CANNOT RUN THE ISOLATED QUERY");
         return false;
     }
@@ -220,6 +266,7 @@ static const struct {
     { "clear", "/clear", "Clear output; keep input and history." },
     { "save", "/save DIR", "Save a package; browser: download it." },
     { "capability", "/capability scene.define", "Grant scene editing to this voyage." },
+    { "work", "/work pose|clock-report ...", "Working harbour: pose swing|deck|approach; clock-report FILE|stop." },
 };
 
 unsigned wake_command_completions(const char *prefix, const char **matches, unsigned capacity)
@@ -350,6 +397,25 @@ static bool run_command(
         emit(command, "%s", plugin->status);
         return restart;
     }
+    if (!strncmp(line, "/work", 5) && (line[5] == ' ' || !line[5])) {
+        char name[32] = "", message[192] = "";
+        const char *rest = trim(line + 5);
+        size_t n = strcspn(rest, " \t");
+        if (!command->work) {
+            emit(command, "NO WORKING HARBOUR IN THIS SESSION");
+            return false;
+        }
+        if (!n || n >= sizeof(name)) {
+            emit(command, "USAGE: /work pose swing|deck|approach");
+            emit(command, "       /work clock-report FILE|stop");
+            return false;
+        }
+        memcpy(name, rest, n);
+        name[n] = 0;
+        bool ok = command->work(command->work_context, name, trim(rest + n), message, sizeof(message));
+        emit(command, "%s%s", ok ? "" : "REFUSED: ", message);
+        return false;
+    }
     if (!strcmp(line, "/restart")) {
         emit(command, "RESTARTING THE SESSION");
         return true;
@@ -435,4 +501,10 @@ void wake_command_tee(WakeCommand *command, WakeCommandPrint tee, void *context)
 {
     command->tee = tee;
     command->tee_context = context;
+}
+
+void wake_command_work(WakeCommand *command, WakeCommandWork work, void *context)
+{
+    command->work = work;
+    command->work_context = context;
 }

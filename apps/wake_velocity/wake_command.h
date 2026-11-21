@@ -16,12 +16,19 @@ typedef void (*WakeCommandClear)(void *context);
 typedef bool (*WakeCommandSave)(
     void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity);
 
+// A host request: `/work NAME [ARGUMENT]` (the working harbour's developer tools). True when the
+// host took it; MESSAGE is then the one result line, else the reason.
+typedef bool (*WakeCommandWork)(void *context, const char *name, const char *argument,
+    char *message, size_t capacity);
+
 typedef struct {
     WakeCommandPrint print;
     WakeCommandPrint tee; // An optional second sink, used by the tool bridge.
     WakeCommandClear clear;
     WakeCommandSave save;
     void *context, *tee_context;
+    WakeCommandWork work; // NULL: this session has no working harbour.
+    void *work_context;
     // Console edits, oldest first. Each is composed onto BASE, the package's unchanged entry.
     char chunks[WAKE_COMMAND_CHUNKS][WAKE_COMMAND_CHUNK_TEXT];
     unsigned chunk_count;
@@ -45,6 +52,8 @@ void wake_command_init(WakeCommand *command, WakeCommandPrint print, WakeCommand
     WakeCommandSave save, void *context);
 // Also send each result line to TEE while it is set; NULL clears it.
 void wake_command_tee(WakeCommand *command, WakeCommandPrint tee, void *context);
+// Route `/work` requests to WORK; NULL clears it.
+void wake_command_work(WakeCommand *command, WakeCommandWork work, void *context);
 // Parse and submit one line. True when the caller must restart the session (a forced /apply of a
 // restarting change or /restart). Appends bounded result lines through PRINT.
 bool wake_command_submit(

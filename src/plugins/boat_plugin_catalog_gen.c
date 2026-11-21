@@ -42,6 +42,11 @@ static bool evaluate(const char *directory, Entry *entry)
         show(directory, &d);
         return false;
     }
+    if (boat_plugin_check_source(&entry->manifest, files.source, files.source_size, &d)
+        != BOAT_PLUGIN_OK) {
+        show(directory, &d);
+        return false;
+    }
     entry->kind = boat_plugin_kind_parse(entry->manifest.kind);
     // S1c: a free package's job (its work sites' objective) runs in the native cargo sandbox,
     // which evaluates the embedded source. Other bundled sessions stay Lua-free.

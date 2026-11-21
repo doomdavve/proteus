@@ -10,6 +10,7 @@
 #include "core/boat_room_definition.h"
 #include "core/boat_world.h"
 #include "plugins/boat_plugin.h"
+#include "plugins/boat_plugin_image.h"
 #include "plugins/boat_plugin_io.h"
 #include "plugins/boat_plugin_load.h"
 #include "plugins/boat_plugin_lua.h"
@@ -19,6 +20,7 @@
 #include "raymath.h"
 #include "support/boat_fixtures.h"
 #include "support/boat_test_cases.h"
+#include "support/boat_test_flat_package.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -298,7 +300,8 @@ static const char *harbor_variant(const char *from, const char *to)
     static char text[BOAT_PLUGIN_SOURCE_MAX + 1];
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
-    if (boat_plugin_read("plugins/harbor-life", NULL, &files, &d) != BOAT_PLUGIN_OK)
+    if (boat_plugin_read("plugins/harbor-life", NULL, &files, &d) != BOAT_PLUGIN_OK
+        || !boat_test_flatten_package(&files))
         return NULL;
     memcpy(text, files.source, files.source_size);
     text[files.source_size] = 0;
@@ -318,6 +321,7 @@ static int scene_traffic(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
@@ -382,9 +386,9 @@ static int scene_traffic(void)
         CHECK(!strcmp(d.field, cases[i].field));
     }
     // A non-retained authored copy of the compiled river actor is a real schedule conflict.
-    const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+    const char *conflict
+        = harbor_variant("route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+            "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
@@ -419,7 +423,8 @@ static int open_path_decode(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
-    const char *old = "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540";
+    CHECK(boat_test_flatten_package(&files));
+    const char *old = "route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540";
     const char *good = "route = \"open\", pieces = {"
                        "{kind=\"line\",x0=0,z0=-100,x1=0,z1=-110,ticks=240,dwell=120,"
                        "max_speed=20,max_acceleration=100},"
@@ -483,7 +488,8 @@ static const char SERVICE_SOURCE[]
     = "return {\n"
       "  voyage = { shelters = {\n"
       "    { id = \"dock\", name = \"DOCK\", x = -12, z = 60, heading = 0, radius = 60 },\n"
-      "    { id = \"bridge\", name = \"BRIDGE\", x = 650, z = -850, heading = 1.33, radius = 150 },\n"
+      "    { id = \"bridge\", name = \"BRIDGE\", x = 650, z = -850, heading = 1.33, radius = 150 "
+      "},\n"
       "    { id = \"east_shore\", name = \"EAST SHORE\", x = 3250, z = -2000, heading = 0.86,"
       " radius = 200 },\n"
       "    { id = \"langedrag\", name = \"LANGEDRAG\", x = 3600, z = -3370, heading = 1.57,"
@@ -633,6 +639,7 @@ static int marina_service_survey(void)
     CHECK(status == BOAT_PLUGIN_OK);
     static BoatPluginFiles files;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     status = load(files.manifest, SERVICE_SOURCE, strlen(SERVICE_SOURCE), NULL, &staged, &d);
     if (status != BOAT_PLUGIN_OK)
         show("service load", &d);
@@ -799,21 +806,88 @@ static int open_leg_wire(void)
 
 // M3 prerequisite: free packages with a marina or traffic scene run the same structural map,
 // berth, module and traffic checks as voyages, but keep the voyage-only shelter rules.
+// The free_scene_location cases share one fixture: the harbor-life package, its voyage, a free
+// copy of that package and the outer map. Each case runs in its own process, so each builds it.
+static int free_location_open(BoatPluginFiles *files, BoatPluginVoyage *voyage,
+    BoatPluginFree *free_package, BoatWorldResources *world, const BoatWorldDefinition **outer)
+{
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(files));
+    BoatPluginBundle bundle = boat_plugin_bundle(files);
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, voyage, &d) == BOAT_PLUGIN_OK);
+    *outer = boat_location_find("outer");
+    CHECK(boat_world_resources_init(world, *outer));
+    *free_package = (BoatPluginFree) {
+        .manifest = voyage->manifest, .has_scene = true, .scene = voyage->scene
+    };
+    strcpy(free_package->manifest.kind, "free");
+    return 0;
+}
+
+// An open two-piece path on open water that crosses no compiled traffic.
+static WaterfrontRouteDefinition internal_open_path(void)
+{
+    WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
+    WaterfrontRouteActor *path = &internal_path.actors[0];
+    strcpy(path->id, "internal_open_path");
+    path->shape = WATERFRONT_ROUTE_OPEN_PATH;
+    path->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    path->retain = 0xff;
+    path->period = 5;
+    path->open_path.count = 2;
+    BoatRouteLeg line = { .start_x = 0,
+        .start_z = -100,
+        .end_x = 0,
+        .end_z = -110,
+        .duration_ticks = 240,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 20,
+        .max_acceleration = 100 };
+    path->open_path.pieces[0].shape.line = line;
+    path->open_path.pieces[0].dwell_ticks = 120;
+    line.start_z = -110;
+    line.end_z = -120;
+    path->open_path.pieces[1].shape.line = line;
+    return internal_path;
+}
+
+// BASE's path turned into a two-arc loop.
+static WaterfrontRouteDefinition loop_open_path(const WaterfrontRouteDefinition *base)
+{
+    WaterfrontRouteDefinition loop_path = *base;
+    WaterfrontRouteActor *loop_actor = &loop_path.actors[0];
+    loop_actor->period = 10;
+    loop_actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
+    BoatRouteArc loop_arc = { .centre_x = 0,
+        .centre_z = -110,
+        .radius = 4,
+        .start_angle = 0,
+        .sweep = BOAT_TWO_PI * .5,
+        .duration_ticks = 600,
+        .tick_seconds = BOAT_TICK_SECONDS,
+        .max_speed = 5,
+        .max_acceleration = 10 };
+    loop_actor->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[0].shape.arc = loop_arc;
+    loop_arc.start_angle = BOAT_TWO_PI * .5;
+    loop_actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
+    loop_actor->open_path.pieces[1].shape.arc = loop_arc;
+    return loop_path;
+}
+
+// Valid scenes, and the internal-only open shapes against the static survey.
 static int free_scene_location(void)
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
-    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
-    BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
-    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    BoatPluginFree free;
     BoatWorldResources world;
-    const BoatWorldDefinition *outer = boat_location_find("outer");
-    CHECK(boat_world_resources_init(&world, outer));
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
 
     // The valid authored scene passes unchanged for both a voyage and a free package.
-    BoatPluginFree free = { .manifest = voyage.manifest, .has_scene = true, .scene = voyage.scene };
-    strcpy(free.manifest.kind, "free");
     CHECK(boat_plugin_check_location(&voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
@@ -851,27 +925,7 @@ static int free_scene_location(void)
         boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "internal"));
 
-    WaterfrontRouteDefinition internal_path = { .actor_count = 1 };
-    WaterfrontRouteActor *path = &internal_path.actors[0];
-    strcpy(path->id, "internal_open_path");
-    path->shape = WATERFRONT_ROUTE_OPEN_PATH;
-    path->recipe = WATERFRONT_CRAFT_RUNABOUT;
-    path->retain = 0xff;
-    path->period = 5;
-    path->open_path.count = 2;
-    BoatRouteLeg line = { .start_x = 0,
-        .start_z = -100,
-        .end_x = 0,
-        .end_z = -110,
-        .duration_ticks = 240,
-        .tick_seconds = BOAT_TICK_SECONDS,
-        .max_speed = 20,
-        .max_acceleration = 100 };
-    path->open_path.pieces[0].shape.line = line;
-    path->open_path.pieces[0].dwell_ticks = 120;
-    line.start_z = -110;
-    line.end_z = -120;
-    path->open_path.pieces[1].shape.line = line;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
     CHECK(waterfront_route_validate(&internal_path, &route));
     internal_free.scene.traffic = internal_path;
     internal_voyage.scene.traffic = internal_path;
@@ -879,32 +933,29 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_OK);
 
-    WaterfrontRouteDefinition loop_path = internal_path;
-    WaterfrontRouteActor *loop_actor = &loop_path.actors[0];
-    loop_actor->period = 10;
-    loop_actor->open_path = (BoatRoutePath) { .count = 2, .loop = true };
-    BoatRouteArc loop_arc = { .centre_x = 0,
-        .centre_z = -110,
-        .radius = 4,
-        .start_angle = 0,
-        .sweep = BOAT_TWO_PI * .5,
-        .duration_ticks = 600,
-        .tick_seconds = BOAT_TICK_SECONDS,
-        .max_speed = 5,
-        .max_acceleration = 10 };
-    loop_actor->open_path.pieces[0].kind = BOAT_ROUTE_PATH_ARC;
-    loop_actor->open_path.pieces[0].shape.arc = loop_arc;
-    loop_arc.start_angle = BOAT_TWO_PI * .5;
-    loop_actor->open_path.pieces[1].kind = BOAT_ROUTE_PATH_ARC;
-    loop_actor->open_path.pieces[1].shape.arc = loop_arc;
+    WaterfrontRouteDefinition loop_path = loop_open_path(&internal_path);
     internal_free.scene.traffic = loop_path;
     CHECK(boat_plugin_free_check_location(&internal_free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// FREE with two crossing timetables over one corridor: a looping visitor and a four-point
+// service. The caller's timetable and phase variations start from this state.
+static int crossing_package(const BoatPluginFree *free_package, BoatPluginFree *out)
+{
+    WaterfrontRouteDiagnostic route;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
+    CHECK(waterfront_route_validate(&internal_path, &route));
+    BoatPluginFree internal_free = *free_package;
+    internal_free.scene.traffic = loop_open_path(&internal_path);
 
     // Same intersecting corridors, different timetables: the native POINTS repeat
     // is exact at 120 Hz, unlike the legacy angular/distance-wrap evaluators.
-    BoatPluginFree crossing = internal_free;
-    crossing.scene.traffic.actor_count = 2;
-    WaterfrontRouteActor *visitor = &crossing.scene.traffic.actors[0];
+    BoatPluginFree *crossing = out;
+    *crossing = internal_free;
+    crossing->scene.traffic.actor_count = 2;
+    WaterfrontRouteActor *visitor = &crossing->scene.traffic.actors[0];
     visitor->period = 20;
     for (unsigned i = 0; i < 2; ++i) {
         visitor->open_path.pieces[i].shape.arc.centre_x = -50;
@@ -913,7 +964,7 @@ static int free_scene_location(void)
         visitor->open_path.pieces[i].shape.arc.max_speed = 10;
         visitor->open_path.pieces[i].shape.arc.duration_ticks = 1200;
     }
-    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
+    WaterfrontRouteActor *service = &crossing->scene.traffic.actors[1];
     *service = (WaterfrontRouteActor) { .shape = WATERFRONT_ROUTE_POINTS,
         .recipe = WATERFRONT_CRAFT_RUNABOUT,
         .retain = 0xff,
@@ -921,8 +972,25 @@ static int free_scene_location(void)
         .point_count = 4,
         .points = { { 40, -160, 3 }, { 40, -140, 3 }, { 60, -140, 3 }, { 60, -160, 3 } } };
     strcpy(service->id, "crossing_service");
-    CHECK(waterfront_route_validate(&crossing.scene.traffic, &route));
+    CHECK(waterfront_route_validate(&crossing->scene.traffic, &route));
     service->phase = 10;
+    return 0;
+}
+
+// Loop timetables that must repeat exactly: equivalent phases pass, others are named.
+static int free_location_crossings(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteActor *visitor = &crossing.scene.traffic.actors[0];
+    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_OK);
     // Equivalent phases put the legacy period wrap on the opposite side of
     // the origin while the authored loop also closes at the final sample.
@@ -939,6 +1007,24 @@ static int free_scene_location(void)
     service->period = 20.001;
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "unsupported exact-tick"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// The traffic work budget, speed bounds and the legacy angular wrap.
+static int free_location_speed_bounds(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteDiagnostic route;
+    WaterfrontRouteActor *service = &crossing.scene.traffic.actors[1];
     service->period = 20 + BOAT_TICK_SECONDS;
     CHECK(boat_plugin_free_check_location(&crossing, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "work budget"));
@@ -974,6 +1060,23 @@ static int free_scene_location(void)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "unsupported exact-tick"));
 
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// A finite crossing: the moving segment and the terminal pose against the service corridor.
+static int free_location_finite_crossing(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    BoatPluginFree crossing;
+    CHECK(crossing_package(&free, &crossing) == 0);
+    WaterfrontRouteDiagnostic route;
     BoatPluginFree finite_crossing = crossing;
     WaterfrontRouteActor *finite_service = &finite_crossing.scene.traffic.actors[1];
     for (unsigned i = 0; i < 4; ++i) {
@@ -1007,6 +1110,25 @@ static int free_scene_location(void)
     CHECK(boat_plugin_free_check_location(&finite_crossing, outer, &world.map, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(strstr(d.message, "terminal pose"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// Berth and contact envelopes, traffic conflicts, land and the sample budget.
+static int free_location_contacts(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
+    WaterfrontRouteDiagnostic route;
+    BoatPluginFree internal_free = free;
+    BoatPluginVoyage internal_voyage = voyage;
+    WaterfrontRouteDefinition internal_path = internal_open_path();
+    CHECK(waterfront_route_validate(&internal_path, &route));
 
     WaterfrontRouteDefinition berth_path = internal_path;
     berth_path.actors[0].open_path.pieces[0].shape.line = (BoatRouteLeg) { .start_x = 13,
@@ -1114,6 +1236,20 @@ static int free_scene_location(void)
         boat_plugin_check_location(&internal_voyage, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.traffic.vessels[1]") && strstr(d.message, "three-minute")
         && !strstr(d.message, "internal"));
+    boat_world_resources_destroy(&world);
+    return 0;
+}
+
+// Free scenes on the basin or without a map, bad berths and traffic conflicts.
+static int free_location_diagnostics(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    BoatPluginVoyage voyage;
+    BoatPluginFree free;
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer;
+    CHECK(free_location_open(&files, &voyage, &free, &world, &outer) == 0);
 
     // A free scene without marina or traffic keeps the old path, even on the unmapped basin.
     const BoatWorldDefinition *basin = boat_location_find("basin");
@@ -1149,9 +1285,9 @@ static int free_scene_location(void)
     voyage.scene.berths[0] = saved;
 
     // Invalid free traffic is caught by the same retained-timetable conflict check.
-    const char *conflict = harbor_variant(
-        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
-        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+    const char *conflict
+        = harbor_variant("route = \"marina_pass\",\n        speed = 4, phase = 0, period = 24.8540",
+            "route = \"river_runabout\",\n        speed = 2.2, phase = 70, period = 158.165");
     CHECK(conflict);
     BoatPluginVoyage traffic;
     CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &traffic, &d) == BOAT_PLUGIN_OK);
@@ -1176,6 +1312,7 @@ static int scene_appearance(void)
     static unsigned char wire[32768];
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     const char *valid = "{ length = 5.2, beam = 2, hull = { 0, 128, 255 }, deck = { 1, 2, 3 }, "
                         "trim = { 9, 8, 7 }, name = \"SEA-1\" }";
     int size = snprintf(source, sizeof(source),
@@ -1248,6 +1385,7 @@ static int scene_berths(void)
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_test_flatten_package(&files));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
@@ -1285,7 +1423,7 @@ static int scene_berths(void)
         bool location;
     } cases[] = {
         { "marina = {", "marina = { pontoons = {},", "scene.marina.pontoons", false },
-        { "      entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
+        { "    entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
         { "id = \"runabout\"", "id = \"sailboat_aft\"", "scene.marina.berths[2].id", false },
         { "recipe = \"runabout\"", "recipe = \"yacht\"", "scene.marina.berths[2].recipe", false },
         { "mooring = \"pontoon\"", "mooring = \"quay\"", "scene.marina.berths[1].mooring", false },
@@ -1814,7 +1952,569 @@ static int package_files(void)
     large[BOAT_PLUGIN_SOURCE_MAX] = 0;
     return read_status(package("exact", MANIFEST, large), BOAT_PLUGIN_OK, "");
 }
+
+static void make_directory(const char *path)
+{
+    if (mkdir(path, 0755) != 0)
+        exit(1);
+}
+
+// A module package: plugin.json declaring MODULES plus main.lua; module files are added by hand.
+static const char *module_package(char *copy, const char *name, const char *modules)
+{
+    char manifest[1024];
+    snprintf(manifest, sizeof(manifest),
+        "{\"id\": \"test.voyage\", \"name\": \"Test\", \"api\": 1, \"kind\": \"voyage\", "
+        "\"entry\": \"main.lua\", \"location\": \"outer\", \"capabilities\": "
+        "[\"voyage.define\"], \"state_version\": 1, \"modules\": %s}",
+        modules);
+    snprintf(copy, 512, "%s", package(name, manifest, "return {}\n"));
+    return copy;
+}
+
+static int add_file(const char *directory, const char *relative, const char *text, size_t size)
+{
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s", directory, relative);
+    return write_file(path, text, size);
+}
+
+// Remove a scratch package tree this test built (two levels, files and links only).
+static void clear_modules(const char *directory)
+{
+    char path[700];
+    static const char *const files[] = { "modules/marina.lua", "modules/marina/berths.lua",
+        "modules/marina/dir", "modules/a.lua", "modules/b.lua", "modules/marina", "modules" };
+    for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); ++i) {
+        snprintf(path, sizeof(path), "%s/%s", directory, files[i]);
+        if (unlink(path) != 0)
+            rmdir(path);
+    }
+}
+
+static int read_modules(
+    const char *directory, BoatPluginStatus status, const char *file, const char *message)
+{
+    BoatPluginFiles *files = malloc(sizeof(*files));
+    CHECK(files);
+    BoatPluginDiagnostic d;
+    BoatPluginStatus got = boat_plugin_read(directory, NULL, files, &d);
+    show(directory, &d);
+    free(files);
+    CHECK(got == status);
+    CHECK(got == BOAT_PLUGIN_OK || !strcmp(d.file, file));
+    CHECK(got == BOAT_PLUGIN_OK || !message || strstr(d.message, message));
+    return 0;
+}
+
+static int package_modules(void)
+{
+    char path[700], other[700];
+    // A valid package with a flat and a nested module reads as a source image.
+    char good_[512];
+    const char *good = module_package(good_, "modules_good", "[\"marina\", \"marina.berths\"]");
+    clear_modules(good);
+    make_directory((snprintf(path, sizeof(path), "%s/modules", good), path));
+    make_directory((snprintf(path, sizeof(path), "%s/modules/marina", good), path));
+    CHECK(!add_file(good, "modules/marina.lua", "return 1", 8));
+    CHECK(!add_file(good, "modules/marina/berths.lua", "return 2\n", 9));
+    BoatPluginFiles *files = malloc(sizeof(*files));
+    CHECK(files);
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read(good, NULL, files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginImageFile views[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count = 0;
+    CHECK(boat_plugin_image_is(files->source, files->source_size));
+    CHECK(boat_plugin_image_unpack(files->source, files->source_size, views, &count) && count == 3);
+    CHECK(views[0].size == 10 && !memcmp(views[0].data, "return {}\n", 10));
+    const BoatPluginImageFile *berths = boat_plugin_image_find(views, count, "marina.berths");
+    CHECK(berths && berths->size == 9 && !memcmp(berths->data, "return 2\n", 9));
+    const BoatPluginImageFile *marina = boat_plugin_image_find(views, count, "marina");
+    CHECK(marina && marina->size == 8 && !memcmp(marina->data, "return 1", 8));
+    free(files);
+    // An empty module file is a valid module.
+    CHECK(!add_file(good, "modules/marina.lua", "", 0));
+    if (read_modules(good, BOAT_PLUGIN_OK, "", NULL))
+        return 1;
+    // Missing: named by file.
+    unlink((snprintf(path, sizeof(path), "%s/modules/marina/berths.lua", good), path));
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "cannot be opened"))
+        return 1;
+    // A directory where the file belongs.
+    make_directory(path);
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "regular file"))
+        return 1;
+    rmdir(path);
+    // A symbolic link to a valid module file.
+    CHECK(!add_file(good, "modules/a.lua", "return 3", 8));
+    snprintf(other, sizeof(other), "%s/modules/a.lua", good);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(good, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "symbolic link"))
+        return 1;
+    unlink(path);
+    clear_modules(good);
+    // A symbolic `modules` directory, and a symbolic intermediate directory, are refused.
+    char linked_[512];
+    const char *linked = module_package(linked_, "modules_linked", "[\"marina\"]");
+    clear_modules(linked);
+    snprintf(other, sizeof(other), "%s/modules", good);
+    make_directory(other);
+    CHECK(!add_file(good, "modules/marina.lua", "return 1", 8));
+    snprintf(path, sizeof(path), "%s/modules", linked);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(linked, BOAT_PLUGIN_IO, "modules/marina.lua", "symbolic link"))
+        return 1;
+    unlink(path);
+    char nested_[512];
+    const char *nested = module_package(nested_, "modules_nested", "[\"marina.berths\"]");
+    clear_modules(nested);
+    snprintf(path, sizeof(path), "%s/modules", nested);
+    make_directory(path);
+    snprintf(other, sizeof(other), "%s/modules/marina", good);
+    make_directory(other);
+    CHECK(!add_file(good, "modules/marina/berths.lua", "return 2", 8));
+    snprintf(path, sizeof(path), "%s/modules/marina", nested);
+    CHECK(symlink(other, path) == 0);
+    if (read_modules(nested, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "symbolic link"))
+        return 1;
+    clear_modules(nested);
+    // `modules` that is a plain file, not a directory.
+    CHECK(!add_file(nested, "modules", "x", 1));
+    if (read_modules(nested, BOAT_PLUGIN_IO, "modules/marina/berths.lua", "cannot be opened"))
+        return 1;
+    clear_modules(nested);
+    clear_modules(good);
+    // Sizes: the entry and the modules share one source budget, framing included.
+    char sized_[512];
+    const char *sized = module_package(sized_, "modules_sized", "[\"a\", \"b\"]");
+    clear_modules(sized);
+    snprintf(path, sizeof(path), "%s/modules", sized);
+    make_directory(path);
+    static char block[BOAT_PLUGIN_SOURCE_MAX + 2];
+    memset(block, '-', sizeof(block));
+    CHECK(!add_file(sized, "modules/a.lua", block, BOAT_PLUGIN_SOURCE_MAX + 1)); // Alone too big.
+    CHECK(!add_file(sized, "modules/b.lua", "x", 1));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/a.lua", "source budget"))
+        return 1;
+    // Total oversize: each file fits alone, the sum does not.
+    CHECK(!add_file(sized, "modules/a.lua", block, 40000));
+    CHECK(!add_file(sized, "modules/b.lua", block, 40000));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/b.lua", "source budget"))
+        return 1;
+    // Exactly the budget: header 6, entry (1+8+4+10), a (1+1+4), b (1+1+4) leave room for the rest.
+    size_t rest = BOAT_PLUGIN_SOURCE_MAX - (6 + 23 + 6 + 6);
+    CHECK(!add_file(sized, "modules/a.lua", block, rest - 1));
+    CHECK(!add_file(sized, "modules/b.lua", block, 1));
+    if (read_modules(sized, BOAT_PLUGIN_OK, "", NULL))
+        return 1;
+    CHECK(!add_file(sized, "modules/a.lua", block, rest));
+    if (read_modules(sized, BOAT_PLUGIN_LIMIT, "modules/b.lua", "source budget"))
+        return 1;
+    clear_modules(sized);
+    // No modules declared: the source stays the raw entry bytes, and undeclared files are ignored.
+    char plain_[512];
+    const char *plain = module_package(plain_, "modules_none", "[]");
+    clear_modules(plain);
+    snprintf(path, sizeof(path), "%s/modules", plain);
+    make_directory(path);
+    CHECK(!add_file(plain, "modules/a.lua", "return 3", 8));
+    files = malloc(sizeof(*files));
+    CHECK(files && boat_plugin_read(plain, NULL, files, &d) == BOAT_PLUGIN_OK);
+    CHECK(files->source_size == 10 && !memcmp(files->source, "return {}\n", 10)
+        && !boat_plugin_image_is(files->source, files->source_size));
+    free(files);
+    clear_modules(plain);
+    // An entry that mimics the image magic is not Lua text.
+    const char *spoof = package("modules_spoof", MANIFEST, NULL);
+    CHECK(!add_file(spoof, "main.lua", "\0PMI\1\1x", 7));
+    return read_modules(spoof, BOAT_PLUGIN_SYNTAX, "main.lua", "not Lua text");
+}
 #endif
+
+// M5 W1: the optional "modules" member.
+static int manifest_modules(void)
+{
+    static const char HEAD[]
+        = "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"voyage\", "
+          "\"entry\": \"main.lua\", \"location\": \"outer\", \"capabilities\": "
+          "[\"voyage.define\"], \"state_version\": 1";
+    BoatPluginManifest m;
+    BoatPluginDiagnostic d;
+    char json[1024];
+    // Absent: none. An empty array is valid too.
+    snprintf(json, sizeof(json), "%s}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 0);
+    snprintf(json, sizeof(json), "%s, \"modules\": []}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 0);
+    snprintf(json, sizeof(json), "%s, \"modules\": [\"marina\", \"marina.berths\", \"a.b_2.c3\"]}",
+        HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 3 && !strcmp(m.modules[0], "marina")
+        && !strcmp(m.modules[1], "marina.berths") && !strcmp(m.modules[2], "a.b_2.c3"));
+    // Eight is the most.
+    snprintf(json, sizeof(json),
+        "%s, \"modules\": [\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\",\"h\"]}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK
+        && m.module_count == 8);
+    static const struct {
+        const char *modules, *field;
+    } bad[] = {
+        { "[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\",\"h\",\"i\"]", "modules" },
+        { "\"marina\"", "modules" },
+        { "{\"a\": 1}", "modules" },
+        { "[1]", "modules[1]" },
+        { "[[\"a\"]]", "modules[1]" },
+        { "[\"a\", \"\"]", "modules[2]" },
+        { "[\"A\"]", "modules[1]" },
+        { "[\"1a\"]", "modules[1]" },
+        { "[\"a-b\"]", "modules[1]" },
+        { "[\"a..b\"]", "modules[1]" },
+        { "[\".a\"]", "modules[1]" },
+        { "[\"a.\"]", "modules[1]" },
+        { "[\"a.b.c.d\"]", "modules[1]" },
+        { "[\"../evil\"]", "modules[1]" },
+        { "[\"a/b\"]", "modules[1]" },
+        { "[\"a\\\\b\"]", "modules[1]" },
+        { "[\"/etc/passwd\"]", "modules[1]" },
+        { "[\"a:b\"]", "modules[1]" },
+        { "[\"abcdefghijklmnopqrstuvwxyz0123456\"]", "modules[1]" }, // 33 bytes
+        { "[\"a\", \"b\", \"a\"]", "modules[3]" },
+        { "[\"main\"]", "modules[1]" },
+    };
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        snprintf(json, sizeof(json), "%s, \"modules\": %s}", HEAD, bad[i].modules);
+        BoatPluginStatus got = boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d);
+        if (got != BOAT_PLUGIN_MANIFEST || strcmp(d.field, bad[i].field)
+            || strcmp(d.file, "plugin.json")) {
+            fprintf(stderr, "modules case %zu: %s %s\n", i, d.field, d.message);
+            return 1;
+        }
+    }
+    // 32 bytes is allowed (three segments), and a duplicate key is refused like any other.
+    snprintf(json, sizeof(json), "%s, \"modules\": [\"abcdefghij.klmnopqrstu.vwxyz012\"]}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_OK);
+    snprintf(json, sizeof(json), "%s, \"modules\": [], \"modules\": []}", HEAD);
+    CHECK(boat_plugin_parse_manifest(json, strlen(json), NULL, &m, &d) == BOAT_PLUGIN_MANIFEST);
+    // Names map to files without walking directories.
+    char path[64];
+    CHECK(boat_plugin_module_path("marina", path, sizeof(path))
+        && !strcmp(path, "modules/marina.lua"));
+    CHECK(boat_plugin_module_path("marina.berths", path, sizeof(path))
+        && !strcmp(path, "modules/marina/berths.lua"));
+    CHECK(!boat_plugin_module_path("../x", path, sizeof(path)));
+    CHECK(!boat_plugin_module_path("marina.berths", path, 10));
+    return 0;
+}
+
+// M5 W1: the source image round trip and its refusals.
+static int plugin_image(void)
+{
+    static const char ENTRY[] = "return {}\n", A[] = "return 1", B[] = "";
+    BoatPluginImageFile files[3] = {
+        { "main.lua", 8, ENTRY, sizeof(ENTRY) - 1 },
+        { "marina", 6, A, sizeof(A) - 1 },
+        { "marina.berths", 13, B, 0 },
+    };
+    char image[256];
+    size_t size = 0;
+    CHECK(
+        boat_plugin_image_size(files, 3) == 6 + (1 + 8 + 4 + 10) + (1 + 6 + 4 + 8) + (1 + 13 + 4));
+    CHECK(boat_plugin_image_pack(files, 3, image, sizeof(image), &size));
+    CHECK(size == boat_plugin_image_size(files, 3) && boat_plugin_image_is(image, size));
+    // The documented byte layout, little-endian.
+    CHECK(!memcmp(image, "\0PMI\1\3\10main.lua\12\0\0\0return {}\n", 6 + 1 + 8 + 4 + 10));
+    BoatPluginImageFile out[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count = 0;
+    CHECK(boat_plugin_image_unpack(image, size, out, &count) && count == 3);
+    for (unsigned i = 0; i < 3; ++i)
+        CHECK(out[i].name_size == files[i].name_size
+            && !memcmp(out[i].name, files[i].name, out[i].name_size) && out[i].size == files[i].size
+            && (!out[i].size || !memcmp(out[i].data, files[i].data, out[i].size)));
+    const BoatPluginImageFile *found = boat_plugin_image_find(out, count, "marina");
+    CHECK(found && found->size == sizeof(A) - 1 && !boat_plugin_image_find(out, count, "nope"));
+    // Raw entry text is not an image; a short capacity refuses to pack.
+    CHECK(!boat_plugin_image_is(ENTRY, sizeof(ENTRY) - 1) && !boat_plugin_image_is("", 0));
+    CHECK(!boat_plugin_image_pack(files, 3, image, size - 1, &size));
+    // Every truncation and every corruption of one header byte is rejected or still canonical.
+    CHECK(boat_plugin_image_pack(files, 3, image, sizeof(image), &size));
+    for (size_t cut = 0; cut < size; ++cut)
+        CHECK(!boat_plugin_image_unpack(image, cut, out, &count));
+    char bad[256];
+    memcpy(bad, image, size);
+    bad[size] = 0; // Trailing byte.
+    CHECK(!boat_plugin_image_unpack(bad, size + 1, out, &count));
+    memcpy(bad, image, size);
+    bad[4] = 2; // Unknown version.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[5] = 0; // No files.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    bad[5] = 10; // Too many.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[5] = 2; // Count disagrees with the bytes: trailing data.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6] = 0; // Empty entry name.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6 + 1 + 8] = (char)0xff; // Entry length beyond the image.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    memcpy(bad, image, size);
+    bad[6 + 1 + 8 + 4 + 10 + 1] = 'M'; // Module name "Marina" breaks the grammar.
+    CHECK(!boat_plugin_image_unpack(bad, size, out, &count));
+    // Duplicates and bad names do not pack either.
+    BoatPluginImageFile dup[2] = { files[0], files[0] };
+    CHECK(boat_plugin_image_size(dup, 2) == 0);
+    BoatPluginImageFile none = { "", 0, "", 0 };
+    CHECK(boat_plugin_image_size(&none, 1) == 0 && boat_plugin_image_size(files, 0) == 0);
+    // The whole image, framing included, fits the shared budget exactly or not at all.
+    static char big[BOAT_PLUGIN_SOURCE_MAX + 1], packed[BOAT_PLUGIN_SOURCE_MAX + 64];
+    memset(big, '-', sizeof(big));
+    BoatPluginImageFile one = { "main.lua", 8, big, BOAT_PLUGIN_SOURCE_MAX - (6 + 1 + 8 + 4) };
+    CHECK(boat_plugin_image_pack(&one, 1, packed, sizeof(packed), &size)
+        && size == BOAT_PLUGIN_SOURCE_MAX);
+    CHECK(boat_plugin_image_unpack(packed, size, out, &count) && count == 1);
+    ++one.size;
+    CHECK(boat_plugin_image_size(&one, 1) == 0);
+    return 0;
+}
+
+// A malformed image is a syntax failure naming the entry; it never reaches the Lua compiler.
+static int image_refused(void)
+{
+    static const char ENTRY[] = "return {}";
+    BoatPluginImageFile file = { "main.lua", 8, ENTRY, sizeof(ENTRY) - 1 };
+    char image[128];
+    size_t size;
+    CHECK(boat_plugin_image_pack(&file, 1, image, sizeof(image), &size));
+    BoatPluginVoyage voyage;
+    BoatPluginDiagnostic d;
+    for (size_t cut = 1; cut < size; cut += 3) {
+        BoatPluginBundle bundle = { MANIFEST, strlen(MANIFEST), image, cut };
+        if (cut < 5)
+            continue; // Shorter than the magic: raw text, which Lua rejects as a syntax error too.
+        CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_SYNTAX);
+        CHECK(!strcmp(d.file, "main.lua") && strstr(d.message, "malformed"));
+        CHECK(d.cost.leaked_bytes == 0);
+    }
+    return 0;
+}
+
+// Marina M5 W2: require serves the image's declared modules, and nothing else.
+typedef struct {
+    const char *name, *text;
+} TestModule;
+
+// Load the reference voyage with PREFIX (Lua statements on the entry's first line) in front of
+// its return, packed with MODULES as a source image.
+static BoatPluginStatus load_modules(const char *prefix, const TestModule *modules, unsigned count,
+    const BoatPluginLimits *limits, BoatPluginVoyage *out, BoatPluginDiagnostic *d)
+{
+    static char image[BOAT_PLUGIN_SOURCE_MAX];
+    char head[256];
+    snprintf(head, sizeof(head), "%sreturn {", prefix);
+    const char *entry = variant("return {", head);
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1]
+        = { { "main.lua", 8, entry, strlen(entry) } };
+    for (unsigned i = 0; i < count; ++i)
+        files[1 + i] = (BoatPluginImageFile) { modules[i].name, strlen(modules[i].name),
+            modules[i].text, strlen(modules[i].text) };
+    size_t size;
+    if (!boat_plugin_image_pack(files, count + 1, image, sizeof(image), &size))
+        return BOAT_PLUGIN_MANIFEST;
+    // The manifest declares exactly the packed modules (W3 checks the pair).
+    static char manifest[1024];
+    char list[512] = "";
+    size_t at = 0;
+    for (unsigned i = 0; i < count; ++i)
+        at += (size_t)snprintf(
+            list + at, sizeof(list) - at, "%s\"%s\"", i ? ", " : "", modules[i].name);
+    snprintf(manifest, sizeof(manifest), "%.*s, \"modules\": [%s]}", (int)strlen(MANIFEST) - 1,
+        MANIFEST, list);
+    return load(count ? manifest : MANIFEST, count ? image : files[0].data,
+        count ? size : files[0].size, limits, out, d);
+}
+
+static int modules_expect(const char *label, const char *prefix, const TestModule *modules,
+    unsigned count, BoatPluginStatus status, const char *file, int line, const char *message)
+{
+    BoatPluginVoyage out;
+    BoatPluginDiagnostic d;
+    BoatPluginStatus got = load_modules(prefix, modules, count, NULL, &out, &d);
+    show(label, &d);
+    CHECK(got == status && d.status == status);
+    CHECK(!file || !strcmp(d.file, file));
+    CHECK(line < 0 || d.line == line);
+    CHECK(!message || strstr(d.message, message));
+    CHECK(d.cost.leaked_bytes == 0);
+    return 0;
+}
+
+static int require_modules(void)
+{
+    // Nested, cached and shared: one table per module within an evaluation.
+    const TestModule chain[] = {
+        { "c", "return { n = 0 }" },
+        { "b", "local c = require('c'); c.n = c.n + 1; return { c = c }" },
+        { "a",
+            "local b, c = require('b'), require('c'); assert(b.c == c and c.n == 1)\n"
+            "return { b = b }" },
+        { "m.x", "return function() return 7 end" },
+    };
+    CHECK(!modules_expect("chain",
+        "local a, b, c = require('a'), require('b'), require('c'); "
+        "assert(a.b == b and b.c == c and require('c') == c and c.n == 1 and "
+        "require('m.x')() == 7); ",
+        chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // A module that returns nothing or nil is cached as true; any other value is returned as is.
+    const TestModule kinds[] = { { "none", "local x = 1" }, { "nope", "return nil" },
+        { "str", "return 'text'" }, { "num", "return 4.5" }, { "flag", "return false" } };
+    CHECK(!modules_expect("kinds",
+        "assert(require('none') == true and require('nope') == true and require('str') == 'text' "
+        "and require('num') == 4.5 and require('flag') == false); ",
+        kinds, 5, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // Declared but never required, and an image that carries no modules at all.
+    CHECK(!modules_expect("unused", "", chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // An image that carries only the entry is the evaluator's business (here: no require); a
+    // manifest that declares no modules refuses such a package before evaluation.
+    BoatPluginVoyageData bare;
+    BoatPluginDiagnostic bare_d;
+    BoatPluginImageFile solo = { "main.lua", 8, "assert(require == nil) return {}", 32 };
+    char solo_image[128];
+    size_t solo_size;
+    CHECK(boat_plugin_image_pack(&solo, 1, solo_image, sizeof(solo_image), &solo_size));
+    BoatPluginStatus solo_status = boat_plugin_lua_voyage(
+        solo_image, solo_size, "main.lua", &boat_plugin_default_limits, &bare, &bare_d);
+    CHECK(solo_status != BOAT_PLUGIN_SYNTAX || !strstr(bare_d.message, "malformed"));
+    BoatPluginVoyage refused;
+    CHECK(load(MANIFEST, solo_image, solo_size, NULL, &refused, &bare_d) == BOAT_PLUGIN_MANIFEST
+        && strstr(bare_d.message, "declares no modules"));
+    CHECK(
+        !modules_expect("no package", "assert(package == nil and load == nil and dofile == nil); ",
+            chain, 4, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    // Raw entry text still has no require.
+    BoatPluginVoyage voyage;
+    BoatPluginDiagnostic d;
+    CHECK(load_source(variant("return {", "assert(require == nil) return {"), &voyage, &d)
+        == BOAT_PLUGIN_OK);
+
+    // Two evaluations of the same image share nothing.
+    const TestModule state[] = { { "t", "return { x = nil }" } };
+    for (int run = 0; run < 2; ++run)
+        CHECK(!modules_expect("isolated",
+            "local t = require('t'); assert(t.x == nil and require('t') == t); t.x = 1; ", state, 1,
+            BOAT_PLUGIN_OK, NULL, -1, NULL));
+
+    // Cycles, including a module that requires itself.
+    const TestModule cycle[] = { { "a", "require('b')" }, { "b", "require('a')" } };
+    CHECK(!modules_expect("cycle", "require('a'); ", cycle, 2, BOAT_PLUGIN_RUNTIME, "modules/b.lua",
+        1, "module cycle: a -> b -> a"));
+    const TestModule self[] = { { "a", "\nrequire('a')" } };
+    CHECK(!modules_expect("self", "require('a'); ", self, 1, BOAT_PLUGIN_RUNTIME, "modules/a.lua",
+        2, "module cycle: a -> a"));
+
+    // Undeclared names, including the entry's own file name, and invalid names.
+    CHECK(!modules_expect("missing", "require('zzz'); ", chain, 4, BOAT_PLUGIN_RUNTIME, "main.lua",
+        -1, "module 'zzz' is not declared in the manifest"));
+    CHECK(!modules_expect("entry name", "require('main.lua'); ", chain, 4, BOAT_PLUGIN_RUNTIME,
+        "main.lua", -1, "not declared"));
+    static const char *const invalid[] = { "'../a'", "'A'", "'/etc/passwd'", "''", "'a..b'",
+        "'a.b.c.d'", "'a/b'", "'a\\0b'", "'modules/a.lua'", "5", "nil", "{}", "'a.b.c.d.e'" };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        char prefix[64];
+        snprintf(prefix, sizeof(prefix), "require(%s); ", invalid[i]);
+        CHECK(!modules_expect(
+            invalid[i], prefix, chain, 4, BOAT_PLUGIN_RUNTIME, "main.lua", -1, "is invalid"));
+    }
+
+    // Errors name the module and its line.
+    const TestModule syntax[] = { { "a", "local a = 1\nreturn )" } };
+    CHECK(!modules_expect(
+        "syntax", "require('a'); ", syntax, 1, BOAT_PLUGIN_SYNTAX, "modules/a.lua", 2, NULL));
+    const TestModule nested_syntax[] = { { "m.b", "x = = 1" }, { "m", "return require('m.b')" } };
+    CHECK(!modules_expect("nested syntax", "require('m'); ", nested_syntax, 2, BOAT_PLUGIN_SYNTAX,
+        "modules/m/b.lua", 1, NULL));
+    const TestModule fails[] = { { "a", "local x = nil\n\nreturn x.y" } };
+    CHECK(!modules_expect(
+        "runtime", "require('a'); ", fails, 1, BOAT_PLUGIN_RUNTIME, "modules/a.lua", 3, NULL));
+    const TestModule later[] = { { "a", "return function()\n  error('late')\nend" } };
+    CHECK(!modules_expect("late error", "require('a')(); ", later, 1, BOAT_PLUGIN_RUNTIME,
+        "modules/a.lua", 2, "late"));
+    return 0;
+}
+
+// Instructions and heap are per evaluation, so they add up across modules and apply to module
+// functions the entry calls later.
+static int require_budgets(void)
+{
+    const TestModule spin[] = { { "a", "while true do end" } };
+    CHECK(!modules_expect("top-level spin", "require('a'); ", spin, 1, BOAT_PLUGIN_BUDGET,
+        "modules/a.lua", 1, "budget"));
+    const TestModule later[] = { { "a", "return function()\n  while true do end\nend" } };
+    CHECK(!modules_expect("function spin", "require('a')(); ", later, 1, BOAT_PLUGIN_BUDGET,
+        "modules/a.lua", 2, "budget"));
+    // Each module alone is within budget; together they are not.
+    const TestModule half[] = {
+        { "a", "local n = 0; for i = 1, 300000 do n = n + i end" },
+        { "b", "local n = 0; for i = 1, 300000 do n = n + i end" },
+    };
+    CHECK(!modules_expect("one half", "require('a'); ", half, 2, BOAT_PLUGIN_OK, NULL, -1, NULL));
+    CHECK(!modules_expect("both halves", "require('a'); require('b'); ", half, 2,
+        BOAT_PLUGIN_BUDGET, "modules/b.lua", 1, "budget"));
+    // Heap: allocating in a module counts against the same limit as the entry.
+    const TestModule heap[] = { { "a", "local t = {}; for i = 1, 400000 do t[i] = i end" } };
+    BoatPluginVoyage out;
+    BoatPluginDiagnostic d;
+    CHECK(load_modules("require('a'); ", heap, 1, NULL, &out, &d) == BOAT_PLUGIN_MEMORY);
+    CHECK(d.cost.leaked_bytes == 0 && d.cost.peak_bytes <= boat_plugin_default_limits.memory_bytes);
+    BoatPluginLimits tight = boat_plugin_default_limits;
+    tight.memory_bytes = 64 * 1024;
+    const TestModule small[] = { { "a", "return string.rep('x', 70000)" } };
+    CHECK(load_modules("require('a'); ", small, 1, &tight, &out, &d) == BOAT_PLUGIN_MEMORY);
+    CHECK(d.cost.leaked_bytes == 0);
+    return 0;
+}
+
+// A scene defined in a module decodes to the same data as the same scene written inline.
+static int require_scene(void)
+{
+    static const char scene_manifest[]
+        = "{\"id\": \"test.voyage\", \"name\": \"Test\", "
+          "\"api\": 1, \"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
+          "\"outer\", \"capabilities\": [\"voyage.define\", \"scene.define\"], "
+          "\"state_version\": 1}";
+    static const char SCENE[]
+        = "{ version = 3, marina = { entrance = { x = 0, z = 170, width = 10 },\n"
+          "  berths = { { id = 'slip', recipe = 'runabout', mooring = 'none', x = 12, z = 195,\n"
+          "    heading = 1.5707963267948966, empty = true } } } }";
+    char inline_entry[2048], module_text[2048];
+    snprintf(inline_entry, sizeof(inline_entry), "return { scene = %s,", SCENE);
+    snprintf(module_text, sizeof(module_text), "return %s", SCENE);
+    const char *inline_source = variant("return {", inline_entry);
+    BoatPluginVoyage inline_voyage, module_voyage;
+    BoatPluginDiagnostic d;
+    CHECK(load(scene_manifest, inline_source, strlen(inline_source), NULL, &inline_voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(inline_voyage.has_scene && boat_scene_has_content(&inline_voyage.scene));
+    const char *entry = variant("return {",
+        "local scene = require('scene.eriksberg'); return { "
+        "scene = scene,");
+    BoatPluginImageFile files[2] = { { "main.lua", 8, entry, strlen(entry) },
+        { "scene.eriksberg", 15, module_text, strlen(module_text) } };
+    static char image[BOAT_PLUGIN_SOURCE_MAX];
+    size_t size;
+    CHECK(boat_plugin_image_pack(files, 2, image, sizeof(image), &size));
+    static char module_manifest[1024];
+    snprintf(module_manifest, sizeof(module_manifest), "%.*s, \"modules\": [\"scene.eriksberg\"]}",
+        (int)strlen(scene_manifest) - 1, scene_manifest);
+    CHECK(load(module_manifest, image, size, NULL, &module_voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(module_voyage.has_scene && module_voyage.scene_digest == inline_voyage.scene_digest);
+    CHECK(!same_route(&module_voyage.route, &inline_voyage.route));
+    return 0;
+}
 
 // The decoded shelters and arrival are open water of the outer map with room for the hull, and
 // the start shelter is the location's spawn (as validate_boat_voyage requires of the route).
@@ -2532,12 +3232,24 @@ static const TestCase cases[] = {
     TEST_CASE(marina_service_decode),
     TEST_CASE(marina_service_survey),
     TEST_CASE(free_scene_location),
+    TEST_CASE(free_location_crossings),
+    TEST_CASE(free_location_speed_bounds),
+    TEST_CASE(free_location_finite_crossing),
+    TEST_CASE(free_location_contacts),
+    TEST_CASE(free_location_diagnostics),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),
     TEST_CASE(last_good_survives),
 #ifndef _WIN32
     TEST_CASE(package_files),
+    TEST_CASE(package_modules),
 #endif
+    TEST_CASE(manifest_modules),
+    TEST_CASE(plugin_image),
+    TEST_CASE(image_refused),
+    TEST_CASE(require_modules),
+    TEST_CASE(require_budgets),
+    TEST_CASE(require_scene),
     TEST_CASE(navigable_water),
     TEST_CASE(tours),
     TEST_CASE(work_sites),

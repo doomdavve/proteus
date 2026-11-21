@@ -1,6 +1,7 @@
 #include "net/boat_net_client.h"
 #include "room/boat_session_record.h"
 #include "support/boat_test_cases.h"
+#include "support/boat_test_module_package.h"
 #include "support/boat_test_world.h"
 
 #include <inttypes.h>
@@ -43,6 +44,7 @@ static bool connected[2];
 static double now;
 static Recording recording;
 static bool armed, combat_activity;
+static const char *hunt_package = "proteus.outer-hunt"; // A catalog ID or a package directory.
 
 static bool sink(void *context, const uint8_t *bytes, size_t size)
 {
@@ -100,7 +102,7 @@ static bool initialize(void)
     armed = combat_activity = false;
     now = 0;
     char error[220];
-    if (!boat_room_package_load_objective("proteus.outer-hunt", false, false, BOAT_LOCATION_OUTER,
+    if (!boat_room_package_load_objective(hunt_package, false, false, BOAT_LOCATION_OUTER,
             test_world(BOAT_LOCATION_OUTER), &room, &source, error, sizeof(error))
         || !boat_room_objective_init(&objective, &source))
         return false;
@@ -234,7 +236,12 @@ static int hunt(void)
     CHECK(advance(240));
     CHECK(server.stats.spawn_requests > 0 && server.fleet.state.slots[0].life > life);
     candidate = source;
-    char *label = strstr(candidate.source, "CREW ");
+    // The source may be an image (it starts with a NUL byte), so search it as bytes.
+    char *label = candidate.source;
+    while (label + 5 <= candidate.source + candidate.source_size && memcmp(label, "CREW ", 5))
+        ++label;
+    if (label + 5 > candidate.source + candidate.source_size)
+        label = NULL;
     CHECK(label);
     memcpy(label, "TEAM ", 5);
     CHECK(boat_room_objective_stage(&objective, &candidate, NULL));
@@ -473,8 +480,29 @@ static int input_mismatch(void)
     return 0;
 }
 
-static const TestCase cases[] = { SLOW_CASE(malformed), SLOW_CASE(sink_failure),
-    SLOW_CASE(input_mismatch), SLOW_CASE(free_room), SLOW_CASE(race_room),
+// M5 W3: the same recorded hunt with the package's source held as an image (the hunt package's
+// entry moved into a module). The recording embeds the image; playback must verify its hash,
+// evaluate it and reproduce every result, including a reload that edits the module's text.
+static int hunt_modules(void)
+{
+    static char directory[700];
+    CHECK(boat_test_module_package("plugins/outer-hunt", BOAT_SESSION_RECORD_TEST_DIR,
+        "outer-hunt-modules", directory, sizeof(directory)));
+    hunt_package = directory;
+    int result = hunt();
+    hunt_package = "proteus.outer-hunt";
+    CHECK(!result);
+    CHECK(boat_plugin_image_is(source.source, source.source_size));
+    // The recorded sources (the embedded block of the first keyframe) are the image's bytes.
+    bool embedded = false;
+    for (size_t at = 0; at + source.source_size <= recording.size && !embedded; ++at)
+        embedded = !memcmp(recording.bytes + at, source.source, source.source_size);
+    CHECK(embedded);
+    return 0;
+}
+
+static const TestCase cases[] = { SLOW_CASE(hunt_modules), SLOW_CASE(malformed),
+    SLOW_CASE(sink_failure), SLOW_CASE(input_mismatch), SLOW_CASE(free_room), SLOW_CASE(race_room),
     SLOW_CASE(deathmatch_room), SLOW_CASE(queue_quarantine) };
 
 int main(int argc, char **argv)

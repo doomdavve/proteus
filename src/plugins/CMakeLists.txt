@@ -34,7 +34,7 @@ endif()
 add_library(proteus_plugin_data STATIC boat_plugin.c boat_plugin.h
   boat_plugin_decode.h boat_plugin_revision.h boat_plugin_race.c
   boat_plugin_objective.h boat_plugin_objective_codec.c boat_plugin_wire.c
-  boat_plugin_wire.h)
+  boat_plugin_image.c boat_plugin_image.h boat_plugin_wire.h)
 target_link_libraries(proteus_plugin_data PUBLIC proteus_boat_core PRIVATE proteus_json)
 target_compile_options(proteus_plugin_data PRIVATE ${PROTEUS_WARNINGS})
 
@@ -78,6 +78,9 @@ foreach(package IN LISTS BOAT_PLUGIN_CATALOG_PACKAGES)
   list(APPEND BOAT_PLUGIN_PACKAGE_FILES
     ${PROJECT_SOURCE_DIR}/${package}/plugin.json
     ${PROJECT_SOURCE_DIR}/${package}/main.lua)
+  # M5: a package's declared modules are inputs too (modules/<a>.lua, modules/<a>/<b>.lua, ...).
+  file(GLOB_RECURSE package_modules CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/${package}/modules/*.lua)
+  list(APPEND BOAT_PLUGIN_PACKAGE_FILES ${package_modules})
 endforeach()
 add_executable(boat_plugin_catalog_gen boat_plugin_catalog_gen.c)
 target_link_libraries(boat_plugin_catalog_gen PRIVATE proteus_plugins)

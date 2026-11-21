@@ -1,4 +1,5 @@
 // Browser voyage authoring. Transport and bundle functions are also exercised under Node.
+// A bundle is the version 2 `wake-velocity-plugin` form: {format, version, manifest, source, modules}.
 (function (root) {
   'use strict';
   const encoder = new TextEncoder();
@@ -17,25 +18,165 @@
   function kind(manifest) {
     try { return JSON.parse(manifest).kind; } catch (_) { return null; }
   }
-  function bundle(manifest, source) {
+  const decoder = new TextDecoder('utf-8', {fatal: true});
+  // The source image of src/plugins/boat_plugin_image.h (byte-identical; see the golden vector in
+  // tests/support/fixtures/plugin_image_golden.hex): "\0PMI" + version 1, a file count, then per
+  // file a u8 name length, the name, a u32 little-endian length and the bytes. File 0 is the
+  // entry; modules follow in the manifest's order.
+  const IMAGE_MAGIC = [0, 0x50, 0x4d, 0x49, 1];
+  const ENTRY = 'main.lua', MANIFEST_MAX = 4096, SOURCE_MAX = 65536;
+  const MODULES_MAX = 8, NAME_MAX = 32;
+  const NAME = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,2}$/;
+  const NAME_RULE = "must be 1-3 dot-separated names of a-z, 0-9 and '_', each starting with a "
+    + `letter, in at most ${NAME_MAX} bytes`;
+  const V1_MESSAGE = 'version 1 bundles are not supported; re-export';
+  const moduleNameValid = name => typeof name === 'string' && name.length <= NAME_MAX && NAME.test(name);
+  const moduleFile = name => 'modules/' + name.replace(/\./g, '/') + '.lua';
+  function imageIs(bytes) {
+    return bytes.length >= IMAGE_MAGIC.length && IMAGE_MAGIC.every((v, i) => bytes[i] === v);
+  }
+  // files: [{name, data: Uint8Array}], entry first. Throws like the native packer refuses.
+  function packImage(files) {
+    if (files.length < 1 || files.length > MODULES_MAX + 1) throw Error('Package image needs 1-9 files');
+    let total = IMAGE_MAGIC.length + 1;
+    const names = new Set();
+    for (const f of files) {
+      const name = encoder.encode(f.name);
+      if (name.length < 1 || name.length > NAME_MAX || names.has(f.name) || f.data.length > SOURCE_MAX)
+        throw Error('Package image file ' + f.name + ' cannot be packed');
+      names.add(f.name); total += 1 + name.length + 4 + f.data.length;
+      if (total > SOURCE_MAX) throw Error('Package image exceeds the 64 KiB source budget');
+    }
+    const out = new Uint8Array(total), view = new DataView(out.buffer);
+    out.set(IMAGE_MAGIC); out[IMAGE_MAGIC.length] = files.length;
+    let at = IMAGE_MAGIC.length + 1;
+    for (const f of files) {
+      const name = encoder.encode(f.name);
+      out[at++] = name.length; out.set(name, at); at += name.length;
+      view.setUint32(at, f.data.length, true); at += 4;
+      out.set(f.data, at); at += f.data.length;
+    }
+    return out;
+  }
+  // The inverse; refuses anything packImage could not have written, like the native unpacker.
+  function unpackImage(bytes) {
+    const bad = () => Error('malformed package source image');
+    if (!imageIs(bytes) || bytes.length > SOURCE_MAX || bytes.length < IMAGE_MAGIC.length + 1) throw bad();
+    const count = bytes[IMAGE_MAGIC.length];
+    if (count < 1 || count > MODULES_MAX + 1) throw bad();
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const files = [], seen = new Set();
+    let at = IMAGE_MAGIC.length + 1;
+    for (let i = 0; i < count; ++i) {
+      if (at >= bytes.length) throw bad();
+      const n = bytes[at++];
+      if (n < 1 || n > NAME_MAX || bytes.length - at < n + 4) throw bad();
+      let name;
+      try { name = decoder.decode(bytes.slice(at, at + n)); } catch (_) { throw bad(); }
+      at += n;
+      const size = view.getUint32(at, true); at += 4;
+      if (size > bytes.length - at || (i > 0 && !moduleNameValid(name)) || seen.has(name)) throw bad();
+      seen.add(name); files.push({name, data: bytes.slice(at, at + size)}); at += size;
+    }
+    if (at !== bytes.length) throw bad();
+    return files;
+  }
+  // The module names plugin.json declares, in order; null when the manifest is not JSON (the
+  // native parser stays the authority and reports that), and the same refusals as the native one.
+  function declared(manifest) {
+    let data;
+    try { data = JSON.parse(manifest); } catch (_) { return null; }
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !('modules' in data)) return [];
+    const list = data.modules;
+    if (!Array.isArray(list) || list.length > MODULES_MAX)
+      throw Error(`plugin.json modules must be an array of at most ${MODULES_MAX} module names`);
+    list.forEach((name, i) => {
+      if (!moduleNameValid(name)) throw Error(`plugin.json modules[${i + 1}] ${NAME_RULE}`);
+      if (name === 'main')
+        throw Error(`plugin.json modules[${i + 1}] must not be "main", the entry's own name`);
+      const first = list.indexOf(name);
+      if (first !== i) throw Error(`plugin.json modules[${i + 1}] repeats modules[${first + 1}]`);
+    });
+    return list;
+  }
+  // The source the native side holds: the entry bytes, or an image when modules are declared.
+  // Per-file and total limits mirror boat_plugin_read: entry, modules and framing share 64 KiB.
+  function sourceBytes(manifest, source, modules) {
+    const names = declared(manifest) || [];
+    const given = Object.keys(modules);
+    for (const name of given)
+      if (!names.includes(name))
+        throw Error(`bundle modules holds "${name}", which plugin.json does not declare`);
+    for (const name of names)
+      if (!given.includes(name))
+        throw Error(`plugin.json declares module "${name}" but ${moduleFile(name)} is missing`);
+    const entry = encoder.encode(source);
+    if (!names.length) {
+      if (entry.length > SOURCE_MAX) throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
+      return entry;
+    }
+    const files = [{name: ENTRY, data: entry}, ...names.map(name => ({name, data: encoder.encode(modules[name])}))];
+    const budget = file => `${file} is larger than the %ROOM% bytes left of the ${SOURCE_MAX}-byte `
+      + 'source budget (entry, modules and framing share it)';
+    let used = IMAGE_MAGIC.length + 1;
+    for (const f of files) {
+      const label = f.name === ENTRY ? ENTRY : moduleFile(f.name);
+      const framing = 1 + f.name.length + 4;
+      const room = Math.max(0, SOURCE_MAX - used - framing);
+      if (used + framing > SOURCE_MAX || f.data.length > room) throw Error(budget(label).replace('%ROOM%', room));
+      used += framing + f.data.length;
+    }
+    return packImage(files);
+  }
+  // The inverse for a source read back from the Wasm side: {entry, modules} as text, checked
+  // against the manifest's declared names and order.
+  function unpackSource(manifest, bytes) {
+    const names = declared(manifest) || [];
+    if (!imageIs(bytes)) {
+      if (names.length) throw Error(`plugin.json declares ${names.length} module${names.length === 1 ? '' : 's'}`
+        + ' but the package source is not a module image');
+      return {entry: decoder.decode(bytes), modules: {}};
+    }
+    const files = unpackImage(bytes);
+    if (!names.length) throw Error('plugin.json declares no modules but the package source is a module image');
+    if (files[0].name !== ENTRY) throw Error('plugin.json entry is not the entry file the module image carries');
+    if (files.length - 1 !== names.length || names.some((n, i) => files[i + 1].name !== n))
+      throw Error('plugin.json modules do not match the modules in the package source image'
+        + ' (names and order must agree)');
+    const modules = {};
+    try {
+      for (const f of files.slice(1)) modules[f.name] = decoder.decode(f.data);
+      return {entry: decoder.decode(files[0].data), modules};
+    } catch (_) { throw Error('package source image is not UTF-8 text'); }
+  }
+  function bundle(manifest, source, modules = {}) {
     if (typeof manifest !== 'string' || typeof source !== 'string') throw Error('Expected source text');
-    if (encoder.encode(manifest).length > 4096 || encoder.encode(source).length > 65536)
+    if (!modules || typeof modules !== 'object' || Array.isArray(modules)
+        || Object.values(modules).some(text => typeof text !== 'string'))
+      throw Error('Expected module text');
+    if (encoder.encode(manifest).length > MANIFEST_MAX)
       throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
+    if (declared(manifest) === null && Object.keys(modules).length)
+      throw Error('plugin.json is not valid JSON, so its modules cannot be matched');
+    sourceBytes(manifest, source, modules); // Limits and consistency; the bytes are rebuilt on use.
     // Native scene authoring is not part of the browser subset; reject before the worker starts.
     // Imported scenes and all solo kinds share the worker's bounded stage wire.
     const type = kind(manifest);
     if (type === 'race' || type === 'match')
       throw Error(`${type} packages are room content; import them through a room`);
-    return {format: FORMAT, version: 1, manifest, source};
+    const ordered = {};
+    for (const name of declared(manifest) || []) ordered[name] = modules[name];
+    return {format: FORMAT, version: 2, manifest, source, modules: ordered};
   }
   function decode(text) {
     if (typeof text !== 'string' || encoder.encode(text).length > 200000)
       throw Error('Bundle exceeds the 200 KB import limit');
     const data = JSON.parse(text);
-    if (!data || data.format !== FORMAT || data.version !== 1
-        || Object.keys(data).sort().join(',') !== 'format,manifest,source,version')
-      throw Error('Expected a Wake Velocity version 1 plugin bundle');
-    return bundle(data.manifest, data.source);
+    if (data && data.format === FORMAT && data.version === 1) throw Error(V1_MESSAGE);
+    if (!data || data.format !== FORMAT || data.version !== 2
+        || Object.keys(data).sort().join(',') !== 'format,manifest,modules,source,version')
+      throw Error('Expected a Wake Velocity version 2 plugin bundle');
+    return bundle(data.manifest, data.source, data.modules);
   }
   function encode(data) {
     const text = JSON.stringify(data, null, 2) + '\n';
@@ -43,10 +184,53 @@
     return text;
   }
   function frame(data) {
-    const m = encoder.encode(data.manifest), s = encoder.encode(data.source);
+    const m = encoder.encode(data.manifest), s = sourceBytes(data.manifest, data.source, data.modules);
     const result = new Uint8Array(8 + m.length + s.length), view = new DataView(result.buffer);
     view.setUint32(0, m.length); view.setUint32(4, s.length);
     result.set(m, 8); result.set(s, 8 + m.length); return result;
+  }
+  // A bundle from the (manifest, source) bytes the Wasm side holds, as the console /save exports.
+  function fromWasm(manifestBytes, source) {
+    const manifest = decoder.decode(manifestBytes), {entry, modules} = unpackSource(manifest, source);
+    return bundle(manifest, entry, modules);
+  }
+  // plugin.json with NAME added to, or removed from, its modules array (reformatted JSON).
+  function editModules(manifest, name, add) {
+    let data;
+    try { data = JSON.parse(manifest); } catch (_) { throw Error('plugin.json is not valid JSON'); }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error('plugin.json is not a JSON object');
+    const list = Array.isArray(data.modules) ? data.modules.filter(n => n !== name) : [];
+    if (add) list.push(name);
+    if (list.length) data.modules = list; else delete data.modules;
+    return JSON.stringify(data, null, 2) + '\n';
+  }
+  // Rewrite /plugins/browser (FS is Emscripten's FS) to hold exactly this package: stale module
+  // files from an earlier staging must not stay readable by the native directory read.
+  function writePackage(fs, data, base = '/plugins/browser') {
+    const clear = dir => {
+      if (!fs.analyzePath(dir).exists) return;
+      for (const name of fs.readdir(dir)) {
+        if (name === '.' || name === '..') continue;
+        const path = dir + '/' + name;
+        if (fs.isDir(fs.stat(path).mode)) clear(path); else fs.unlink(path);
+      }
+      fs.rmdir(dir);
+    };
+    fs.mkdirTree(base);
+    clear(base + '/modules');
+    fs.writeFile(base + '/plugin.json', encoder.encode(data.manifest));
+    fs.writeFile(base + '/' + ENTRY, encoder.encode(data.source));
+    for (const [name, text] of Object.entries(data.modules)) {
+      const path = base + '/' + moduleFile(name);
+      fs.mkdirTree(path.slice(0, path.lastIndexOf('/')));
+      fs.writeFile(path, encoder.encode(text));
+    }
+  }
+  // The saved draft, or why it cannot be restored (a version 1 save names the re-export).
+  function restoreSaved(saved) {
+    if (!saved) return {data: null, error: null};
+    try { return {data: decode(saved), error: null}; }
+    catch (error) { return {data: null, error: error.message}; }
   }
   function equal(a, b) { return a.length === b.length && a.every((v, i) => v === b[i]); }
   function sameBase(a, b) { return equal(a, b); }
@@ -131,6 +315,12 @@
     const get = id => document.getElementById(id);
     const storage = get('plugin-storage');
     const status = get('plugin-status'), manifest = get('plugin-manifest'), source = get('plugin-source');
+    const moduleList = get('plugin-module'), moduleText = get('plugin-module-source');
+    const moduleName = get('plugin-module-name'), moduleFileLabel = get('plugin-module-file');
+    // Module texts by name. The selector shows them; plugin.json's modules array fixes the
+    // names and order the package uses, and a mismatch is reported when staging or exporting.
+    const texts = {};
+    let selected = '';
     const stage = get('plugin-stage'), play = get('plugin-play');
     const makeWorker = () => {
       const worker = new Worker(files['plugin_worker.js'], {type: 'module'});
@@ -147,9 +337,52 @@
     Module.boatPluginStage = transport;
     let sequence = 0, pending = 0, accepted = null, ready = false;
     const base = () => (Module.boatPluginOwner || [0, 0, 0]).slice();
-    const current = () => bundle(manifest.value, source.value);
+    const current = () => { keep(); return bundle(manifest.value, source.value, {...texts}); };
     const show = text => { status.textContent = text; };
-    const set = data => { manifest.value = data.manifest; source.value = data.source; };
+    function keep() { if (selected in texts) texts[selected] = moduleText.value; }
+    function listModules() {
+      let listed = [];
+      try { listed = declared(manifest.value) || []; } catch (_) { /* reported when staging */ }
+      const names = Object.keys(texts);
+      moduleList.textContent = '';
+      for (const name of names) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = listed.includes(name) ? name : name + ' (not in plugin.json)';
+        moduleList.appendChild(option);
+      }
+      if (!(selected in texts)) selected = names[0] || '';
+      moduleList.value = selected;
+      moduleText.value = selected ? texts[selected] : '';
+      moduleText.disabled = !selected;
+      moduleFileLabel.textContent = selected ? moduleFile(selected) : 'no modules';
+      get('plugin-module-remove').disabled = !selected;
+    }
+    const set = data => {
+      manifest.value = data.manifest; source.value = data.source;
+      for (const name of Object.keys(texts)) delete texts[name];
+      Object.assign(texts, data.modules); selected = ''; listModules();
+    };
+    moduleList.onchange = () => { keep(); selected = moduleList.value; listModules(); };
+    get('plugin-module-add').onclick = () => {
+      cancel(); keep(); const name = moduleName.value.trim();
+      try {
+        if (!moduleNameValid(name)) throw Error(`Module name ${NAME_RULE}`);
+        if (name === 'main' || name in texts) throw Error(`Module "${name}" already exists`);
+        if (Object.keys(texts).length >= MODULES_MAX) throw Error(`A package holds at most ${MODULES_MAX} modules`);
+        manifest.value = editModules(manifest.value, name, true);
+        texts[name] = '-- ' + moduleFile(name) + '\nreturn {}\n'; selected = name; moduleName.value = '';
+        listModules(); show('Added ' + moduleFile(name) + '. Stage to validate it.');
+      } catch (error) { show(error.message); }
+    };
+    get('plugin-module-remove').onclick = () => {
+      cancel(); if (!selected) return;
+      const name = selected;
+      try {
+        manifest.value = editModules(manifest.value, name, false);
+        delete texts[name]; selected = ''; listModules(); show('Removed ' + moduleFile(name) + '.');
+      } catch (error) { show(error.message); }
+    };
     function cancel() {
       ++sequence;
       if (pending) transport.close(pending);
@@ -188,10 +421,7 @@
           : result.failure || 'Worker failed or reached its five-second deadline');
         transport.prepare(bytes, pin, result.bytes);
         accepted = data;
-        const fs = getFS();
-        fs.mkdirTree('/plugins/browser');
-        fs.writeFile('/plugins/browser/plugin.json', encoder.encode(data.manifest));
-        fs.writeFile('/plugins/browser/main.lua', encoder.encode(data.source));
+        writePackage(getFS(), data);
         if (Module.boatGameStarted) Module.boatPluginActions = (Module.boatPluginActions || 0) | 1;
         else play.disabled = false;
         show(Module.boatGameStarted ? 'Validated; offering revision to the live voyage…'
@@ -214,18 +444,22 @@
     get('plugin-export').onclick = () => {
       try {
         const data = current();
-        downloadBundle(data.manifest, data.source);
+        downloadBundle(data.manifest, data.source, data.modules);
       } catch (error) { show(error.message); }
     };
-    function downloadBundle(manifestText, sourceText) {
-      const url = URL.createObjectURL(new Blob([encode(bundle(manifestText, sourceText))],
+    function downloadBundle(manifestText, sourceText, modules) {
+      const url = URL.createObjectURL(new Blob([encode(bundle(manifestText, sourceText, modules))],
         {type: 'application/json'}));
       const link = document.createElement('a'); link.href = url;
       link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
     }
     // The native console's /save reaches this export path instead of writing a directory.
+    // The Wasm side holds the source as the native side does: an image when modules exist.
     Module.boatPluginExport = (manifestBytes, sourceBytes) => {
-      downloadBundle(new TextDecoder().decode(manifestBytes), new TextDecoder().decode(sourceBytes));
+      try {
+        const data = fromWasm(manifestBytes, sourceBytes);
+        downloadBundle(data.manifest, data.source, data.modules);
+      } catch (error) { show('Export failed: ' + error.message); }
     };
     get('plugin-import').onchange = async event => {
       cancel(); const request = sequence;
@@ -239,12 +473,15 @@
       } catch (error) { if (request === sequence) show(error.message); }
       event.target.value = '';
     };
-    for (const editor of [manifest, source]) editor.addEventListener('input', cancel);
+    for (const editor of [manifest, source, moduleText]) editor.addEventListener('input', cancel);
+    manifest.addEventListener('change', () => { keep(); listModules(); });
     // Restoration is source-only and never bypasses validation. A storage failure is nonfatal.
     let restored = false;
     try {
-      const saved = window.localStorage.getItem(STORAGE);
-      if (saved) { set(decode(saved)); restored = true; show('Restored source. Stage to validate it.'); }
+      const {data, error} = restoreSaved(window.localStorage.getItem(STORAGE));
+      if (data) { set(data); restored = true; show('Restored source. Stage to validate it.'); }
+      else if (error) storage.textContent = 'Saved source not restored: ' + error
+        + '. Import a bundle or use the example.';
     } catch (_) { storage.textContent = 'Saved source unavailable or invalid. Import a bundle or use the example.'; }
     get('plugin-example').onclick = async () => {
       cancel(); const request = sequence;
@@ -265,5 +502,7 @@
     return transport;
   }
   root.installBoatPluginAuthor = install;
-  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes, WIRE_MAGIC};
+  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes, WIRE_MAGIC,
+    packImage, unpackImage, imageIs, sourceBytes, unpackSource, fromWasm, editModules, writePackage,
+    restoreSaved, moduleNameValid, moduleFile};
 })(globalThis);

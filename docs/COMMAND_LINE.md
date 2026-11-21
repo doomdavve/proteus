@@ -29,7 +29,7 @@ directly; `--title` selects the title explicitly. The direct-launch default loca
 This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, with a small
 service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
 reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
-it saves automatically (see below), and it stays the review harness; the game runs the same session as `wake_velocity --work`. Holding Space brakes; G
+it saves automatically (see below), and it stays the review harness; the game runs the same session from a working-harbour package (`wake_velocity --package proteus.outer-work`). Holding Space brakes; G
 starts/cancels assisted mooring when BERTH READY appears; N cycles the guided site (the job may
 choose it) and C returns an unhooked, unlashed crate to its source pad. The HUD shows persistent throttle, the landing
 footprint/deck gap before contact and the package's job row. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
@@ -41,31 +41,33 @@ desktop context). With `--screenshot FILE` it saves only the first failing frame
 is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
 wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction).
 
-## Working harbour in the game (`--work`, native)
+## Working harbour in the game (a package, native)
 
 ```sh
-./build/wake_velocity --location outer --work
-./build/wake_velocity --location outer --work --data-dir build/work-profile
-./build/wake_velocity --renderer cpu --location outer --work --screenshot build/work.png --time 3
+./build/wake_velocity --package proteus.outer-work
+./build/wake_velocity --package proteus.outer-work --data-dir build/work-profile
+./build/wake_velocity --renderer cpu --package proteus.outer-work --screenshot build/work.png --time 3
+./build/wake_velocity --plugin plugins/outer-work   # the same package from a directory (authoring)
 ```
 
-`--work` runs the location's bundled working-harbour package (on `outer`, `outer-work`) in place
+A working harbour is a package like any other: a `free` package with `scene.work` sites. `--package ID` runs a bundled one (`proteus.outer-work`; a package names its own location, so `--location` is not needed and must agree if given) and `--plugin DIR` runs one from a directory, in place
 of the free-ride boat step, with the game's camera, water and harbour, plus the work sites, crate,
 crane and the package's job rows. It is the SV1f/SV1g step of the
 [save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume). It cannot be combined
-with `--plugin`, `--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or
-`--plugin-bridge`. The title offers it as GOTHENBURG HARBOUR, CONTENT `WORKING HARBOUR` (native
+with rooms, `--course`, replays, wake, water, `--start` or `--skin`; `--plugin` and `--plugin-bridge` work
+as for other packages (`--plugin` takes a directory, `--package` a bundled ID, never both). The title offers it as GOTHENBURG HARBOUR, CONTENT `WORKING HARBOUR` (native
 builds), with a SAVE row (CONTINUE, NEW, DELETE; NEW and DELETE ask first). START passes
-`--location outer --work` (plus `--new` for NEW), so these options stay the scripted spelling.
+`--package proteus.outer-work` (plus `--new` for NEW), so these options stay the scripted spelling.
 
 The session saves itself: there is no save key and F5 stays the plugin reload key. Plain
 interactive play reads and writes `cargo-<package id>.sav` in the game's data directory
 (`--data-dir DIR` replaces the directory) at every milestone, every 30 s of simulated play, and
-when the menu opens, the window loses focus, or you quit or close the window; the next `--work`
-run resumes it. A small `SAVED` mark appears after milestone and leave writes, and `SAVE FAILED`
+when the menu opens, the window loses focus, or you quit or close the window; the next run of the
+package resumes it. A small `SAVED` mark appears after milestone and leave writes, and `SAVE FAILED`
 stays until a write succeeds. `--save FILE` uses an explicit file, `--new` ignores any save, and a
 save that cannot be used (damaged, a changed package or physics) is set aside as `NAME.rejected`,
-never deleted. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
+never deleted. A `--plugin DIR` run (authoring) touches no save unless given `--save` or
+`--data-dir`, like the scripted runs below. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
 `--save` or `--data-dir`. `--save-now` (a test fixture, with `--time` and `--save`) runs the
 scripted drive, writes one save and exits.
 
@@ -82,11 +84,19 @@ ignored here; explicit `--daylight` or `--lighting-hour` fixes the render while 
 advancing and saving. The [lighting plan](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the
 full contract.
 
-Two developer-only review options belong to bounded `--work` runs. `--work-clock-report FILE`
-needs `--work` and `--frames` in a visible native window, rejects `--screenshot` and
-`--performance-report`, and writes one CSV with actual GL sun/mask observations and optional GPU
-times. `--work-review-pose swing|deck|approach` prepares a real cargo-api pose for bounded
-screenshots or frame runs; it adds no normal menu or HUD feature.
+Two developer review requests belong to a working-harbour run and are console lines, not
+options: `/work clock-report FILE` starts one CSV of actual GL sun/mask observations and optional
+GPU times (up to 18,000 frames; `/work clock-report stop`, or leaving the game, writes it), and
+`/work pose swing|deck|approach` prepares a real cargo-api pose, refused with a reason when the
+session cannot reach it. Send them through the live console (F2) or the bridge
+(`plugin_author.py live-console --line TEXT`, `./wv console`); they need a window, so no
+`--screenshot`. They add no normal menu or HUD feature.
+
+A package change (a stage, Undo or reload from the bridge or console, or F5) restarts the cargo
+session at the new definition: the cargo, sites and job start over, a boat that is under way keeps
+its pose and the clock keeps its hour, and a moored boat returns to the berth. A package run with
+`--plugin DIR` is under authoring and never reads or writes the game's default data directory;
+give it `--save` or `--data-dir` to keep its session.
 
 ## Locations and voyages
 
@@ -191,7 +201,8 @@ game thread and the boat is never moved. Layout edits install live when the hull
 otherwise held until it is. `/save DIR` writes a complete package and refuses a non-empty directory
 that is not this session's package; in the browser the same command downloads a source bundle. See the
 [console contract](PLUGIN_API.md#live-console-and-command-layer-pc) for the command list and limits.
-`--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`.
+`--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`, and
+holds saved plugin files until F5 or a tool stages them ([agent workspaces](PLUGIN_API.md#agent-workspaces)).
 
 ## Courses and recordings
 
@@ -303,6 +314,10 @@ multiplier once with ordinary flat shading, so basin captures from earlier dayti
 differ intentionally. T2c readability/performance limits and T3's fixed-hour title controls are
 recorded in the [lighting plan](SUNSET_PLAN.md#t3-implementation-2026-11-08).
 
+`--no-audio` disables all music and sound effects for the entire run, including sessions
+started from `--title`. Use it for graphics-only demos and captures; it does not change saved
+soundtrack preferences. `--soundtrack off` disables only music.
+
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
 320×200 pixel grid and integer-scaled desktop presentation. It does not select a location
@@ -333,14 +348,14 @@ authority and client in the game process, live, under `--demo` and in `--screens
 (whose scripted drive runs on virtual time); the time trial's course, recording, best selection
 and practice latch run on the authority, and its best and last runs are saved after the frame as
 before. Replay viewing is client-side (`--replay` opens no local session; the L/B keys pause the
-attempt's ticks). The developer studies, voyages, `--work`, rooms and the browser keep the direct
+attempt's ticks). The developer studies, voyages, working-harbour packages, rooms and the browser keep the direct
 session path. At exit the game
 prints a `Local session:` line with its generation, ticks, chunks and restarts.
 
 `--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The
 existing `[` / `]` (or typed brackets and `,` / `.`) steps and `\` restore continue to work. It
 is rejected with `--connect` or `--host`; rooms keep their own time. A scripted `--time` capture
-still uses its own scripted ticks rather than this scale. In `--work`, the same scale moves the
+still uses its own scripted ticks rather than this scale. In a working harbour, the same scale moves the
 session light as well as the world because both use fixed ticks.
 
 ```sh

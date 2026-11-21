@@ -60,6 +60,8 @@
     #plugin-panel textarea { display: block; width: 100%; min-height: 110px; background: #101e25;
       color: #edf2eb; font: 12px/1.4 monospace; }
     #plugin-source { min-height: 240px !important; }
+    #plugin-module-source { min-height: 160px !important; }
+    #plugin-modules input { width: 12em; }
     #plugin-panel button { margin: 4px; padding: 6px; }
     body.playing #plugin-tools { position: fixed; right: 4px; top: 4px; margin: 0;
       width: min(640px, 95vw); }
@@ -92,6 +94,12 @@
       <button id="plugin-example">Load example</button><button id="plugin-export">Export draft</button>
       <label>plugin.json<textarea id="plugin-manifest" spellcheck="false"></textarea></label>
       <label>main.lua<textarea id="plugin-source" spellcheck="false"></textarea></label>
+      <div id="plugin-modules">
+        <label>Module <select id="plugin-module"></select></label>
+        <input id="plugin-module-name" placeholder="new.module" aria-label="New module name" spellcheck="false">
+        <button id="plugin-module-add">Add module</button><button id="plugin-module-remove">Remove module</button>
+        <label><span id="plugin-module-file">no modules</span><textarea id="plugin-module-source" spellcheck="false"></textarea></label>
+      </div>
       <button id="plugin-stage" disabled>Stage / reload</button><button id="plugin-cancel">Cancel staging</button>
       <button id="plugin-play" disabled>Play staged voyage</button>
       <button id="plugin-apply">Apply held revision</button><button id="plugin-undo">Undo / discard</button>

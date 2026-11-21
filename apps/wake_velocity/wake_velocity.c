@@ -152,7 +152,6 @@ static void usage(void)
     cli_usage_line(stdout, "--title", "Open the title screen explicitly");
     cli_usage_line(
         stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
-    cli_usage_line(stdout, "--work", "Run the location's working-harbour package (outer)");
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
@@ -170,10 +169,10 @@ static void usage(void)
     cli_usage_line(
         stdout, "--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
     cli_usage_line(stdout, "--mouse-steering", "Start with captured mouse steering");
-    cli_usage_line(stdout, "--plugin DIR", "Solo voyage from a Lua plugin");
+    cli_usage_line(stdout, "--plugin DIR", "Solo voyage or working harbour from a Lua plugin");
     cli_usage_line(stdout, "", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
     cli_usage_line(
-        stdout, "--package ID", "Bundled solo package (title content row selects outer)");
+        stdout, "--package ID", "Bundled solo package or working harbour (title content row)");
     cli_usage_line(stdout, "--waves", "Gentle crossing waves and a floating hull");
 
     cli_usage_section(stdout, "WATER AND WAKES");
@@ -194,6 +193,7 @@ static void usage(void)
     cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; outer 12)");
     cli_usage_line(stdout, "--camera-height N", "4..36 (default 14; outer 6)");
     cli_usage_line(stdout, "--fixed-fov", "Hold the 55-degree view instead of widening with speed");
+    cli_usage_line(stdout, "--no-audio", "Disable all music and sound effects for this run");
     cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
     cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
@@ -228,10 +228,6 @@ static void usage(void)
     cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
     cli_usage_line(
         stdout, "--demo-idle", "Neutral helm in solo --demo or --screenshot; world time runs");
-    cli_usage_line(stdout, "--work-clock-report FILE",
-        "Developer review: with --work and --frames, write a live lighting CSV");
-    cli_usage_line(stdout, "--work-review-pose swing|deck|approach",
-        "Developer review: bounded --work pose for lighting inspection");
 
     cli_usage_section(stdout, "RECORDINGS");
     cli_usage_line(stdout, "--save-run FILE", "Export each finish");
@@ -241,6 +237,7 @@ static void usage(void)
     cli_usage_line(
         stdout, "--plugin-bridge DIR", "With --plugin, let tools/plugin_author.py live-inspect,");
     cli_usage_line(stdout, "", "stage, apply and undo revisions through the private directory");
+    cli_usage_line(stdout, "", "(saved files are then held until F5 or a tool stages them)");
 
     cli_usage_section(stdout, "MULTIPLAYER");
     cli_usage_line(stdout, "--name TEXT", "Player name");
@@ -430,6 +427,7 @@ static NetHost net_host; // The room this session started with --host, if any.
 
 // The steering mode a session ended in, so the title remembers changes made in game.
 static bool study_mouse_steering;
+static bool study_no_audio;
 // The latest session launch's diagnostic, for the title's message line.
 static char study_failure[192];
 
@@ -460,6 +458,60 @@ static bool console_save(
 #else
     return wake_plugin_save(plugin, directory, message, capacity);
 #endif
+}
+
+// The `/work` console requests of a working-harbour run: developer review tools that used to be
+// command-line options. They act on the running session between frames.
+typedef struct {
+    WakeWork *work;
+    BoatSession *session;
+    WakeLightingReview *review;
+    WaterfrontGpuScene *scene; // NULL for the CPU renderer.
+} WorkRequests;
+
+static bool work_request(
+    void *context, const char *name, const char *argument, char *message, size_t capacity)
+{
+    WorkRequests *r = context;
+    if (!strcmp(name, "pose")) {
+        if (strcmp(argument, "swing") && strcmp(argument, "deck") && strcmp(argument, "approach")) {
+            snprintf(message, capacity, "pose is swing, deck or approach");
+            return false;
+        }
+        if (!wake_work_review_pose(r->work, r->session, argument, GetTime())) {
+            snprintf(message, capacity, "the %s pose is not reachable from here", argument);
+            return false;
+        }
+        snprintf(message, capacity, "POSED %s", argument);
+        return true;
+    }
+    if (!strcmp(name, "clock-report")) {
+        if (!strcmp(argument, "stop")) {
+            if (!r->review->state) {
+                snprintf(message, capacity, "no clock report is running");
+                return false;
+            }
+            bool ok = wake_lighting_review_end(r->review);
+            snprintf(message, capacity, ok ? "CLOCK REPORT WRITTEN" : "the report was not written");
+            return ok;
+        }
+        if (!*argument) {
+            snprintf(message, capacity, "usage: clock-report FILE|stop");
+            return false;
+        }
+        if (r->review->state) {
+            snprintf(message, capacity, "a clock report is running; clock-report stop first");
+            return false;
+        }
+        if (!wake_lighting_review_begin(r->review, argument, r->scene)) {
+            snprintf(message, capacity, "cannot start the report (native builds only)");
+            return false;
+        }
+        snprintf(message, capacity, "CLOCK REPORT RUNNING; clock-report stop writes it");
+        return true;
+    }
+    snprintf(message, capacity, "unknown request %s", name);
+    return false;
 }
 
 // The personal best of the session's course, from DATA_DIR or the default data directory.
@@ -629,6 +681,7 @@ static int study(int argc, char **argv)
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false, far_detail = true;
     BoatResolution resolution = BOAT_RESOLUTION_LOW;
+    int hud_scale = 1; // High resolution draws the HUD on a finer grid so it takes less room.
     int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
     float lighting_hour = 0;
@@ -653,11 +706,9 @@ static int study(int argc, char **argv)
     const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
     const char *package_id = NULL; // --package: a bundled catalog entry in runtime mode.
     const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
-    bool work_mode = false; // --work: the location's working-harbour session (SV1f).
+    bool work_mode = false; // The package has work sites: the working-harbour session (SV1f).
     const char *save_path = NULL; // --save: the work session's file (default: the data directory).
     bool fresh_work = false, save_now = false; // --new ignores a save; --save-now (tests).
-    const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
-    const char *work_review_pose_name = NULL; // --work-review-pose: developer bounded fixture.
 #ifdef PROTEUS_BOAT_NET
     WakeRoom *net = NULL;
 #endif
@@ -789,23 +840,12 @@ static int study(int argc, char **argv)
             package_id = argv[++i];
         } else if (strcmp(argv[i], "--plugin-bridge") == 0 && i + 1 < argc) {
             bridge_path = argv[++i];
-        } else if (strcmp(argv[i], "--work") == 0) {
-            work_mode = true;
         } else if (strcmp(argv[i], "--save") == 0 && i + 1 < argc) {
             save_path = argv[++i];
         } else if (strcmp(argv[i], "--new") == 0) {
             fresh_work = true;
         } else if (strcmp(argv[i], "--save-now") == 0) {
             save_now = true;
-        } else if (strcmp(argv[i], "--work-clock-report") == 0 && i + 1 < argc) {
-            work_clock_report = argv[++i];
-            if (!work_clock_report[0])
-                goto invalid;
-        } else if (strcmp(argv[i], "--work-review-pose") == 0 && i + 1 < argc) {
-            const char *value = argv[++i];
-            if (strcmp(value, "swing") && strcmp(value, "deck") && strcmp(value, "approach"))
-                goto invalid;
-            work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--demo-idle") == 0) {
@@ -883,6 +923,14 @@ static int study(int argc, char **argv)
             goto invalid;
         }
     }
+    // A working harbour is a package like any other: a free package with work sites, named by
+    // --plugin DIR or --package ID, runs the work session.
+    if (plugin_path && package_id) {
+        fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
+        goto invalid;
+    }
+    work_mode = plugin_path ? wake_work_probe_directory(plugin_path)
+                            : package_id && wake_work_probe_catalog(package_id);
     if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
         || (!replay_path && time > 60))
         goto invalid;
@@ -971,31 +1019,13 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--plugin-bridge is only available in native builds.\n");
         goto invalid;
     }
-    if (work_clock_report) {
-        fprintf(stderr, "--work-clock-report is only available in native builds.\n");
-        goto invalid;
-    }
 #endif
     if (bridge_path && (!plugin_path || screenshot)) {
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
         goto invalid;
     }
-    if ((work_clock_report || work_review_pose_name) && !work_mode) {
-        fprintf(stderr, "--work-clock-report and --work-review-pose belong to --work.\n");
-        goto invalid;
-    }
-    if (work_clock_report && (!frame_limit || screenshot || performance_report)) {
-        fprintf(stderr,
-            "--work-clock-report needs --work and --frames, with no --screenshot or "
-            "--performance-report.\n");
-        goto invalid;
-    }
-    if (work_review_pose_name && !screenshot && !frame_limit) {
-        fprintf(stderr, "--work-review-pose needs a bounded --screenshot or --frames run.\n");
-        goto invalid;
-    }
     if ((save_path || fresh_work || save_now) && !work_mode) {
-        fprintf(stderr, "--save, --new and --save-now belong to --work.\n");
+        fprintf(stderr, "--save, --new and --save-now belong to a working-harbour package.\n");
         goto invalid;
     }
     if (save_now && (!(save_path || data_dir) || screenshot || frame_limit || demo)) {
@@ -1003,16 +1033,11 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if (work_mode
-        && (plugin_path || package_id || connect_to || host_mode || course || replay_path
-            || ghost_path || wake_objects || player_wake_set || current || crossing_wake || waves
-            || start_set || skin_set || bridge_path)) {
+        && (connect_to || host_mode || course || replay_path || ghost_path || wake_objects
+            || player_wake_set || current || crossing_wake || waves || start_set || skin_set)) {
         fprintf(stderr,
-            "--work runs the location's working-harbour package; it cannot be combined with "
-            "package, room, course, replay, wake, water, start, skin or bridge options.\n");
-        goto invalid;
-    }
-    if (plugin_path && package_id) {
-        fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
+            "A working-harbour package runs its own session; it cannot be combined with "
+            "room, course, replay, wake, water, start or skin options.\n");
         goto invalid;
     }
     if (package_id && connect_to) {
@@ -1027,7 +1052,8 @@ static int study(int argc, char **argv)
                 "course, replay or ghost.\n");
             goto invalid;
         }
-        const BoatWorldDefinition *named = wake_plugin_location(plugin_path);
+        const BoatWorldDefinition *named
+            = work_mode ? wake_plugin_location_work(plugin_path) : wake_plugin_location(plugin_path);
         if (!named)
             return 1;
         if (location_set && named != location) {
@@ -1036,11 +1062,20 @@ static int study(int argc, char **argv)
         }
         location = named;
     }
+    // A bundled package names its own location, as a plugin directory does. An explicit
+    // --location must agree (checked below).
+    if (package_id && !plugin_path && !connect_to && !location_set) {
+        const BoatPluginCatalogEntry *named = boat_plugin_catalog_find(package_id);
+        const BoatWorldDefinition *found = named ? boat_location_find(named->location) : NULL;
+        if (found)
+            location = found;
+    }
     // Every solo session starts from a build-time catalog entry. Explicit --package IDs must
     // name this location's kind. The browser builds the same catalog into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
-    if (!plugin_path && !connect_to && !work_mode) {
-        BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
+    if (!plugin_path && !connect_to && !(work_mode && !package_id)) {
+        BoatPluginKind kind = work_mode               ? BOAT_PLUGIN_KIND_FREE
+            : course              ? BOAT_PLUGIN_KIND_COURSE
             : location->id == BOAT_LOCATION_OUTER ? BOAT_PLUGIN_KIND_VOYAGE
                                                   : BOAT_PLUGIN_KIND_FREE;
         catalog = package_id ? boat_plugin_catalog_find(package_id)
@@ -1076,6 +1111,8 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--resolution high needs the GPU renderer and replaces --gpu-aa.\n");
         goto invalid;
     }
+    if (gpu_enabled && resolution != BOAT_RESOLUTION_LOW)
+        hud_scale = 2;
     bool hdr = hdr_option < 0 ? resolution == BOAT_RESOLUTION_HIGH : hdr_option;
     if (hdr && (!gpu_enabled || gpu_aa)) {
         fprintf(stderr, "--hdr on needs the GPU renderer without --gpu-aa.\n");
@@ -1196,6 +1233,7 @@ static int study(int argc, char **argv)
     static WakePlugin plugin;
     static WakeConsole console;
     static WakeCommand command;
+    static WorkRequests work_requests;
     wake_console_init(&console);
     wake_command_init(&command, wake_console_print, wake_console_clear, console_save, &console);
     if (plugin_path) {
@@ -1213,8 +1251,8 @@ static int study(int argc, char **argv)
     }
     static WakeWork work;
     if (work_mode
-        && !wake_work_open(
-            &work, &session, &worlds[location->id], location, study_failure, sizeof(study_failure)))
+        && !wake_work_open(&work, &session, &worlds[location->id],
+            boat_plugin_host_active(&plugin.host), study_failure, sizeof(study_failure)))
         goto cleanup;
     if (work_mode) {
         // The session clock keeps running and saving; only presentation yields to an explicit
@@ -1222,13 +1260,13 @@ static int study(int argc, char **argv)
         work.lighting_cycle = !daylight_set && !lighting_hour_set;
         // Only interactive play reads or writes the game's data directory unasked; scripted runs
         // use a save only when told which one (--save or --data-dir).
-        bool plain = !screenshot && !demo && !frame_limit && !save_now;
+        // A package from disk is under authoring and never touches the player's save unasked.
+        bool plain = !screenshot && !demo && !frame_limit && !save_now && !plugin_path;
         wake_work_save_open(&work, &session, save_path, data_dir, plain, fresh_work);
     }
-    if (work_review_pose_name && !wake_work_review_pose(&work, &session, work_review_pose_name)) {
-        fprintf(stderr, "Could not prepare the %s work review pose.\n", work_review_pose_name);
-        goto cleanup;
-    }
+    work_requests = (WorkRequests) { &work, &session, &lighting_review, NULL };
+    if (work_mode)
+        wake_command_work(&command, work_request, &work_requests);
     if (save_now) {
         // Test fixture: the scripted drive, then one save and exit.
         bool ok = wake_work_script(&work, &session, (uint64_t)round(time / BOAT_TICK_SECONDS))
@@ -1245,8 +1283,10 @@ static int study(int argc, char **argv)
     static WakeBridge bridge;
     if (bridge_path && !wake_bridge_open(&bridge, bridge_path, GetTime()))
         goto cleanup;
-    if (bridge_path)
+    if (bridge_path) {
         wake_bridge_commands(&bridge, &command);
+        wake_plugin_hold_saves(&plugin);
+    }
 #endif
     // An imported course package is still a time trial: use the same start, best-run path and
     // practice latch as the bundled course.
@@ -1531,7 +1571,7 @@ static int study(int argc, char **argv)
             goto cleanup;
     }
     SetTextureFilter(texture, TEXTURE_FILTER_POINT);
-    frame_target = LoadRenderTexture(width, height);
+    frame_target = LoadRenderTexture(width * hud_scale, height * hud_scale);
     if (!IsRenderTextureValid(frame_target))
         goto cleanup;
     SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
@@ -1543,12 +1583,13 @@ static int study(int argc, char **argv)
             SetTextureFilter(minimap_textures[mode], TEXTURE_FILTER_POINT);
         }
     }
-    boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
+    if (!study_no_audio)
+        boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     char music_path[4096];
     const BoatMusic *track = boat_music(soundtrack);
-    if (track->asset && !boat_asset_path(music_path, sizeof(music_path), track->asset))
+    if (!study_no_audio && track->asset && !boat_asset_path(music_path, sizeof(music_path), track->asset))
         goto cleanup;
-    if (IsAudioDeviceReady() && track->asset) {
+    if (!study_no_audio && IsAudioDeviceReady() && track->asset) {
         music = LoadMusicStream(music_path);
         music_ready = IsMusicValid(music);
         if (music_ready && !xm_music_start_at(&music, music_path, 0)) {
@@ -1614,14 +1655,7 @@ static int study(int argc, char **argv)
         = { .capture = &capture, .lighting = &lighting_review };
     if (performance_capture && gpu_enabled)
         boat_gpu_timer_init(&performance_timer);
-    if (work_clock_report) {
-        WaterfrontGpuScene *scene = gpu_enabled ? &gpu.scene : NULL;
-        if (!wake_lighting_review_begin(&lighting_review, work_clock_report, scene)) {
-            fprintf(stderr, "Could not start the work clock report %s.\n", work_clock_report);
-            result = 1;
-            goto cleanup;
-        }
-    }
+    work_requests.scene = gpu_enabled ? &gpu.scene : NULL;
     result = 0;
     if (work_mode) {
         wake_work_autosave(&work, true);
@@ -1653,7 +1687,8 @@ static int study(int argc, char **argv)
         int next_width = width, next_height = height;
         if (wake_app_viewport(&next_width, &next_height) && gpu_enabled
             && (next_width != width || next_height != height)) {
-            RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
+            RenderTexture2D next_frame
+                = LoadRenderTexture(next_width * hud_scale, next_height * hud_scale);
             int window_scale = wake_app_canvas_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
                 next_width * window_scale, next_height * window_scale);
@@ -1755,9 +1790,11 @@ static int study(int argc, char **argv)
         if (gpu_enabled && (resolution != BOAT_RESOLUTION_LOW || hdr)
             && apply_screen_layout(&gpu, layout))
             texture = gpu.target.texture;
-        Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
-                                     destination.y + (height - 200) * scale / 2 },
-            .zoom = scale };
+        // High resolution draws the menu at the HUD's finer grid (never below one pixel).
+        int menu_zoom = scale / hud_scale < 1 ? 1 : scale / hud_scale;
+        Camera2D menu_camera = { .offset = { destination.x + (width * scale - 320 * menu_zoom) / 2,
+                                     destination.y + (height * scale - 200 * menu_zoom) / 2 },
+            .zoom = menu_zoom };
         if (menu_gate) {
             BoatMenuChoice choice
                 = boat_menu_update(&menu, &app_input, menu_camera, GetFrameTime());
@@ -2073,7 +2110,9 @@ static int study(int argc, char **argv)
                 boat_replay_runs_reset(&session.runs);
             }
             work_frame_sent = true;
-            if (work_mode && !wake_work_reset(&work, &session, GetTime())) {
+            if (work_mode && plugin_restart && plugin_active)
+                wake_work_use(&work, boat_plugin_host_active(&plugin.host));
+            if (work_mode && !wake_work_reset(&work, &session, plugin_restart && !reset_requested, GetTime())) {
                 // D10: back to the title; the leave-time save below still runs.
                 snprintf(study_failure, sizeof(study_failure), "Working harbour stopped: %s.",
                     work.local.failure);
@@ -2392,6 +2431,7 @@ static int study(int argc, char **argv)
         // High resolution draws the HUD over a transparent frame, accumulating premultiplied
         // alpha, and composites it over the full-size scene; low draws the scene into the frame.
         bool hud_overlay = gpu_enabled && resolution != BOAT_RESOLUTION_LOW;
+        int hw = width * hud_scale, hh = height * hud_scale; // The HUD's own grid.
         BeginTextureMode(frame_target);
         if (hud_overlay) {
             boat_screen_begin_overlay();
@@ -2407,20 +2447,19 @@ static int study(int argc, char **argv)
                 .steering = view->boat.wheel,
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
-            width,
-            height > width ? height - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80)
-                           : height);
+            hw,
+            hh > hw ? hh - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80) : hh);
         if (work_mode)
             wake_work_hud(&work,
                 &(WakeWorkProjection) { .view = view,
                     .presentation = view_presentation,
                     .world = view_world,
                     .camera = camera_settings },
-                width, height);
+                hw, hh);
         minimap.room_marks = live_view.marks;
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
-        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
+        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, hw, hh);
         if (chart) {
             Rectangle bounds = minimap_bounds;
             UpdateTexture(minimap_textures[minimap_mode], chart->data);
@@ -2429,10 +2468,10 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_NET
         if (net)
             wake_room_combat_hud(
-                net, width, height, view, view_presentation, view_world, camera_settings);
+                net, hw, hh, view, view_presentation, view_world, camera_settings);
 #endif
         if (mirror_visible)
-            boat_rearview_draw(&mirror, width);
+            boat_rearview_draw(&mirror, hw);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (!(mobile_buttons & 16) && mouse_driving && !menu.open)
             boat_ui_text(mouse_captured ? "MOUSE / P: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
@@ -2444,16 +2483,18 @@ static int study(int argc, char **argv)
                 (Color) { 218, 223, 202, 255 });
         if (review_label_frames > 0 && review_label) {
             --review_label_frames;
-            boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
+            boat_ui_text(review_label, 4, hh - 76, 10, (Color) { 233, 180, 104, 255 });
         }
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
             const char *time_label = TextFormat("TIME %.2gx%s", boat_time_rate(time_speed_index),
                 session.runs.practice ? " / PRACTICE" : "");
-            boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
+            boat_ui_text(time_label, 4, hh - 64, 10, (Color) { 233, 180, 104, 255 });
         }
+        BeginMode2D((Camera2D) { .zoom = (float)hud_scale });
         draw_touch_controls(width, height, destination, active && !demo && !session.runs.playing,
             mobile_buttons, mobile_button_height);
+        EndMode2D();
         if (hud_overlay)
             boat_screen_end_overlay();
         EndTextureMode();
@@ -2494,11 +2535,11 @@ static int study(int argc, char **argv)
             boat_ui_text(wake_room_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
                 12, SKYBLUE);
             int match_top
-                = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
+                = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale / hud_scale : 12;
             int roster_top = mirror_visible ? match_top + 28 : 12;
             if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
                 roster_top = (int)fmaxf((float)roster_top,
-                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
+                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale / hud_scale);
             int feed_top = wake_room_draw_roster(net, GetScreenWidth() - 12, roster_top);
             int objective_bottom
                 = wake_room_draw_objective(net, GetScreenWidth() - 12, feed_top + 8);
@@ -2611,7 +2652,7 @@ static int study(int argc, char **argv)
             sample.traffic_wake_live
                 = objects && objects->traffic_enabled ? objects->traffic.live : 0;
             boat_capture_add(&capture, &sample);
-            if (work_clock_report)
+            if (lighting_review.state)
                 wake_lighting_review_frame(&lighting_review, &sample, wake_work_view(&work)->tick,
                     wake_work_view(&work)->lighting_hours,
                     wake_work_view(&work)->lighting_cycle_seconds, boat_time_rate(time_speed_index),
@@ -2801,7 +2842,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 {
     char *arguments[32] = { "wake_velocity" };
     int count = 1;
-    // WORKING HARBOUR runs its own --work session, which refuses the free-ride options.
+    // WORKING HARBOUR runs its package's work session, which refuses the free-ride options.
     bool working_harbour = settings->location == BOAT_LOCATION_OUTER
         && settings->outer_content == BOAT_TITLE_OUTER_WORKING_HARBOUR;
     if (working_harbour) {
@@ -2812,9 +2853,8 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
             if (slot.present && !slot.available)
                 wake_work_title_set_aside(&slot);
         }
-        arguments[count++] = "--location";
-        arguments[count++] = "outer";
-        arguments[count++] = "--work";
+        arguments[count++] = "--package"; // The package names its location.
+        arguments[count++] = (char *)boat_title_outer_package(BOAT_TITLE_OUTER_WORKING_HARBOUR);
         if (settings->work_new)
             arguments[count++] = "--new";
         if (settings->data_dir) {
@@ -2945,6 +2985,17 @@ static int title_join(BoatTitleSettings *settings, bool host)
 // session. Explicit options enter their session directly, keeping scripted checks unchanged.
 int main(int argc, char **argv)
 {
+    // Apply to every entry path, including sessions launched from the title.
+    for (int i = 1; i < argc;) {
+        if (strcmp(argv[i], "--no-audio") != 0) {
+            ++i;
+            continue;
+        }
+        study_no_audio = true;
+        for (int j = i; j < argc; ++j)
+            argv[j] = argv[j + 1];
+        --argc;
+    }
 #if !defined(__EMSCRIPTEN__)
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
@@ -3016,7 +3067,8 @@ int main(int argc, char **argv)
         CloseWindow();
         return ok ? 0 : 1;
     }
-    wake_app_title_open();
+    if (!study_no_audio)
+        wake_app_title_open();
     wake_servers_start();
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
@@ -3038,7 +3090,8 @@ int main(int argc, char **argv)
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
     wake_servers_stop();
-    wake_app_title_close();
+    if (!study_no_audio)
+        wake_app_title_close();
     CloseWindow();
     return 0;
 }

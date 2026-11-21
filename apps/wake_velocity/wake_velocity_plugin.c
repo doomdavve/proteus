@@ -1,6 +1,7 @@
 #include "wake_velocity/wake_velocity_plugin.h"
 #include "core/waterfront_traffic.h"
 #include "plugins/boat_plugin_eval.h"
+#include "plugins/boat_plugin_image.h"
 #include "render/boat_ui.h"
 
 #ifdef _WIN32
@@ -70,7 +71,7 @@ static BoatPluginStatus read_package(WakePlugin *plugin, uint64_t *key)
     return status;
 }
 
-const BoatWorldDefinition *wake_plugin_location(const char *directory)
+static const BoatWorldDefinition *package_location(const char *directory, bool work)
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic d;
@@ -89,14 +90,34 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
             "--plugin accepts voyage, free and course packages; race and match run in rooms.\n");
         return NULL;
     }
-    if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective) {
+    if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective && !work) {
         fprintf(stderr,
-            "--plugin %s: a free package's objective runs in cargo_sandbox (work sites) or a "
-            "room (marks).\n",
+            "--plugin %s: a free package's objective runs in a working harbour (work sites) or "
+            "a room (marks).\n",
             directory);
         return NULL;
     }
     return boat_location_find(manifest.location);
+}
+
+const BoatWorldDefinition *wake_plugin_location(const char *directory)
+{
+    return package_location(directory, false);
+}
+
+const BoatWorldDefinition *wake_plugin_location_work(const char *directory)
+{
+    return package_location(directory, true);
+}
+
+// A free package with work sites is a working harbour: the game runs its work session, and
+// every changed revision restarts that session (SA0.1).
+static bool work_package(const WakePlugin *plugin)
+{
+    if (plugin->host.kind != BOAT_PLUGIN_KIND_FREE || !plugin->host.depth)
+        return false;
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    return active->free.has_scene && active->free.scene.work_present;
 }
 
 // A callback receipt is private to its request and complete committed input. No imported
@@ -423,8 +444,9 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     default:
         session->voyage_route = route; // The caller's restart begins it.
         report(plugin, "applied", false,
-            scene_restart ? "SESSION RESTARTED WITH THE NEW MARINA LAYOUT"
-                          : "SESSION RESTARTED WITH THE NEW WATER",
+            work_package(plugin)  ? "WORK SESSION RESTARTED WITH THE NEW PACKAGE"
+                : scene_restart ? "SESSION RESTARTED WITH THE NEW MARINA LAYOUT"
+                                : "SESSION RESTARTED WITH THE NEW WATER",
             "R%u %s", revision->number, how);
         return true;
     }
@@ -447,6 +469,10 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
         return false;
     }
     if (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)
+        return commit(plugin, session);
+    // A working harbour has no state worth holding for: a changed site, job or load restarts
+    // the cargo session at once, so an agent's stage is visible without a second command.
+    if (change == BOAT_PLUGIN_RESTART_SESSION && work_package(plugin))
         return commit(plugin, session);
     if (change == BOAT_PLUGIN_LIVE) {
         if (wake_plugin_live_ready(plugin, session))
@@ -536,6 +562,12 @@ bool wake_plugin_stage_files(
     return stage(plugin, session, true, now);
 }
 
+void wake_plugin_hold_saves(WakePlugin *plugin)
+{
+    plugin->watching = false;
+    snprintf(plugin->detail, sizeof(plugin->detail), "F5 RELOAD / F6 UNDO / SAVES HELD (BRIDGE)");
+}
+
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
 {
     close_stage(plugin);
@@ -598,12 +630,20 @@ static size_t manifest_json(const BoatPluginManifest *m, char *out, size_t capac
     json_text(kind, sizeof(kind), m->kind);
     json_text(entry, sizeof(entry), m->entry);
     json_text(location, sizeof(location), m->location);
+    // Module names are [a-z0-9_.] only (boat_plugin_image.h), so they need no escaping.
+    char modules[BOAT_PLUGIN_MODULES_MAX * (BOAT_PLUGIN_MODULE_NAME_MAX + 4) + 32] = "";
+    size_t at = 0;
+    for (unsigned i = 0; i < m->module_count; ++i)
+        at += (size_t)snprintf(modules + at, sizeof(modules) - at, "%s\"%s\"",
+            i ? "," : ",\"modules\":[", m->modules[i]);
+    if (m->module_count)
+        snprintf(modules + at, sizeof(modules) - at, "]");
     int n = snprintf(out, capacity,
         "{\"id\":\"%s\",\"name\":\"%s\",\"api\":%u,\"kind\":\"%s\",\"entry\":\"%s\","
-        "\"location\":\"%s\",\"capabilities\":[\"%s.define\"%s%s%s],\"state_version\":%u}",
+        "\"location\":\"%s\",\"capabilities\":[\"%s.define\"%s%s%s],\"state_version\":%u%s}",
         id, name, m->api, kind, entry, location, m->kind, m->scene ? ",\"scene.define\"" : "",
         m->objective ? ",\"objective.hud\"" : "", m->timers ? ",\"objective.timers\"" : "",
-        m->state_version);
+        m->state_version, modules);
     return n > 0 && (size_t)n < capacity ? (size_t)n : 0;
 }
 
@@ -796,6 +836,55 @@ static bool replace_file(const char *directory, const char *name, const char *by
     }
     return true;
 }
+
+static bool make_folder(const char *path)
+{
+#ifdef _WIN32
+    return !_mkdir(path) || errno == EEXIST;
+#else
+    return !mkdir(path, 0700) || errno == EEXIST;
+#endif
+}
+
+// Write the entry and, for a module image, each module under DIRECTORY/modules/ (M5 W3).
+static bool save_source(
+    const char *directory, const BoatPluginManifest *manifest, const char *source, size_t size)
+{
+    if (!boat_plugin_image_is(source, size))
+        return replace_file(directory, "main.lua", source, size);
+    BoatPluginImageFile files[BOAT_PLUGIN_MODULES_MAX + 1];
+    unsigned count;
+    if (!boat_plugin_image_unpack(source, size, files, &count)
+        || !replace_file(directory, manifest->entry, files[0].data, files[0].size))
+        return false;
+    for (unsigned i = 1; i < count; ++i) {
+        char name[BOAT_PLUGIN_MODULE_NAME_MAX + 1], relative[96], folder[1100];
+        if (files[i].name_size > BOAT_PLUGIN_MODULE_NAME_MAX)
+            return false;
+        memcpy(name, files[i].name, files[i].name_size); // The image's names are not terminated.
+        name[files[i].name_size] = 0;
+        if (!boat_plugin_module_name_valid(name)
+            || !boat_plugin_module_path(name, relative, sizeof(relative)))
+            return false;
+        // Create DIRECTORY/modules and each folder of the module's path, then write the file.
+        int n = snprintf(folder, sizeof(folder), "%s", directory);
+        if (n < 0 || (size_t)n >= sizeof(folder))
+            return false;
+        const char *part = relative;
+        for (const char *slash; (slash = strchr(part, '/')); part = slash + 1) {
+            int m = snprintf(
+                folder + n, sizeof(folder) - (size_t)n, "/%.*s", (int)(slash - part), part);
+            if (m < 0 || (size_t)m >= sizeof(folder) - (size_t)n)
+                return false;
+            n += m;
+            if (!make_folder(folder))
+                return false;
+        }
+        if (!replace_file(folder, part, files[i].data, files[i].size))
+            return false;
+    }
+    return true;
+}
 #endif
 
 bool wake_plugin_save(
@@ -839,7 +928,7 @@ bool wake_plugin_save(
     const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
     if (!manifest_size || !active->source_size
         || !replace_file(directory, "plugin.json", manifest, manifest_size)
-        || !replace_file(directory, "main.lua", active->source, active->source_size)) {
+        || !save_source(directory, &active->manifest, active->source, active->source_size)) {
         snprintf(message, capacity, "cannot write the package files");
         return false;
     }
@@ -1099,10 +1188,10 @@ static bool preview_session(const BoatSession *s)
         for (unsigned i = 1; i < BOAT_OBJECT_BOATS; ++i)
             if (s->world.water.objects->emitters[i].initialized)
                 return false; // A crossing/fleet fixture needs its other boats checkpointed too.
-    return !s->record_runs && !s->course.enabled && !s->world.combat
-        && !s->world.water.radial && !r->playing && !r->export_path && !r->recording.samples
-        && !r->last.samples && !r->best.samples && !r->opponent.samples && !r->reference.samples
-        && !r->save_best && !r->export_last && !r->report_finish;
+    return !s->record_runs && !s->course.enabled && !s->world.combat && !s->world.water.radial
+        && !r->playing && !r->export_path && !r->recording.samples && !r->last.samples
+        && !r->best.samples && !r->opponent.samples && !r->reference.samples && !r->save_best
+        && !r->export_last && !r->report_finish;
 }
 
 bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const BoatSession *s)

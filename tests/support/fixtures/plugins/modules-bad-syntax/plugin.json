@@ -1,0 +1,11 @@
+{
+  "id": "test.catalog-bad-syntax",
+  "name": "Catalog modules fixture",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define"],
+  "state_version": 1,
+  "modules": ["route"]
+}

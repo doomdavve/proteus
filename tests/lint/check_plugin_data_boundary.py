@@ -23,7 +23,8 @@ from pathlib import Path
 DATA_FILES = ("src/plugins/boat_plugin.c", "src/plugins/boat_plugin.h", "src/plugins/boat_plugin_decode.h",
               "src/plugins/boat_plugin_revision.h", "src/plugins/boat_plugin_race.c",
               "src/plugins/boat_plugin_objective.h", "src/plugins/boat_plugin_objective_codec.c",
-              "src/plugins/boat_plugin_wire.c", "src/plugins/boat_plugin_wire.h")
+              "src/plugins/boat_plugin_wire.c", "src/plugins/boat_plugin_wire.h",
+              "src/plugins/boat_plugin_image.c", "src/plugins/boat_plugin_image.h")
 CONSUMER_FILES = ("src/session/boat_sandbox_save.c", "src/session/boat_sandbox_save.h",
                   "src/plugins/boat_plugin_catalog.c", "src/plugins/boat_plugin_catalog.h",
                   "tests/plugins/validate_boat_plugin_data.c")

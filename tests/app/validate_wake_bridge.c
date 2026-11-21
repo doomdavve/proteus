@@ -397,6 +397,13 @@ int main(int argc, char **argv)
         CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(plugin.requests == requests && boat_plugin_host_held(&plugin.host));
 
+    // A bridge holds saves: the game stops watching the directory and says so.
+    wake_plugin_hold_saves(&plugin);
+    CHECK(!plugin.watching && strstr(plugin.detail, "SAVES HELD"));
+    for (unsigned i = 0; i < 8; ++i)
+        CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(plugin.requests == requests);
+
     // L1b: with a local authority the inspection is deferred until the authority's next one
     // arrives, and its objective lines replace the host's.
     static WakePluginAuthority authority = { .inspect = fake_inspect };
