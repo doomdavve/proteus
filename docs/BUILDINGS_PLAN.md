@@ -550,7 +550,8 @@ walls, and benches and planters keep out from under balconies and canopies throu
 Review command (GPU, from the basin at the quay row; a window opens, `Esc` quits):
 
 ```sh
-./build/wake_velocity --location outer --start -5,80,200 --demo-idle
+./build/wake_velocity --location outer --start -5,80,200   # drive it yourself
+./build/wake_velocity --location outer --start -5,80,200 --demo --demo-idle   # boat held still
 ```
 
 Other poses: `--start -40,-80,200` (150 m, the whole row), `--start -25,30,215` (brick block and

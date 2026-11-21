@@ -228,7 +228,8 @@ python -I tools/prepare_waterfront.py && python -I tools/prepare_outer_map.py
 build/ambient_bake --map river --out assets/geometry/river/ambient.bin
 build/ambient_bake --map outer --out assets/geometry/outer/ambient.bin
 # Look at the quay row in a window (GPU), from the basin:
-./build/wake_velocity --location outer --start -5,80,200 --demo-idle
+./build/wake_velocity --location outer --start -5,80,200   # drive it yourself
+./build/wake_velocity --location outer --start -5,80,200 --demo --demo-idle   # boat held still
 ```
 
 ## Generated outputs and packaging
