@@ -30,7 +30,8 @@ triangles per window, was never shipped and is rejected.
   (anything else, flat). `boat_scenery_role_is_wall` names the four wall roles; only they take
   facade records.
 - Per facade (a wall rectangle that takes windows): the first triangle of its wall pair, its number in the
-  building, bay and floor counts and a window style. Origin, length, base and top y and heading
+  building, bay and floor counts, a window style and a lighting profile (the record's last byte,
+  below 4; see [Window lighting](#window-lighting)). Origin, length, base and top y and heading
   come from the pair's vertices, so draping and rebakes cannot disagree with the mesh. No window
   triangles are stored: the runtime generator expands the grid (see
   [Window generation](#window-generation)).
@@ -60,6 +61,41 @@ wall's origin, end, outward normal, length and top from its triangle pair;
 right, bottom right, seen from outside), glass colour and whether it is lit at night, in the
 style's grid. Ground-floor windows have their own size. `BUILDING_WINDOW_NEAR_RANGE` (430 m) is
 the horizontal distance within which the renderers use the quads.
+
+### Window lighting
+
+A window is lit only if it is occupied (three in eight, as above); `building_window_lit(profile,
+seed, minute)` then says whether its schedule has the light on at a minute of the day, 0 to 1439.
+The facade record's profile picks the schedule, and `tools/building_kit.py` assigns it per
+facade: shop, lobby and ribbon glazing is `workplace`, a warehouse or any other non-house building
+of an industrial district is `industrial`, a shed is `quiet`, everything else `residential`; an
+authored `lighting` key (`residential`, `workplace`, `industrial`, `quiet`) in
+`tools/building_overrides.json` replaces the choice. The facade record's profile byte is the only
+lighting data in the pack, so the pack version is unchanged (0, residential, is what older packs
+hold).
+
+| Profile | Evening | Overnight |
+| --- | --- | --- |
+| residential | every occupied window on at 16:00-20:00, off at 22:00-01:00 | 3 in 16 until 05:00; 2 in 16 light 05:00-07:00 to 08:00 |
+| workplace | on through a working evening, off at 18:00-22:00 | 1 in 16 all night |
+| industrial | 1 in 4 until a 21:00-23:00 shift end | 1 in 16 all night, 1 in 16 early |
+| quiet | 1 in 4 until 19:00-21:00 | none |
+
+The offsets are drawn from the window seed (`fmix32(seed + 0x7F4A7C15)`: the low 4 bits pick the
+window's role, the next two bytes place its switch-on and switch-off inside the ranges), so a
+window keeps its habits and neighbours differ. The function is integer only and
+`window_lit` in `assets/shaders/waterfront_city.fs` repeats it exactly. The clock is
+`WaterfrontLighting.window_clock/window_minute`, set by `waterfront_lighting_hour` (the fixed
+`--lighting-hour` and the Working Harbour clock); a fixed daylight phase has no clock and lights
+every occupied window as before. Window light itself (how bright the windows are at the hour) is
+unchanged and independent. The GPU window quads carry the seed in their texture coordinates and
+the profile in the two low bits of the vertex alpha (its lit share is the upper six), so the shader
+decides each frame and nothing is rebuilt when the hour changes; the facade mask reads the
+profile from the facade record's texel and settles distant facades on
+`building_window_lit_share(profile, minute)`, the lit fraction of all windows at that minute,
+uploaded as `windowMean`. A merged far window of the untagged generic windows stands for its
+first window's seed. Unmigrated generic windows follow `residential`. No building family yields
+`quiet` facades by default (houses and sheds take no windows); authored entries can.
 
 Windows have a reveal in three tiers, all from this module so the CPU and GPU draw the same faces.
 `building_window_faces` splits the pane into four coplanar faces: the glass, a dark band under the
@@ -288,7 +324,7 @@ records. Precedence: override entry, supported facts, inference, plain fallback.
 bake that reads the entry (`river` by default, `outer` for the outer dressing); ids are `way/N` or
 `relation/N`, with `#K` pieces of a clipped footprint sharing their base id's entry. The validator
 refuses unknown keys, out-of-range numbers, bad colours and ids that name no building of the bake.
-Added keys: `roof_shape` (`flat`, `gable`, `sawtooth`), `windows` (false: none), `doors` (`count`,
+Added keys: `lighting` (the window schedule, see Window lighting), `roof_shape` (`flat`, `gable`, `sawtooth`), `windows` (false: none), `doors` (`count`,
 `width`, `height`, `color`: large doors on the longest ground wall) and `balconies.max_stacks`;
 families `block`, `warehouse`, `house` and `shed`; window styles `cottage` (1.0 x 1.1 m on a 3 m bay)
 and `hall` (2.2 x 1.3 m, a row from 4.6 m up, above the doors).
@@ -327,7 +363,7 @@ and take its windows from the generator (`building_windows.h`) only:
   (the y of its normal, free on a horizontal wall) and `facadeData`, a three-texel RGBA32F row per
   record, gives the shader the seed halves, counts and style. The shader repeats the generator's
   seed, glass and occupancy formulas, filters the window rectangle by the pixel footprint and
-  settles on the palette mean and the lit share (3/8) once a pixel spans about a bay, so the far
+  settles on the palette mean and the profile's lit share at the hour (3/8 with no clock) once a pixel spans about a bay, so the far
   facade neither shimmers nor pops against the quads. The mask and the quads overlap between 430
   and 526 m; they are the same windows, so nothing doubles visibly. More than 32,767 facade
   records cannot be named by the vertices: all cells then expand and stay (not exercised).

@@ -23,7 +23,8 @@
     } while (0)
 
 // Every member is a float, so the presets compare and difference as plain arrays.
-enum { FIELDS = sizeof(WaterfrontLighting) / sizeof(float) };
+// The float fields; the window clock after them is not blended.
+enum { FIELDS = offsetof(WaterfrontLighting, window_clock) / sizeof(float) };
 _Static_assert(sizeof(WaterfrontLighting) % sizeof(float) == 0, "lighting holds only floats");
 
 static const float *fields(const WaterfrontLighting *l) { return (const float *)l; }

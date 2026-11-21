@@ -29,7 +29,8 @@ FAMILY_DEFAULTS = {"balcony": ("plaster", "balcony"), "stepped": ("panel", "ribb
                    "shed": ("panel", "cottage")}
 KEYS = {"map", "family", "wall", "roof", "trim", "material", "style", "ground", "setbacks",
         "parapet", "cornice", "balconies", "entrance", "note", "auto", "legacy", "roof_shape",
-        "windows", "doors"}
+        "windows", "doors", "lighting"}
+LIGHTING = ("residential", "workplace", "industrial", "quiet")  # window schedules by hour
 DOOR_KEYS = {"count", "width", "height", "color"}
 GROUND_KEYS = {"band", "wall", "material", "style", "windows"}
 # An apartment unit is UNIT bays wide; every EVERY-th unit (from OFFSET) has one balcony stack,
@@ -100,6 +101,10 @@ def validate_params(ident, params):
         out["auto"] = True
     if "family" in params:
         out["family"] = params["family"]
+    if "lighting" in params:
+        if params["lighting"] not in LIGHTING:
+            raise ValueError(f"{what}.lighting: not one of {LIGHTING}")
+        out["lighting"] = params["lighting"]
     for key in ("wall", "roof", "trim"):
         if key in params:
             out[key] = _color(params[key], f"{what}.{key}")

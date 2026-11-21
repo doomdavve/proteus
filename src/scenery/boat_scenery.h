@@ -28,7 +28,8 @@ typedef enum {
     BOAT_SCENERY_ROLE_BALCONY, // Balcony slabs and fronts, flat in the run's own colour.
     BOAT_SCENERY_ROLE_CANOPY, // Canopies, awnings and entrance roofs, flat.
     BOAT_SCENERY_ROLE_TRIM, // Plinths, cornices, parapets, piers and frames, flat.
-    BOAT_SCENERY_ROLE_WALL_PLASTER, // Authored walls: the material is the role, the colour the run's.
+    BOAT_SCENERY_ROLE_WALL_PLASTER, // Authored walls: the material is the role, the colour the
+                                    // run's.
     BOAT_SCENERY_ROLE_WALL_BRICK,
     BOAT_SCENERY_ROLE_WALL_PANEL,
     BOAT_SCENERY_ROLE_COUNT
@@ -66,7 +67,7 @@ typedef struct {
     uint32_t id_hash;
     uint32_t wall;
     uint16_t index, bays, floors;
-    uint8_t style;
+    uint8_t style, profile; // PROFILE: the lighting schedule (scenery/building_windows.h).
 } BoatSceneryFacade;
 
 // A window grid: window F of bay B spans [first_bay + B bay_pitch, + width] along the wall and

@@ -6,6 +6,7 @@
 #include "render/waterfront_corner.h"
 #include "scenery/boat_ambient.h"
 #include "scenery/boat_water_atlas.h"
+#include "scenery/building_windows.h"
 #include "support/boat_test_scenery.h"
 
 #include "raymath.h"
@@ -268,7 +269,7 @@ int main(void)
     memcpy(words0 + RUNS, r, sizeof(r));
     words0[FACADE] = wall;
     words0[FACADE + 1] = 3 | 1u << 16; // Facade number 3, one bay.
-    words0[FACADE + 2] = 1; // One floor, style 0, reserved byte 0.
+    words0[FACADE + 2] = 1; // One floor, style 0, profile 0.
     memcpy(words0 + STYLE, tiny, sizeof(tiny));
     struct {
         const char *what;
@@ -284,7 +285,7 @@ int main(void)
         { "run order", RUNS + 3, 0 }, { "wall outside building", FACADE, wall + 7 },
         { "wall not a wall", FACADE, wall + 6 }, { "wall unpaired", FACADE, wall + 1 },
         { "no bays", FACADE + 1, 3 }, { "no floors", FACADE + 2, 0 },
-        { "no such style", FACADE + 2, 1 | 1u << 16 }, { "reserved byte", FACADE + 2, 1 | 1u << 24 },
+        { "no such style", FACADE + 2, 1 | 1u << 16 }, { "no such profile", FACADE + 2, 1 | (unsigned)BUILDING_PROFILE_COUNT << 24 },
         { "grid larger than the wall", FACADE + 1, 3 | 60000u << 16 },
         { "style not finite", STYLE, 0x7FC00000u }, { "style pitch", STYLE + 1, 0 },
         { "style size", STYLE + 4, 0 },

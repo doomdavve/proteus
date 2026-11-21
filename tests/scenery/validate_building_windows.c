@@ -64,6 +64,81 @@ static int seeds(void)
     return 0;
 }
 
+// Lit windows of a large sample at HOUR (virtual: the schedule takes a minute, never a clock).
+static unsigned lit_at(unsigned profile, int minute, unsigned *occupied)
+{
+    unsigned lit = 0;
+    *occupied = 0;
+    uint32_t facade = building_window_facade_seed(0x4242u, 7);
+    for (unsigned bay = 0; bay < 100; ++bay)
+        for (unsigned floor = 0; floor < 80; ++floor) {
+            uint32_t seed = building_window_seed(facade, bay, floor);
+            *occupied += building_window_occupied(seed);
+            lit += building_window_lit(profile, seed, minute);
+        }
+    return lit;
+}
+
+static int schedules(void)
+{
+    const unsigned total = 8000;
+    unsigned occupied;
+    // Without a clock every occupied window is lit, whatever its profile.
+    for (unsigned p = 0; p < BUILDING_PROFILE_COUNT; ++p)
+        CHECK(lit_at(p, -1, &occupied) == occupied);
+    // Pinned: one occupied window of each kind (seeds found by search, stable by construction).
+    unsigned residential[24];
+    for (unsigned h = 0; h < 24; ++h)
+        residential[h] = lit_at(BUILDING_PROFILE_RESIDENTIAL, (int)h * 60 + 30, &occupied);
+    CHECK(occupied > total * 3 / 8 - 300 && occupied < total * 3 / 8 + 300);
+    // Residential: none at midday, all occupied rooms in the evening, about 7% (3 of 16 of the
+    // lit rooms) through the small hours, and a few early risers at 06:00.
+    CHECK(residential[12] == 0 && residential[14] == 0);
+    CHECK(residential[22] > occupied * 8 / 10 && residential[22] <= occupied);
+    CHECK(residential[3] > total * 5 / 100 && residential[3] < total * 9 / 100);
+    CHECK(residential[6] > total * 2 / 100 && residential[6] < total * 9 / 100);
+    CHECK(residential[9] == 0);
+    // Switch-on is spread over 16:00-20:00: a rising count, none before, all by 20:00.
+    CHECK(lit_at(0, 15 * 60 + 59, &occupied) == 0 && lit_at(0, 21 * 60, &occupied) > 0);
+    unsigned previous = 0;
+    for (int minute = 16 * 60; minute <= 20 * 60; minute += 20) {
+        unsigned now = lit_at(0, minute, &occupied);
+        CHECK(now >= previous);
+        previous = now;
+    }
+    // Bedtime is spread over 22:00-01:00: a falling count after, past midnight too.
+    unsigned evening = lit_at(0, 21 * 60 + 59, &occupied), late = lit_at(0, 23 * 60 + 30, &occupied);
+    unsigned after = lit_at(0, 60, &occupied), night = lit_at(0, 2 * 60, &occupied);
+    CHECK(evening > late && late > after && after >= night && night > 0);
+    // Districts differ: industrial is mostly dark in the evening, a quiet boatyard darker still,
+    // a shop floor lit as residential in the working evening and dark late.
+    unsigned shop = lit_at(BUILDING_PROFILE_WORKPLACE, 17 * 60, &occupied);
+    CHECK(shop == occupied);
+    CHECK(lit_at(BUILDING_PROFILE_WORKPLACE, 23 * 60, &occupied) < occupied / 8);
+    unsigned industrial = lit_at(BUILDING_PROFILE_INDUSTRIAL, 20 * 60, &occupied);
+    CHECK(industrial > occupied / 5 && industrial < occupied * 3 / 10);
+    unsigned quiet = lit_at(BUILDING_PROFILE_QUIET, 18 * 60, &occupied);
+    CHECK(quiet > occupied / 5 && quiet < occupied * 3 / 10);
+    CHECK(lit_at(BUILDING_PROFILE_QUIET, 2 * 60, &occupied) == 0);
+    CHECK(lit_at(BUILDING_PROFILE_INDUSTRIAL, 2 * 60, &occupied) > 0);
+    // A window is never lit unless occupied; minutes wrap; an unknown profile reads as residential.
+    for (uint32_t seed = 0; seed < 5000; ++seed) {
+        for (int minute = 0; minute < 1440; minute += 97)
+            CHECK(!building_window_lit(0, seed, minute) || building_window_occupied(seed));
+        CHECK(building_window_lit(9, seed, 22 * 60) == building_window_lit(0, seed, 22 * 60));
+        CHECK(building_window_lit(1, seed, 1440 + 17 * 60) == building_window_lit(1, seed, 17 * 60));
+    }
+    // The settled share the facade shader uses matches the sample within sampling error.
+    for (unsigned p = 0; p < BUILDING_PROFILE_COUNT; ++p)
+        for (int minute = 0; minute < 1440; minute += 60 + p * 7) {
+            float share = building_window_lit_share(p, minute);
+            float sampled = (float)lit_at(p, minute, &occupied) / total;
+            CHECK(fabsf(share - sampled) < .03f);
+        }
+    CHECK(building_window_lit_share(0, -1) == 3.0f / 8);
+    return 0;
+}
+
 typedef struct {
     size_t count;
     uint32_t hash; // Order-dependent over the corners and look.
@@ -94,7 +169,7 @@ static int synthetic(void)
         { { 0, 3, 1 }, { 1, 2, 3, 255 } }, { { 4, 6, 5 }, { 1, 2, 3, 255 } },
         { { 4, 7, 6 }, { 1, 2, 3, 255 } } };
     Mesh3D mesh = { vertices, triangles, 4 };
-    BoatSceneryFacade facade = { 0x9df80401u, 0, 3, 4, 3, 0 };
+    BoatSceneryFacade facade = { 0x9df80401u, 0, 3, 4, 3, 0, 0 };
     BuildingWall wall;
     CHECK(building_wall(&mesh, &facade, &wall));
     CHECK(wall.length == 20 && wall.top == 17 && wall.along.x == 1 && wall.normal.z == -1
@@ -213,11 +288,13 @@ static int pack(const BoatMapDescription *map, size_t min_facades, size_t min_wi
     const BoatSceneryFacade *f = boat_scenery_facades(map, &facades);
     const BoatSceneryWindowStyle *style = boat_scenery_window_styles(map, &styles);
     CHECK(full && b && f && style && styles == 8 && facades >= min_facades);
-    size_t windows = 0;
+    size_t windows = 0, profiles[BUILDING_PROFILE_COUNT] = { 0 };
     uint32_t forward = 0, backward = 0;
     for (size_t k = 0; k < buildings; ++k) {
         for (size_t i = 0; i < b[k].facade_count; ++i) {
             const BoatSceneryFacade *w = &f[b[k].facade_first + i];
+            CHECK(w->profile < BUILDING_PROFILE_COUNT);
+            ++profiles[w->profile];
             const BoatSceneryWindowStyle *s = &style[w->style];
             BuildingWall wall;
             CHECK(building_wall(full->mesh, w, &wall));
@@ -262,6 +339,9 @@ static int pack(const BoatMapDescription *map, size_t min_facades, size_t min_wi
     }
     CHECK(forward == backward);
     CHECK(windows >= min_windows);
+    printf("facade profiles: %zu residential, %zu workplace, %zu industrial, %zu quiet\n",
+        profiles[0], profiles[1], profiles[2], profiles[3]);
+    CHECK(profiles[BUILDING_PROFILE_RESIDENTIAL] > 0 && profiles[BUILDING_PROFILE_WORKPLACE] > 0);
     return 0;
 }
 
@@ -269,6 +349,7 @@ int main(void)
 {
     CHECK(seeds() == 0);
     CHECK(synthetic() == 0);
+    CHECK(schedules() == 0);
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
     CHECK(pack(&waterfront_city_river_map, 5000, 80000) == 0);
