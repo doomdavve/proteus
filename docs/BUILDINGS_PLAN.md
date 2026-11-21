@@ -661,3 +661,7 @@ Relief range 2026-11-21: the user viewed the rework ("Looks good!", hi-res, oute
 relief range to be cut from 80 m to about 40 m: `BUILDING_WINDOW_DEEP_RANGE` is 40 m, release
 hysteresis 20 m. The shaded lintel/jamb/sill bands are unchanged out to 430 m. Quick stills at 30,
 50 and 100 m only; no perf pass (fewer relief faces than the measured 80 m state).
+User review 2026-11-21 (windowed, hi-res, outer): the user noticed the switch from relief to bands
+when looking for it at the 40 m range and approved it as a good trade-off. This accepts the
+40 m relief range and the lintel/jamb/sill bands only; the balcony-stack density, the
+projecting-surround reveal and the rest of B2 remain unreviewed.
