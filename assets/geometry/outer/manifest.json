@@ -100,22 +100,23 @@
   "playable_boundary_m": 5165.3,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 361664,
-  "triangles": 619497,
+  "vertices": 397106,
+  "triangles": 648229,
   "water_triangles": 3731,
   "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings (A3.5a; since A3.5f before the authored range, with windows), container cranes, port masts, channel marks and trees (A3.5a)",
   "dressing": {
-    "first_triangle": 542636,
+    "first_triangle": 570898,
     "buildings": 4766,
-    "gabled": 1350,
+    "gabled": 1349,
     "skipped_small": 91,
     "stone": 10,
+    "courtyards": 134,
     "container_cranes": 13,
     "lighting_masts": 80,
     "marks": 14,
-    "trees": 6092,
-    "building_triangles": 95225,
-    "triangles": 66764,
+    "trees": 6139,
+    "building_triangles": 113379,
+    "triangles": 67234,
     "marks_in_water": 13,
     "assumptions": "Footprints, crane, mast and mark positions and tagged heights are OSM. Untagged heights: houses 5.5 m eaves with a gable roof on near-rectangular footprints, sheds and garages 2.8 m, tanks 14 m, other buildings 8-14 m by area. Walls sink 0.6 m below the lowest corner. Container cranes are a raised-boom blockout at the mapped 118 m (also used where untagged), boom toward the nearest water; lighting masts 30 m; marks are 3.5-4.5 m piles in their mapped colour on a 1.5 m carved rock where they stand in water. Buildings within 150 m of Nya \u00c4lvsborg are stone. Trees are an authored scatter (11 m lattice, 80 m value noise) on ground at least 3 m high and under 24 degrees, 6 m from shore and clear of buildings, roads and the port; not mapped vegetation. Colours are authored.",
     "landmarks": {
@@ -352,16 +353,22 @@
   },
   "river_overlay": {
     "source": "assets/geometry/river/scenery.bin",
-    "triangles": 130733,
+    "triangles": 158995,
     "bridge_triangles": 4388,
     "river_ground_m": 3.5,
     "placement": "roads and garden beds paint the terrain; each other solid moves by the lowest terrain under it less river_ground_m; the bridge is unchanged",
-    "solids": 1474,
+    "solids": 1584,
     "paint_source_triangles": 35432,
     "painted_land_triangles": 66941,
     "lift_min_m": -2.5,
     "lift_max_m": 51.83,
-    "lift_median_m": 11.82
+    "lift_median_m": 11.67
+  },
+  "building_records": {
+    "count": 6264,
+    "facades": 26144,
+    "windows": 410227,
+    "contract": "docs/BUILDINGS.md; ids are the stable source ids, '#N' for pieces of a footprint clipped to the dressing area"
   },
   "land_triangles": 330908,
   "kit_ground": {
@@ -376,6 +383,6 @@
     "rows": 601,
     "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "scenery_sha256": "238de574394a035aa4bae32015c0ac9a8d82e59d008903ccf0c34dffb6e6529a",
+  "scenery_sha256": "e3e2e6c24e4475e74a3944a5f138ad090019e8a829ed3c0e173d346394a28544",
   "water_sha256": "a721eb87ca72f679c9a6bfe9e5628e1e3a146de9f018fbb2daa505b9299a114c"
 }

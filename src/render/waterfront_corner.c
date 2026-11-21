@@ -1,4 +1,5 @@
 #include "render/waterfront_corner.h"
+#include "scenery/building_windows.h"
 
 #include "core/waterfront_city.h"
 #include "render/waterfront_scene.h"
@@ -9,6 +10,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Local u follows the north facade east; v points out into the courtyard north.
 // Ground is 3.5 m. The mapped west facade runs from v=0 to v=-13.9.
@@ -39,6 +41,15 @@ bool waterfront_facade_triangle(Vector3 a, Vector3 b, Vector3 c, Color color)
     return fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f;
 }
 
+bool waterfront_facade_role(unsigned char role, Vector3 a, Vector3 b, Vector3 c, Color color)
+{
+    if (role == BOAT_SCENERY_ROLE_NONE)
+        return waterfront_facade_triangle(a, b, c, color);
+    Vector3 normal
+        = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+    return boat_scenery_role_is_wall(role) && fabsf(normal.y) < .15f;
+}
+
 bool waterfront_building_roof(Color color)
 {
     for (size_t i = 0; i < sizeof(building_tints) / sizeof(building_tints[0]); ++i) {
@@ -60,18 +71,9 @@ unsigned int waterfront_window_seed(size_t triangle, int column, int floor)
         + (unsigned int)floor * 374761393u;
 }
 
-Color waterfront_window_glass(unsigned int seed)
-{
-    return seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-        : seed % 7 == 3 ? (Color) { 181, 211, 221, 255 }
-                        : (Color) { 66, 100, 120, 255 };
-}
+Color waterfront_window_glass(unsigned int seed) { return building_window_glass(seed); }
 
-// About three in eight, mixed independently of the glass colour.
-bool waterfront_window_occupied(unsigned int seed)
-{
-    return ((seed ^ (seed >> 15)) * 2654435761u) >> 29 < 3;
-}
+bool waterfront_window_occupied(unsigned int seed) { return building_window_occupied(seed); }
 
 #define SCENERY_MAX_BOXES 16384
 
@@ -531,7 +533,17 @@ static float street_distance(Vector3 p)
     return best;
 }
 
-static void build_frontages(Builder *k, const Mesh3D *city)
+// A building that carries attached architecture (tools/building_compose.py: roof edges, balconies,
+// canopies, an entrance or doors) builds its own ground floor, so the generic frontage and forecourt
+// passes leave its walls alone. AUTHORED marks the triangles of such buildings; every other
+// building, migrated or not, keeps the passes (a family's walls and windows come from its records,
+// the entrances and forecourts of the river crop are still this pass's inference).
+static bool composed_wall(const unsigned char *authored, size_t triangle)
+{
+    return authored && authored[triangle];
+}
+
+static void build_frontages(Builder *k, const Mesh3D *city, const unsigned char *authored)
 {
     static const Color trims[] = { { 65, 112, 106, 255 }, { 113, 65, 60, 255 },
         { 64, 86, 113, 255 }, { 153, 133, 89, 255 } };
@@ -539,7 +551,8 @@ static void build_frontages(Builder *k, const Mesh3D *city)
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]], c = city->vertices[t->vertices[1]];
         Vector3 b = city->vertices[t->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12)
+        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12
+            || composed_wall(authored, i))
             continue;
         float length = Vector3Distance(a, b);
         Vector3 middle = Vector3Scale(Vector3Add(a, b), .5f);
@@ -619,7 +632,7 @@ static void garden_court(Builder *k, float v)
     }
 }
 
-static void build_forecourts(Builder *k, const Mesh3D *city)
+static void build_forecourts(Builder *k, const Mesh3D *city, const unsigned char *authored)
 {
     // Larger purposeful groups carry across a whole frame, where individual chairs
     // disappear. These are inferred uses of empty land, not surveyed businesses.
@@ -627,7 +640,8 @@ static void build_forecourts(Builder *k, const Mesh3D *city)
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]], c = city->vertices[t->vertices[1]];
         Vector3 b = city->vertices[t->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12)
+        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 12
+            || composed_wall(authored, i))
             continue;
         float length = Vector3Distance(a, b);
         Vector3 p = Vector3Scale(Vector3Add(a, b), .5f);
@@ -774,6 +788,7 @@ bool waterfront_scenery_init_tiled(
     }
     scenery->ground = waterfront_kit_ground(map);
     scenery->river = map == &waterfront_city_river_map || scenery->ground;
+    unsigned char *authored = NULL;
     Builder builder = { .out = scenery,
         .origin = { -71.82f, 3.5f, 105.9f },
         .axis_u = { .99284f, 0, .11952f },
@@ -781,12 +796,22 @@ bool waterfront_scenery_init_tiled(
     Builder *k = &builder;
     // On a kit ground the layout comes from the river map, whose flat 3.5 m ground the kit's
     // placement rules read; the boxes are set on the ground afterwards.
+    const BoatMapDescription *records = scenery->full;
     if (scenery->ground) {
         const BoatMapDescription *river = boat_scenery_of(&waterfront_city_river_map);
         if (!river)
             goto failed;
         city = river->mesh;
+        records = river;
     }
+    authored = calloc(city->triangle_count, 1);
+    size_t building_count = 0;
+    const BoatSceneryBuilding *buildings = boat_scenery_buildings(records, &building_count);
+    if (!authored)
+        goto failed;
+    for (size_t b = 0; b < building_count; ++b)
+        if (buildings[b].detail_first < buildings[b].end && buildings[b].end <= city->triangle_count)
+            memset(authored + buildings[b].first, 1, buildings[b].end - buildings[b].first);
     k->surfaces = calloc(city->triangle_count, sizeof(*k->surfaces));
     if (!k->surfaces)
         goto failed;
@@ -806,9 +831,11 @@ bool waterfront_scenery_init_tiled(
         build_cafe(k);
         build_streets(k);
     }
-    build_frontages(k, city);
+    build_frontages(k, city, authored);
     build_quays(k, city);
-    build_forecourts(k, city);
+    build_forecourts(k, city, authored);
+    free(authored);
+    authored = NULL;
     free(k->surfaces);
     k->surfaces = NULL;
     surface_grid_destroy(k);
@@ -840,6 +867,7 @@ bool waterfront_scenery_init_tiled(
         k->trees);
     return true;
 failed:
+    free(authored);
     free(k->surfaces);
     surface_grid_destroy(k);
     waterfront_scenery_destroy(scenery);

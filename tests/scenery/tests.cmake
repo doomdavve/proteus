@@ -23,3 +23,10 @@ add_executable(validate_boat_map_index tests/scenery/validate_boat_map_index.c)
 target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_map_index validate_boat_map_index LABELS core cpu)
+# Buildings: the window generator's seeds and expansion of the shipped packs' facade records.
+add_executable(validate_building_windows tests/scenery/validate_building_windows.c)
+target_link_libraries(validate_building_windows PRIVATE proteus_boat_scenery)
+target_compile_options(validate_building_windows PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME building_windows COMMAND validate_building_windows)
+set_tests_properties(building_windows PROPERTIES PASS_REGULAR_EXPRESSION "building_windows=ok"
+  LABELS "core;cpu")

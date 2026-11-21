@@ -18,10 +18,47 @@
     950.0,
     800.0
   ],
-  "vertices": 63035,
-  "triangles": 78612,
-  "scenery_sha256": "eacde313ea10c6edabd49bedd13a12f2e2a63c09c2e49e191190590f511286e6",
+  "vertices": 71265,
+  "triangles": 88720,
+  "scenery_sha256": "2b028af1f0dbd0b3bea9f6c72a6a2e71f0c5882b9fca9830b82238a2c02fbaf3",
   "water_sha256": "f0dc521fd2e657cbe0b615a9e14a6cebf96d039553767575bc979ad82b68cf4c",
+  "building_records": {
+    "count": 1498,
+    "facades": 6262,
+    "windows": 110196
+  },
+  "compositions": {
+    "way/164963584": {
+      "family": "brick",
+      "entrance_canopy": 2.6
+    },
+    "way/164963867": {
+      "family": "balcony",
+      "rejected": 5,
+      "stacks": 3,
+      "balconies": 12,
+      "entrance_canopy": 2.0
+    },
+    "way/164963868": {
+      "family": "brick"
+    },
+    "way/164963869": {
+      "family": "stepped",
+      "entrance_canopy": 2.6
+    },
+    "way/164963897": {
+      "family": "brick"
+    },
+    "way/164964582": {
+      "family": "balcony",
+      "stacks": 3,
+      "balconies": 12,
+      "rejected": 3
+    },
+    "way/164964585": {
+      "family": "stepped"
+    }
+  },
   "buildings": [
     {
       "osm": "relation/942382",

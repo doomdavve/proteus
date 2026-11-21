@@ -6,13 +6,20 @@ roof shapes, crane and mark proportions, colours and the tree scatter are author
 recorded in the manifest. Coordinates are crane-origin metres, x = east, z = north, y = up.
 """
 import math
+import sys
 import zlib
+from pathlib import Path
 
 import numpy as np
-from shapely import contains_xy, make_valid, prepare, transform
+from shapely import STRtree, contains_xy, make_valid, prepare, transform
 from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import building_families  # noqa: E402
+import building_kit  # noqa: E402
 
 HOUSE_TYPES = {"detached", "house", "semidetached_house", "terrace", "villa", "farm",
                "residential", "bungalow", "cabin"}
@@ -205,53 +212,100 @@ def footprints(osm, frame, multipolygon):
     return out
 
 
-def add_buildings(builder, osm, frame, area, model, fort, multipolygon, skip=()):
-    """Extrude the corridor's buildings inside AREA on the terrain. Returns manifest stats.
+COURTYARD_MIN = 30.0   # courtyards at least this big (m2) stay holes; smaller ones are filled
+DENSE_NEIGHBOURS = 8   # this many buildings within 50 m make a dense urban block
+COASTAL_RANGE = 150.0  # houses this close to water read as the coastal settlement
+
+
+def district(part, tags, tree, shapes, kinds, port_zone, water):
+    """The district context of one footprint: industrial in or near the port, urban where
+    buildings are dense, coastal near water, else suburban."""
+    if port_zone is not None and port_zone.intersects(part):
+        return "industrial"
+    near = [i for i in tree.query(part.buffer(50)) if shapes[i] is not part]
+    if sum(shapes[i].area > 60 for i in near) >= DENSE_NEIGHBOURS:
+        return "urban"
+    if water is not None and water.distance(part) < COASTAL_RANGE:
+        return "coastal"
+    return "suburban"
+
+
+def add_buildings(builder, osm, frame, area, model, fort, multipolygon, skip=(), water=None,
+                  compositions=None, legacy=None):
+    """Extrude the corridor's buildings inside AREA on the terrain through the shared kit. Returns
+    manifest stats, the solids, the port footprints, the building records and the assignments.
 
     Footprints whose key ("w/ID" or "r/ID") is in SKIP are left out: hand-built landmarks
-    (tools/outer_landmarks.py) stand there instead.
+    (tools/outer_landmarks.py) stand there instead. COMPOSITIONS are the override file's entries
+    for this map; WATER (shape) keeps attached architecture out of the water and gives the
+    coastal district.
     """
     prepare(area)
-    stats = {"buildings": 0, "gabled": 0, "skipped_small": 0, "stone": 0}
-    solids = []
-    port = []
+    stats = {"buildings": 0, "gabled": 0, "skipped_small": 0, "stone": 0, "courtyards": 0}
+    pieces = []
     for key, tags, shape in sorted(footprints(osm, frame, multipolygon), key=lambda e: e[0]):
         if key in skip or not area.intersects(shape):
             continue
         shape = shape.intersection(area).simplify(.25, preserve_topology=True)
-        for part in _parts(shape):
+        for piece, part in enumerate(_parts(shape)):
             if part.area < MIN_AREA:
                 stats["skipped_small"] += 1
                 continue
-            part = Polygon(part.exterior)  # courtyards are rare out here; fill them
-            wall, roof = building_shape(tags, part.area)
-            ground = _height(model, list(part.exterior.coords))
-            base = float(ground.min()) - SINK
-            eave = float(ground.max()) + wall
-            stone = part.centroid.distance(fort) < FORT_RADIUS
-            seed = int(_hash(key) * 1e6)
-            if stone:
-                color, top = STONE, tuple(c - 22 for c in STONE)
-                stats["stone"] += 1
-            elif roof == "gable":
-                color, top = HOUSE_WALLS[seed % 5], HOUSE_ROOFS[seed // 5 % 3]
-            else:
-                color = CITY_WALLS[seed % 4]
-                top = tuple(max(0, c - 30) for c in color)
-            rect = None
-            if roof == "gable" and not stone:
-                with np.errstate(invalid="ignore"):  # slivers have no defined envelope
-                    rect = part.minimum_rotated_rectangle
+            # Courtyards worth a yard stay holes; small ones are filled.
+            holes = [h for h in part.interiors if Polygon(h).area >= COURTYARD_MIN]
+            part = Polygon(part.exterior, holes) if holes else Polygon(part.exterior)
+            stats["courtyards"] += len(holes)
+            pieces.append((key, tags, piece, part))
+    solids = [p[3] for p in pieces]
+    port = [p[3] for p in pieces if p[1].get("building") in PORT_TYPES or p[3].area > 3000]
+    port_zone = unary_union(port).buffer(40) if port else None
+    tree = STRtree(solids)
+    kinds = [p[1].get("building") for p in pieces]
+    descriptions = []
+    for key, tags, piece, part in pieces:
+        wall, roof = building_shape(tags, part.area)
+        ground = _height(model, list(part.exterior.coords))
+        base = float(ground.min()) - SINK
+        eave = float(ground.max()) + wall
+        stone = part.centroid.distance(fort) < FORT_RADIUS
+        seed = int(_hash(key) * 1e6)
+        if stone:
+            color, top = STONE, tuple(c - 22 for c in STONE)
+            stats["stone"] += 1
+        elif roof == "gable":
+            color, top = HOUSE_WALLS[seed % 5], HOUSE_ROOFS[seed // 5 % 3]
+        else:
+            color = CITY_WALLS[seed % 4]
+            top = tuple(max(0, c - 30) for c in color)
+        shape = part
+        if roof == "gable" and not stone:
+            with np.errstate(invalid="ignore"):  # slivers have no defined envelope
+                rect = part.minimum_rotated_rectangle
             if rect is not None and rect.area > 0 and part.area / rect.area > .8:
-                gable(builder, rect, base, eave, color, top)
+                shape = rect  # a house is its envelope, as before the kit
                 stats["gabled"] += 1
-            else:
-                builder.prism(list(part.exterior.coords), base, eave, color, roof=top)
-            stats["buildings"] += 1
-            solids.append(part)
-            if tags.get("building") in PORT_TYPES or part.area > 3000:
-                port.append(part)
-    return stats, unary_union(solids), unary_union(port)
+        # Stable id: "way/ID" or "relation/ID", "#N" for the N-th piece of the clipped footprint
+        # (the river crop's own buildings carry the bare id).
+        ident = ("way" if key.startswith("w/") else "relation") + "/" + key[2:] + f"#{piece}"
+        height, basis = wall, ("height" if "height" in tags else "levels"
+                               if "building:levels" in tags else "fallback")
+        descriptions.append(building_kit.BuildingDescription(
+            ident, [building_kit.Section(shape, base, eave)], color, top, facade=not stone,
+            facts=building_families.facts(tags, part.area, height, basis, 1, len(part.interiors)),
+            context=district(part, tags, tree, solids, kinds, port_zone, water)))
+        stats["buildings"] += 1
+    streets = [LineString(frame.xy(w["geometry"])).buffer(3, cap_style=2) for w in osm["ways"]
+               if "highway" in w["tags"] and len(w["geometry"]) >= 2
+               and w["tags"]["highway"] not in {"path", "footway", "steps", "cycleway", "pedestrian"}]
+    obstacles = unary_union(([water.buffer(.5)] if water is not None else []) + streets)
+    emitter = building_kit.Emitter(
+        lambda points, color: builder.triangles.append(([tuple(map(float, p)) for p in points],
+                                                        color)),
+        lambda: len(builder.triangles), _triangulate, compositions=compositions,
+        obstacles=obstacles)
+    records = emitter.emit_all(descriptions)
+    return (stats, unary_union(solids), unary_union(port) if port else Polygon(), records,
+            {"emitter": emitter, "descriptions": descriptions})
 
 
 def container_crane(builder, x, z, ground, toward, height):
@@ -385,8 +439,11 @@ def carve_marks(water, mark_list):
     return water.difference(unary_union(islands)) if islands else water, len(islands)
 
 
-def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip=()):
-    """(buildings, other) triangles ((three (x, y, z)), colour) and manifest stats.
+def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip=(),
+          compositions=None):
+    """(buildings, other) triangles ((three (x, y, z)), colour), manifest stats, the building
+    records (tools/building_kit.py), indexed into the buildings list, and the data of the
+    building report (building_kit.build_report).
 
     Since A3.5f the buildings are returned apart: the bake puts them before the authored
     range, like the river's own buildings, so the renderers give their walls facades and
@@ -395,8 +452,8 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip
     houses = Builder()
     builder = Builder()
     outside = land.difference(crop)
-    stats, solids, port = add_buildings(houses, osm, frame, outside, model, fort,
-                                         multipolygon, skip)
+    stats, solids, port, records, building_data = add_buildings(
+        houses, osm, frame, outside, model, fort, multipolygon, skip, water, compositions)
     port_zone = [port.buffer(40)]
     cranes = masts = 0
     for n in sorted(osm["points"], key=lambda n: n["id"]):
@@ -429,7 +486,8 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip
     trees = add_trees(builder, outside, keep_out, model)
     stats.update(container_cranes=cranes, lighting_masts=masts, marks=placed, trees=trees,
                  building_triangles=len(houses.triangles), triangles=len(builder.triangles))
-    return houses.triangles, builder.triangles, stats
+    return (houses.triangles, builder.triangles, stats, records,
+            building_data)
 
 
 def self_test():

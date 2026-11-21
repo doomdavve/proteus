@@ -104,6 +104,11 @@ typedef struct {
     size_t wake_texels; // Texels the stamped pieces cover; zero when the field is reused.
     unsigned history_substeps; // Fixed water history substeps run this frame.
     unsigned history_resets; // 1 when the history reset and pre-rolled this frame.
+    // Quad windows of migrated buildings (scenery/building_windows.h) resident this frame, and
+    // the cells expanded and released by it.
+    unsigned window_cells, window_cells_expanded, window_cells_released;
+    size_t window_quads;
+    size_t window_reveal_triangles; // Relief of facades within BUILDING_WINDOW_DEEP_RANGE.
 } WaterfrontGpuStats;
 
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
@@ -132,7 +137,26 @@ typedef struct {
     bool wake_stamp_disabled; // Review: shade every piece analytically, the reference.
     WaterfrontWaterHistory water_history; // Foam history and ripples; none when unsupported.
     bool water_history_disabled; // Review: stamp-only water, the G3a comparison.
-    WaterfrontGpuTiled windows;
+    WaterfrontGpuTiled windows; // Generic windows of unmigrated buildings.
+    // Windows of migrated buildings: the facade records of the bound map expanded into quads in
+    // the detail cells near the anchor (window_select), drawn by the windows pass; beyond
+    // BUILDING_WINDOW_NEAR_RANGE the facade shader draws the same grid from facade_data. No
+    // facade_data (no records, or too many for the vertex format): every cell expands at once.
+    Texture2D facade_data;
+    const BoatMapDescription *window_map; // The scenery the records belong to; NULL: none.
+    unsigned *window_cell_start; // Cells + 1 offsets into window_cell_facades (facade records).
+    unsigned *window_cell_facades;
+    WaterfrontGpuTiled *window_cells; // Per detail cell; count 0 unless expanded.
+    unsigned char *window_cell_ready; // Per detail cell: expanded.
+    Vector2 window_anchor; // Renderer X/Z the mask and expansion are measured from.
+    size_t window_quads; // Quads resident.
+    WaterfrontGpuTiled window_reveal; // The relief of the facades marked in window_reveal_ready.
+    unsigned char *window_reveal_ready; // Per facade record: within the deep range.
+    unsigned short *window_cell_reveals; // Per detail cell: how many of its facades are marked.
+    size_t window_reveal_triangles; // Resident.
+    unsigned window_facade_total; // Length of the two per-facade arrays above.
+    int window_cell_total; // Length of the per-cell arrays above.
+    unsigned window_expanded, window_released; // This frame.
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
     // Far levels of the two detailed classes, on the same fine grid. Each view chooses per cell.

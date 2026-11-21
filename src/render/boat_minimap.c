@@ -181,8 +181,9 @@ static void shore_distance(const unsigned char *mask, float *distance, int colum
 
 // Roofs mark built-up land: flat, non-green triangles at least 4 m above the lowest land in
 // their pixel, covering a quarter of it or more. Water, terrain, trees and walls do not count.
-static void built_up(const BoatMinimapLayer *layer, const Mesh3D *mesh, size_t water_count,
-    int width, int height, unsigned char *roof, float *lowest)
+static void built_up(const BoatMinimapLayer *layer, const Mesh3D *mesh,
+    const unsigned char *roles, size_t water_count, int width, int height, unsigned char *roof,
+    float *lowest)
 {
     for (int i = 0; i < width * height; ++i)
         lowest[i] = FLT_MAX;
@@ -210,6 +211,10 @@ static void built_up(const BoatMinimapLayer *layer, const Mesh3D *mesh, size_t w
         Color color = mesh->triangles[i].color;
         if (color.g > color.r + 8 && color.g >= color.b)
             continue; // Trees and lawns.
+        if (roles
+            && (roles[i] == BOAT_SCENERY_ROLE_BALCONY || roles[i] == BOAT_SCENERY_ROLE_CANOPY
+                || roles[i] == BOAT_SCENERY_ROLE_TRIM))
+            continue; // Attached architecture would fatten the footprint it hangs from.
         Vector3 p[3];
         for (int k = 0; k < 3; ++k)
             p[k] = mesh->vertices[mesh->triangles[i].vertices[k]];
@@ -255,8 +260,8 @@ static void neat_line(BoatMinimapLayer *layer)
 // Land is buff, built-up land darker, and land touching water carries the black coastline.
 // Water is white offshore and blue near land; the game has no soundings, so the tints stand
 // for distance from shore, not depth.
-static bool bake(BoatMinimapLayer *layer, const Mesh3D *mesh, size_t water_count, Rectangle extent,
-    int max_width, int max_height)
+static bool bake(BoatMinimapLayer *layer, const Mesh3D *mesh, const unsigned char *roles,
+    size_t water_count, Rectangle extent, int max_width, int max_height)
 {
     layer->scale = fminf(max_width / extent.width, max_height / extent.height);
     layer->north_west = (Vector2) { extent.x, extent.y + extent.height };
@@ -284,7 +289,7 @@ static bool bake(BoatMinimapLayer *layer, const Mesh3D *mesh, size_t water_count
             fill_triangle(mask, columns, rows, v[0], v[1], v[2]);
         }
         shore_distance(mask, distance, columns, rows);
-        built_up(layer, mesh, water_count, width, height, roof, lowest);
+        built_up(layer, mesh, roles, water_count, width, height, roof, lowest);
         // Per pixel: water (WET 1), land (0) or uncharted (2, outside every map triangle), and
         // the roof fraction, smoothed over 3x3 pixels so built-up areas read as solid tints.
         Color *pixels = layer->base.data;
@@ -370,8 +375,8 @@ bool boat_minimap_init(BoatMinimap *minimap, const BoatWorldDefinition *location
         }
     Rectangle extent = { west, south, east - west, north - south };
     for (int mode = BOAT_MINIMAP_CORNER; mode < BOAT_MINIMAP_MODES; ++mode)
-        if (!bake(&minimap->layers[mode], mesh, water_count, extent, max_size[mode][0],
-                max_size[mode][1])) {
+        if (!bake(&minimap->layers[mode], mesh, boat_scenery_roles(map), water_count, extent,
+                max_size[mode][0], max_size[mode][1])) {
             boat_minimap_destroy(minimap);
             return false;
         }

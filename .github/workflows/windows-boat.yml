@@ -158,6 +158,10 @@ jobs:
             Copy-Item "assets/geometry/$map/manifest.json" "$package/assets/geometry/$map"
             Copy-Item "assets/geometry/$map/scenery.bin" "$package/assets/geometry/$map"
           }
+          # The outer location's water atlas and ambient occlusion sidecars (the river crop
+          # is not a location and loads none).
+          Copy-Item "assets/geometry/outer/water_atlas.bin" "$package/assets/geometry/outer"
+          Copy-Item "assets/geometry/outer/ambient.bin" "$package/assets/geometry/outer"
           # Reference Lua plugins (--plugin assets/plugins/langedrag, copied to edit) and the
           # authoring tools with their isolated validator beside the game.
           python tools/package_plugin_tools.py --authoring "$package/authoring" `

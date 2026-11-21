@@ -284,7 +284,10 @@ Every pass must cull at least one tile.
 `detail_transitions` (`boat_water_review --check-detail`, `gpu`; graphics G2b) drives a river view
 through the distance-detail threshold. Orbiting the boat must change no level, a cell that just
 switched must hold under small camera movement, repeated out-and-back trips must end alike, and
-every cell with windows must keep them far. It prints the switch counts and near/far cells.
+every cell with windows must keep them far. It also checks the migrated buildings' window cells
+(`docs/BUILDINGS.md`): expanded exactly within the near range plus prefetch of the anchor, released
+beyond twice the range, none left after a far teleport and expanded again on return. It prints the
+switch counts, near/far cells and window cell events.
 `instancing_parity` (`boat_water_review --check-instancing`, `gpu`, about 6 s; graphics G1) draws
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
@@ -632,7 +635,29 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   map validators and review tools load the packs from the source tree
   (`tests/support/boat_test_scenery.h`).
 - `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
-  count and a pack round trip.
+  count, a pack round trip, and the version 3 building records (round trip, version 1 packs, every
+  invalid-record case for buildings, runs, facades and styles, identity independent of input order
+  and of other buildings).
+- `building_windows` runs `validate_building_windows` (quick): the seeds, glass and occupancy
+  against values computed with Python's `zlib.crc32` and murmur3's finalizer (the formulas the
+  facade shader repeats), a synthetic wall's exact window corners, determinism, independence of
+  wall position and the facade number's effect, and every migrated facade of the shipped packs:
+  its windows lie inside the wall and the building's bounds, face outward 3.5 cm off the wall, no
+  wall is listed twice and the window totals are pinned (they change when the kit's migrated set
+  or grid does).
+- `building_packs` (`tests/tools/check_building_packs.py`, quick) pins `water.h` of `river` and
+  `outer` (sha256) and checks that each pack's leading water is exactly its compiled water, so a
+  rebake that adds or changes buildings cannot change water, collision or the content digest; it
+  also checks the packs carry building records after the water, hold no baked window triangles and
+  that every facade record names a wall pair of its building, that a pack holds at most 32,767
+  facades (the GPU vertex format), that no building-tinted wall stands outside the records (windows
+  come only from facade records) and that the building report matches the pack. Update a pin only for a
+  deliberate change to a map's water. `building_kit` (`tools/building_kit.py`) runs the kit
+  fixtures (validation, determinism, outward faces, roles) and is registered only when
+  shapely, numpy and pyproj are installed (`docs/adventure/requirements.txt`), as is
+  `building_families` (`tools/building_families.py`: family rules from tags, district and scale).
+  `building_report` (quick, standard library) runs `tools/building_report.py --check` on the
+  shipped reports and overrides.
 - `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `outer`
   and none for the basin, checks that both frames fit the 320×200 scene (the chart
   above the instruments), that the spawn, every voyage shelter and the destination are water

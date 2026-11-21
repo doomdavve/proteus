@@ -21,6 +21,7 @@ uniform mat4 matNormal;
 uniform vec4 objectColor;
 uniform int emissive;
 uniform int instanced;
+uniform int facadePass;
 
 out vec2 fragTexCoord;
 out vec4 fragColor;
@@ -29,6 +30,9 @@ out vec3 fragWorldNormal;
 // Flat: interpolating a constant across a triangle does not reproduce it exactly.
 flat out vec4 fragObjectColor;
 flat out int fragEmissive;
+// Facade pass: the facade record number + 1 of a migrated wall (its normal's y component, free on
+// a horizontal wall), or 0, for the window mask in the fragment shader.
+flat out int fragFacade;
 out float fragOcclusion;
 
 void main()
@@ -52,7 +56,13 @@ void main()
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
     fragWorldPosition = worldPosition.xyz;
-    fragWorldNormal = normalize((objectNormal * vec4(vertexNormal.xyz, 0.0)).xyz);
+    vec3 normalIn = vertexNormal.xyz;
+    fragFacade = 0;
+    if (facadePass != 0) {
+        fragFacade = int(vertexNormal.y + 0.5);
+        normalIn.y = 0.0;
+    }
+    fragWorldNormal = normalize((objectNormal * vec4(normalIn, 0.0)).xyz);
     fragOcclusion = clamp((vertexNormal.w - 1.0) / 255.0, 0.0, 1.0);
     gl_Position = objectMvp * vec4(vertexPosition, 1.0);
 }

@@ -67,7 +67,10 @@ def main():
     # Eriksberg river crop's, which lays out the river kit on it.
     for name in ("river", "outer"):
         (assets / "geometry" / name).mkdir(parents=True)
-        for file in ("manifest.json", "scenery.bin"):
+        # The outer location also loads its water atlas and ambient occlusion sidecars; the river
+        # crop is not a location and loads none (boat_scenery_load_location).
+        sidecars = ("water_atlas.bin", "ambient.bin") if name == "outer" else ()
+        for file in ("manifest.json", "scenery.bin", *sidecars):
             shutil.copy2(root / "assets/geometry" / name / file, assets / "geometry" / name)
     # Reference Lua plugins (--plugin) and their authoring tools; authors copy an example
     # somewhere writable to edit it. Nested code must live in Contents/MacOS to be signed.

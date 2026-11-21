@@ -9,6 +9,7 @@ import gzip
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 from pyproj import Transformer
@@ -18,6 +19,11 @@ from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+import building_families  # noqa: E402
+import building_kit  # noqa: E402
+
 SOURCE = ROOT / "docs/river/osm-survey.json.gz"
 EXPECTED_HASH = "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a"
 GROUND = 3.5
@@ -247,7 +253,7 @@ def prepare(output, expanded=False):
         bottom = float(e["tags"].get("min_height", "0").replace(",", "."))
         assert math.isfinite(bottom) and 0 <= bottom < height, e["id"]
         parts.append((e, shape.intersection(CROP), height, bottom))
-    manifest_buildings, solids = [], []
+    manifest_buildings, solids, descriptions = [], [], []
     for e in sorted(buildings, key=lambda e: (e["type"], e["id"])):
         if e["tags"].get("man_made") == "crane" or (e["type"] == "way" and e["id"] in members):
             continue
@@ -269,21 +275,27 @@ def prepare(output, expanded=False):
         # for partitioning so shared edges do not grow slivers from separate simplification.
         matching = [(p, h, part["id"]) for part, p, h, bottom in parts
                     if bottom == 0 and shape.intersection(p).area > p.area * .9]
-        for section, part_height, _ in resolve_parts(shape, matching):
+        # One description per mapped building: its ground-based sections and its raised parts
+        # are sections of the same building (tools/building_kit.py), so they keep one identity.
+        sections = []
+        for section, part_height, part_id in resolve_parts(shape, matching):
             top = GROUND + (height if part_height is None else part_height)
-            walls(section, GROUND, top, tint)
-            surface(section, top, tuple(max(0, c - 30) for c in tint))
+            sections.append(building_kit.Section(section, GROUND, top, part_id))
         for part, p, part_height, bottom in parts:
             if bottom > 0 and shape.intersection(p).area > p.area * .9:
-                section = p.intersection(shape)
-                walls(section, GROUND + bottom, GROUND + part_height, tint)
-                surface(section, GROUND + part_height, tuple(max(0, c - 30) for c in tint))
+                sections.append(building_kit.Section(
+                    p.intersection(shape), GROUND + bottom, GROUND + part_height,
+                    f"way/{part['id']}"))
+        descriptions.append(building_kit.BuildingDescription(
+            f"{e['type']}/{e['id']}", sections, tint, tuple(max(0, c - 30) for c in tint),
+            facts=building_families.facts(e["tags"], shape.area, height, basis, len(sections),
+                                          sum(len(p.interiors) for p in polygons(shape))),
+            context="urban"))
         solids.append(shape)
         manifest_buildings.append({"osm": f"{e['type']}/{e['id']}", "height": height,
                                    "basis": basis, "courtyards": sum(len(p.interiors) for p in polygons(shape)),
                                    "parts": [key for _, _, key in matching]})
-    solid_union = unary_union(solids)
-    roads = []
+    roads, streets = [], []
     for e in elements:
         tags = e.get("tags", {})
         if "highway" not in tags or tags.get("bridge") == "yes" or tags.get("tunnel") == "yes":
@@ -291,9 +303,24 @@ def prepare(output, expanded=False):
         pts = coordinates(e.get("geometry", []))
         if len(pts) < 2:
             continue
-        width = 2 if tags["highway"] in {"path", "footway", "steps", "cycleway"} else 6
-        roads.append(LineString(pts).buffer(width / 2, cap_style=2, join_style=2))
+        footway = tags["highway"] in {"path", "footway", "steps", "cycleway"}
+        road = LineString(pts).buffer((2 if footway else 6) / 2, cap_style=2, join_style=2)
+        roads.append(road)
+        if not footway:
+            streets.append(road)
     road_union = unary_union(roads)
+    # Attached architecture (balconies, canopies, cornices) must stay out of the water and clear
+    # of vehicle streets; footways may pass under it.
+    obstacles = unary_union([water.buffer(.5)] + streets)
+    compositions = building_kit.load_compositions(map_name="river")
+    emitter = building_kit.Emitter(
+        triangle, lambda: len(triangles),
+        lambda poly: [list(t.exterior.coords)[:3] for t in triangulate(poly)],
+        compositions=compositions, obstacles=obstacles)
+    records = emitter.emit_all(descriptions)
+    building_report = building_kit.build_report("river", emitter, descriptions, records,
+                                                "tools/prepare_waterfront.py")
+    solid_union = unary_union(solids)
     road_surface = road_union.intersection(land).difference(solid_union)
     if expanded:
         road_surface = road_surface.difference(approach_footprint)
@@ -358,7 +385,8 @@ def prepare(output, expanded=False):
     # The runtime loads the whole bake as a scenery pack; collision compiles its water (A3.5i).
     import map_pack
     pack = map_pack.write(output, "river", "tools/prepare_waterfront.py", vertices, triangles,
-                          bridge_first_triangle if expanded else len(triangles))
+                          bridge_first_triangle if expanded else len(triangles),
+                          buildings=records, styles=building_kit.STYLES)
     manifest = {"source": str(SOURCE.relative_to(ROOT)), "source_sha256": EXPECTED_HASH,
                 "snapshot": data.get("osm3s", {}).get("timestamp_osm_base", data.get("retrieved_utc")),
                 "origin_epsg3007": [ox, oy],
@@ -370,6 +398,12 @@ def prepare(output, expanded=False):
                 "crop": list(CROP.bounds), "vertices": len(vertices), "triangles": len(triangles),
                 "scenery_sha256": hashlib.sha256(pack).hexdigest(),
                 "water_sha256": hashlib.sha256((output / "water.h").read_bytes()).hexdigest(),
+                "building_records": {"count": len(records),
+                                     "facades": sum(len(r["facades"]) for r in records),
+                                     "windows": sum(f["bays"] * f["floors"] for r in records
+                                                    for f in r["facades"])},
+                "compositions": {k: {"family": compositions[k].get("family", "auto"), **emitter.report.get(k, {})}
+                                 for k in sorted(compositions)},
                 "buildings": manifest_buildings, "landscape": garden_manifest,
                 "building_parts": [{"osm": f"{e['type']}/{e['id']}", "height": h,
                                     "min_height": bottom} for e, _, h, bottom in parts]}
@@ -389,6 +423,7 @@ def prepare(output, expanded=False):
             "omitted_buildings_in_approach_grading": omitted_approach_buildings,
         }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    building_kit.write_report(output / "buildings.json", building_report)
     print(f"Prepared {len(manifest_buildings)} buildings, {len(vertices)} vertices, {len(triangles)} triangles")
 
 

@@ -77,4 +77,11 @@ unsigned int waterfront_window_seed(size_t triangle, int column, int floor);
 Color waterfront_window_glass(unsigned int seed);
 bool waterfront_window_occupied(unsigned int seed);
 
+// Migrated buildings (scenery pack v2 records, scenery/boat_scenery.h) carry explicit roles
+// instead of the colour and geometry conventions above. ROLE is the BoatSceneryRole of a
+// triangle (0 for a pack without records or an unmigrated building, which keeps the legacy
+// classification); a migrated building never gets generic windows: its facade records do.
+// A facade triangle: a WALL-role wall that is upright, or by the legacy rule for ROLE 0.
+bool waterfront_facade_role(unsigned char role, Vector3 a, Vector3 b, Vector3 c, Color color);
+
 #endif

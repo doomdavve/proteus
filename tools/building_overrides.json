@@ -1,0 +1,64 @@
+{
+  "_comment": "Authored building compositions keyed by stable source id (docs/BUILDINGS.md). Validated by tools/building_compose.py; 'map' names the bake that reads the entry (default river). Heights above the building's lowest base, metres.",
+
+  "way/164963584": {
+    "family": "brick",
+    "note": "Eriksberg quay row, 6 levels: dark red brick block with a shopfront and teal canopy toward the basin quay",
+    "wall": [172, 94, 70], "roof": [98, 94, 96], "trim": [88, 72, 66],
+    "ground": {"band": 4.2, "wall": [122, 110, 100], "material": "plaster", "style": "shop"},
+    "parapet": 1.0, "cornice": 0.6,
+    "entrance": {"side": "west", "at": 0.5, "width": 3.6, "canopy": 2.6, "canopy_color": [30, 120, 112], "fascia": [30, 120, 112]}
+  },
+  "way/164963868": {
+    "family": "brick",
+    "note": "Low wing east of 164963584, same brick",
+    "wall": [164, 90, 68], "roof": [98, 94, 96], "trim": [88, 72, 66],
+    "ground": {"band": 4.2, "wall": [122, 110, 100], "material": "plaster", "style": "shop"},
+    "parapet": 0.9, "cornice": 0.5
+  },
+  "way/164963867": {
+    "family": "balcony",
+    "note": "8 levels: warm plaster, one balcony per 3-bay apartment, none on the ground or top storey",
+    "wall": [238, 226, 196], "roof": [112, 116, 124], "trim": [244, 240, 232],
+    "ground": {"band": 4.0, "wall": [182, 150, 112], "material": "plaster", "style": "lobby"},
+    "setbacks": [{"above": 21.5, "inset": 2.2}],
+    "parapet": 0.8, "cornice": 0.35,
+    "balconies": {"sides": ["west", "north", "south"], "from_floor": 1, "to_floor": -1, "unit": 3, "span": 1, "every": 1,
+                  "depth": 1.7, "slab": [222, 218, 210], "front": [190, 92, 62]},
+    "entrance": {"side": "west", "at": 0.5, "width": 3.0, "canopy": 2.0, "canopy_color": [190, 92, 62]}
+  },
+  "way/164963869": {
+    "family": "stepped",
+    "note": "12 levels: pale panel block stepping back from the quay end in two terraces",
+    "wall": [226, 231, 234], "roof": [170, 178, 184], "trim": [248, 249, 248],
+    "ground": {"band": 4.2, "wall": [104, 124, 138], "material": "panel", "style": "lobby"},
+    "setbacks": [{"above": 17.0, "cut": "west", "depth": 8}, {"above": 27.0, "cut": "west", "depth": 8}],
+    "parapet": 0.9, "cornice": 0.4,
+    "entrance": {"side": "west", "at": 0.5, "width": 3.6, "canopy": 2.6, "canopy_color": [246, 247, 246]}
+  },
+  "way/164963897": {
+    "family": "brick",
+    "note": "8 levels: yellow brick block with a strong cornice",
+    "wall": [206, 172, 102], "roof": [104, 96, 90], "trim": [104, 80, 62],
+    "ground": {"band": 4.2, "wall": [96, 84, 76], "material": "plaster", "style": "shop"},
+    "parapet": 1.0, "cornice": 0.6
+  },
+  "way/164964582": {
+    "family": "balcony",
+    "note": "8 levels: grey-blue plaster, one two-bay balcony per 4-bay apartment, none on the ground or top storey",
+    "wall": [196, 210, 220], "roof": [112, 116, 124], "trim": [240, 240, 238],
+    "ground": {"band": 4.0, "wall": [150, 162, 170], "material": "plaster", "style": "lobby"},
+    "setbacks": [{"above": 21.5, "inset": 2.2}],
+    "parapet": 0.8, "cornice": 0.35,
+    "balconies": {"sides": ["west", "north", "south"], "from_floor": 1, "to_floor": -1, "unit": 4, "span": 2, "every": 1,
+                  "depth": 1.6, "slab": [226, 224, 216], "front": [214, 164, 72]}
+  },
+  "way/164964585": {
+    "family": "stepped",
+    "note": "6 levels: small warm-white block, top floors stepped back from the north end",
+    "wall": [232, 226, 216], "roof": [176, 172, 168], "trim": [250, 248, 244],
+    "ground": {"band": 4.0, "wall": [150, 138, 126], "material": "plaster", "style": "lobby"},
+    "setbacks": [{"above": 13.0, "cut": "north", "depth": 9}],
+    "parapet": 0.8, "cornice": 0.35
+  }
+}
