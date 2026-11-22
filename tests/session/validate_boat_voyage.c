@@ -25,9 +25,11 @@
 
 // The A0.3 slice route's southern legs, in map east/north metres (survey.py SLICE_ROUTE).
 static const Vector2 direct[] = { { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 } };
-// A coastal alternative along the east shore of the outer fjord.
-static const Vector2 coastal[]
-    = { { -3300, -1550 }, { -3600, -2300 }, { -3680, -2700 }, { -3700, -3000 }, { -3720, -3150 } };
+// A coastal alternative along the east shore of the outer fjord. The last waypoint
+// rounds the harbour approach before aiming for arrival, rather than cutting the bank
+// and relying on a low-restitution collision to slide into the arrival area.
+static const Vector2 coastal[] = { { -3300, -1550 }, { -3600, -2300 }, { -3680, -2700 },
+    { -3700, -3000 }, { -3720, -3150 }, { -3750, -3370 } };
 #define COASTAL ((int)(sizeof(coastal) / sizeof(coastal[0])))
 
 static Vector2 sim(Vector2 east_north) { return (Vector2) { -east_north.x, east_north.y }; }
