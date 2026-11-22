@@ -1,14 +1,14 @@
 # Shore bounce trial
 
-Current state: implemented and machine-verified locally; awaiting user handling review.
+Current state: cartoon tuning machine-verified locally; awaiting user handling review.
 Open items: user motion/handling review; other platforms remain unqualified.
 Done when: bow/stern bank shots, docking and scrapes pass checks and feel good to the user.
 Next task: user comparison in the basin and outer harbour; tune rebound/turn strength from feedback.
 
 ## Scope
 
-Try symmetric 70% shore reflection at speed, soft docking below 0.5 m/s, a smooth
-transition through 3 m/s, low tangential friction and a restrained corner turn.
+Try symmetric 90% shore reflection at speed, soft docking below 0.5 m/s, a smooth
+transition through 3 m/s, low tangential friction, a stronger corner turn and extra rebound yaw damping.
 Keep moored-craft, moving-craft and boat-pair restitution unchanged. This track defers the existing
 wake handling trial, controls acceptance, race pacing, multiplayer qualification and
 other Open loops in [the index](README.md#open-loops).
@@ -20,7 +20,34 @@ other Open loops in [the index](README.md#open-loops).
 3. Record the contract in [Playing](PLAYING.md#shore-impacts) (written);
    user feel review remains open before closing the trial.
 
-## Verification
+4. Cartoon pass: raise restitution from 70% to 90%, double the turn lever from
+   0.35 m to 0.70 m, reduce tangential friction from 0.03 to 0.02, and settle rebound spin
+   with an extra 6/s damping rate near shore (implemented and machine-verified).
+
+## Current cartoon pass — 2026-11-22
+
+The user found the first pass a bit better and requested an almost cartoonish trial.
+This is feedback on the baseline, not final acceptance.
+The turn lever remains shortened relative to the real hull. The larger impulse is still
+dissipative: the same lever is used for contact speed, effective mass and yaw impulse.
+
+Extra damping is stateless: it applies only while receding from a nearby map shore or
+basin wall, ramps from zero at 0.5 m/s to full strength at 3 m/s, and stops in open water.
+The proximity radius is the larger hull end plus half beam, 0.35 m clearance and a 3 m
+exit margin. This approximation also damps ordinary turns when already moving away from
+a nearby shore; it is not a timer attached to the last collision. It requires no network,
+save or replay state changes. Moored and moving craft keep their existing contact response.
+
+Verification: build and focused collision/damping checks passed on macOS Debug.
+`ctest --preset full`: all 609 tests passed (63.98 s), with local socket access for
+integration checks. Silent windowed basin and outer demos completed with the baseline
+commands below (`--no-audio --demo --frames 180`). Compiler output was warning-clean.
+The new damping check compares the same receding/spinning state near shore and in open
+water, requiring faster settling near shore. The fast contact checks retain energy and
+containment assertions while expecting the stronger rebound and angular kick.
+These demo runs are runtime smoke checks; user collision feel review is next.
+
+## Baseline verification (70%, superseded tuning)
 
 2026-11-22, macOS / AppleClang 21, Debug:
 - Build completed without compiler warnings.
@@ -39,6 +66,6 @@ other Open loops in [the index](README.md#open-loops).
   the navigable-water, calm-route and controlled-arrival assertions remain active.
 
 No user acceptance, interactive collision review or other-platform qualification is claimed.
-The turning lever is deliberately shortened to 0.35 m, trading physical fidelity for a
-readable rebound. This affects angular impulse, not the rendered hull size or collision footprint.
+The baseline used a 0.35 m turning lever; the current trial doubles it to 0.70 m.
+This affects angular impulse, not the rendered hull size or collision footprint.
 

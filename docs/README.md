@@ -42,8 +42,10 @@ the detail; where plans disagreed, the entry with the newer date was used.
 ## Shore bounce trial
 
 [Shore bounce](SHORE_BOUNCE_PLAN.md) implements a local handling trial: symmetric bow/stern
-rebounds at speed, soft docking and restrained corner turns. The Debug build, all 609 CTests and silent basin/outer demo smoke checks passed on macOS
-2026-11-22. User feel review is next; boat-to-boat contacts retain their existing response.
+rebounds at speed and soft docking. A cartoon pass raises rebound to 90% and doubles
+the turning lever, with extra damping near shore. The Debug build, all 609 CTests and
+silent basin/outer demo smoke checks passed on macOS 2026-11-22. User feel review is
+next; boat-to-boat contacts retain their existing response.
 
 ## Empty-room server CPU
 

@@ -311,9 +311,10 @@ its existing wake recipe. [Research status and evidence](WAKE_RESEARCH_PLAN.md).
 ## Shore impacts
 
 The bow and stern rebound symmetrically from shore and basin walls.
-Firm impacts reflect the velocity into the shore with up to 70% restitution, retaining
-most motion along the edge. Corner hits add a restrained turn without instantly changing
-the hull's heading. Normal impact speeds below 0.5 m/s are absorbed for gentle docking;
+Firm impacts reflect the velocity into the shore with up to 90% restitution, retaining
+most motion along the edge. Corner hits add an exaggerated turning kick without instantly
+changing the hull's heading. Extra yaw damping settles the turn while moving away from a
+nearby shore; normal open-water steering uses its existing resistance. Normal impact speeds below 0.5 m/s are absorbed for gentle docking;
 the bounce increases smoothly to full strength at 3 m/s. Holding throttle still applies
 engine thrust after the rebound. Moored craft, moving craft and boat-to-boat contacts retain their
 existing softer response.

@@ -106,11 +106,13 @@ static size_t hull_samples(const BoatHull *hull, float margin, Vector2 *out)
     return n;
 }
 static const float CONTACT_FRICTION = .15f;
-static const float SHORE_RESTITUTION = .70f;
-static const float SHORE_FRICTION = .03f;
+static const float SHORE_RESTITUTION = .90f;
+static const float SHORE_FRICTION = .02f;
 static const float SHORE_DOCK_SPEED = .5f;
 static const float SHORE_BOUNCE_SPEED = 3;
-static const float SHORE_TURN_ARM = .35f;
+static const float SHORE_TURN_ARM = .70f;
+static const float SHORE_EXIT_DAMPING = 6;
+static const float SHORE_EXIT_MARGIN = 3;
 
 void boat_reset(Boat *boat) { *boat = (Boat) { .position = { 0, 10 } }; }
 
@@ -228,6 +230,36 @@ static void resolve_hull_contact(
             Vector2Scale((Vector2) { -contact.normal.y, contact.normal.x },
                 copysignf(friction, tangent_speed)));
     }
+}
+
+// Settle the exaggerated turn while rebounding into open water near a shore.
+// Derive this from pose and velocity so prediction/replays need no extra timed state.
+// A conservative hull radius covers bow/stern contacts for every handling recipe.
+static void damp_shore_exit(Boat *boat, const BoatHull *hull, const BoatWorld *world)
+{
+    if (fabsf(boat->yaw_velocity) < .001f)
+        return;
+    float clearance = fmaxf(hull->bow, hull->stern) + hull->half_beam + HULL_SHORE_CLEARANCE
+        + SHORE_EXIT_MARGIN;
+    Vector2 normal = { 0 };
+    if (world->definition->mapped) {
+        if (boat_map_water_contact(&world->resources->map, boat->position, clearance, &normal))
+            return;
+    } else {
+        Vector2 half = world->definition->half_extent;
+        float x_gap = half.x - fabsf(boat->position.x);
+        float z_gap = half.y - fabsf(boat->position.y);
+        if (fminf(x_gap, z_gap) >= clearance)
+            return;
+        if (x_gap < z_gap)
+            normal.x = boat->position.x < 0 ? 1 : -1;
+        else
+            normal.y = boat->position.y < 0 ? 1 : -1;
+    }
+    float exit_speed = Vector2DotProduct(boat->velocity, normal);
+    float blend
+        = Clamp((exit_speed - SHORE_DOCK_SPEED) / (SHORE_BOUNCE_SPEED - SHORE_DOCK_SPEED), 0, 1);
+    boat->yaw_velocity *= expf(-SHORE_EXIT_DAMPING * blend * BOAT_STEP);
 }
 
 static void resolve_traffic(Boat *boat, const BoatHull *hull, const BoatWorld *world, double time)
@@ -692,6 +724,7 @@ void boat_step_handling(
         torque += hull->yaw_inertia * .3f * boat->wheel * (1 - wet);
     boat->velocity = Vector2Add(boat->velocity, Vector2Scale(force, BOAT_STEP));
     boat->yaw_velocity += torque / hull->yaw_inertia * BOAT_STEP;
+    damp_shore_exit(boat, hull, world);
     // Accept translation and rotation separately. A rejected rotation must not leave a hull
     // sample on land, otherwise even an outward move can be rejected on the next tick.
     Vector2 previous = boat->position;

@@ -188,7 +188,7 @@ static int shore_bounce(void)
                 if (slow)
                     CHECK(fabsf(returned) < .01f);
                 else
-                    CHECK(returned > 6.5f && returned < 7.1f);
+                    CHECK(returned > 8.5f && returned < 9.1f);
                 if (scrape)
                     CHECK(boat.velocity.x > (slow ? 1.8f : 1.4f));
                 CHECK(fabsf(boat.yaw_velocity) < (scrape ? 1 : .01f));
@@ -208,10 +208,22 @@ static int shore_bounce(void)
         .velocity = { 2, -10 } };
     CHECK(boat_hull_clear(&corner, &world, 0));
     boat_step(&corner, &world, BOAT_STEP, (BoatInput) { 0 });
-    CHECK(corner.velocity.y > 6 && corner.velocity.x > 1.4f);
-    CHECK(fabsf(corner.yaw_velocity) > .01f && fabsf(corner.yaw_velocity) < 1);
+    CHECK(corner.velocity.y > 8 && corner.velocity.x > 1.4f);
+    CHECK(fabsf(corner.yaw_velocity) > .3f && fabsf(corner.yaw_velocity) < 2);
     CHECK(
         Vector2LengthSqr(corner.velocity) + 2.2f * corner.yaw_velocity * corner.yaw_velocity < 104);
+    // A receding boat settles its spin faster near shore than in open water.
+    Boat near = { .position = corner.position, .velocity = { 0, 8 }, .yaw_velocity = 1 };
+    Boat open = near;
+    open.position = (Vector2) { 0 };
+    float kick = fabsf(near.yaw_velocity);
+    for (int tick = 2; tick <= 31; ++tick) {
+        boat_step(&near, &world, tick * BOAT_STEP, (BoatInput) { 0 });
+        boat_step(&open, &world, tick * BOAT_STEP, (BoatInput) { 0 });
+        CHECK(boat_hull_clear(&near, &world, tick * BOAT_STEP));
+    }
+    CHECK(fabsf(near.yaw_velocity) < kick * .3f);
+    CHECK(fabsf(near.yaw_velocity) < fabsf(open.yaw_velocity) * .6f);
     corner.throttle = 1;
     for (int tick = 2; tick < 1200; ++tick) {
         boat_step(&corner, &world, tick * BOAT_STEP, (BoatInput) { 0 });
