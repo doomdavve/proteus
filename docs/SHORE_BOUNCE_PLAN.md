@@ -1,9 +1,9 @@
 # Shore bounce trial
 
-Current state: cartoon tuning machine-verified locally; awaiting user handling review.
-Open items: user motion/handling review; other platforms remain unqualified.
+Current state: done; cartoon handling accepted by the user on 2026-11-22.
+Open items: other-platform qualification remains with the existing platform tracks.
 Done when: bow/stern bank shots, docking and scrapes pass checks and feel good to the user.
-Next task: user comparison in the basin and outer harbour; tune rebound/turn strength from feedback.
+Next task: PR and CI review; the current contract is in Playing → Shore impacts.
 
 ## Scope
 
@@ -18,7 +18,7 @@ other Open loops in [the index](README.md#open-loops).
 1. Implement shore-specific response and integration regression checks (implemented).
 2. Build, run full CTest, and perform graphics-only demo smoke checks (complete).
 3. Record the contract in [Playing](PLAYING.md#shore-impacts) (written);
-   user feel review remains open before closing the trial.
+   accepted behavior is the current contract.
 
 4. Cartoon pass: raise restitution from 70% to 90%, double the turn lever from
    0.35 m to 0.70 m, reduce tangential friction from 0.03 to 0.02, and settle rebound spin
@@ -45,7 +45,9 @@ commands below (`--no-audio --demo --frames 180`). Compiler output was warning-c
 The new damping check compares the same receding/spinning state near shore and in open
 water, requiring faster settling near shore. The fast contact checks retain energy and
 containment assertions while expecting the stronger rebound and angular kick.
-These demo runs are runtime smoke checks; user collision feel review is next.
+These demo runs are runtime smoke checks. On 2026-11-22 the user accepted the cartoon
+handling ("I like this a lot") and authorized a PR. The implementation and documentation
+steps are complete; other-platform qualification remains with the existing platform tracks.
 
 ## Baseline verification (70%, superseded tuning)
 
@@ -65,7 +67,8 @@ These demo runs are runtime smoke checks; user collision feel review is next.
   waypoint. Its former final leg cut a bank and depended on the softer collision response;
   the navigable-water, calm-route and controlled-arrival assertions remain active.
 
-No user acceptance, interactive collision review or other-platform qualification is claimed.
+The baseline had no user acceptance. The cartoon pass above was subsequently accepted;
+other-platform qualification is still unclaimed.
 The baseline used a 0.35 m turning lever; the current trial doubles it to 0.70 m.
 This affects angular impulse, not the rendered hull size or collision footprint.
 

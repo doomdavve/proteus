@@ -44,8 +44,9 @@ the detail; where plans disagreed, the entry with the newer date was used.
 [Shore bounce](SHORE_BOUNCE_PLAN.md) implements a local handling trial: symmetric bow/stern
 rebounds at speed and soft docking. A cartoon pass raises rebound to 90% and doubles
 the turning lever, with extra damping near shore. The Debug build, all 609 CTests and
-silent basin/outer demo smoke checks passed on macOS 2026-11-22. User feel review is
-next; boat-to-boat contacts retain their existing response.
+silent basin/outer demo smoke checks passed on macOS 2026-11-22. The user accepted the
+cartoon handling and authorized a PR that day. [Playing](PLAYING.md#shore-impacts) owns
+the behavior; boat-to-boat contacts retain their existing response.
 
 ## Empty-room server CPU
 
