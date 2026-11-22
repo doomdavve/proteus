@@ -106,6 +106,11 @@ static size_t hull_samples(const BoatHull *hull, float margin, Vector2 *out)
     return n;
 }
 static const float CONTACT_FRICTION = .15f;
+static const float SHORE_RESTITUTION = .70f;
+static const float SHORE_FRICTION = .03f;
+static const float SHORE_DOCK_SPEED = .5f;
+static const float SHORE_BOUNCE_SPEED = 3;
+static const float SHORE_TURN_ARM = .35f;
 
 void boat_reset(Boat *boat) { *boat = (Boat) { .position = { 0, 10 } }; }
 
@@ -117,6 +122,7 @@ void boat_reset_location(Boat *boat, const BoatWorldDefinition *definition)
 
 typedef struct {
     Vector2 local, normal, velocity;
+    bool shore;
 } HullContact;
 
 static Vector2 hull_point(Vector2 forward, Vector2 right, Vector2 position, Vector2 local)
@@ -153,10 +159,11 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
     for (size_t i = 0; i < count; ++i) {
         Vector2 point = hull_point(forward, right, boat->position, samples[i]);
         Vector2 normal = { 0 };
-        bool water;
+        bool water, shore;
         if (world->definition->mapped) {
             water = boat_map_water_contact(
                 &world->resources->map, point, HULL_SHORE_CLEARANCE, &normal);
+            shore = !water;
             if (water
                 && waterfront_harbor_contact_height_scene(world->scene, point, HULL_SHORE_CLEARANCE,
                     bottom, top, world->water, time, &normal))
@@ -165,6 +172,7 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
             Vector2 half = world->definition->half_extent;
             water = fabsf(point.x) <= half.x - HULL_SHORE_CLEARANCE
                 && fabsf(point.y) <= half.y - HULL_SHORE_CLEARANCE;
+            shore = !water;
             if (!water) {
                 if (fabsf(point.x) - (half.x - HULL_SHORE_CLEARANCE)
                     > fabsf(point.y) - (half.y - HULL_SHORE_CLEARANCE))
@@ -174,7 +182,7 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
             }
         }
         if (!water) {
-            *contact = (HullContact) { .local = samples[i], .normal = normal };
+            *contact = (HullContact) { .local = samples[i], .normal = normal, .shore = shore };
             return true;
         }
     }
@@ -185,25 +193,37 @@ static void resolve_hull_contact(
     Boat *boat, const BoatHull *hull, Vector2 safe_position, HullContact contact)
 {
     const float inertia = hull->yaw_inertia;
+    const bool shore = contact.shore;
     boat->position = safe_position;
     Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
     Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
     Vector2 arm
         = Vector2Add(Vector2Scale(right, contact.local.x), Vector2Scale(forward, contact.local.y));
+    // Shore impacts favour a readable bank shot over spinning around a hull corner.
+    // Use the same shortened lever for contact speed, effective mass and yaw impulse:
+    // this retains the dissipative impulse model rather than adding a free turning kick.
+    if (shore)
+        arm = Vector2Scale(arm, fminf(1, SHORE_TURN_ARM / fmaxf(Vector2Length(arm), .001f)));
     Vector2 point_velocity = Vector2Add(
         boat->velocity, (Vector2) { -boat->yaw_velocity * arm.y, boat->yaw_velocity * arm.x });
     float normal_speed
         = Vector2DotProduct(Vector2Subtract(point_velocity, contact.velocity), contact.normal);
     if (normal_speed < 0) {
         float arm_cross_normal = arm.x * contact.normal.y - arm.y * contact.normal.x;
-        float impulse = -(1 + BOAT_CONTACT_RESTITUTION) * normal_speed
+        // Gentle docking absorbs the impact; firm hits return 70% of normal speed.
+        float blend = Clamp(
+            (-normal_speed - SHORE_DOCK_SPEED) / (SHORE_BOUNCE_SPEED - SHORE_DOCK_SPEED), 0, 1);
+        float restitution = shore ? SHORE_RESTITUTION * blend * blend * (3 - 2 * blend)
+                                  : BOAT_CONTACT_RESTITUTION;
+        float impulse = -(1 + restitution) * normal_speed
             / (1 + arm_cross_normal * arm_cross_normal / inertia);
         boat->velocity = Vector2Add(boat->velocity, Vector2Scale(contact.normal, impulse));
         boat->yaw_velocity += arm_cross_normal * impulse / inertia;
         // Limit tangential friction by impact strength so shallow scrapes retain momentum.
         float tangent_speed = Vector2DotProduct(Vector2Subtract(boat->velocity, contact.velocity),
             (Vector2) { -contact.normal.y, contact.normal.x });
-        float friction = fminf(fabsf(tangent_speed), CONTACT_FRICTION * impulse);
+        float friction
+            = fminf(fabsf(tangent_speed), (shore ? SHORE_FRICTION : CONTACT_FRICTION) * impulse);
         boat->velocity = Vector2Subtract(boat->velocity,
             Vector2Scale((Vector2) { -contact.normal.y, contact.normal.x },
                 copysignf(friction, tangent_speed)));

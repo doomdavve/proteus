@@ -39,6 +39,12 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | v0.0.26 recorded; v0.0.31 is the latest published/deployed release; human input/audio, physical-device/network and browser timing/freshness review remain | 2026-11-14 | [releases](RELEASES.md#status-and-verification) |
 
+## Shore bounce trial
+
+[Shore bounce](SHORE_BOUNCE_PLAN.md) implements a local handling trial: symmetric bow/stern
+rebounds at speed, soft docking and restrained corner turns. The Debug build, all 609 CTests and silent basin/outer demo smoke checks passed on macOS
+2026-11-22. User feel review is next; boat-to-boat contacts retain their existing response.
+
 ## Empty-room server CPU
 
 [Idle server work](SERVER_IDLE_PLAN.md) fixes fractional-millisecond polling and pauses ordinary

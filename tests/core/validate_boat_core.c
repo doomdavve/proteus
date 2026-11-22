@@ -167,12 +167,68 @@ static int shoreline(void)
     return 0;
 }
 
+// Drive actual integration into both basin ends: fast bank shots, docking, scrapes,
+// and sustained throttle all use the production contact path.
+static int shore_bounce(void)
+{
+    for (int stern = 0; stern < 2; ++stern)
+        for (int slow = 0; slow < 2; ++slow)
+            for (int scrape = 0; scrape < 2; ++scrape) {
+                BoatWorld world;
+                boat_world_init(&world, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+                float sign = stern ? 1 : -1;
+                float speed = slow ? .2f : 10;
+                Boat boat = { .position
+                    = { 0, sign * (BOAT_BASIN_HALF_Z - .35f - (stern ? 1.6f : 2.0f) - .0001f) },
+                    .velocity = { scrape ? 2 : 0, sign * speed } };
+                CHECK(boat_hull_clear(&boat, &world, 0));
+                boat_step(&boat, &world, BOAT_STEP, (BoatInput) { 0 });
+                CHECK(boat_hull_clear(&boat, &world, BOAT_STEP));
+                float returned = -sign * boat.velocity.y;
+                if (slow)
+                    CHECK(fabsf(returned) < .01f);
+                else
+                    CHECK(returned > 6.5f && returned < 7.1f);
+                if (scrape)
+                    CHECK(boat.velocity.x > (slow ? 1.8f : 1.4f));
+                CHECK(fabsf(boat.yaw_velocity) < (scrape ? 1 : .01f));
+                float energy = Vector2LengthSqr(boat.velocity);
+                for (int tick = 2; tick < 120; ++tick) {
+                    boat_step(&boat, &world, tick * BOAT_STEP, (BoatInput) { 0 });
+                    CHECK(boat_hull_clear(&boat, &world, tick * BOAT_STEP));
+                    CHECK(Vector2LengthSqr(boat.velocity) <= energy + .001f);
+                    energy = Vector2LengthSqr(boat.velocity);
+                }
+            }
+    // Oblique bow corner hits turn a little, without consuming the whole rebound.
+    BoatWorld world;
+    boat_world_init(&world, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    Boat corner = { .heading = .3f,
+        .position = { 0, -BOAT_BASIN_HALF_Z + .35f + 2 * cosf(.3f) + .75f * sinf(.3f) + .0001f },
+        .velocity = { 2, -10 } };
+    CHECK(boat_hull_clear(&corner, &world, 0));
+    boat_step(&corner, &world, BOAT_STEP, (BoatInput) { 0 });
+    CHECK(corner.velocity.y > 6 && corner.velocity.x > 1.4f);
+    CHECK(fabsf(corner.yaw_velocity) > .01f && fabsf(corner.yaw_velocity) < 1);
+    CHECK(
+        Vector2LengthSqr(corner.velocity) + 2.2f * corner.yaw_velocity * corner.yaw_velocity < 104);
+    corner.throttle = 1;
+    for (int tick = 2; tick < 1200; ++tick) {
+        boat_step(&corner, &world, tick * BOAT_STEP, (BoatInput) { 0 });
+        CHECK(boat_hull_clear(&corner, &world, tick * BOAT_STEP));
+        CHECK(isfinite(corner.yaw_velocity) && Vector2Length(corner.velocity) < 30);
+    }
+    puts("shore_bounce=ok");
+    return 0;
+}
+
 int main(void)
 {
     CHECK(interleaved() == 0);
     CHECK(course() == 0);
     CHECK(water() == 0);
     CHECK(shoreline() == 0);
+    CHECK(shore_bounce() == 0);
     puts("boat_core=ok");
     return 0;
 }

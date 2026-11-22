@@ -585,7 +585,7 @@ static int validate_hull_contacts(void)
     CHECK(glancing.boat.heading < 0);
     CHECK(kinetic_energy(&glancing.boat) < energy);
 
-    // A faster beam impact legitimately exceeds the old 4 rad/s stress-test limit.
+    // A faster beam impact retains a restrained turning kick.
     // It must exchange translation for rotation without creating kinetic energy.
     BoatSession fast
         = physics_basin_session((Boat) { .position = { 118.5f, 10 }, .velocity = { 19, -3 } });
@@ -597,7 +597,7 @@ static int validate_hull_contacts(void)
         CHECK(kinetic_energy(&fast.boat) <= before + .00001f);
         peak_yaw = fmaxf(peak_yaw, fabsf(fast.boat.yaw_velocity));
     }
-    CHECK(peak_yaw > 4);
+    CHECK(peak_yaw > .1f && peak_yaw < 4);
 
     // A shallow scrape retains useful forward motion while the contact redirects the hull.
     BoatSession sliding

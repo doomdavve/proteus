@@ -307,3 +307,13 @@ and wakes; Esc closes. The spread model can produce substantially larger launche
 old wakes. Its handling-preservation screen failed, so this trial is for comparing changed
 gameplay. It has no audio, networking, plugins or saved preferences. The normal game retains
 its existing wake recipe. [Research status and evidence](WAKE_RESEARCH_PLAN.md).
+
+## Shore impacts
+
+The bow and stern rebound symmetrically from shore and basin walls.
+Firm impacts reflect the velocity into the shore with up to 70% restitution, retaining
+most motion along the edge. Corner hits add a restrained turn without instantly changing
+the hull's heading. Normal impact speeds below 0.5 m/s are absorbed for gentle docking;
+the bounce increases smoothly to full strength at 3 m/s. Holding throttle still applies
+engine thrust after the rebound. Moored craft, moving craft and boat-to-boat contacts retain their
+existing softer response.

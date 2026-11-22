@@ -1,0 +1,44 @@
+# Shore bounce trial
+
+Current state: implemented and machine-verified locally; awaiting user handling review.
+Open items: user motion/handling review; other platforms remain unqualified.
+Done when: bow/stern bank shots, docking and scrapes pass checks and feel good to the user.
+Next task: user comparison in the basin and outer harbour; tune rebound/turn strength from feedback.
+
+## Scope
+
+Try symmetric 70% shore reflection at speed, soft docking below 0.5 m/s, a smooth
+transition through 3 m/s, low tangential friction and a restrained corner turn.
+Keep moored-craft, moving-craft and boat-pair restitution unchanged. This track defers the existing
+wake handling trial, controls acceptance, race pacing, multiplayer qualification and
+other Open loops in [the index](README.md#open-loops).
+
+## Steps
+
+1. Implement shore-specific response and integration regression checks (implemented).
+2. Build, run full CTest, and perform graphics-only demo smoke checks (complete).
+3. Record the contract in [Playing](PLAYING.md#shore-impacts) (written);
+   user feel review remains open before closing the trial.
+
+## Verification
+
+2026-11-22, macOS / AppleClang 21, Debug:
+- Build completed without compiler warnings.
+- `ctest --preset full`: all 609 tests passed (60.69 s), with local socket access
+  for ENet/process integration tests. The sandbox-only attempt could not open sockets.
+- Silent windowed basin and outer demos completed with
+  `./build/wake_velocity --no-audio --demo --frames 180` and
+  `./build/wake_velocity --no-audio --location outer --demo --frames 180`.
+  These are startup/runtime smoke checks, not a human assessment of collision feel.
+- Integration checks cover fast and slow bow/stern impacts, tangential momentum,
+  corner yaw, energy dissipation, unpowered separation and sustained powered containment.
+- Existing contact checks now expect restrained spin; mapped-world checks verify
+  contact and containment instead of a final position held against a bank.
+- The voyage validator's coastal autopilot rounds the harbour approach with an extra
+  waypoint. Its former final leg cut a bank and depended on the softer collision response;
+  the navigable-water, calm-route and controlled-arrival assertions remain active.
+
+No user acceptance, interactive collision review or other-platform qualification is claimed.
+The turning lever is deliberately shortened to 0.35 m, trading physical fidelity for a
+readable rebound. This affects angular impulse, not the rendered hull size or collision footprint.
+

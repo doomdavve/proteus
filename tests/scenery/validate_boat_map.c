@@ -284,10 +284,17 @@ static int worlds(void)
         start.x += 1;
     Run alone;
     run_start(&alone, &first, start);
-    for (uint64_t t = 0; t < TICKS; ++t)
+    bool touched_bank = false;
+    for (uint64_t t = 0; t < TICKS; ++t) {
+        Boat projected = alone.boat;
+        projected.position
+            = Vector2Add(projected.position, Vector2Scale(projected.velocity, BOAT_STEP));
+        touched_bank |= !boat_hull_clear(&projected, &alone.world, boat_tick_seconds(t + 1));
         run_step(&alone, t);
-    // 30 s at full throttle ends held at the bank, so the map shapes the trace.
-    CHECK(alone.boat.position.x < start.x + 25);
+        CHECK(boat_hull_clear(&alone.boat, &alone.world, boat_tick_seconds(t + 1)));
+    }
+    // The map shapes the trace even when a rebound carries the boat along another bank.
+    CHECK(touched_bank);
 
     Run a, b, shared, small;
     run_start(&a, &first, start);
