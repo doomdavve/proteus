@@ -101,6 +101,9 @@ PLACE SKERRY REACH, or run `./build/wake_velocity --location archipelago`. Leave
 harbour to explore the island channels and outer coast, then find your way back. The chart
 (`N`) names the landings and navigation landmarks; approaching a place shows its name once
 per trip. Holding Backspace resets the boat to the home harbour. Discoveries are not saved.
+Local boats travel and pause on their own schedules, with gulls around the fishing circuit
+and people near the landings. Give moving boats room: their hulls are solid and their routes
+do not react to you. Their foam trails are cosmetic.
 This first procedural location is solo free boating, with a fixed baked seed; it has no
 work jobs or multiplayer rooms. See [the world guide](PROCEDURAL_WORLD.md) for the generation
 recipe and alternate-seed review commands. Public downloads and the hosted browser change

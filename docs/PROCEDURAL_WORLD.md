@@ -23,10 +23,16 @@ location's start. The bounded map ends at a collision boundary.
 Needle Pass runs between steep granite shoulders. Hidden Lagoon is surrounded by lower,
 wooded island lobes; its small shore terrace contrasts with the workshops and lifting derrick
 at Net Sheds. Bell Rock has a timber bell house, while the outer headland carries the tall
-lighthouse and keeper's house. These are static places to explore, without interaction jobs.
+lighthouse and keeper's house. These places have local activity, without interaction jobs.
+A harbour launch waits and departs, a workboat makes a fishing circuit, a sailboat travels
+the outer reach and a small runabout circles the lagoon. Their routes include pauses and
+repeat independently. Gulls circle the inhabited shores and follow the fishing boat; shore
+residents walk and carry crates near the landings. Boats have moving hull contacts and
+cosmetic foam trails. Their wakes do not add physical waves, and the scheduled boats do
+not steer around the player.
 
-This location supports a plain free package and static baked scenery. Room hosting,
-authored life/work scenes, moving sea traffic and runtime seed selection are unavailable.
+This location supports a plain free package, baked scenery and native local life. Room hosting,
+plugin-authored life/work scenes and runtime seed selection are unavailable.
 New terrain does not imply new water physics: the open coast's exposure is expressed by
 the geography and skyline. The current generator supplies no depth or tidal model.
 
@@ -47,7 +53,7 @@ python3 tools/generate_archipelago.py --seed 41719 --output build/skerry-41719
 python3 tools/generate_archipelago.py --self-test
 ```
 
-Each output contains `scenery.bin`, `water.h`, `places.h`, `routes.h`, `manifest.json`,
+Each output contains `scenery.bin`, `water.h`, `places.h`, `routes.h`, `life.h`, `manifest.json`,
 `preview.svg` and `preview.png`. The SVG shows the coast, place names and proposed routes;
 the PNG provides a compact coast-and-route preview. The manifest records the recipe
 version, seed, bounds, mesh counts, hashes, approach positions and route samples. Changing
@@ -61,6 +67,11 @@ grammar; they do not yet generate entirely different regional layouts. Mesh posi
 metres, with simulation X reflected from mesh east: `simulation x = -mesh x`, Z unchanged.
 The spawn is simulation `(0,0)`, heading zero towards decreasing Z.
 
+Terrain and shores use a 16 m lattice. Water clear of land stays at 32 m, with explicitly
+stitched shared edges at transitions and jetties. This increases shore detail while keeping
+offshore collision and rendering data compact. `life.h` contains the seed's local traffic,
+gull groups, surveyed resident paths and a smooth conservative terrain envelope for birds.
+
 ## Resource contract
 
 The core owns immutable water triangles and approach points compiled from the generated
@@ -68,6 +79,10 @@ headers. Collision caches remain caller-owned. The scenery loader reads the matc
 and checks its leading water against the compiled mesh, just as it does for Gothenburg.
 Rendering and file loading remain outside the core. Archipelago map identity suppresses
 the Gothenburg kit, ferries, traffic, street actors and permanent chart landmarks.
+Its own traffic and birds use the existing native route/flock evaluators. Shore people,
+boats, gulls, reflections and shadows share poses evaluated from simulation time; pause
+and seeking do not accumulate actor state. The bird clearance envelope stays above baked
+land. It is separate from physics collision and does not supply bathymetry.
 
 The native and browser asset staging includes the new scenery where the location is offered.
 The catalog entry `proteus.archipelago-free` supplies its free-ride definition. A different

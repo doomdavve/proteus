@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A4 complete locally; user found recipe 2 better. A5 finer shores/local life implemented.
-**Open** — A6 native qualification and human review of recipe 3.
+**State** — A0–A6 native implementation and qualification complete locally; recipe 3 ready.
+**Open** — Human review of finer shores and local life; reactive AI, jobs and physical traffic wakes deferred.
 **Done when** — Finer shores and independent boats, seabirds and shore residents pass clearance, seek and native rendering checks.
-**Next** — A6 full native tests, captures, windowed check and contract handoff.
+**Next** — Native play review of recipe 3, then choose the next archipelago-life behavior.
 
 ## The first boat trip
 
@@ -50,8 +50,34 @@ Focused native validation passes route structure, model-sized clearance over two
 including negative time, moving/stopped phases, hull/height contacts, shore-foot paths,
 terrain clearance and repeatable seeks. The explorer completes 8,462.1 m in 909.22 simulated
 seconds with maximum route departure 32.11 m. Native CPU/GPU frames and the 1,200-frame
-windowed idle-helm check have been inspected with audio disabled. A6's final full-suite
-result and the recipe 3 review images remain to close qualification.
+windowed idle-helm check have been inspected with audio disabled. A6 closes native qualification
+below; the current contract is in [the world guide](PROCEDURAL_WORLD.md).
+
+### A6 qualification and closing — 2026-11-25
+
+Apple Silicon/macOS 26.6.2, Debug, `PROTEUS_GPU_TESTS=ON`:
+
+- Complete native build passes without compiler warnings in the final build log.
+- `ctest --preset full` passes **653/653** in 119.13 s, including 36 GPU-labelled checks.
+  This includes the private-local archipelago parity and existing basin/Gothenburg checks.
+- The three-seed generator validator passes stitched topology, 12 m navigation clearance,
+  8 m sampled rounded traffic-path clearance, resident water/building exclusion and local
+  repeatability/shipped geometry. The previous recipe's coarse water budget is retained
+  offshore; no streaming system or new map loader is introduced.
+- The native C validator passes all ten navigation routes and four timetables, model-sized
+  hull clearance over negative and positive time, height-aware contacts, moving/stopped phases,
+  deterministic seeking, land-foot paths and bird terrain clearance. Its direct explorer
+  drive returns home after 8.46 km in 909.22 simulated seconds with traffic present.
+- CPU/GPU review captures and a 1,200-frame native `--demo-idle --demo` windowed check complete
+  with `--no-audio`. The [recipe 3 images](procedural/README.md#recipe-3--finer-shores-and-local-life)
+  preserve the launch waiting/departing and the finer passage beside the old recipe 2 view.
+  These establish scripted operation and agent inspection, not human acceptance.
+
+A5–A6 are complete and the runtime/behavior contract is in the owning world and playing guides.
+The next task is a human native drive. No new browser, audio, Release, packaged-app,
+Windows/Linux or physical-device qualification is claimed. Traffic is scheduled and does not
+yield, foam is cosmetic, shore activity has no jobs/interactions, and seeds retain one regional
+grammar. These limitations stay open rather than blocking this first native life layer.
 
 Use a bounded coast a few kilometres across, small enough to explore in one sitting.
 Generate geography before dressing. Protect a launch basin, fork and reunion with hull clearance.
@@ -151,7 +177,7 @@ The current contract is in [the world guide](PROCEDURAL_WORLD.md), the launch/co
 and the [plugin spec](PLUGIN_API.md#free-schema). The native implementation milestone is closed;
 the experience review remains open rather than being inferred from the test results.
 
-## Native verification — 2026-11-25
+## Recipe 2 native verification — 2026-11-25 (history)
 
 Apple Silicon (arm64), macOS 26.6.2, AppleClang 21, Debug, `PROTEUS_GPU_TESTS=ON`.
 
@@ -187,7 +213,7 @@ resource counts, not a frame-time benchmark. The real-source `outer` pack has 64
 triangles and is 5,899,814 bytes; density alone does not explain or establish enjoyment.
 The generator has not been calibrated against real-source channel/settlement statistics.
 
-No second user acceptance, audio listening, Release, packaged-app execution, Windows/Linux,
+At this checkpoint no second user acceptance, audio listening, Release, packaged-app execution, Windows/Linux,
 physical-device or browser-play qualification is claimed. Browser staging/build work already
 performed is left local, but browser qualification stopped at the user's request. No work was
 pushed or published. Jobs, dynamic traffic/life, persistence, tides, streaming and runtime seed

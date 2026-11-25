@@ -18,7 +18,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 | Area | Open loop (human check or unfinished step) | Since | Owner |
 | --- | --- | --- | --- |
-| Procedural world | First playable found bland by the user; native character revision available for review. Browser work deferred at the user's request. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
+| Procedural world | User found native character revision better; finer shores/local life pass native qualification and await human review. Browser work remains deferred. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
 | Wakes | R2b experimental CPU basin trial available; curved handling preservation failed, user comparison next; production recipe unchanged, broader performance/platform review open | 2026-11-19 | [wake research](WAKE_RESEARCH_PLAN.md) |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
 | Plugins | P5 follow-ups: hunt tick cost has Debug and Release numbers (M1 Max, ENet bots) but no WebRTC clients or other platform, and Release reading slower than Debug is unexplained (the browser hunt case and old-bundle rejection passed on Chrome/macOS 2026-11-14); P5g recording not qualified beyond macOS Debug, with disk cost and a human view of a reconstruction open; R2 loaded maps not scheduled | 2026-11-14 | [P5 plan](PLUGIN_P5_PLAN.md#p5i-closing-step) |
@@ -45,10 +45,11 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 Skerry Reach is a local solo boating location generated from a repeatable seed, with branching
 routes, six named places and solid jetties. The first user drive found it bland; the native
-revision adds a granite passage, enclosed wooded lagoon and more distinct shore sites.
+revision adds a granite passage, enclosed wooded lagoon and more distinct shore sites. The
+user found it better; the follow-up adds finer shores, local craft, seabirds and shore residents.
 The [world guide](PROCEDURAL_WORLD.md) owns the current contract; the
 [plan](PROCEDURAL_WORLD_PLAN.md) records checks, limitations and the next human review.
-Runtime seed selection, jobs and traffic remain deferred. No PR or publication is authorized.
+Runtime seed selection, jobs and reactive traffic AI remain deferred. No PR or publication is authorized.
 
 ## Empty-room server CPU
 

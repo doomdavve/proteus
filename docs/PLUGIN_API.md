@@ -98,7 +98,8 @@ return { free = { version = 1 } }
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
 location must be `basin`, `outer` or `archipelago`. The archipelago supports solo free boating
-with its baked static scenery; authored life/work scenes and room hosting are unavailable.
+with its baked scenery and native local boat/bird/shore activity; plugin-authored life/work
+scenes and room hosting are unavailable.
 Its approach-name notices belong to the local game's presentation, not plugin objectives.
 A free package has no objective or callback grant unless
 it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`, or
