@@ -1,7 +1,7 @@
 {
   "name": "Skerry Reach",
   "location": "archipelago",
-  "recipe": 1,
+  "recipe": 2,
   "seed": 41717,
   "generator": "tools/generate_archipelago.py",
   "sources": "Entirely synthetic; no external geographic source data",
@@ -20,17 +20,17 @@
     ],
     "heading_radians": 0
   },
-  "scenery_sha256": "a7387d6a60d2437f61f77a03264a71ba255b4492693fe7058704bf1610321303",
-  "water_header_sha256": "6b4d29a978c330cb320be6cd44a0b5501c67e3ae1a626328cc5f99db0d684bba",
+  "scenery_sha256": "7c3fb9610a77edffa1b663b09c0cb79ce8a1e551965315da8ad47c138dc42e9c",
+  "water_header_sha256": "5e097fc5b3f49027145dc9e6314aca1c4b872e2ed29593898fbf69341e176c8c",
   "counts": {
-    "island_recipes": 37,
-    "trees": 153,
+    "island_recipes": 48,
+    "trees": 337,
     "filled_inland_lattice_pockets": 0,
-    "vertices": 19280,
-    "triangles": 33142,
-    "water_triangles": 20814,
-    "shore_edges": 2246,
-    "scenery_bytes": 214729
+    "vertices": 24373,
+    "triangles": 38568,
+    "water_triangles": 20640,
+    "shore_edges": 2420,
+    "scenery_bytes": 267644
   },
   "places": [
     {
@@ -43,8 +43,8 @@
       "arrival_radius_m": 65,
       "capture": {
         "start": [
-          -2.457695761557119,
-          -1.720387033089983
+          0.0,
+          0.0
         ],
         "heading_degrees": -55.01,
         "target": [
@@ -63,7 +63,7 @@
       "arrival_radius_m": 70,
       "capture": {
         "start": [
-          -726.2873800916293,
+          -683.2873800916293,
           -650.9915436024112
         ],
         "heading_degrees": -90.0,
@@ -83,13 +83,13 @@
       "arrival_radius_m": 60,
       "capture": {
         "start": [
-          -341.57031660942596,
+          -170.570316609426,
           -1161.4809605029654
         ],
-        "heading_degrees": -90.0,
+        "heading_degrees": -4.86,
         "target": [
-          -406.57031660942596,
-          -1161.4809605029654
+          -190,
+          -1390
         ]
       }
     },
@@ -123,12 +123,12 @@
       "arrival_radius_m": 75,
       "capture": {
         "start": [
-          934.2802216899038,
+          791.2802216899038,
           -1226.7346263481302
         ],
         "heading_degrees": 90.0,
         "target": [
-          999.2802216899038,
+          899.2802216899038,
           -1226.7346263481302
         ]
       }
@@ -143,13 +143,13 @@
       "arrival_radius_m": 90,
       "capture": {
         "start": [
-          -44.38838562674968,
-          -2692.8837016861335
+          410,
+          -2520
         ],
-        "heading_degrees": -60.0,
+        "heading_degrees": -74.86,
         "target": [
-          -139.65118004303793,
-          -2747.8837016861335
+          -80.356529085814,
+          -2652.6827868870478
         ]
       }
     }
@@ -403,7 +403,7 @@
     {
       "place": "lagoon",
       "shore": [
-        999.2802216899038,
+        899.2802216899038,
         -1226.7346263481302
       ]
     },
@@ -416,7 +416,7 @@
     },
     {
       "place": "beacon",
-      "lighthouse": [
+      "bell_house": [
         -304.9206670011964,
         -1688.1963826053973
       ]
@@ -424,8 +424,8 @@
     {
       "place": "outer_light",
       "lighthouse": [
-        -139.65118004303793,
-        -2747.8837016861335
+        -80.356529085814,
+        -2652.6827868870478
       ]
     }
   ],
@@ -465,11 +465,11 @@
     },
     {
       "start": [
-        971.2802216899038,
+        871.2802216899038,
         -1226.7346263481302
       ],
       "end": [
-        999.2802216899038,
+        899.2802216899038,
         -1226.7346263481302
       ],
       "width_m": 4.2

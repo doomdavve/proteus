@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import map_pack  # noqa: E402
 
-RECIPE = 1
+RECIPE = 2
 DEFAULT_SEED = 41717
 STEP = 32
 BOUNDS = (-1600, -3104, 1600, 608)
@@ -145,6 +145,19 @@ class World:
             self.islands.append((r.uniform(-1300, 1300), r.uniform(-2820, -450),
                                  r.uniform(28, 65), r.uniform(35, 85), r.uniform(5, 17),
                                  r.uniform(-1, 1), r.uniform(0, 6.28)))
+        # Give the trip distinct landforms, rather than a field of interchangeable domes.
+        # The protected passages still determine the navigable openings through these lobes.
+        nx, nz = self.nodes["narrows"]
+        for side in (-1, 1):
+            self.islands.append((nx + side * 94, nz - 28, 105, 175,
+                                 102 if side < 0 else 76, side * .25, r.uniform(0, 6.28)))
+        lx, lz = self.nodes["lagoon"]
+        for i in range(8):
+            angle = i * math.pi / 4
+            self.islands.append((lx + math.cos(angle) * 175, lz + math.sin(angle) * 175,
+                                 90, 100, r.uniform(24, 38), angle, r.uniform(0, 6.28)))
+        ox, oz = self.nodes["outer_light"]
+        self.islands.append((ox - 175, oz - 145, 125, 95, 58, -.45, 1.2))
         self.places = [
             ("HOME HARBOUR", "home", 65), ("NET SHEDS", "net_sheds", 70),
             ("NEEDLE PASS", "narrows", 60), ("BELL ROCK", "beacon", 70),
@@ -173,7 +186,20 @@ class World:
 
     def ground(self, x, z):
         d, peak = self.field(x, z)
-        return max(0, peak * (1 - math.exp(-max(0, d) / 75)))
+        nx, nz = self.nodes["narrows"]
+        gorge = math.hypot((x-nx) * .85, z-nz) < 240
+        rise = 22 if gorge else 56 if z < -2050 else 75
+        # Steep granite walls at Needle Pass, gentle fertile slopes inside the lagoon,
+        # and low wind-scoured rock shelves at the exposed end of the archipelago.
+        height = max(0, peak * (1 - math.exp(-max(0, d) / rise)))
+        for node, (shore, _) in self.sites.items():
+            if node not in ("net_sheds", "lagoon"):
+                continue
+            distance = math.hypot(x-shore[0], z-shore[1])
+            blend = max(0, min(1, (distance-55)/55))
+            terrace = min(3.2, max(0, d)*.28)
+            height = terrace + (height-terrace)*blend
+        return height
 
     def vertex(self, p):
         # Reflect simulation X to the renderer/map east axis. Round before deduplicating,
@@ -291,7 +317,10 @@ class World:
             y = sum(p[1] for p in points) / 3
             # Broad weathered granite shore, heath above it, wooded inner islands.
             tone = int(5 * math.sin(cx / 180 + cz / 137))
-            if y < 7 or cz < -1900:
+            nx, nz = self.nodes["narrows"]
+            if math.hypot((cx-nx) * .85, cz-nz) < 240:
+                color = (132 + tone, 127 + tone, 117 + tone)
+            elif y < 7 or cz < -1900:
                 color = (115 + tone, 116 + tone, 111 + tone)
             elif y > 39:
                 color = (102 + tone, 114 + tone, 88 + tone)
@@ -311,9 +340,11 @@ class World:
         self.quad(aa, dd, cc, bb, tuple(min(255, k+9) for k in color))
 
     def house(self, x, z, width=13, depth=9, color=(143, 58, 46)):
-        base = self.ground(x, z) + .2
-        # Deep foundations tie houses to the low-poly ground without floating corners.
-        self.box(x, z, width + .5, depth + .5, max(0, base-3), 3.2, (111, 109, 99))
+        corners = [(xx, zz) for xx in (x-width/2, x+width/2)
+                   for zz in (z-depth/2, z+depth/2)]
+        base = max(self.ground(xx, zz) for xx, zz in corners) + .2
+        bottom = max(0, min(self.ground(xx, zz) for xx, zz in corners)-2)
+        self.box(x, z, width + .5, depth + .5, bottom, base-bottom, (111, 109, 99))
         self.box(x, z, width, depth, base, 5, color)
         x0, x1, z0, z1 = x-width/2-.6, x+width/2+.6, z-depth/2-.6, z+depth/2+.6
         a, b, c, d = (x0, base+5, z0), (x1, base+5, z0), (x1, base+5, z1), (x0, base+5, z1)
@@ -379,6 +410,33 @@ class World:
         self.box(x, z, w*.74, w*.74, base+h+.7, 2.7, (186, 183, 117))
         self.cone(x, z, base+h+3.4, w*.85, 2.8, (60, 67, 69), 8)
 
+    def shore_workshop(self, x, z):
+        """A visible working waterfront: lifting derrick, drying racks and timber stacks."""
+        y = self.ground(x, z)
+        self.box(x, z, 2.2, 2.2, y, 18, (155, 87, 47))
+        self.box(x+5, z, 12, 1.1, y+17, 1.1, (166, 101, 54))
+        self.box(x+10, z, .2, .2, y+7, 10, (61, 64, 60))
+        for dz in (-15, 15):
+            for dx in (-4, 4):
+                yy = self.ground(x+dx, z+dz)
+                self.box(x+dx, z+dz, .5, .5, yy, 5, (123, 100, 70))
+            self.box(x, z+dz, 9, .6, y+4.6, .5, (134, 111, 78))
+            self.box(x, z+dz, 7, .2, y+2, 2.5, (78, 92, 79))
+        for dx, dz in ((-9, 8), (-12, 8), (-9, 12)):
+            yy = self.ground(x+dx, z+dz)
+            self.box(x+dx, z+dz, 2.5, 2.5, yy, 2, (150, 119, 75))
+
+    def bell_house(self, x, z):
+        base = self.ground(x, z)
+        self.box(x, z, 9, 9, max(0, base-3), 3.5, (117, 111, 98))
+        for dx in (-3, 3):
+            for dz in (-3, 3):
+                self.box(x+dx, z+dz, .8, .8, base, 14, (174, 167, 140))
+        self.box(x, z, 8, 8, base+12, .8, (134, 66, 47))
+        self.cone(x, z, base+12.8, 6.5, 5, (93, 110, 91), 4)
+        self.cone(x, z, base+6, 2.5, 3, (154, 132, 67), 8)
+        self.box(x, z, .5, .5, base+9, 3, (75, 78, 70))
+
     def plan_dressing(self):
         for x in (-110, 95):
             end = self.shore_at("home", math.atan2(-50, x), 220)
@@ -423,27 +481,52 @@ class World:
                     self.house(xx, zz, width=14 if count>1 else 10, depth=9,
                                color=(137, 57, 45) if count>1 else (122, 116, 87))
             self.structures.append({"place": node, "shore": list(shore)})
+            if node == "net_sheds":
+                self.shore_workshop(sx+4, sz+45)
+                for i in range(3):
+                    xx, zz = sx-28-i*12, sz+16+i*8
+                    if self.field(xx, zz)[0] > 14:
+                        self.house(xx, zz, width=18-i*2, depth=11,
+                                   color=((178, 151, 103), (184, 182, 157), (147, 72, 49))[i])
+            elif node == "lagoon":
+                # A pale bathing hut, broadleaf canopy and a quiet landing contrast with
+                # the industrial fishing sheds and the bare outer light.
+                self.house(sx+14, sz+16, width=7, depth=6, color=(201, 187, 126))
         for node, small in (("beacon", True), ("outer_light", False)):
             choices = [self.shore_at(node, j*math.pi/12, 330) for j in range(24)]
             shore = next((p for p in choices if p), None)
             if shore:
-                self.lighthouse(*shore, small=small)
-                self.structures.append({"place": node, "lighthouse": list(shore)})
+                if small:
+                    self.bell_house(*shore)
+                    self.structures.append({"place": node, "bell_house": list(shore)})
+                else:
+                    self.lighthouse(*shore)
+                    self.house(shore[0]-18, shore[1]+14, width=15, depth=10,
+                               color=(186, 180, 149))
+                    self.structures.append({"place": node, "lighthouse": list(shore)})
         # Trees cluster on fertile sheltered slopes; exposed outer rocks stay bare.
         self.tree_count = 0
-        for _ in range(900):
+        for _ in range(1800):
             x, z = r.uniform(-1350, 1350), r.uniform(-2100, 420)
             d, _ = self.field(x, z)
             y = self.ground(x, z)
             if d < 30 or y < 9 or y > 52:
+                continue
+            nx, nz = self.nodes["narrows"]
+            if math.hypot((x-nx) * .85, z-nz) < 240:
                 continue
             if any(math.hypot(x-s[0], z-s[1]) < 35 for s in
                    [tuple(v["shore"]) for v in self.structures if "shore" in v]):
                 continue
             height = r.uniform(9, 18)
             self.box(x, z, .75, .75, y-.4, height*.6, (93, 79, 57))
-            self.cone(x, z, y+height*.25, height*.30, height*.70, (46, 74, 54))
-            self.cone(x, z, y+height*.55, height*.20, height*.55, (55, 85, 59))
+            lx, lz = self.nodes["lagoon"]
+            if math.hypot(x-lx, z-lz) < 370:
+                self.cone(x, z, y+height*.25, height*.48, height*.55, (68, 96, 59), 8)
+                self.cone(x, z, y+height*.55, height*.32, height*.45, (82, 110, 66), 8)
+            else:
+                self.cone(x, z, y+height*.25, height*.30, height*.70, (46, 74, 54))
+                self.cone(x, z, y+height*.55, height*.20, height*.55, (55, 85, 59))
             self.tree_count += 1
 
     def preview(self, output):
@@ -472,7 +555,7 @@ class World:
         lines += [f'<text x="15" y="26">SKERRY REACH / SEED {self.seed}</text>',
                   '<text x="15" y="46">Synthetic coast; dashed lines are verified route samples</text>',
                   '</g></svg>']
-        (output / "preview.svg").write_text('\n'.join(lines)+'\n')
+        (output / "preview.svg").write_text('\n'.join(lines)+'\n', newline='\n')
         # A dependency-free raster companion lets review tools inspect the coastline too.
         pixels = [bytearray((40,79,103)*width) for _ in range(height)]
         for ids,color in self.triangles[self.water_count:self.terrain_end]:
@@ -547,14 +630,14 @@ class World:
         header = (output/"water.h").read_text().replace(
             "// Map data (c) OpenStreetMap contributors, ODbL 1.0; see manifest.json.",
             "// Synthetic geometry; no external geographic sources. See manifest.json.")
-        (output/"water.h").write_text(header)
+        (output/"water.h").write_text(header, newline='\n')
         places = ['// Generated by tools/generate_archipelago.py. Do not edit.',
                   'static const BoatArchipelagoPlace archipelago_places[] = {']
         for name, node, radius in self.places:
             x,z = self.nodes[node]
             places.append(f'    {{ "{name}", {{ {map_pack.c_float(x)}, '
                           f'{map_pack.c_float(z)} }}, {map_pack.c_float(radius)} }},')
-        (output/"places.h").write_text('\n'.join(places+['};', '']))
+        (output/"places.h").write_text('\n'.join(places+['};', '']), newline='\n')
         routes = []
         route_points = []
         route_offsets = [0]
@@ -571,7 +654,7 @@ class World:
                         for x,z in route_points]
         route_lines += ['};', 'static const unsigned archipelago_route_offsets[] = {',
                         '    '+', '.join(str(i) for i in route_offsets)+',', '};', '']
-        (output/"routes.h").write_text('\n'.join(route_lines))
+        (output/"routes.h").write_text('\n'.join(route_lines), newline='\n')
         manifest = {
             "name": "Skerry Reach", "location": "archipelago", "recipe": RECIPE,
             "seed": self.seed, "generator": "tools/generate_archipelago.py",
@@ -598,7 +681,7 @@ class World:
         }
         for place in manifest["places"]:
             node = place["id"]
-            target = next((item.get("lighthouse", item.get("shore"))
+            target = next((item.get("lighthouse", item.get("bell_house", item.get("shore")))
                            for item in reversed(self.structures) if item["place"] == node), None)
             if node == "home":
                 target = self.shore_at("home", math.atan2(-70,-100), 240)
@@ -608,7 +691,7 @@ class World:
                 x,z = self.nodes[node]
                 # Review from a usable boating approach, not a distant graph waypoint.
                 distance = math.hypot(target[0]-x,target[1]-z)
-                stand_off = 110 if node in ("outer_light","beacon") else 65
+                stand_off = 250 if node == "outer_light" else 110
                 t = max(0,1-stand_off/distance)
                 while t > 0 and self.field(x+(target[0]-x)*t,z+(target[1]-z)*t)[0] > -20:
                     t = max(0,t-.05)
@@ -616,7 +699,22 @@ class World:
                 heading = math.atan2(target[0]-cx, -(target[1]-cz))
                 place["capture"] = {"start": [cx,cz], "heading_degrees": round(math.degrees(heading),2),
                                     "target": target}
-        (output/"manifest.json").write_text(json.dumps(manifest, indent=2)+'\n')
+            if node == "narrows":
+                # Look along the passage between its rock walls, rather than into a wall.
+                x,z = self.nodes[node]
+                target = self.routes[4][3][0]
+                place["capture"] = {"start": [x,z],
+                                    "heading_degrees": round(math.degrees(
+                                        math.atan2(target[0]-x, -(target[1]-z))), 2),
+                                    "target": target}
+            elif node == "outer_light" and target:
+                # The full headland and tower must fit above the default low helm camera.
+                cx,cz = self.routes[9][3][-1]
+                place["capture"] = {"start": [cx,cz],
+                                    "heading_degrees": round(math.degrees(
+                                        math.atan2(target[0]-cx, -(target[1]-cz))), 2),
+                                    "target": target}
+        (output/"manifest.json").write_text(json.dumps(manifest, indent=2)+'\n', newline='\n')
         self.preview(output)
         return manifest
 

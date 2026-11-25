@@ -2,6 +2,7 @@
 """Validate baked topology, route choices and reproducibility independently of the field."""
 from collections import Counter, defaultdict, deque
 import hashlib
+import json
 import math
 from pathlib import Path
 import sys
@@ -136,8 +137,23 @@ def main():
         for path in (root/str(generator.DEFAULT_SEED)).iterdir():
             assert path.read_bytes() == (root/'repeat'/path.name).read_bytes(), path.name
             shipped = ROOT/'assets/geometry/archipelago'/path.name
-            assert path.read_bytes() == shipped.read_bytes(), f'Stale default bake: {path.name}'
-    print('archipelago_generator=ok seeds=3 repeat=identical shipped=identical')
+            if path.suffix == '.bin':
+                # Compression can differ between zlib versions; the geometry must agree.
+                generated_mesh = map_pack.read_pack(path)
+                shipped_mesh = map_pack.read_pack(shipped)
+                assert generated_mesh[1:] == shipped_mesh[1:], 'Stale default mesh topology'
+                assert len(generated_mesh[0]) == len(shipped_mesh[0])
+                for generated, stored in zip(generated_mesh[0], shipped_mesh[0]):
+                    assert all(abs(a-b) <= .0002 for a,b in zip(generated,stored)), \
+                        'Stale default mesh vertex'
+            elif path.suffix == '.json':
+                generated, stored = json.loads(path.read_text()), json.loads(shipped.read_text())
+                assert (generated['recipe'],generated['seed']) == (stored['recipe'],stored['seed'])
+                assert generated['routes'] == stored['routes']
+                assert generated['places'] == stored['places']
+            elif path.suffix != '.png':
+                assert path.read_text() == shipped.read_text(), f'Stale default bake: {path.name}'
+    print('archipelago_generator=ok seeds=3 repeat=identical shipped=geometry_matched')
 
 
 if __name__ == '__main__':

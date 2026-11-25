@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0 planned on 2026-11-25. Native solo free boating is the first playable milestone.
-**Open** — Bake the coast, connect the location, drive it and compare alternate seeds.
+**State** — A0–A3 implemented locally, 2026-11-25; A4 native character pass and qualification in progress.
+**Open** — The user found the first playable world bland. Distinct places and a second native review remain.
 **Done when** — A player can leave a furnished home harbour, choose between two channels, reach a recognisable outer light and return. Two other seeds pass the same navigability checks and visibly differ.
-**Next** — A1–A3 can proceed together using the coordinate and ownership agreements below. A4 closes the milestone.
+**Next** — Inspect the revised harbour, rock passage and enclosed lagoon; complete native verification.
 
 ## The first boat trip
 
@@ -15,7 +15,7 @@ reach the same coast and offer a way home. A landing, a beacon and the light eac
 player a reason to turn off course. Show a place name on first approach during the session.
 The sense of exposure comes from the distance to shore, skyline and amount of open water.
 
-Use a bounded coast on the order of a kilometre across, small enough to explore in one sitting.
+Use a bounded coast a few kilometres across, small enough to explore in one sitting.
 Generate geography before dressing. Protect a launch basin, fork and reunion with hull clearance.
 Use the seed to vary island shapes, coast outlines and channel geometry. Site settlements on
 buildable ground near landings, seamarks beside navigable passages and the light on a prominent
@@ -34,7 +34,9 @@ low-resolution camera. Keep water, handling, lighting and controls on the existi
 - Reuse [map_pack.write](../tools/map_pack.py) with prefix `archipelago` for matched
   `assets/geometry/archipelago/scenery.bin` and `water.h`. Emit an indexed, consistently wound
   leading water surface with shared shoreline coordinates. Terrain and dressing follow the water.
-  Set the bridge split to the end of the triangle array. Shape the shoreline around solid quays
+  Set the bridge split after terrain and before the flat-coloured authored dressing; this
+  legacy pack field separates material treatment and does not imply an actual bridge.
+  Shape the shoreline around solid quays
   and piers wherever the boat should stop. Keep boats clear of decorative overhangs.
 - The same bake emits `places.h` containing `static const BoatArchipelagoPlace archipelago_places[]`.
   Each initializer holds a short uppercase name, a simulation-space approach `Vector2` and a radius
@@ -85,3 +87,26 @@ fun review, Vinga source acquisition, paused Gothenburg work, plugin loaded maps
 qualification. This track defers new handling or weather physics, runtime seed entry, streaming,
 persistent discovery saves, work jobs, sea traffic and multiplayer map distribution. The next
 design decision follows a playable drive and a comparison of the three seed previews.
+
+## First playable and user direction — 2026-11-25
+
+Astra produced the plan; three implementation agents delivered the generator, isolated mapped
+world and player entry. The first playable has six named approaches, ten route polylines,
+solid jetty footprints and a free-ride package. An actual virtual-clock explorer drive completed
+both sides of the loop and returned home: 8,457.9 m in 904.72 simulated seconds. This is a
+navigation check, not human enjoyment or artistic acceptance.
+
+The user tried the world and found it bland. That supersedes any implication that a connected
+map and populated harbour satisfy the experience. The remaining weakness is place character:
+similar low rounded islands, sparse settlements and little contrast between destinations.
+The user requested native focus and reduced usage; browser qualification and further agent
+calls are stopped. The existing web staging changes remain, with no browser-play claim.
+
+A4's native refinement raises steep bare granite shoulders at Needle Pass, surrounds Hidden
+Lagoon with wooded island lobes, gives Net Sheds a working waterfront and distinguishes the
+bell house from the outer lighthouse. It preserves the route grammar and boat handling.
+The shore settlements have low terrain terraces instead of long exposed foundations. Recipe 2
+is implemented locally; its C navigation validator completes the same 8.46 km loop, and six
+GPU destination captures plus a 180-frame native windowed demo were inspected with audio off.
+These checks establish operation and agent visual review, not user acceptance of the revision.
+Final full-suite evidence and limitations belong below before handoff.
