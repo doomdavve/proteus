@@ -1,4 +1,6 @@
 #include "render/boat_view.h"
+#include "core/boat_archipelago.h"
+#include "render/boat_archipelago_view.h"
 #include "core/boat_combat.h"
 #include "core/boat_map.h"
 #include "core/boat_pose.h"
@@ -713,6 +715,9 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     if (waterfront_map_has_river_kit(world->definition->map))
         waterfront_boating_gulls_scene(view->scene, time, p->hull.position,
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
+    else if (world->definition->map == &boat_archipelago_map)
+        boat_archipelago_evaluate(world->water, time, p->hull.position,
+            (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
     p->particle_count
         = pose_particles(presentation, world, time, p->particles, WATERFRONT_PLAYER_PARTICLES);
 }
@@ -897,6 +902,21 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
                 renderer3d_draw_emissive_mesh(
                     renderer, waterfront_gull_mesh(part), birds.gulls[i][part]);
         renderer->emissive_tint = (Vector3) { 1, 1, 1 };
+    }
+    if (world->definition->map == &boat_archipelago_map) {
+        WaterfrontSceneFrame life = { 0 };
+        boat_archipelago_evaluate(world->water, time,
+            (Vector3) { -boat->position.x, boat->height, boat->position.y },
+            (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, &life);
+        renderer->emissive_tint = lighting.unlit;
+        waterfront_draw_traffic(renderer, &life.traffic);
+        for (int i = 0; i < life.gull_count; ++i)
+            for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
+                renderer3d_draw_emissive_mesh(
+                    renderer, waterfront_gull_mesh(part), life.gulls[i][part]);
+        renderer->emissive_tint = (Vector3) { 1, 1, 1 };
+        for (int i = 0; i < life.scenery_count; ++i)
+            renderer3d_draw_box(renderer, life.scenery[i].transform, life.scenery[i].color);
     }
     if (view->props) {
         // The working harbour's own geometry, in renderer coordinates (identity transform). Only

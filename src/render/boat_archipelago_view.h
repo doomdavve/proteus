@@ -1,0 +1,11 @@
+#ifndef PROTEUS_BOAT_ARCHIPELAGO_VIEW_H
+#define PROTEUS_BOAT_ARCHIPELAGO_VIEW_H
+
+#include "render/waterfront_scene.h"
+
+// Append native local boats, birds and shore residents to the caller's scene snapshot.
+// Pure simulation-time evaluation; CPU, GPU, reflections and shadows share these poses.
+void boat_archipelago_evaluate(
+    BoatWater water, double time, Vector3 player, Vector3 velocity, WaterfrontSceneFrame *frame);
+
+#endif

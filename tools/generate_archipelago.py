@@ -24,9 +24,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import map_pack  # noqa: E402
 
-RECIPE = 2
+RECIPE = 3
 DEFAULT_SEED = 41717
-STEP = 32
+STEP = 16
+WATER_STEP = 32
 BOUNDS = (-1600, -3104, 1600, 608)
 WATER = (45, 79, 104)
 
@@ -168,6 +169,7 @@ class World:
         self.shore = []
         self.docks = []
         self.sites = {}
+        self.buildings = []
 
     def field(self, x, z):
         result, peak = -10000., 0
@@ -262,15 +264,24 @@ class World:
                                 first[1] + t * (second[1] - first[1])))
             return out
 
-        for z in range(z0, z1, STEP):
-            for x in range(x0, x1, STEP):
-                a, b, c, d = (x, z), (x + STEP, z), (x + STEP, z + STEP), (x, z + STEP)
-                # Positive sim X/Z winding becomes upward after X reflection.
-                for points in ([a, b, c], [a, c, d]):
-                    for wet, target in ((True, water), (False, land)):
-                        poly = clip(points, wet)
-                        for i in range(1, len(poly) - 1):
-                            target.append((poly[0], poly[i], poly[i + 1]))
+        cells = []
+        for z in range(z0, z1, WATER_STEP):
+            for x in range(x0, x1, WATER_STEP):
+                samples = [(xx,zz) for xx in range(x,x+WATER_STEP+1,STEP)
+                           for zz in range(z,z+WATER_STEP+1,STEP)]
+                if all(field[p] < -24 for p in samples):
+                    cells.append((x,z,WATER_STEP))
+                else:
+                    cells.extend((xx,zz,STEP) for xx in range(x,x+WATER_STEP,STEP)
+                                 for zz in range(z,z+WATER_STEP,STEP))
+        for x,z,step in cells:
+            a, b, c, d = (x, z), (x + step, z), (x + step, z + step), (x, z + step)
+            # Positive sim X/Z winding becomes upward after X reflection.
+            for points in ([a, b, c], [a, c, d]):
+                for wet, target in ((True, water), (False, land)):
+                    poly = clip(points, wet)
+                    for i in range(1, len(poly) - 1):
+                        target.append((poly[0], poly[i], poly[i + 1]))
         # Piers have actual collision footprints. Subtract their convex deck rectangle
         # before compiling water, then conform shared triangle edges after clipping.
         for start, end in self.docks:
@@ -340,6 +351,7 @@ class World:
         self.quad(aa, dd, cc, bb, tuple(min(255, k+9) for k in color))
 
     def house(self, x, z, width=13, depth=9, color=(143, 58, 46)):
+        self.buildings.append((x,z,width,depth))
         corners = [(xx, zz) for xx in (x-width/2, x+width/2)
                    for zz in (z-depth/2, z+depth/2)]
         base = max(self.ground(xx, zz) for xx, zz in corners) + .2
@@ -622,6 +634,150 @@ class World:
         self.validate()
         return self
 
+    def life(self):
+        """Independent local circuits: home, fishing islands, outer coast and lagoon."""
+        def graph_path(indices, reverse=None):
+            path = []
+            for k,index in enumerate(indices):
+                a,b,_,bends = self.routes[index]
+                points = [self.nodes[a], *bends, self.nodes[b]]
+                if reverse and reverse[k]:
+                    points.reverse()
+                path.extend(points if not path else points[1:])
+            if math.dist(path[0],path[-1]) < .001:
+                path.pop()
+            return path
+        lx,lz = self.nodes['lagoon']
+        actors = [
+            dict(id='harbour_launch', recipe='CRUISER', speed=2.8, period=280, phase=188,
+                 points=[(-12,-40),(-12,-260),(12,-260),(12,-40)], radius=10, stops=[1,3]),
+            dict(id='fishing_round', recipe='WORKBOAT', speed=3.5, period=1000, phase=230,
+                 points=graph_path([1,2,3],[False,False,True]), radius=16, stops=[2]),
+            dict(id='outer_sail', recipe='SAILBOAT', speed=0, period=1400, phase=450,
+                 points=graph_path([7,9,8],[False,True,True]), radius=20, stops=[]),
+            dict(id='lagoon_dinghy', recipe='RUNABOUT', speed=1.2, period=180, phase=0,
+                 points=[(lx-14,lz-18),(lx+14,lz-18),(lx+14,lz+18),(lx-14,lz+18)],
+                 radius=10, stops=[1]),
+        ]
+        flocks = [('home_gulls','home',8,-1,20,7),
+                  ('net_shed_gulls','net_sheds',7,-1,38,7),
+                  ('fishing_followers','net_sheds',6,1,27,6),
+                  ('outer_gulls','outer_light',5,-1,70,13)]
+        # Resident paths stay on surveyed, low shore terraces; their feet use the actual
+        # emitted terrain triangles rather than the continuous pre-triangulation height.
+        land_cells = {}
+        for ids,_ in self.triangles[self.water_count:self.terrain_end]:
+            points = [(-self.vertices[i][0],self.vertices[i][1],self.vertices[i][2]) for i in ids]
+            for ix in range(math.floor(min(p[0] for p in points)/32),
+                            math.floor(max(p[0] for p in points)/32)+1):
+                for iz in range(math.floor(min(p[2] for p in points)/32),
+                                math.floor(max(p[2] for p in points)/32)+1):
+                    land_cells.setdefault((ix,iz),[]).append(points)
+        def ground_at(x,z):
+            for a,b,c in land_cells.get((math.floor(x/32),math.floor(z/32)),()):
+                determinant = (b[2]-c[2])*(a[0]-c[0])+(c[0]-b[0])*(a[2]-c[2])
+                if abs(determinant) < 1e-9:
+                    continue
+                u = ((b[2]-c[2])*(x-c[0])+(c[0]-b[0])*(z-c[2]))/determinant
+                v = ((c[2]-a[2])*(x-c[0])+(a[0]-c[0])*(z-c[2]))/determinant
+                if min(u,v,1-u-v) >= -1e-6:
+                    return u*a[1]+v*b[1]+(1-u-v)*c[1]+.04
+            return None
+        residents = []
+        sites = [('home', end) for _,end in self.docks[:2]]
+        sites += [(node,shore) for node,(shore,_) in self.sites.items()
+                  if node in ('net_sheds','lagoon')]
+        colors = [(181,111,55),(65,99,129),(179,164,109),(136,66,53)]
+        for node,(sx,sz) in sites:
+            nx,nz = self.nodes[node]
+            distance = math.hypot(sx-nx,sz-nz)
+            ux,uz = (sx-nx)/distance, (sz-nz)/distance
+            for shift in (0,9):
+                start = (sx-ux*9-uz*shift,sz-uz*9+ux*shift)
+                probes = [ground_at(start[0]+dx,start[1]+dz)
+                          for dx,dz in ((1,0),(-1,0),(0,1),(0,-1))]
+                if any(h is None for h in probes):
+                    continue
+                gx,gz = probes[0]-probes[1],probes[2]-probes[3]
+                gradient = math.hypot(gx,gz)
+                tx,tz = (-gz/gradient,gx/gradient) if gradient > .001 else (-uz,ux)
+                for length in (9,5,2.5):
+                    end = (start[0]+tx*length,start[1]+tz*length)
+                    samples = [(start[0]+(end[0]-start[0])*t/8,
+                                start[1]+(end[1]-start[1])*t/8) for t in range(9)]
+                    heights = [ground_at(*p) for p in samples]
+                    clear = all(not any(abs(x-bx) < width/2+1 and abs(z-bz) < depth/2+1
+                                        for bx,bz,width,depth in self.buildings)
+                                for x,z in samples)
+                    if (clear and all(h is not None for h in heights)
+                            and max(heights)-min(heights) <= .8):
+                        break
+                if not clear or any(h is None for h in heights) or max(heights)-min(heights) > .8:
+                    continue
+                i = len(residents)
+                residents.append(dict(start=[start[0],heights[0],start[1]],
+                                      end=[end[0],heights[-1],end[1]], period=32+i*4,
+                                      phase=i*7, coat=colors[i%len(colors)]))
+        # Each grid node bounds all triangles in its four adjacent cells. Bilinear
+        # interpolation therefore stays above actual land, with smooth shared transitions.
+        cell_heights = {cell:max(p[1] for triangle in triangles for p in triangle)
+                        for cell,triangles in land_cells.items()}
+        ground = [math.ceil(100*max(cell_heights.get((math.floor(x/32)+dx,
+                                                     math.floor(z/32)+dz),0)
+                                    for dx in (-1,0) for dz in (-1,0)))
+                  for z in range(BOUNDS[1],BOUNDS[3]+1,32)
+                  for x in range(BOUNDS[0],BOUNDS[2]+1,32)]
+        return actors,flocks,residents,ground
+
+    def write_life(self, output):
+        actors,flocks,residents,ground = self.life()
+        f = map_pack.c_float
+        lines = ['// Generated native life. POINTS routes use renderer east/Z; residents use simulation X/Z.',
+                 'static const BoatSceneDefinition archipelago_life = {',
+                 '    .version = BOAT_SCENE_VERSION, .traffic_present = true,',
+                 '    .traffic = { .actor_count = 4, .actors = {']
+        for a in actors:
+            lines += [f'        {{ .id = "{a["id"]}", .shape = WATERFRONT_ROUTE_POINTS,',
+                      f'          .recipe = WATERFRONT_CRAFT_{a["recipe"]}, .retain = 0xff,',
+                      f'          .speed = {f(a["speed"])}, .accel = 4, '
+                      f'.period = {a["period"]}, .phase = {f(a["phase"])},',
+                      f'          .point_count = {len(a["points"])}, .points = {{']
+            lines += [f'              {{ {f(-x)}, {f(z)}, {f(a["radius"])} }},'
+                      for x,z in a['points']]
+            lines += ['          },', f'          .stop_count = {len(a["stops"])}, .stops = {{']
+            lines += [f'              {{ .id = "landing_{i}", .segment = {s}, .dwell = -1 }},'
+                      for i,s in enumerate(a['stops'])]
+            if not a['stops']:
+                lines += ['              { 0 },']
+            lines += ['          } },']
+        lines += ['    } }, .gulls_present = true, .gulls = { .flock_count = 4, .flocks = {']
+        for i,(name,node,count,follow,radius,height) in enumerate(flocks):
+            x,z = self.nodes[node]
+            if node == 'home':
+                z -= 145
+            lines += [f'        {{ .id = "{name}", .x = {f(x)}, .z = {f(z)}, .count = {count},',
+                      f'          .seed = {self.seed+i*19}, .radius = {radius}, .height = {height},',
+                      f'          .rate = .15f, .follow_actor = {follow}, .implicit_cues = true }},']
+        lines += ['    } }', '};',
+                  'static const BoatArchipelagoResident archipelago_residents[] = {']
+        assert residents, 'Expected inhabited shore paths'
+        for r in residents:
+            start,end = ', '.join(f(v) for v in r['start']), ', '.join(f(v) for v in r['end'])
+            coat = ', '.join(str(v) for v in r['coat'])
+            lines += [f'    {{ {{ {start} }}, {{ {end} }}, {f(r["period"])}, '
+                      f'{f(r["phase"])}, {{ {coat}, 255 }} }},']
+        columns = (BOUNDS[2]-BOUNDS[0])//32+1
+        rows = (BOUNDS[3]-BOUNDS[1])//32+1
+        lines += ['};', f'enum {{ archipelago_ground_columns = {columns}, '
+                  f'archipelago_ground_rows = {rows} }};',
+                  'static const unsigned short archipelago_ground_cm[] = {']
+        lines += ['    '+', '.join(str(v) for v in ground[i:i+16])+','
+                  for i in range(0,len(ground),16)]
+        lines += ['};', '']
+        (output/'life.h').write_text('\n'.join(lines), newline='\n')
+        return dict(actors=actors, residents=residents,
+                    gulls=sum(flock[2] for flock in flocks), physical_traffic_wakes=False)
+
     def write(self, output):
         output.mkdir(parents=True, exist_ok=True)
         blob = map_pack.write(output, "archipelago", "tools/generate_archipelago.py",
@@ -655,12 +811,14 @@ class World:
         route_lines += ['};', 'static const unsigned archipelago_route_offsets[] = {',
                         '    '+', '.join(str(i) for i in route_offsets)+',', '};', '']
         (output/"routes.h").write_text('\n'.join(route_lines), newline='\n')
+        life = self.write_life(output)
         manifest = {
             "name": "Skerry Reach", "location": "archipelago", "recipe": RECIPE,
             "seed": self.seed, "generator": "tools/generate_archipelago.py",
             "sources": "Entirely synthetic; no external geographic source data",
             "coordinates": "Metres; places/routes simulation X/Z; mesh X=-simulation X",
             "bounds_simulation_xz": BOUNDS, "lattice_step_m": STEP,
+            "open_water_step_m": WATER_STEP,
             "spawn": {"position": [0,0], "heading_radians": 0},
             "scenery_sha256": hashlib.sha256(blob).hexdigest(),
             "water_header_sha256": hashlib.sha256(header.encode()).hexdigest(),
@@ -673,11 +831,12 @@ class World:
                         "arrival_radius_m": radius}
                        for name,node,radius in self.places],
             "routes": routes, "structures": self.structures,
+            "life": life,
             "dock_footprints": [{"start": a, "end": b, "width_m": 4.2} for a,b in self.docks],
             "limits": ["Bounded offline bake; outside rectangle is collision shore",
                        "Seed variation preserves the same region/route grammar",
                        "Coast and solid pier footprints supply static collision; land buildings are scenery",
-                       "No bathymetry, tides, dynamic population or infinite streaming"],
+                       "No bathymetry, tides, reactive traffic AI or infinite streaming"],
         }
         for place in manifest["places"]:
             node = place["id"]

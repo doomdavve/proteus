@@ -1,4 +1,5 @@
 #include "core/boat.h"
+#include "core/boat_archipelago.h"
 #include "core/boat_map.h"
 #include "core/boat_model.h"
 #include "core/boat_pose.h"
@@ -213,15 +214,17 @@ static void resolve_hull_contact(
 
 static void resolve_traffic(Boat *boat, const BoatHull *hull, const BoatWorld *world, double time)
 {
-    if (!waterfront_map_has_river_kit(world->definition->map))
+    bool archipelago = world->definition->map == &boat_archipelago_map;
+    if (!archipelago && !waterfront_map_has_river_kit(world->definition->map))
         return;
+    const BoatSceneDefinition *scene = archipelago ? boat_archipelago_life() : world->scene;
     float bottom, top;
     hull_vertical_bounds(boat, hull, &bottom, &top);
     // Separate the full hull footprints, then match contact velocity against the moving hull.
     // Multiple passes cover a rare simultaneous contact without advancing traffic time.
     for (int pass = 0; pass < 4; ++pass) {
         WaterfrontTrafficContact traffic;
-        if (!waterfront_traffic_contact_height_scene(world->scene, boat->position, boat->heading,
+        if (!waterfront_traffic_contact_height_scene(scene, boat->position, boat->heading,
                 hull->bow, hull->stern, hull->half_beam, bottom, top, world->water, time, &traffic))
             break;
         Vector2 previous = boat->position;

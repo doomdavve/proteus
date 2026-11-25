@@ -22,7 +22,7 @@ typedef struct {
     BoatLocationId id;
     const char *name; // Command-line spelling.
     const char *title; // Player-facing spelling, upper-case ASCII.
-    bool mapped; // Shoreline comes from MAP; river actors belong only to the river kit.
+    bool mapped; // Shoreline comes from MAP; native local actors are selected by map identity.
     const BoatMapDescription *map; // Non-NULL exactly when mapped; NULL for the basin.
     Vector2 half_extent; // Basin wall half-sizes in simulation X/Z; zero for mapped records.
     Vector2 spawn; // Free-boating start position in simulation X/Z.

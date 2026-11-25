@@ -22,6 +22,7 @@ ALLOWED_QUOTED = {
     "raylib.h", "raymath.h",
     # Generated immutable approach-point data, alongside the compiled shoreline.
     "../../assets/geometry/archipelago/places.h",
+    "../../assets/geometry/archipelago/life.h",
 }
 GEOMETRY_INCLUDE = re.compile(r"\.\./\.\./assets/geometry/[a-z]+/water\.h")
 ALLOWED_SYSTEM = {
@@ -169,6 +170,7 @@ def self_test():
     failures = [k for k, v in violations.items() if not check_source(k, v, headers)]
     clean = ('#include "boat.h"\n#include "raymath.h"\n#include <math.h>\n'
              '#include "../../assets/geometry/archipelago/places.h"\n'
+             '#include "../../assets/geometry/archipelago/life.h"\n'
              "// DrawCube(fopen) in a comment\n"
              "typedef struct { BoatStats (*stats)(void *context); } Table;\n"
              'float f(Vector2 v) { const char *s = "printf("; (void)s;\n'

@@ -10,6 +10,7 @@
 #include "core/waterfront_harbor.h"
 #include "core/waterfront_outer.h"
 #include "raymath.h"
+#include "render/boat_archipelago_view.h"
 #include "render/boat_minimap.h"
 #include "render/boat_view.h"
 #include "scenery/boat_scenery.h"
@@ -137,8 +138,8 @@ static int drive(void)
         float throttle = Clamp(.2f + (target_speed - speed) * .08f, .03f, .6f);
         Vector2 before = boat.position;
         boat_step_handling(&boat, &world, boat_tick_seconds(tick),
-            (BoatInput) {
-                .steering_rate = boat_steering_rate(boat.wheel, wheel), .throttle_rate = boat_throttle_rate(boat.throttle, throttle) },
+            (BoatInput) { .steering_rate = boat_steering_rate(boat.wheel, wheel),
+                .throttle_rate = boat_throttle_rate(boat.throttle, throttle) },
             &boat_handling_explorer);
         CHECK(isfinite(boat.position.x) && isfinite(boat.position.y));
         CHECK(boat_map_water(&resources.map, boat.position, 3));
@@ -215,6 +216,87 @@ static int isolation(void)
     return 0;
 }
 
+static int life(void)
+{
+    const BoatSceneDefinition *scene = boat_archipelago_life();
+    WaterfrontRouteDiagnostic route_diagnostic;
+    if (!waterfront_route_validate(&scene->traffic, &route_diagnostic)) {
+        fprintf(stderr, "%s: %s\n", route_diagnostic.field, route_diagnostic.message);
+        CHECK(false);
+    }
+    WaterfrontFlockDiagnostic flock_diagnostic;
+    CHECK(waterfront_flock_validate(&scene->gulls, &flock_diagnostic));
+    BoatWorldResources resources;
+    CHECK(boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_ARCHIPELAGO)));
+    BoatWorld world;
+    boat_world_init(&world, &resources, (BoatWater) { 0 });
+    BoatViewState view = { 0 };
+    boat_reset_location(&view.boat, resources.definition);
+    BoatPresentation presentation = { 0 };
+    WaterfrontSceneFrame frame;
+    boat_scene_frame(&view, &presentation, &world, BOAT_CAMERA_DEFAULT, &frame);
+    CHECK(frame.traffic.vessel_count == 4 && !frame.traffic.lift);
+    CHECK(frame.traffic.routes == &scene->traffic);
+    CHECK(frame.gull_count == 26 && !frame.lamp_count);
+    CHECK(!frame.harbor.berth_count && frame.harbor.ferry.scale.x == 0);
+    size_t moving = 0, stopped = 0;
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
+        double period = waterfront_route_period(&scene->traffic, (int)i);
+        CHECK(period > 0 && period <= 1400);
+        for (double t = -period; t <= period; t += 2) {
+            WaterfrontVesselMotion motion = waterfront_route_motion(&scene->traffic, (int)i, t);
+            Vector2 p = { -motion.position.x, motion.position.z };
+            float clearance = hypotf(spec.length * .55f, spec.beam * .55f) + .5f;
+            if (!boat_map_water(&resources.map, p, clearance)) {
+                fprintf(stderr, "traffic=%s time=%g x=%g z=%g\n", scene->traffic.actors[i].id, t,
+                    p.x, p.y);
+                CHECK(false);
+            }
+            CHECK(isfinite(motion.heading) && isfinite(motion.yaw_rate));
+            float speed = Vector3Length(motion.velocity);
+            moving += speed > .1f;
+            stopped += speed < .01f;
+            WaterfrontTrafficContact contact;
+            CHECK(waterfront_traffic_contact_height_scene(scene, p, motion.heading, 1.8f, 1.8f,
+                .75f, -.2f, 1, (BoatWater) { 0 }, t, &contact));
+            CHECK(contact.vessel == (int)i);
+            CHECK(!waterfront_traffic_contact_height_scene(scene, p, motion.heading, 1.8f, 1.8f,
+                .75f, 100, 110, (BoatWater) { 0 }, t, &contact));
+        }
+    }
+    CHECK(moving > 1000 && stopped > 20);
+    size_t count;
+    const BoatArchipelagoResident *residents = boat_archipelago_residents(&count);
+    CHECK(count >= 4 && count <= 16);
+    for (size_t i = 0; i < count; ++i) {
+        const BoatArchipelagoResident *r = &residents[i];
+        CHECK(r->period > 0 && Vector3Distance(r->start, r->end) > 2);
+        for (int j = 0; j <= 16; ++j) {
+            Vector3 p = Vector3Lerp(r->start, r->end, j / 16.0f);
+            CHECK(!boat_map_water(&resources.map, (Vector2) { p.x, p.z }, 0));
+            CHECK(isfinite(p.y) && p.y > 0);
+        }
+    }
+    WaterfrontSceneFrame a = { 0 }, b = { 0 }, other = { 0 };
+    Vector3 player = { 0 };
+    boat_archipelago_evaluate((BoatWater) { 0 }, 73, player, player, &a);
+    boat_archipelago_evaluate((BoatWater) { 0 }, 5000, player, player, &other);
+    boat_archipelago_evaluate((BoatWater) { 0 }, 73, player, player, &b);
+    CHECK(memcmp(&a, &b, sizeof(a)) == 0); // Pause or seeking never accumulates actor state.
+    CHECK(a.scenery_count > 0 && a.gull_count == 26 && a.traffic.wake_count > 0);
+    CHECK(a.scenery_count == b.scenery_count);
+    CHECK(memcmp(a.gulls, other.gulls, sizeof(a.gulls)) != 0);
+    for (int i = 0; i < a.gull_count; ++i) {
+        Vector3 p = a.gulls[i][0].position;
+        CHECK(p.y >= boat_archipelago_ground((Vector2) { -p.x, p.z }) + 3.99f);
+    }
+    boat_world_resources_destroy(&resources);
+    printf("archipelago_life=ok vessels=%u gulls=%d residents=%zu moving=%zu stopped=%zu\n",
+        scene->traffic.actor_count, a.gull_count, count, moving, stopped);
+    return 0;
+}
+
 static int scenery(void)
 {
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_ARCHIPELAGO);
@@ -225,6 +307,11 @@ static int scenery(void)
     CHECK(full && full->mesh && full != location->map);
     CHECK(full->mesh->triangle_count > location->map->mesh->triangle_count);
     CHECK(boat_map_leading_water(full->mesh) == location->map->mesh->triangle_count);
+    for (size_t i = location->map->mesh->triangle_count; i < full->bridge_first_triangle; ++i)
+        for (int j = 0; j < 3; ++j) {
+            Vector3 p = full->mesh->vertices[full->mesh->triangles[i].vertices[j]];
+            CHECK(boat_archipelago_ground((Vector2) { -p.x, p.z }) >= p.y - .02f);
+        }
     CHECK(!boat_scenery_of(&waterfront_outer_map));
     CHECK(!boat_scenery_of(&waterfront_city_river_map));
     WaterfrontScenery scenery;
@@ -252,6 +339,7 @@ int main(void)
     CHECK(geometry() == 0);
     CHECK(drive() == 0);
     CHECK(isolation() == 0);
+    CHECK(life() == 0);
     CHECK(scenery() == 0);
     puts("boat_archipelago=ok");
     return 0;

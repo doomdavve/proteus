@@ -3237,8 +3237,8 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
         add_scenery(scene, frame, material);
         if (!frame->map_only) {
             draw_harbor(scene, material, frame, emissive);
-            draw_traffic(scene, material, frame, emissive);
         }
+        draw_traffic(scene, material, frame, emissive);
     }
     // By part, so each part's flock forms one instanced run. Gulls are self-coloured.
     Vector3 unlit = frame->lighting.unlit;

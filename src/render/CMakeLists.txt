@@ -1,6 +1,7 @@
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
+  boat_archipelago_view.c boat_archipelago_view.h
   boat_cargo_view.c boat_cargo_view.h
   boat_ui.c boat_ui.h
   boat_hud.c boat_hud.h boat_cabin.c boat_cabin.h boat_grodan.c

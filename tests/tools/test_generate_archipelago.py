@@ -73,6 +73,36 @@ class Water:
                                  for a,b in self.shore_cells[cell])
 
 
+def traffic_samples(actor):
+    """Sample the emitted rounded route, including its actual circular corners."""
+    points = actor['points']
+    corners = []
+    for i,p in enumerate(points):
+        a,b = points[i-1],points[(i+1)%len(points)]
+        before,after = math.dist(a,p),math.dist(p,b)
+        d0 = ((p[0]-a[0])/before,(p[1]-a[1])/before)
+        d1 = ((b[0]-p[0])/after,(b[1]-p[1])/after)
+        turn = math.atan2(d0[0]*d1[1]-d0[1]*d1[0],d0[0]*d1[0]+d0[1]*d1[1])
+        radius = actor['radius']
+        tangent = radius*math.tan(abs(turn)/2)
+        assert tangent < min(before,after)
+        enter = (p[0]-d0[0]*tangent,p[1]-d0[1]*tangent)
+        leave = (p[0]+d1[0]*tangent,p[1]+d1[1]*tangent)
+        side = 1 if turn > 0 else -1
+        center = (enter[0]-d0[1]*radius*side,enter[1]+d0[0]*radius*side)
+        angle = math.atan2(enter[1]-center[1],enter[0]-center[0])
+        count = max(1,math.ceil(radius*abs(turn)/4))
+        for j in range(count+1):
+            phase = angle+turn*j/count
+            yield center[0]+radius*math.cos(phase),center[1]+radius*math.sin(phase)
+        corners.append((enter,leave))
+    for i,(_,start) in enumerate(corners):
+        end = corners[(i+1)%len(corners)][0]
+        count = max(1,math.ceil(math.dist(start,end)/4))
+        for j in range(count+1):
+            yield start[0]+(end[0]-start[0])*j/count,start[1]+(end[1]-start[1])*j/count
+
+
 def check_seed(seed, output):
     world = generator.World(seed).build()
     manifest = world.write(output)
@@ -105,6 +135,19 @@ def check_seed(seed, output):
                 t = i/count
                 p = a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])
                 assert mesh.contains(p,12), ('route',seed,route['from'],route['to'],p)
+    assert manifest['lattice_step_m'] == 16 and manifest['open_water_step_m'] == 32
+    assert len(manifest['life']['actors']) == 4 and manifest['life']['gulls'] == 26
+    for actor in manifest['life']['actors']:
+        for p in traffic_samples(actor):
+            assert mesh.contains(p,8), ('traffic',seed,actor['id'],p)
+    assert len(manifest['life']['residents']) >= 4
+    for resident in manifest['life']['residents']:
+        a,b = resident['start'],resident['end']
+        for i in range(17):
+            p = a[0]+(b[0]-a[0])*i/16,a[2]+(b[2]-a[2])*i/16
+            assert not mesh.contains(p), ('resident over water',seed,p)
+            assert not any(abs(p[0]-x) < width/2+1 and abs(p[1]-z) < depth/2+1
+                           for x,z,width,depth in world.buildings), ('resident in building',seed,p)
     # A second way through the inner islands must be materially longer, not a duplicate
     # segment over the same water. The separating island itself must be solid.
     routes = {(r['from'],r['to']):r for r in manifest['routes']}

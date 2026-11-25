@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A4 native implementation and qualification complete locally, 2026-11-25; recipe 2 ready.
-**Open** — The user found recipe 1 bland. Recipe 2's experience and place character await human review.
-**Done when** — A player can leave a furnished home harbour, choose between two channels, reach a recognisable outer light and return. Two other seeds pass the same navigability checks and visibly differ.
-**Next** — Drive the revised harbour, rock passage and enclosed lagoon; choose the next native content pass.
+**State** — A0–A4 complete locally; user found recipe 2 better. A5 finer shores/local life implemented.
+**Open** — A6 native qualification and human review of recipe 3.
+**Done when** — Finer shores and independent boats, seabirds and shore residents pass clearance, seek and native rendering checks.
+**Next** — A6 full native tests, captures, windowed check and contract handoff.
 
 ## The first boat trip
 
@@ -14,6 +14,44 @@ past low skerries into an open reach, with an outer light visible on the headlan
 reach the same coast and offer a way home. A landing, a beacon and the light each give the
 player a reason to turn off course. Show a place name on first approach during the session.
 The sense of exposure comes from the distance to shore, skyline and amount of open water.
+
+## Native life follow-up — 2026-11-25
+
+The user found recipe 2 better and requested finer shores and a sense of archipelago life.
+Continue on the same local milestone branch, with no browser work or additional agents.
+
+- A5: finer shores and local life. Halve shore/terrain spacing from 32 m to 16 m; keep clear
+  offshore water at 32 m and stitch transitions so collision has no false shore edges.
+  Revalidate all three seeds. Reuse native traffic routes and gull evaluation for a harbour launch, fishing circuit
+  and outer-coast pleasure craft. Add small shore residents at inhabited sites. Evaluate all
+  life from explicit simulation time, share CPU/GPU poses and moving hull contacts, and keep
+  Gothenburg's actors absent. Traffic trails are cosmetic in this step, as for authored routes.
+- A6: full native build/tests, route clearance and collision checks, seek/pause consistency,
+  representative finer-shore/life captures, windowed demo and current spec/guide updates.
+
+This continues to defer jobs/economy, interactive docking, reactive traffic AI, persistent
+discovery, physical traffic wakes, runtime seeds and streaming. Other open-loop owners in the
+index remain separate; the paused Gothenburg track and browser qualification are not resumed.
+
+### A5 implementation — 2026-11-25
+
+Recipe 3 uses a 16 m land/shore lattice and stitched 32 m clear offshore water. The default
+bake has 70,992 triangles (36,192 water), up from recipe 2's 38,568 total. The scenery pack
+is 483,805 bytes and the collision cache is 2,629,096 bytes. Terrain detail increases without
+refining the entire open sea to the same spacing.
+
+Native life is four independent scheduled craft (harbour launch, workboat, outer sailboat and
+lagoon runabout), 26 gulls and seven shore residents on the default seed. Their shared-time
+evaluation supplies CPU/GPU poses; moving hull contacts use the same native route data.
+People stay out of water and building footprints, and a smooth conservative terrain envelope
+keeps the gulls above the granite. Foam trails are cosmetic; the boats do not yield or berth.
+
+Focused native validation passes route structure, model-sized clearance over two periods
+including negative time, moving/stopped phases, hull/height contacts, shore-foot paths,
+terrain clearance and repeatable seeks. The explorer completes 8,462.1 m in 909.22 simulated
+seconds with maximum route departure 32.11 m. Native CPU/GPU frames and the 1,200-frame
+windowed idle-helm check have been inspected with audio disabled. A6's final full-suite
+result and the recipe 3 review images remain to close qualification.
 
 Use a bounded coast a few kilometres across, small enough to explore in one sitting.
 Generate geography before dressing. Protect a launch basin, fork and reunion with hull clearance.
@@ -85,7 +123,7 @@ window. Record displayed images, scripted motion and human play as distinct evid
 The [open loops board](README.md#open-loops) continues to own wake handling research, the sandbox
 fun review, Vinga source acquisition, paused Gothenburg work, plugin loaded maps and multiplayer
 qualification. This track defers new handling or weather physics, runtime seed entry, streaming,
-persistent discovery saves, work jobs, sea traffic and multiplayer map distribution. The next
+persistent discovery saves, work jobs, reactive sea traffic and multiplayer map distribution. The next
 design decision follows a playable drive and a comparison of the three seed previews.
 
 ## First playable and user direction — 2026-11-25

@@ -1,7 +1,7 @@
 {
   "name": "Skerry Reach",
   "location": "archipelago",
-  "recipe": 2,
+  "recipe": 3,
   "seed": 41717,
   "generator": "tools/generate_archipelago.py",
   "sources": "Entirely synthetic; no external geographic source data",
@@ -12,7 +12,8 @@
     1600,
     608
   ],
-  "lattice_step_m": 32,
+  "lattice_step_m": 16,
+  "open_water_step_m": 32,
   "spawn": {
     "position": [
       0,
@@ -20,17 +21,17 @@
     ],
     "heading_radians": 0
   },
-  "scenery_sha256": "7c3fb9610a77edffa1b663b09c0cb79ce8a1e551965315da8ad47c138dc42e9c",
-  "water_header_sha256": "5e097fc5b3f49027145dc9e6314aca1c4b872e2ed29593898fbf69341e176c8c",
+  "scenery_sha256": "6fe44f20f14649104877919d0ca8c0516634b8a8104762eb156359bd58161af3",
+  "water_header_sha256": "2ad13de5a9114ca7d39efc7707848df70347ac208268314f399f61f46dccb044",
   "counts": {
     "island_recipes": 48,
     "trees": 337,
-    "filled_inland_lattice_pockets": 0,
-    "vertices": 24373,
-    "triangles": 38568,
-    "water_triangles": 20640,
-    "shore_edges": 2420,
-    "scenery_bytes": 267644
+    "filled_inland_lattice_pockets": 1,
+    "vertices": 40592,
+    "triangles": 70992,
+    "water_triangles": 36192,
+    "shore_edges": 4422,
+    "scenery_bytes": 483805
   },
   "places": [
     {
@@ -429,6 +430,302 @@
       ]
     }
   ],
+  "life": {
+    "actors": [
+      {
+        "id": "harbour_launch",
+        "recipe": "CRUISER",
+        "speed": 2.8,
+        "period": 280,
+        "phase": 188,
+        "points": [
+          [
+            -12,
+            -40
+          ],
+          [
+            -12,
+            -260
+          ],
+          [
+            12,
+            -260
+          ],
+          [
+            12,
+            -40
+          ]
+        ],
+        "radius": 10,
+        "stops": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "fishing_round",
+        "recipe": "WORKBOAT",
+        "speed": 3.5,
+        "period": 1000,
+        "phase": 230,
+        "points": [
+          [
+            0.0,
+            -360.0
+          ],
+          [
+            -290,
+            -455
+          ],
+          [
+            -520,
+            -470
+          ],
+          [
+            -683.2873800916293,
+            -650.9915436024112
+          ],
+          [
+            -700,
+            -910
+          ],
+          [
+            -430,
+            -1070
+          ],
+          [
+            -170.570316609426,
+            -1161.4809605029654
+          ],
+          [
+            -40,
+            -870
+          ],
+          [
+            75,
+            -650
+          ]
+        ],
+        "radius": 16,
+        "stops": [
+          2
+        ]
+      },
+      {
+        "id": "outer_sail",
+        "recipe": "SAILBOAT",
+        "speed": 0,
+        "period": 1400,
+        "phase": 450,
+        "points": [
+          [
+            -498.9103574489107,
+            -1800.1963826053973
+          ],
+          [
+            -620,
+            -2110
+          ],
+          [
+            -360,
+            -2440
+          ],
+          [
+            116.69233947715594,
+            -2599.8837016861335
+          ],
+          [
+            410,
+            -2520
+          ],
+          [
+            660,
+            -2310
+          ],
+          [
+            632.5643704354862,
+            -1987.300580766041
+          ],
+          [
+            340,
+            -1810
+          ],
+          [
+            -60,
+            -1890
+          ]
+        ],
+        "radius": 20,
+        "stops": []
+      },
+      {
+        "id": "lagoon_dinghy",
+        "recipe": "RUNABOUT",
+        "speed": 1.2,
+        "period": 180,
+        "phase": 0,
+        "points": [
+          [
+            777.2802216899038,
+            -1244.7346263481302
+          ],
+          [
+            805.2802216899038,
+            -1244.7346263481302
+          ],
+          [
+            805.2802216899038,
+            -1208.7346263481302
+          ],
+          [
+            777.2802216899038,
+            -1208.7346263481302
+          ]
+        ],
+        "radius": 10,
+        "stops": [
+          1
+        ]
+      }
+    ],
+    "residents": [
+      {
+        "start": [
+          -46.42869035059284,
+          2.711304832813388,
+          -21.103950159360387
+        ],
+        "end": [
+          -46.42869035059284,
+          2.7113048328133877,
+          -30.103950159360387
+        ],
+        "period": 32,
+        "phase": 0,
+        "coat": [
+          181,
+          111,
+          55
+        ]
+      },
+      {
+        "start": [
+          -42.70446385188218,
+          1.5309857285770196,
+          -29.297248456523832
+        ],
+        "end": [
+          -42.70446385188218,
+          1.5309857285770196,
+          -38.29724845652383
+        ],
+        "period": 36,
+        "phase": 7,
+        "coat": [
+          65,
+          99,
+          129
+        ]
+      },
+      {
+        "start": [
+          48.67050223100903,
+          3.9049021152339503,
+          -25.616053805794227
+        ],
+        "end": [
+          48.67050223100903,
+          3.9049021152339503,
+          -20.616053805794227
+        ],
+        "period": 40,
+        "phase": 14,
+        "coat": [
+          179,
+          164,
+          109
+        ]
+      },
+      {
+        "start": [
+          -782.2873800916293,
+          2.1207047729502806,
+          -650.9915436024112
+        ],
+        "end": [
+          -782.1557735914103,
+          2.086904239582269,
+          -659.9905813136945
+        ],
+        "period": 44,
+        "phase": 21,
+        "coat": [
+          136,
+          66,
+          53
+        ]
+      },
+      {
+        "start": [
+          -782.2873800916293,
+          2.1231277396989925,
+          -659.9915436024112
+        ],
+        "end": [
+          -782.400783978747,
+          2.123127739699001,
+          -668.9908291050712
+        ],
+        "period": 48,
+        "phase": 28,
+        "coat": [
+          181,
+          111,
+          55
+        ]
+      },
+      {
+        "start": [
+          890.2802216899038,
+          1.9791996671322367,
+          -1226.7346263481302
+        ],
+        "end": [
+          890.2802216899038,
+          2.1913227121938967,
+          -1217.7346263481302
+        ],
+        "period": 52,
+        "phase": 35,
+        "coat": [
+          65,
+          99,
+          129
+        ]
+      },
+      {
+        "start": [
+          890.2802216899038,
+          2.1913227121938967,
+          -1217.7346263481302
+        ],
+        "end": [
+          887.8123537002322,
+          1.8583346869141781,
+          -1209.0795915367876
+        ],
+        "period": 56,
+        "phase": 42,
+        "coat": [
+          179,
+          164,
+          109
+        ]
+      }
+    ],
+    "gulls": 26,
+    "physical_traffic_wakes": false
+  },
   "dock_footprints": [
     {
       "start": [
@@ -490,6 +787,6 @@
     "Bounded offline bake; outside rectangle is collision shore",
     "Seed variation preserves the same region/route grammar",
     "Coast and solid pier footprints supply static collision; land buildings are scenery",
-    "No bathymetry, tides, dynamic population or infinite streaming"
+    "No bathymetry, tides, reactive traffic AI or infinite streaming"
   ]
 }
