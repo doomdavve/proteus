@@ -39,6 +39,12 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | v0.0.26 recorded; v0.0.31 is the latest published/deployed release; human input/audio, physical-device/network and browser timing/freshness review remain | 2026-11-14 | [releases](RELEASES.md#status-and-verification) |
 
+## Skerry Reach
+
+The [procedural archipelago plan](PROCEDURAL_WORLD_PLAN.md) covers a fictional solo boating
+location generated from a repeatable seed. The first milestone takes the boat from a sheltered
+fishing harbour through branching channels to the outer light.
+
 ## Empty-room server CPU
 
 [Idle server work](SERVER_IDLE_PLAN.md) fixes fractional-millisecond polling and pauses ordinary
