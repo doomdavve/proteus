@@ -1,9 +1,62 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A6 native implementation and qualification complete locally; recipe 3 ready.
-**Open** — Human review of finer shores and local life; reactive AI, jobs and physical traffic wakes deferred.
-**Done when** — Finer shores and independent boats, seabirds and shore residents pass clearance, seek and native rendering checks.
-**Next** — Native play review of recipe 3, then choose the next archipelago-life behavior.
+**State** — A0–A6 qualified locally; A7–A10 art-direction follow-up in progress.
+**Open** — Fishing-boat character, inhabited marinas and solo day/night cycle; human review.
+**Done when** — Reference-led boats/marina and deterministic cycle pass native checks and visual review.
+**Next** — A7 fishing-boat model, then A8 marina, A9 cycle and A10 qualification/closing.
+
+## Additional art direction — 2026-11-25
+
+The user supplied four photographic references for the next visual iterations. These are
+art direction, not evidence of implemented features or acceptance of recipe 3. Local copies
+preserve the references; they are not game textures. Original source URLs and reuse rights
+were not supplied; the fishing-boat image visibly credits `www.klasnilssonsfotosida.se`.
+
+- **[Fishing boats](procedural/references/fishing-boat.png):** use the character of a
+  traditional Swedish wooden working boat: warm ochre/yellow planked hull, pronounced bow,
+  dark rubbing strakes, repeated hanging black fenders, a compact aft wheelhouse, mast,
+  rigging and Swedish flag. Prioritize silhouette, proportions and readable fittings at the
+  game's resolution. The current generic workboat is not the finished visual target.
+- **[Exposed sea](procedural/references/exposed-sea.png):** aim for wind, weight and movement:
+  blue-green uneven water, bright broken highlights, foam and spray where waves strike low,
+  rounded granite. Contrast exposed passages with sheltered harbour water. This is an
+  aspirational reference; full breaking surf and spray are beyond the current implementation.
+- **[Sunset](procedural/references/sunset.png):** enable a day/night cycle so exploration can
+  reach low orange sunlight, pink/lilac sky and water, a narrow reflected sun path and dark
+  distant skerries. Preserve the quiet sheltered-water mood and broad, smooth granite with
+  shallow pools and sparse vegetation. Coordinate cycle transitions and controls with the
+  [sunset plan](SUNSET_PLAN.md); recording this request does not implement the cycle.
+- **[Marinas](procedural/references/marina.png):** marinas are a high priority for the place's
+  identity. Compose inhabited rocky coves with clusters of red timber boathouses, orange/red
+  pitched roofs, pale trim, jetties and small footbridges, moored boats and sailboat masts.
+  Fit buildings into the rock and sparse green pockets; keep navigable entrances legible.
+  Use the [marina authoring work](MARINA_AUTHORING_PLAN.md) where applicable. Shore houses
+  and passing craft alone do not fulfill this direction.
+
+**Next art task:** use these references in recipe 3's native review, then scope the fishing
+boat and inhabited-marina pass alongside the requested day/night enablement. Keep the existing
+open-loop owners and deferred AI/jobs/physical wakes separate. No new runtime behavior or
+visual verification is claimed by this documentation update; reference files and local links
+were checked on 2026-11-25. Implementation, build/full CTest and visual review remain for the
+chosen follow-up step.
+
+## Art-direction follow-up — 2026-11-25
+
+Continue the existing local branch with no browser work or additional agents.
+
+- A7: traditional ochre wooden fishing workboat, aft wheelhouse, planking, dark fenders,
+  working mast/rigging and Swedish flag; keep generated meshes and contact bounds in agreement.
+- A8: sheltered Home Harbour marina with moored small craft, sailboat masts and connected
+  timber jetties against the red boathouse frontage. Preserve the launch and traffic corridors;
+  share boat poses and contacts across native renderers and simulation.
+- A9: enable the existing 900-simulation-second day/night lighting cycle for solo archipelago
+  exploration; start at noon, pause with simulation and seek deterministically. Explicit fixed
+  lighting overrides it. Keep other locations and multiplayer ownership unchanged.
+- A10: full native build/CTest, deterministic cycle/berth clearance checks, representative
+  CPU/GPU captures and windowed motion check; update the current world guide and evidence.
+
+Breaking surf/spray remains inspiration, deferred with the existing physical-wake, reactive-AI,
+job/economy and browser work. Human acceptance remains separate from automated qualification.
 
 ## The first boat trip
 

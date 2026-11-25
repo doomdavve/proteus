@@ -1,5 +1,8 @@
 # Skerry Reach native review
 
+The [additional art direction](../PROCEDURAL_WORLD_PLAN.md#additional-art-direction--2026-11-25)
+records the user’s fishing-boat, sea, sunset and marina photographs for future iterations.
+
 ## Recipe 3 — finer shores and local life
 
 Native captures on Apple Silicon/macOS, 2026-11-25, Day lighting, audio disabled. Terrain and
