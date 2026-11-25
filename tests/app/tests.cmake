@@ -53,7 +53,7 @@ if(NOT EMSCRIPTEN)
   add_test(NAME cargo_shadow_wave_cpu COMMAND cargo_sandbox --location basin --renderer cpu --shadow-review)
   if(PROTEUS_GPU_TESTS)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
-    set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" TIMEOUT 30)
+    set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 30)
   endif()
   foreach(scenario shadow-high shadow-low remoor crossing receiver-approach delivered
     landing-built redelivered job-reset build-blocked quay-pickup jetty-approach jetty-delivered)

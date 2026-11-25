@@ -1,5 +1,9 @@
 # tests/tools: registered from tests/tests.cmake in the project root's directory scope.
 
+add_test(NAME archipelago_generator COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tools/test_generate_archipelago.py)
+set_tests_properties(archipelago_generator PROPERTIES LABELS "cpu;slow" TIMEOUT 180)
+
 if(NOT EMSCRIPTEN)
   add_test(NAME boat_combat_lighting_hour_invalid
     COMMAND boat_combat_review --lighting-hour nope)

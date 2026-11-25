@@ -103,6 +103,7 @@ give it `--save` or `--data-dir` to keep its session.
 ```sh
 ./build/wake_velocity --location outer
 ./build/wake_velocity --location basin --waves
+./build/wake_velocity --location archipelago
 ./build/wake_velocity --location outer --skin explorer
 ./build/wake_velocity --location outer --start 1980,-1196,75
 ```
@@ -110,6 +111,10 @@ give it `--save` or `--data-dir` to keep its session.
 `outer` covers the Eriksberg waterfront towards Älvsborgsbron, upstream past Hisingsbron and out
 along the fjord, with the solo voyage to Långedrag. The former `river` location, a crop of the same
 water, was retired on 2026-11-04; `--location river` now names `outer` and exits.
+`archipelago` is Skerry Reach, a fictional seeded coast for solo free boating. It selects
+`proteus.archipelago-free`; the title's PLACE row offers the same location. Its seed is baked
+into the build, so there is no runtime `--seed` option. Generation and comparison commands
+are in [the world guide](PROCEDURAL_WORLD.md). Hosting and server rooms use `basin` or `outer`.
 `--start X,Z[,DEGREES]` places a boat on mapped water using simulation coordinates; heading zero
 faces −Z. It is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
 or solo squall.
@@ -132,7 +137,7 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ```
 
 Every native solo session starts from a package compiled into the executable at build time; the
-default for the basin is free boating, for `outer` the Långedrag voyage, and for
+default for the basin and `archipelago` is free boating, for `outer` the Långedrag voyage, and for
 `--course` the basin time trial. `--package ID` selects another bundled package, which must
 belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
 Launching a package starts no Lua VM, polls no files and shows no authoring panel. There is no
@@ -142,7 +147,7 @@ package for another location, fails with an explicit message. The title's single
 panel selects Standard, Harbor life, the Grodan tour or the canal tour for `outer` on native and
 web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
 `--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
-so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
+so tests can prove each PLACE opens (`basin`, `archipelago`, `outer`, `outer-standard`, `outer-harbor-life`,
 `outer-grodan`, `outer-canal-tour`, `outer-working-harbour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring

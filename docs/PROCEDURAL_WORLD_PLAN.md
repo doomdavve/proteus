@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A3 implemented locally, 2026-11-25; A4 native character pass and qualification in progress.
-**Open** — The user found the first playable world bland. Distinct places and a second native review remain.
+**State** — A0–A4 native implementation and qualification complete locally, 2026-11-25; recipe 2 ready.
+**Open** — The user found recipe 1 bland. Recipe 2's experience and place character await human review.
 **Done when** — A player can leave a furnished home harbour, choose between two channels, reach a recognisable outer light and return. Two other seeds pass the same navigability checks and visibly differ.
-**Next** — Inspect the revised harbour, rock passage and enclosed lagoon; complete native verification.
+**Next** — Drive the revised harbour, rock passage and enclosed lagoon; choose the next native content pass.
 
 ## The first boat trip
 
@@ -109,4 +109,48 @@ The shore settlements have low terrain terraces instead of long exposed foundati
 is implemented locally; its C navigation validator completes the same 8.46 km loop, and six
 GPU destination captures plus a 180-frame native windowed demo were inspected with audio off.
 These checks establish operation and agent visual review, not user acceptance of the revision.
-Final full-suite evidence and limitations belong below before handoff.
+The current contract is in [the world guide](PROCEDURAL_WORLD.md), the launch/controls guides
+and the [plugin spec](PLUGIN_API.md#free-schema). The native implementation milestone is closed;
+the experience review remains open rather than being inferred from the test results.
+
+## Native verification — 2026-11-25
+
+Apple Silicon (arm64), macOS 26.6.2, AppleClang 21, Debug, `PROTEUS_GPU_TESTS=ON`.
+
+- Configure and complete native build passed. The final incremental build emitted no compiler
+  warnings. Pinned raylib and ENet source directories were reused from the main checkout.
+- `ctest --preset full` passed **653/653** in 119.94 s, including 36 GPU-labelled checks.
+  The initial run exposed a clock validator that tested every mapped boat against river water;
+  it now queries the selected world's map. A sandbox GPU check lacked the common GPU resource
+  lock; it now takes that lock after initial parallel GLFW monitor-initialization failures.
+  The final full run passed with desktop and loopback-socket access.
+- `boat_archipelago` samples all ten generated routes in C (2,366 positions at at most 4 m
+  spacing), verifies independent scenery/chart ownership and absence of river actors, then
+  drives the explorer through 28 waypoints using ordinary helm/throttle inputs. Result:
+  8,457.9 m, 904.72 simulated seconds, maximum route departure 32.10 m, no capsize, continuous
+  3 m centre clearance and return within 18 m of home. The test advances a virtual clock.
+- The generator validator checks seeds 41717, 41718 and 41719: a connected emitted water mesh,
+  closed shoreline topology, 12 m sampled route/capture clearance, solid pier footprints,
+  different outputs and identical repeated bakes on this host. Shipped geometry is checked
+  independently of compressed bytes. Both alternate-seed PNG previews were inspected; their
+  coastlines vary but share the same regional grammar.
+- CPU reference frames and all six GPU destination frames were inspected. A native
+  `--no-audio --location archipelago --demo --frames 180` run completed; its captured HUD
+  shows the Home Harbour discovery notice. [Review images](procedural/README.md) preserve
+  the revised departure, passage, fishing shore, bell house, lagoon and outer light.
+- The public-room digest remains `d8edae7493480844`, matching the unchanged baseline.
+  Private-local archipelago parity, public-room rejection, title persistence, package policy
+  and virtual-clock discovery behavior pass. Sixteen added/changed documentation targets
+  resolved, and `git diff --check` passed.
+
+Recipe 2 has 48 island lobes, 337 trees, 20,640 water triangles and 38,568 full scenery
+triangles. Its scenery pack is 267,644 bytes; the collision cache is about 1.9 MB. These are
+resource counts, not a frame-time benchmark. The real-source `outer` pack has 648,229 total
+triangles and is 5,899,814 bytes; density alone does not explain or establish enjoyment.
+The generator has not been calibrated against real-source channel/settlement statistics.
+
+No second user acceptance, audio listening, Release, packaged-app execution, Windows/Linux,
+physical-device or browser-play qualification is claimed. Browser staging/build work already
+performed is left local, but browser qualification stopped at the user's request. No work was
+pushed or published. Jobs, dynamic traffic/life, persistence, tides, streaming and runtime seed
+selection remain explicitly deferred; a sparse repeatable route grammar is still a limitation.

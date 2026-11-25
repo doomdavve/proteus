@@ -96,6 +96,16 @@ reset/recovery action to get moving again.
 
 ## Explore
 
+SKERRY REACH is a separate fictional archipelago. In a source build, choose SINGLE PLAYER,
+PLACE SKERRY REACH, or run `./build/wake_velocity --location archipelago`. Leave the home
+harbour to explore the island channels and outer coast, then find your way back. The chart
+(`N`) names the landings and navigation landmarks; approaching a place shows its name once
+per trip. Holding Backspace resets the boat to the home harbour. Discoveries are not saved.
+This first procedural location is solo free boating, with a fixed baked seed; it has no
+work jobs or multiplayer rooms. See [the world guide](PROCEDURAL_WORLD.md) for the generation
+recipe and alternate-seed review commands. Public downloads and the hosted browser change
+only when a release containing this work is published.
+
 Gothenburg Harbour (the title's default PLACE; `--location outer`) starts in the Eriksberg dock, with moored craft,
 moving traffic and gulls. Leave the dock and follow the river southwest towards Älvsborgsbron.
 The basin provides an open practice area. Player wakes are rideable; crossing your own trail or another

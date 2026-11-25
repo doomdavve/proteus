@@ -3,7 +3,8 @@
 Current status reconciled on 2026-11-07. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
-Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`), a
+Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`),
+plus the local experimental Skerry Reach archipelago (`archipelago`), a
 basin time trial, the Långedrag voyage and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
 display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrack, the separate
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git
@@ -17,6 +18,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 | Area | Open loop (human check or unfinished step) | Since | Owner |
 | --- | --- | --- | --- |
+| Procedural world | First playable found bland by the user; native character revision available for review. Browser work deferred at the user's request. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
 | Wakes | R2b experimental CPU basin trial available; curved handling preservation failed, user comparison next; production recipe unchanged, broader performance/platform review open | 2026-11-19 | [wake research](WAKE_RESEARCH_PLAN.md) |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
 | Plugins | P5 follow-ups: hunt tick cost has Debug and Release numbers (M1 Max, ENet bots) but no WebRTC clients or other platform, and Release reading slower than Debug is unexplained (the browser hunt case and old-bundle rejection passed on Chrome/macOS 2026-11-14); P5g recording not qualified beyond macOS Debug, with disk cost and a human view of a reconstruction open; R2 loaded maps not scheduled | 2026-11-14 | [P5 plan](PLUGIN_P5_PLAN.md#p5i-closing-step) |
@@ -41,9 +43,12 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 ## Skerry Reach
 
-The [procedural archipelago plan](PROCEDURAL_WORLD_PLAN.md) covers a fictional solo boating
-location generated from a repeatable seed. The first milestone takes the boat from a sheltered
-fishing harbour through branching channels to the outer light.
+Skerry Reach is a local solo boating location generated from a repeatable seed, with branching
+routes, six named places and solid jetties. The first user drive found it bland; the native
+revision adds a granite passage, enclosed wooded lagoon and more distinct shore sites.
+The [world guide](PROCEDURAL_WORLD.md) owns the current contract; the
+[plan](PROCEDURAL_WORLD_PLAN.md) records checks, limitations and the next human review.
+Runtime seed selection, jobs and traffic remain deferred. No PR or publication is authorized.
 
 ## Empty-room server CPU
 
