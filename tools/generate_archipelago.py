@@ -449,7 +449,8 @@ class World:
     def preview(self, output):
         width, height = 800, 928
         def pos(p):
-            return ((p[0]-BOUNDS[0])/4, (BOUNDS[3]-p[1])/4)
+            # The in-game nautical chart has east to the right; simulation X increases west.
+            return ((BOUNDS[2]-p[0])/4, (BOUNDS[3]-p[1])/4)
         lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
                  f'viewBox="0 0 {width} {height}">',
                  '<rect width="100%" height="100%" fill="#284f67"/>',

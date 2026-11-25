@@ -230,6 +230,8 @@ static int scenery(void)
     WaterfrontScenery scenery;
     CHECK(waterfront_scenery_init(&scenery, location->map));
     CHECK(!scenery.river && !scenery.ground);
+    CHECK(scenery.ready && scenery.tiles.tiles);
+    CHECK(!scenery.count && !scenery.boxes && !scenery.bounds);
     BoatMinimap minimap;
     CHECK(boat_minimap_init(&minimap, location));
     const Image *chart

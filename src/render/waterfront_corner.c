@@ -1,6 +1,7 @@
 #include "render/waterfront_corner.h"
 #include "scenery/building_windows.h"
 
+#include "core/boat_archipelago.h"
 #include "core/waterfront_city.h"
 #include "render/waterfront_scene.h"
 #include "scenery/boat_scenery.h"
@@ -785,6 +786,11 @@ bool waterfront_scenery_init_tiled(
         || !boat_map_tiles_init_land(&scenery->tiles, scenery->full, tile_size)) {
         *scenery = (WaterfrontScenery) { 0 };
         return false;
+    }
+    // Skerry Reach bakes its own quays, frontages and shore fittings into the map.
+    if (map == &boat_archipelago_map) {
+        scenery->ready = true;
+        return true;
     }
     scenery->ground = waterfront_kit_ground(map);
     scenery->river = waterfront_map_has_river_kit(map);

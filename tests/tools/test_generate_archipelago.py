@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -80,6 +81,16 @@ def check_seed(seed, output):
     assert hashlib.sha256((output/'scenery.bin').read_bytes()).hexdigest() == manifest['scenery_sha256']
     mesh = Water(vertices,triangles[:water])
     assert len(mesh.shore) == manifest['counts']['shore_edges']
+    preview = ET.parse(output/'preview.svg')
+    marks = preview.findall('.//{http://www.w3.org/2000/svg}circle')
+    assert len(marks) == len(manifest['places'])
+    # Each marker must lie on the same side of home as on the game's north-up chart.
+    for mark, place in zip(marks, manifest['places']):
+        x, z = place['position']
+        east = float(mark.get('cx')) - float(marks[0].get('cx'))
+        north = float(marks[0].get('cy')) - float(mark.get('cy'))
+        assert math.isclose(east, -x / 4, abs_tol=.06)
+        assert math.isclose(north, z / 4, abs_tol=.06)
     for z in range(0,-65,-4):
         assert mesh.contains((0,z), 12), ('launch',seed,z)
     for place in manifest['places']:
