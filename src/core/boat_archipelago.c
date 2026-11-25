@@ -20,6 +20,13 @@ const BoatArchipelagoPlace *boat_archipelago_places(size_t *count)
     return archipelago_places;
 }
 
+const Vector3 *boat_archipelago_moorings(unsigned berth)
+{
+    return berth < sizeof(archipelago_moorings) / sizeof(archipelago_moorings[0])
+        ? archipelago_moorings[berth]
+        : NULL;
+}
+
 BoatModelSpec boat_archipelago_fishing_spec(void)
 {
     BoatModelSpec s = boat_model_preset(BOAT_MODEL_WORKBOAT);

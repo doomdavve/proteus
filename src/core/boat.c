@@ -163,6 +163,10 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
                 && waterfront_harbor_contact_height_scene(world->scene, point, HULL_SHORE_CLEARANCE,
                     bottom, top, world->water, time, &normal))
                 water = false;
+            if (water && world->definition->map == &boat_archipelago_map
+                && waterfront_harbor_berths_contact_height_scene(boat_archipelago_life(), point,
+                    HULL_SHORE_CLEARANCE, bottom, top, world->water, time, &normal))
+                water = false;
         } else {
             Vector2 half = world->definition->half_extent;
             water = fabsf(point.x) <= half.x - HULL_SHORE_CLEARANCE

@@ -1,6 +1,5 @@
 #include "render/boat_view.h"
 #include "core/boat_archipelago.h"
-#include "render/boat_archipelago_view.h"
 #include "core/boat_combat.h"
 #include "core/boat_map.h"
 #include "core/boat_pose.h"
@@ -8,6 +7,7 @@
 #include "core/waterfront_outer.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "render/boat_archipelago_view.h"
 #include "render/boat_cargo_view.h"
 #include "render/boat_course_view.h"
 #include "render/boat_grodan.h"
@@ -910,6 +910,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, &life);
         renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &life.traffic);
+        if (!waterfront_draw_harbor(renderer, &cpu->harbor, &life.harbor))
+            return false;
         for (int i = 0; i < life.gull_count; ++i)
             for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
                 renderer3d_draw_emissive_mesh(

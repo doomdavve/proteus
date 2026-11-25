@@ -47,6 +47,7 @@ typedef struct {
     int berth_count;
     bool visible[BOAT_SCENE_BERTHS];
     Transform3D ferry;
+    bool omit_ferry; // Local marinas can share hull rendering without the compiled river ferry.
     // Compiled dock furniture (NULL/length-zero authored-module scenes use modules instead).
     Transform3D pontoon;
     Transform3D gangway;
@@ -89,6 +90,10 @@ Vector3 waterfront_harbor_attachment(Transform3D pose, Vector3 local);
 bool waterfront_harbor_contact(Vector2 position, float clearance, Vector2 *normal);
 bool waterfront_harbor_contact_height(Vector2 position, float clearance, float bottom, float top,
     BoatWater water, double time, Vector2 *normal);
+// Authored moored hulls only, excluding compiled river fixtures and authored modules.
+bool waterfront_harbor_berths_contact_height_scene(const BoatSceneDefinition *scene,
+    Vector2 position, float clearance, float bottom, float top, BoatWater water, double time,
+    Vector2 *normal);
 bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,
     float clearance, float bottom, float top, BoatWater water, double time, Vector2 *normal);
 bool waterfront_harbor_camera_clear(Vector3 position, float clearance);

@@ -17,6 +17,8 @@ typedef struct {
 const BoatArchipelagoPlace *boat_archipelago_places(size_t *count);
 
 BoatModelSpec boat_archipelago_fishing_spec(void);
+// Two fixed jetty tie points in renderer coordinates for each local berth.
+const Vector3 *boat_archipelago_moorings(unsigned berth);
 
 struct BoatSceneDefinition;
 // Native local life only: independent of plugin-authored scenes and the public-room digest.

@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import map_pack  # noqa: E402
 
-RECIPE = 3
+RECIPE = 4
 DEFAULT_SEED = 41717
 STEP = 16
 WATER_STEP = 32
@@ -479,7 +479,7 @@ class World:
             shore = self.shore_at("home", math.atan2(z, x), 240)
             if shore:
                 self.house(*shore, width=r.uniform(10, 16), color=r.choice(
-                    [(151, 62, 46), (167, 143, 99), (188, 183, 153)]))
+                    [(151, 62, 46), (137, 57, 45), (165, 69, 48)]))
         mouth_beacon = self.shore_at("mouth", math.atan2(160,120), 300)
         if mouth_beacon:
             self.lighthouse(*mouth_beacon, small=True)
@@ -729,13 +729,35 @@ class World:
                   for x in range(BOUNDS[0],BOUNDS[2]+1,32)]
         return actors,flocks,residents,ground
 
+    def marina(self):
+        """Two small boats alongside each home jetty, outside the central departure lane."""
+        berths = []
+        for pier, (start, end) in enumerate(self.docks[:2]):
+            dx, dz = end[0]-start[0], end[1]-start[1]
+            length = math.hypot(dx, dz)
+            dx, dz = dx/length, dz/length
+            for side in (-1, 1):
+                x = start[0] - dx*3 - dz*side*5.5
+                z = start[1] - dz*3 + dx*side*5.5
+                berths.append(dict(id=f'home_{pier}_{"port" if side < 0 else "starboard"}',
+                                   x=x, z=z, heading=math.atan2(-dx, -dz),
+                                   recipe='SAILBOAT_7M' if side < 0 else 'RUNABOUT',
+                                   ties=[[start[0]+dx*t, start[1]+dz*t] for t in (0, 5)]))
+        return berths
+
     def write_life(self, output):
         actors,flocks,residents,ground = self.life()
         f = map_pack.c_float
         lines = ['// Generated native life. POINTS routes use renderer east/Z; residents use simulation X/Z.',
                  'static const BoatSceneDefinition archipelago_life = {',
-                 '    .version = BOAT_SCENE_VERSION, .traffic_present = true,',
-                 '    .traffic = { .actor_count = 4, .actors = {']
+                 '    .version = BOAT_SCENE_VERSION, .berths_present = true,',
+                 f'    .berth_count = {len(self.marina())}, .berths = {{']
+        for berth in self.marina():
+            lines += [f'        {{ .id = "{berth["id"]}", .recipe = BOAT_SCENE_BERTH_{berth["recipe"]},',
+                      f'          .x = {f(berth["x"])}, .z = {f(berth["z"])}, '
+                      f'.heading = {f(berth["heading"])}, .mooring = BOAT_SCENE_MOORING_PONTOON }},']
+        lines += ['    }, .traffic_present = true,',
+                  '    .traffic = { .actor_count = 4, .actors = {']
         for a in actors:
             lines += [f'        {{ .id = "{a["id"]}", .shape = WATERFRONT_ROUTE_POINTS,',
                       f'          .recipe = WATERFRONT_CRAFT_{a["recipe"]}, .retain = 0xff,',
@@ -766,6 +788,11 @@ class World:
             coat = ', '.join(str(v) for v in r['coat'])
             lines += [f'    {{ {{ {start} }}, {{ {end} }}, {f(r["period"])}, '
                       f'{f(r["phase"])}, {{ {coat}, 255 }} }},']
+        lines += ['};', 'static const Vector3 archipelago_moorings[][2] = {']
+        for berth in self.marina():
+            ties = ', '.join('{ '+f(-x)+', 1.6f, '+f(z)+' }' for x,z in berth['ties'])
+            lines += ['    { '+ties+' },']
+        # The common final terminator below closes the mooring table first.
         columns = (BOUNDS[2]-BOUNDS[0])//32+1
         rows = (BOUNDS[3]-BOUNDS[1])//32+1
         lines += ['};', f'enum {{ archipelago_ground_columns = {columns}, '
@@ -831,7 +858,7 @@ class World:
                         "arrival_radius_m": radius}
                        for name,node,radius in self.places],
             "routes": routes, "structures": self.structures,
-            "life": life,
+            "life": life, "marina": self.marina(),
             "dock_footprints": [{"start": a, "end": b, "width_m": 4.2} for a,b in self.docks],
             "limits": ["Bounded offline bake; outside rectangle is collision shore",
                        "Seed variation preserves the same region/route grammar",

@@ -1,7 +1,7 @@
 {
   "name": "Skerry Reach",
   "location": "archipelago",
-  "recipe": 3,
+  "recipe": 4,
   "seed": 41717,
   "generator": "tools/generate_archipelago.py",
   "sources": "Entirely synthetic; no external geographic source data",
@@ -21,7 +21,7 @@
     ],
     "heading_radians": 0
   },
-  "scenery_sha256": "6fe44f20f14649104877919d0ca8c0516634b8a8104762eb156359bd58161af3",
+  "scenery_sha256": "ad01a8989f7db8badad9e6a6743fe5ba02b3fead2bca3e9672c53696a8addbad",
   "water_header_sha256": "2ad13de5a9114ca7d39efc7707848df70347ac208268314f399f61f46dccb044",
   "counts": {
     "island_recipes": 48,
@@ -31,7 +31,7 @@
     "triangles": 70992,
     "water_triangles": 36192,
     "shore_edges": 4422,
-    "scenery_bytes": 483805
+    "scenery_bytes": 483810
   },
   "places": [
     {
@@ -726,6 +726,76 @@
     "gulls": 26,
     "physical_traffic_wakes": false
   },
+  "marina": [
+    {
+      "id": "home_0_port",
+      "x": -28.67654404007205,
+      "z": -6.993269758690013,
+      "heading": 1.1441688336680205,
+      "recipe": "SAILBOAT_7M",
+      "ties": [
+        [
+          -29.13172727880335,
+          -13.24169421763789
+        ],
+        [
+          -33.68355966611637,
+          -15.310708939143812
+        ]
+      ]
+    },
+    {
+      "id": "home_0_starboard",
+      "x": -24.12471165275902,
+      "z": -17.007301010778665,
+      "heading": 1.1441688336680205,
+      "recipe": "RUNABOUT",
+      "ties": [
+        [
+          -29.13172727880335,
+          -13.24169421763789
+        ],
+        [
+          -33.68355966611637,
+          -15.310708939143812
+        ]
+      ]
+    },
+    {
+      "id": "home_1_port",
+      "x": 26.640695958025994,
+      "z": -20.236682506577438,
+      "heading": -1.0863183977578734,
+      "recipe": "SAILBOAT_7M",
+      "ties": [
+        [
+          31.857056005751364,
+          -16.766871581974403
+        ],
+        [
+          36.28164711766128,
+          -19.095603746137513
+        ]
+      ]
+    },
+    {
+      "id": "home_1_starboard",
+      "x": 31.76390671918484,
+      "z": -10.502582060375634,
+      "heading": -1.0863183977578734,
+      "recipe": "RUNABOUT",
+      "ties": [
+        [
+          31.857056005751364,
+          -16.766871581974403
+        ],
+        [
+          36.28164711766128,
+          -19.095603746137513
+        ]
+      ]
+    }
+  ],
   "dock_footprints": [
     {
       "start": [

@@ -3,7 +3,7 @@
 **State** — A0–A6 qualified locally; A7–A10 art-direction follow-up in progress.
 **Open** — Fishing-boat character, inhabited marinas and solo day/night cycle; human review.
 **Done when** — Reference-led boats/marina and deterministic cycle pass native checks and visual review.
-**Next** — A8 marina, then A9 cycle and A10 qualification/closing.
+**Next** — A9 cycle, then A10 qualification/closing.
 
 ## Additional art direction — 2026-11-25
 
@@ -284,3 +284,16 @@ Native Debug build, existing harbor appearance/geometry checks and the full 653-
 passed on Apple Silicon/macOS 26.6.2 with GPU tests enabled. The local validator checks the
 fishing mesh against its declared bounds; the close GPU fishing view was inspected. These are
 automated/agent checks, not human acceptance. A8 is next; breaking surf stays deferred.
+
+### A8 result — 2026-11-25
+
+Recipe 4 gives Home Harbour two moored runabouts and two seven-metre sailboats, eight
+jetty-to-hull mooring lines and red boathouse frontages. The generated water geometry and
+central departure route are retained. Berths sit clear of both shore and solid pier footprints;
+local hull-only contacts share the rendered specs/poses without importing Gothenburg fixtures.
+CPU/GPU rendering shares the native harbor hull cache, including reflection and shadow poses.
+
+The three-seed generator validator and native berth/route/seek checks pass; the native Debug
+build and 653-test full suite passed with GPU tests enabled. Default-view CPU/GPU and a closer
+GPU marina capture were inspected. Four boats are a first small marina composition; interactive
+docking, occupancy services and harbour night lamps remain deferred. Human review is open.

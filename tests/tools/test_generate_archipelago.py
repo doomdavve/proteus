@@ -140,6 +140,17 @@ def check_seed(seed, output):
     for actor in manifest['life']['actors']:
         for p in traffic_samples(actor):
             assert mesh.contains(p,8), ('traffic',seed,actor['id'],p)
+    assert len(manifest['marina']) == 4
+    for berth in manifest['marina']:
+        h = berth['heading']
+        length, beam = (7, 2.4) if berth['recipe'] == 'SAILBOAT_7M' else (5.8, 2.15)
+        for side in (-1, 0, 1):
+            for end in (-1, 0, 1):
+                across, along = side*(beam/2+.45), end*(length/2+.9)
+                p = (berth['x']-math.cos(h)*across-math.sin(h)*along,
+                     berth['z']-math.sin(h)*across+math.cos(h)*along)
+                assert mesh.contains(p,.1), ('marina hull over shore/pier',seed,berth,p)
+        assert abs(berth['x']) > 20, ('marina launch clearance',seed,berth)
     assert len(manifest['life']['residents']) >= 4
     for resident in manifest['life']['residents']:
         a,b = resident['start'],resident['end']

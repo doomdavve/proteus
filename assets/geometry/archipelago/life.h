@@ -1,6 +1,16 @@
 // Generated native life. POINTS routes use renderer east/Z; residents use simulation X/Z.
 static const BoatSceneDefinition archipelago_life = {
-    .version = BOAT_SCENE_VERSION, .traffic_present = true,
+    .version = BOAT_SCENE_VERSION, .berths_present = true,
+    .berth_count = 4, .berths = {
+        { .id = "home_0_port", .recipe = BOAT_SCENE_BERTH_SAILBOAT_7M,
+          .x = -28.676544f, .z = -6.99326976f, .heading = 1.14416883f, .mooring = BOAT_SCENE_MOORING_PONTOON },
+        { .id = "home_0_starboard", .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+          .x = -24.1247117f, .z = -17.007301f, .heading = 1.14416883f, .mooring = BOAT_SCENE_MOORING_PONTOON },
+        { .id = "home_1_port", .recipe = BOAT_SCENE_BERTH_SAILBOAT_7M,
+          .x = 26.640696f, .z = -20.2366825f, .heading = -1.0863184f, .mooring = BOAT_SCENE_MOORING_PONTOON },
+        { .id = "home_1_starboard", .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+          .x = 31.7639067f, .z = -10.5025821f, .heading = -1.0863184f, .mooring = BOAT_SCENE_MOORING_PONTOON },
+    }, .traffic_present = true,
     .traffic = { .actor_count = 4, .actors = {
         { .id = "harbour_launch", .shape = WATERFRONT_ROUTE_POINTS,
           .recipe = WATERFRONT_CRAFT_CRUISER, .retain = 0xff,
@@ -84,6 +94,12 @@ static const BoatArchipelagoResident archipelago_residents[] = {
     { { -782.28738f, 2.12312774f, -659.991544f }, { -782.400784f, 2.12312774f, -668.990829f }, 48.0f, 28.0f, { 181, 111, 55, 255 } },
     { { 890.280222f, 1.97919967f, -1226.73463f }, { 890.280222f, 2.19132271f, -1217.73463f }, 52.0f, 35.0f, { 65, 99, 129, 255 } },
     { { 890.280222f, 2.19132271f, -1217.73463f }, { 887.812354f, 1.85833469f, -1209.07959f }, 56.0f, 42.0f, { 179, 164, 109, 255 } },
+};
+static const Vector3 archipelago_moorings[][2] = {
+    { { 29.1317273f, 1.6f, -13.2416942f }, { 33.6835597f, 1.6f, -15.3107089f } },
+    { { 29.1317273f, 1.6f, -13.2416942f }, { 33.6835597f, 1.6f, -15.3107089f } },
+    { { -31.857056f, 1.6f, -16.7668716f }, { -36.2816471f, 1.6f, -19.0956037f } },
+    { { -31.857056f, 1.6f, -16.7668716f }, { -36.2816471f, 1.6f, -19.0956037f } },
 };
 enum { archipelago_ground_columns = 101, archipelago_ground_rows = 117 };
 static const unsigned short archipelago_ground_cm[] = {

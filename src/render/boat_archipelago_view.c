@@ -23,6 +23,35 @@ void boat_archipelago_evaluate(
     BoatWater water, double time, Vector3 player, Vector3 velocity, WaterfrontSceneFrame *frame)
 {
     const BoatSceneDefinition *life = boat_archipelago_life();
+    // The baked piers supply static collision. Borrow only authored hull recipes and poses;
+    // the Gothenburg ferry, quay and furniture do not belong to this local marina.
+    frame->harbor.modules_authored = true;
+    frame->harbor.omit_ferry = true;
+    frame->harbor.berth_count = (int)life->berth_count;
+    for (unsigned i = 0; i < life->berth_count; ++i) {
+        WaterfrontBerth berth = waterfront_harbor_berth_at(life, i);
+        BoatModelSpec spec = waterfront_harbor_berth_spec(&berth);
+        frame->harbor.recipes[i] = berth.recipe;
+        frame->harbor.specs[i] = spec;
+        frame->harbor.visible[i] = true;
+        frame->harbor.boats[i]
+            = boat_water_pose(water, time, berth.position, berth.heading, spec.length, spec.beam);
+        const Vector3 *ties = boat_archipelago_moorings(i);
+        for (int end = 0; ties && end < 2; ++end) {
+            Transform3D pose = frame->harbor.boats[i];
+            Vector3 local = Vector3Transform(
+                Vector3Subtract(ties[end], pose.position), MatrixRotateY(-berth.heading));
+            Vector3 attachment = boat_model_point(pose,
+                (Vector3) { copysignf(spec.beam * .4f, local.x), spec.freeboard,
+                    (end ? -.3f : .3f) * spec.length });
+            Vector3 delta = Vector3Subtract(ties[end], attachment);
+            float length = Vector3Length(delta);
+            frame->harbor.lines[frame->harbor.line_count++]
+                = (Transform3D) { .position = Vector3Lerp(attachment, ties[end], .5f),
+                      .rotation = { -asinf(delta.y / length), atan2f(delta.x, delta.z), 0 },
+                      .scale = { .045f, .045f, length } };
+        }
+    }
     waterfront_traffic_evaluate_routes(&life->traffic, water, time, &frame->traffic);
     waterfront_boating_gulls_scene(life, time, player, velocity, frame);
     for (int i = 0; i < frame->gull_count; ++i) {

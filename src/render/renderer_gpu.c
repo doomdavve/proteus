@@ -1541,8 +1541,8 @@ static void reveal_select(WaterfrontGpuScene *scene, Vector3 anchor)
             bool far = dx * dx + dz * dz > reach * reach;
             if (far && !scene->window_cell_reveals[cell])
                 continue;
-            for (unsigned k = scene->window_cell_start[cell]; k < scene->window_cell_start[cell + 1];
-                 ++k) {
+            for (unsigned k = scene->window_cell_start[cell];
+                k < scene->window_cell_start[cell + 1]; ++k) {
                 unsigned i = scene->window_cell_facades[k];
                 if (i >= count || i >= scene->window_facade_total)
                     continue;
@@ -3143,7 +3143,8 @@ static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
         draw_colored_mesh(
             scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
     }
-    draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
+    if (!harbor->omit_ferry)
+        draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     for (int i = 0; i < harbor->berth_count; ++i)
         if (harbor->visible[i])
             draw_colored_mesh(scene->harbor_custom[i].vaoId
@@ -3235,7 +3236,7 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
 {
     if (!frame->boating_basin) {
         add_scenery(scene, frame, material);
-        if (!frame->map_only) {
+        if (!frame->map_only || frame->harbor.berth_count) {
             draw_harbor(scene, material, frame, emissive);
         }
         draw_traffic(scene, material, frame, emissive);
