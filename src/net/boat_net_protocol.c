@@ -1183,6 +1183,11 @@ uint64_t boat_net_bytes_digest(const void *data, size_t size)
     return d.value;
 }
 
+bool boat_net_room_location(BoatLocationId location)
+{
+    return location == BOAT_LOCATION_BASIN || location == BOAT_LOCATION_OUTER;
+}
+
 uint64_t boat_net_content_digest(void)
 {
     // Compiled geometry is immutable. LAN rows may ask for compatibility every frame.
@@ -1199,6 +1204,8 @@ uint64_t boat_net_content_digest(void)
     digest_float(&d, BOAT_CANNON_MUZZLE_SIDE);
     digest_bytes(&d, "proteus-boat-net", 16);
     for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
+        if (!boat_net_room_location((BoatLocationId)id))
+            continue;
         const BoatWorldDefinition *definition = boat_location(id);
         digest_u64(&d, (uint64_t)definition->id);
         digest_u64(&d, definition->mapped);

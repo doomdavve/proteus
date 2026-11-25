@@ -613,6 +613,14 @@ static int basin_8x(void) { return run(BASIN, eight, 40); }
 static int outer_8x(void) { return run(OUTER, eight, 30); }
 static int outer_1x(void) { return run(OUTER, one, 200); }
 
+// The solo-only procedural coast still uses the ordinary local authority/client transport.
+static int archipelago_1x(void)
+{
+    const World islands = { BOAT_LOCATION_ARCHIPELAGO, true, false, false, NULL };
+    CHECK(!boat_net_room_location(islands.location));
+    return run(islands, one, 300);
+}
+
 // L6: `--demo` through the local session. The scripted drive's helm changes at ticks 420 and
 // 1440; uneven frames at 1x and 8x cross both, every predicted tick equal to demo_step's.
 static int scripted_demo(void)
@@ -2834,6 +2842,7 @@ int main(int argc, char **argv)
         TEST_CASE(basin_quarter),
         TEST_CASE(basin_8x),
         TEST_CASE(outer_1x),
+        TEST_CASE(archipelago_1x),
         TEST_CASE(outer_8x),
         SLOW_CASE(scripted_demo),
         SLOW_CASE(scripted_capture),

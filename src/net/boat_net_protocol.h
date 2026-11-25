@@ -404,7 +404,10 @@ BoatNetCommand boat_net_precise_command(BoatInput input, uint8_t flags);
 // The command an inactive or silent slot integrates: controls easing toward neutral.
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags);
 
-// Compatibility digest of all compiled locations/shore geometry, the cannon constants, the
+// Public rooms currently support the basin and Gothenburg only. Private local authorities
+// also use this codec for solo-only maps, without expanding the multiplayer content contract.
+bool boat_net_room_location(BoatLocationId location);
+// Compatibility digest of public-room locations/shore geometry, the cannon constants, the
 // fleet/wake contract and the weather recipes. The room supplies the course, rules and contacts.
 uint64_t boat_net_content_digest(void);
 // Canonical digest of the live record set (slot index and every field of live records).

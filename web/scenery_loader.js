@@ -1,4 +1,4 @@
-// Scenery packs the page does not preload (A3.5i): the outer map's is fetched the first time a
+// Scenery packs the page does not preload are fetched the first time a
 // session needs it and written to the in-memory file system where the game reads its packs.
 Module['boatScenery'] = (() => {
   const loads = {};
@@ -45,10 +45,14 @@ Module['boatScenery'] = (() => {
       };
       const directory = path.slice(0, path.lastIndexOf('/') + 1);
       fetchInto('scenery.bin', path, true)
-        .then(() => fetchInto('water_atlas.bin', directory + 'water_atlas.bin', false).catch(
-          error => console.warn('Water atlas', name, error)))
-        .then(() => fetchInto('ambient.bin', directory + 'ambient.bin', false).catch(error =>
-          console.warn('Ambient occlusion', name, error)))
+        .then(() => name === 'outer'
+          ? fetchInto('water_atlas.bin', directory + 'water_atlas.bin', false).catch(
+              error => console.warn('Water atlas', name, error))
+          : undefined)
+        .then(() => name === 'outer'
+          ? fetchInto('ambient.bin', directory + 'ambient.bin', false).catch(error =>
+              console.warn('Ambient occlusion', name, error))
+          : undefined)
         .then(() => {
           load.state = 2;
         })

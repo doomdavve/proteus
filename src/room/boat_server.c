@@ -917,6 +917,10 @@ int boat_server_main(int argc, char **argv)
                     value);
                 return 2;
             }
+            if (!boat_net_room_location(location->id)) {
+                fprintf(stderr, "boat_server: %s is solo-only.\n", location->name);
+                return 2;
+            }
             room_options.location = location->id;
             location_given = true;
             ++i;

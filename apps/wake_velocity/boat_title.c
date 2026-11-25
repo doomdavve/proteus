@@ -1026,8 +1026,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 s->host_mode
                     = (s->host_mode + BOAT_TITLE_HOST_MODES + turn) % BOAT_TITLE_HOST_MODES;
             else if (t.selected == ROW_PLACE && !fixed_place(s))
-                s->host_location
-                    = (s->host_location + BOAT_LOCATION_COUNT + turn) % BOAT_LOCATION_COUNT;
+                s->host_location = (s->host_location + BOAT_LOCATION_OUTER + 1 + turn)
+                    % (BOAT_LOCATION_OUTER + 1);
             else if (t.selected == ROW_WATER && turn)
                 s->host_waves = !s->host_waves;
             activate = false;
@@ -1287,7 +1287,7 @@ void boat_title_load(BoatTitleSettings *s)
                     s->host_mode = i;
         } else if (!strcmp(line, "host_location")) {
             const BoatWorldDefinition *location = boat_location_find(value);
-            if (location)
+            if (location && boat_net_room_location(location->id))
                 s->host_location = location->id;
         } else if (!strcmp(line, "host_waves"))
             s->host_waves = !strcmp(value, "on");

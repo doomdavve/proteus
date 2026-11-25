@@ -153,7 +153,7 @@ jobs:
           Copy-Item build-win/Release/assets/fonts "$package/assets" -Recurse
           New-Item -ItemType Directory -Force -Path "$package/assets/music" | Out-Null
           Copy-Item build-win/Release/assets/music/a-little-boat.xm "$package/assets/music"
-          foreach ($map in "river", "outer") {
+          foreach ($map in "river", "outer", "archipelago") {
             New-Item -ItemType Directory -Force -Path "$package/assets/geometry/$map" | Out-Null
             Copy-Item "assets/geometry/$map/manifest.json" "$package/assets/geometry/$map"
             Copy-Item "assets/geometry/$map/scenery.bin" "$package/assets/geometry/$map"

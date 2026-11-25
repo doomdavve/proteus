@@ -49,6 +49,8 @@ configure_file(assets/geometry/river/scenery.bin "${WEB_ASSETS}/geometry/river/s
   COPYONLY)
 configure_file(assets/geometry/outer/scenery.bin
   "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/scenery.bin" COPYONLY)
+configure_file(assets/geometry/archipelago/scenery.bin
+  "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/archipelago/scenery.bin" COPYONLY)
 # The water atlas (graphics G4) is fetched with the outer pack. A missing atlas only loses the
 # atlas shading.
 configure_file(assets/geometry/outer/water_atlas.bin

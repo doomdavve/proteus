@@ -26,6 +26,8 @@ bool boat_net_server_init(
         || config->room->location != config->resources->definition->id)
         return false;
     const BoatRoomDefinition *room = config->room;
+    if (!config->local.enabled && !boat_net_room_location((BoatLocationId)room->location))
+        return false;
     BoatRoomDiagnostic check;
     if (!boat_room_definition_validate(room, &check))
         return false;

@@ -63,7 +63,7 @@ def load_layout():
                 "anchors_name": "tools/plugin_anchors.json",
                 "api_document": "docs/PLUGIN_API.md",
                 "examples": ["plugins/langedrag", "plugins/harbor-life", "plugins/river-sprint",
-                             "plugins/shelter-tour", "plugins/basin-free",
+                             "plugins/shelter-tour", "plugins/basin-free", "plugins/archipelago-free",
                              "plugins/time-trial"]}
     with open(path, encoding="utf-8") as stream:
         package = json.load(stream)
@@ -171,7 +171,7 @@ def capabilities():
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
             "browser": {"capabilities": ["voyage.define", "free.define", "course.define",
                                          "scene.define"],
-                        "locations": ["basin", "outer"],
+                        "locations": ["basin", "outer", "archipelago"],
                         "bundle_format": "wake-velocity-plugin", "bundle_version": 2,
                         "result_bytes": 16384},
             "workspace": {"kinds": ["voyage", "free"],

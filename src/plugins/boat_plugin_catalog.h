@@ -21,6 +21,7 @@ extern const unsigned boat_plugin_catalog_count;
 
 // Bundled defaults. A missing default is a build failure, never a launch-time fallback.
 #define BOAT_PLUGIN_DEFAULT_BASIN_FREE "proteus.basin-free"
+#define BOAT_PLUGIN_DEFAULT_ARCHIPELAGO_FREE "proteus.archipelago-free"
 #define BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE "proteus.langedrag"
 #define BOAT_PLUGIN_DEFAULT_RACE "proteus.river-sprint"
 #define BOAT_PLUGIN_DEFAULT_BASIN_COURSE "proteus.time-trial"
@@ -30,8 +31,8 @@ extern const unsigned boat_plugin_catalog_count;
 
 const BoatPluginCatalogEntry *boat_plugin_catalog_at(unsigned index);
 const BoatPluginCatalogEntry *boat_plugin_catalog_find(const char *id);
-// KIND's default for LOCATION, or NULL. FREE uses the basin or outer package; VOYAGE the outer
-// voyage; COURSE the basin time trial; RACE the river sprint on the outer map.
+// KIND's default for LOCATION, or NULL. FREE uses the basin, outer or archipelago package; VOYAGE
+// the outer voyage; COURSE the basin time trial; RACE the river sprint on the outer map.
 const BoatPluginCatalogEntry *boat_plugin_catalog_default(
     BoatPluginKind kind, const char *location);
 // LOCATION's bundled work package: the basin reference fixture or the outer job, or NULL. This

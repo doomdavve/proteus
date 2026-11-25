@@ -32,6 +32,7 @@
 #include "wake_velocity/wake_velocity_app.h"
 #include "wake_velocity/wake_velocity_controls.h"
 #include "wake_velocity/wake_velocity_drive.h"
+#include "wake_velocity/wake_velocity_discovery.h"
 #include "wake_velocity/wake_velocity_input.h"
 #include "wake_velocity/wake_velocity_lighting_review.h"
 #include "wake_velocity/wake_velocity_menu.h"
@@ -161,7 +162,8 @@ static void usage(void)
     cli_usage_line(stdout, "--serve", "Run only a room; see --serve --help");
 
     cli_usage_section(stdout, "WORLD");
-    cli_usage_line(stdout, "--location basin|outer", "Water map (default basin; title uses outer)");
+    cli_usage_line(
+        stdout, "--location basin|outer|archipelago", "Water map (archipelago is solo-only)");
     cli_usage_line(
         stdout, "--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
     cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin|grodan");
@@ -948,6 +950,10 @@ static int study(int argc, char **argv)
     NetHostOptions host_options = { 0 };
     char host_endpoint[32];
 #endif
+    if (host_mode && !boat_net_room_location(location->id)) {
+        fprintf(stderr, "%s is solo-only; it cannot be hosted.\n", location->name);
+        return 1;
+    }
     if (host_mode) {
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
         if (connect_to || net_token[0]) {
@@ -1608,6 +1614,7 @@ static int study(int argc, char **argv)
     bool work_was_active = false;
     bool net_ready_sent = !networked;
     int frames = 0, demo_tick = 0;
+    WakeDiscovery discoveries = { 0 };
     bool plugin_reset_pending = false;
     bool replay_dragging = false;
     bool help_visible = false;
@@ -2520,6 +2527,11 @@ static int study(int argc, char **argv)
             boat_voyage_hud(&session.voyage, &session.boat, live_view.time, GetScreenWidth());
         if (plugin_active && plugin.authoring)
             wake_plugin_draw(&plugin, 12, (int)destination.y + (height - 48) * scale - 20);
+        const char *discovered = !networked
+            ? wake_discovery_update(&discoveries, location->id, view->boat.position, live_view.time)
+            : NULL;
+        if (discovered)
+            boat_ui_text(TextFormat("SKERRY REACH / %s", discovered), 12, 64, 16, SKYBLUE);
         if (notice)
             boat_ui_text(notice, 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_CAPSIZED)
@@ -2864,8 +2876,10 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     } else if (settings->location == BOAT_LOCATION_COUNT)
         arguments[count++] = "--course";
     else {
-        arguments[count++] = "--current";
-        arguments[count++] = "--crossing-wake";
+        if (settings->location != BOAT_LOCATION_ARCHIPELAGO) {
+            arguments[count++] = "--current";
+            arguments[count++] = "--crossing-wake";
+        }
         arguments[count++] = "--location";
         arguments[count++] = (char *)boat_location(settings->location)->name;
     }
@@ -2909,7 +2923,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 
 // --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
 // proves that every PLACE the panel offers opens. PLACE is basin, outer, outer-standard,
-// outer-harbor-life, outer-grodan, outer-canal-tour, outer-working-harbour or basin-trial.
+// archipelago, outer-harbor-life, outer-grodan, outer-canal-tour, outer-working-harbour or basin-trial.
 static int title_start(int argc, char **argv)
 {
     BoatTitleSettings settings;
