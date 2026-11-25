@@ -3,7 +3,7 @@
 **State** — A0–A6 qualified locally; A7–A10 art-direction follow-up in progress.
 **Open** — Fishing-boat character, inhabited marinas and solo day/night cycle; human review.
 **Done when** — Reference-led boats/marina and deterministic cycle pass native checks and visual review.
-**Next** — A7 fishing-boat model, then A8 marina, A9 cycle and A10 qualification/closing.
+**Next** — A8 marina, then A9 cycle and A10 qualification/closing.
 
 ## Additional art direction — 2026-11-25
 
@@ -271,3 +271,16 @@ physical-device or browser-play qualification is claimed. Browser staging/build 
 performed is left local, but browser qualification stopped at the user's request. No work was
 pushed or published. Jobs, dynamic traffic/life, persistence, tides, streaming and runtime seed
 selection remain explicitly deferred; a sparse repeatable route grammar is still a limitation.
+
+### A7 result — 2026-11-25
+
+The local fishing circuit now resolves an 11 m ochre wooden boat with a raised bow, aft
+wheelhouse, plank seams, twelve dark hanging fenders, mast/stays and a Swedish ensign.
+Its generated mesh uses 730 triangles within the existing 1,024-triangle storage; the route
+spec supplies matching contact bounds. The registered generic workboat remains unchanged,
+including its authored color/name budget. Route mesh caching distinguishes the local variant.
+
+Native Debug build, existing harbor appearance/geometry checks and the full 653-test suite
+passed on Apple Silicon/macOS 26.6.2 with GPU tests enabled. The local validator checks the
+fishing mesh against its declared bounds; the close GPU fishing view was inspected. These are
+automated/agent checks, not human acceptance. A8 is next; breaking surf stays deferred.

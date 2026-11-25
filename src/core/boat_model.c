@@ -317,7 +317,7 @@ bool boat_model_generate(BoatModel *m, BoatModelSpec s)
     return boat_model_generate_oriented(m, s, false);
 }
 
-bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_lettering)
+static bool generate(BoatModel *m, BoatModelSpec s, bool mirror_lettering, bool fishing)
 {
     if (!m)
         return false;
@@ -337,7 +337,9 @@ bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_let
     Vector3 rings[6][8];
     for (int r = 0; r < 6; ++r)
         for (int i = 0; i < 8; ++i)
-            rings[r][i] = (Vector3) { outline[i].x * scale[r], y[r], outline[i].y * scale[r] };
+            rings[r][i] = (Vector3) { outline[i].x * scale[r],
+                y[r] + (fishing && r > 0 ? .32f * fmaxf(0, -outline[i].y / (l * .5f)) : 0),
+                outline[i].y * scale[r] };
     for (int r = 0; r < 5; ++r)
         for (int i = 0; i < 8; ++i) {
             int j = (i + 1) % 8;
@@ -428,7 +430,7 @@ bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_let
     }
     if (s.mast_height > 0) {
         Vector3 foot = { 0, floor, -l * .10f };
-        Vector3 head = { 0, s.mast_height, -l * .10f };
+        Vector3 head = { 0, s.mast_height - (fishing ? .1f : 0), -l * .10f };
         boat_model_beam(m, foot, head, .13f, steel);
         boat_model_beam(m, (Vector3) { 0, floor + 1.2f, -l * .10f },
             (Vector3) { 0, floor + 1.2f, l * .30f }, .18f, cream);
@@ -447,19 +449,81 @@ bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_let
         boat_model_beam(m, (Vector3) { -.9f, floor + 2.5f, l * .04f },
             (Vector3) { -.9f, floor + 1.5f, l * .04f }, .05f, rubber);
     }
+    if (fishing) {
+        // Clinker seams follow the hull facets instead of floating alongside a straight box.
+        // A slight outward scale keeps them clear of the side faces in both renderers.
+        for (int plank = 1; plank < 8; ++plank)
+            for (int i = 0; i < 8; ++i) {
+                int j = (i + 1) % 8;
+                Vector3 panel[4];
+                for (int v = 0; v < 4; ++v) {
+                    int edge = v == 0 || v == 3 ? i : j;
+                    float t = plank / 8.0f + (v >= 2 ? .018f : 0);
+                    panel[v] = Vector3Lerp(rings[0][edge], rings[1][edge], t);
+                    panel[v].x *= 1.004f;
+                    panel[v].z *= 1.004f;
+                }
+                quad(m, panel[0], panel[1], panel[2], panel[3], s.trim);
+            }
+        boat_model_box(m, (Vector3) { -.55f, floor + .3f, -l * .05f }, (Vector3) { 1, .6f, 1.1f },
+            (Color) { 125, 98, 64, 255 });
+        // Ensign on the aft wheelhouse; a two-sided cloth panel remains visible on either tack.
+        float top = floor + .08f + s.cabin_height;
+        Vector3 foot = { 0, top, s.cabin_offset + s.cabin_length * .3f };
+        Vector3 head = Vector3Add(foot, (Vector3) { 0, 1.6f, 0 });
+        boat_model_beam(m, foot, head, .055f, s.trim);
+        for (int face = 0; face < 2; ++face)
+            for (int row = 0; row < 3; ++row)
+                for (int col = 0; col < 3; ++col) {
+                    const float xs[] = { 0, .28f, .41f, 1.1f };
+                    const float ys[] = { 0, .23f, .35f, .65f };
+                    Vector3 v[4] = { { xs[col], -ys[row], .03f }, { xs[col + 1], -ys[row], .03f },
+                        { xs[col + 1], -ys[row + 1], .03f }, { xs[col], -ys[row + 1], .03f } };
+                    for (int i = 0; i < 4; ++i)
+                        v[i] = Vector3Add(head, v[i]);
+                    Color color = row == 1 || col == 1 ? (Color) { 237, 193, 55, 255 }
+                                                       : (Color) { 44, 91, 148, 255 };
+                    if (face)
+                        quad(m, v[3], v[2], v[1], v[0], color);
+                    else
+                        quad(m, v[0], v[1], v[2], v[3], color);
+                }
+    }
     for (int side = -1; side <= 1; side += 2)
         for (int end = -1; end <= 1; end += 2) {
             float z = end * l * .24f;
-            if (s.fenders)
+            if (s.fenders && !fishing)
                 boat_model_box(m, (Vector3) { side * b * .5f, s.freeboard * .48f, z },
                     (Vector3) { .22f, .55f, .25f }, cream);
             boat_model_box(m, (Vector3) { side * b * .39f, s.freeboard + .05f, z },
                 (Vector3) { .23f, .10f, .12f }, steel);
         }
+    if (fishing && s.fenders)
+        for (int side = -1; side <= 1; side += 2)
+            for (int fender = 0; fender < 6; ++fender) {
+                float z = l * (-.27f + fender * .105f);
+                float x = side * b
+                    * (z < 0 ? .40f + .10f * (z / l + .30f) / .35f
+                             : .5f - .15f * (z / l - .05f) / .45f);
+                boat_model_beam(m, (Vector3) { x, s.freeboard + .12f, z },
+                    (Vector3) { x + side * .16f, s.freeboard * .65f, z }, .035f, s.trim);
+                boat_model_beam(m, (Vector3) { x + side * .16f, s.freeboard * .76f, z },
+                    (Vector3) { x + side * .22f, s.freeboard * .15f, z + .14f }, .25f, rubber);
+            }
     name_panels(m, s, mirror_lettering);
     if (m->overflow)
         m->mesh.triangle_count = 0;
     return !m->overflow;
+}
+
+bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_lettering)
+{
+    return generate(m, s, mirror_lettering, false);
+}
+
+bool boat_model_generate_fishing(BoatModel *m, BoatModelSpec s)
+{
+    return generate(m, s, false, true);
 }
 
 void boat_model_vertical_bounds(BoatModelSpec spec, Transform3D pose, float *bottom, float *top)

@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_ARCHIPELAGO_H
 
 #include "core/boat_map.h"
+#include "core/boat_model.h"
 
 // Baked seed: immutable water geometry shared by collision and scenery validation.
 extern const BoatMapDescription boat_archipelago_map;
@@ -14,6 +15,8 @@ typedef struct {
 
 // Stable bake order, home harbour first. The caller borrows process-lifetime data.
 const BoatArchipelagoPlace *boat_archipelago_places(size_t *count);
+
+BoatModelSpec boat_archipelago_fishing_spec(void);
 
 struct BoatSceneDefinition;
 // Native local life only: independent of plugin-authored scenes and the public-room digest.

@@ -20,6 +20,23 @@ const BoatArchipelagoPlace *boat_archipelago_places(size_t *count)
     return archipelago_places;
 }
 
+BoatModelSpec boat_archipelago_fishing_spec(void)
+{
+    BoatModelSpec s = boat_model_preset(BOAT_MODEL_WORKBOAT);
+    s.bow_width = .12f;
+    s.stern_width = .7f;
+    s.cabin_length = 2.8f;
+    s.cabin_offset = 2.1f;
+    s.windshield_rake = .04f;
+    s.mast_height = 6.4f;
+    s.work_deck = false;
+    s.fenders = true;
+    s.hull = (Color) { 203, 151, 53, 255 };
+    s.deck = (Color) { 156, 116, 65, 255 };
+    s.trim = (Color) { 70, 62, 45, 255 };
+    return s;
+}
+
 const BoatSceneDefinition *boat_archipelago_life(void) { return &archipelago_life; }
 
 const BoatArchipelagoResident *boat_archipelago_residents(size_t *count)

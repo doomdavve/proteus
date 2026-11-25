@@ -1,6 +1,8 @@
 #include "core/waterfront_route.h"
 
+#include "core/boat_archipelago.h"
 #include "core/boat_clock.h"
+#include "core/boat_scene_definition.h"
 #include "core/waterfront_upstream.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -174,7 +176,6 @@ bool waterfront_route_recipe_from_name(const char *name, WaterfrontCraftRecipe *
         }
     return false;
 }
-
 
 // A bounded copy of a constant id into its fixed buffer.
 static void set_id(char *destination, size_t size, const char *source)
@@ -819,6 +820,8 @@ BoatModelSpec waterfront_route_spec(const WaterfrontRouteDefinition *routes, int
     const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
     if (!actor)
         return (BoatModelSpec) { 0 };
+    if (routes == &boat_archipelago_life()->traffic && actor->recipe == WATERFRONT_CRAFT_WORKBOAT)
+        return boat_archipelago_fishing_spec();
     return recipe_spec(
         actor->recipe, compiled_actor && actor->recipe == WATERFRONT_CRAFT_RUNABOUT && index == 0);
 }
@@ -865,7 +868,9 @@ const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int
     if (!actor)
         return NULL;
     uint64_t digest = waterfront_route_digest(routes);
-    if (!models_ready || model_digest != digest) {
+    static bool fishing_ready;
+    bool fishing = routes == &boat_archipelago_life()->traffic;
+    if (!models_ready || model_digest != digest || fishing_ready != fishing) {
         unsigned count = routes ? routes->actor_count : WATERFRONT_ROUTE_ACTORS;
         if (count > WATERFRONT_ROUTE_ACTORS)
             count = WATERFRONT_ROUTE_ACTORS;
@@ -874,9 +879,12 @@ const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int
                                                   : (WaterfrontCraftRecipe)compiled[i].recipe;
             if (recipe == WATERFRONT_CRAFT_SCHOONER)
                 build_schooner(&models[i]);
+            else if (fishing && recipe == WATERFRONT_CRAFT_WORKBOAT)
+                boat_model_generate_fishing(&models[i], waterfront_route_spec(routes, (int)i));
             else
                 boat_model_generate(&models[i], waterfront_route_spec(routes, (int)i));
         }
+        fishing_ready = fishing;
         model_digest = digest;
         models_ready = true;
     }
