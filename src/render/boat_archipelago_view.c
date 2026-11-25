@@ -6,6 +6,13 @@
 
 #include <math.h>
 
+BoatViewProps boat_archipelago_lighting(double time)
+{
+    return (BoatViewProps) { .lighting_cycle = isfinite(time),
+        .lighting_hours = 12 + time * (24.0 / 900),
+        .lighting_cycle_seconds = 900 };
+}
+
 static void part(WaterfrontSceneFrame *frame, Vector3 origin, float heading, Vector3 offset,
     Vector3 size, Color color, float swing)
 {

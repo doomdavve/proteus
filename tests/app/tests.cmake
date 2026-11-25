@@ -365,6 +365,15 @@ set_tests_properties(
   wake_velocity_time_scale_missing_rejected
   wake_velocity_time_scale_multiplayer_rejected
   PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
+# Extending Skerry Reach to a full lighting day keeps the older mode limits intact.
+add_test(NAME wake_velocity_capture_basin_limit_rejected COMMAND wake_velocity --no-audio --renderer cpu
+  --location basin --time 61 --screenshot unused.png)
+add_test(NAME wake_velocity_capture_archipelago_limit_rejected COMMAND wake_velocity --no-audio --renderer cpu
+  --location archipelago --time 901 --screenshot unused.png)
+set_tests_properties(
+  wake_velocity_capture_basin_limit_rejected
+  wake_velocity_capture_archipelago_limit_rejected
+  PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 

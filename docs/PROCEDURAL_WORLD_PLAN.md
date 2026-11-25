@@ -3,7 +3,7 @@
 **State** — A0–A6 qualified locally; A7–A10 art-direction follow-up in progress.
 **Open** — Fishing-boat character, inhabited marinas and solo day/night cycle; human review.
 **Done when** — Reference-led boats/marina and deterministic cycle pass native checks and visual review.
-**Next** — A9 cycle, then A10 qualification/closing.
+**Next** — A10 final verification, evidence and native review handoff.
 
 ## Additional art direction — 2026-11-25
 
@@ -297,3 +297,19 @@ The three-seed generator validator and native berth/route/seek checks pass; the 
 build and 653-test full suite passed with GPU tests enabled. Default-view CPU/GPU and a closer
 GPU marina capture were inspected. Four boats are a first small marina composition; interactive
 docking, occupancy services and harbour night lamps remain deferred. Human review is open.
+
+### A9 result — 2026-11-25
+
+Solo archipelago views now supply the existing shared lighting renderer with noon plus
+24 hours per 900 displayed simulation seconds. There is no accumulated render clock: pause,
+reset, scaled time and backwards seeks follow the session's simulation time. The title-default
+DAY starts the cycle; the other saved choices and explicit CLI light stay fixed. Working
+Harbour and other locations retain their existing ownership. Replay/room clock formats remain
+unchanged. Skerry Reach screenshot time now accepts 0..900 s; other mode limits are retained.
+
+Virtual-time checks cover noon/evening/midnight/dawn/noon, negative/backwards seeks and the
+analytic glitter clock. Native CPU/GPU captures at 225 s (18:00) and 450 s (midnight) were
+inspected; an explicit fixed 18:00 title-start capture and the 1,800-frame windowed neutral-helm
+8× run exited successfully with audio disabled. The latter advanced 14,556 ticks (121.3
+simulated seconds); it is a motion smoke check, not a measured full-cycle speed qualification.
+Night remains deliberately dark with no new marina lamps. A10 records the final suite.

@@ -14,6 +14,11 @@ Choose SINGLE PLAYER, PLACE SKERRY REACH, or launch from the repository root:
 ./build/wake_velocity --package proteus.archipelago-free
 ```
 
+Home Harbour has four moored small craft alongside its two timber jetties, including two
+sailboats with masts. The mooring lines follow the shared wave-driven hull poses. Give these
+boats room: their hulls have height-aware contacts, while the baked piers remain solid shore.
+The central launch/departure lane stays open.
+
 The boat starts at Home Harbour, facing the harbour mouth. The inner channels and more open
 eastern passage connect the landings and outer light, with alternate routes home. Press `N`
 for the chart. Place names appear on first approach during the current trip; they do not
@@ -24,7 +29,10 @@ Needle Pass runs between steep granite shoulders. Hidden Lagoon is surrounded by
 wooded island lobes; its small shore terrace contrasts with the workshops and lifting derrick
 at Net Sheds. Bell Rock has a timber bell house, while the outer headland carries the tall
 lighthouse and keeper's house. These places have local activity, without interaction jobs.
-A harbour launch waits and departs, a workboat makes a fishing circuit, a sailboat travels
+The fishing boat has an ochre wooden hull with plank seams, a raised bow, black fenders,
+an aft wheelhouse, working mast and Swedish ensign. This is a native local recipe; the generic
+registered workboat used by other scenes retains its existing appearance and name budget.
+A harbour launch waits and departs, the fishing boat makes a circuit, a sailboat travels
 the outer reach and a small runabout circles the lagoon. Their routes include pauses and
 repeat independently. Gulls circle the inhabited shores and follow the fishing boat; shore
 residents walk and carry crates near the landings. Boats have moving hull contacts and
@@ -38,6 +46,28 @@ the geography and skyline. The current generator supplies no depth or tidal mode
 
 [Native review images](procedural/README.md) show the departure, passage, shore sites and
 lighthouse using the game's normal camera and lighting.
+
+## Light through the trip
+
+Solo Skerry Reach starts at noon and follows a day/night cycle: one full day takes **900
+simulated seconds** (15 minutes at 1×; 112.5 active seconds at 8×). Pause/help stop its clock
+with the simulation. `--time-scale` and the existing solo speed controls move the world and
+light together. Resetting session time returns the light to noon; the clock is not saved.
+Scripted `--time` seeks the cycle along with local life, without waiting in real time.
+
+The title's default DAY choice enables this cycle for Skerry Reach. Choosing SUNSET, DUSK
+or a specific hour keeps that selected light fixed. Explicit `--daylight day|sunset|dusk` or
+`--lighting-hour H` also keeps a capture or session fixed; the explicit hour wins when both
+are supplied. Other free-boating locations retain their fixed-lighting behavior. Replays keep
+their existing lighting behavior; no shared multiplayer clock or replay format is added.
+
+```sh
+./build/wake_velocity --no-audio --location archipelago --time-scale 8
+./build/wake_velocity --no-audio --renderer cpu --location archipelago --demo-idle \
+  --screenshot build/skerry-evening.png --time 225
+./build/wake_velocity --no-audio --renderer cpu --location archipelago --demo-idle \
+  --lighting-hour 18 --screenshot build/skerry-fixed-evening.png --time 0
+```
 
 ## Reproducing and comparing worlds
 

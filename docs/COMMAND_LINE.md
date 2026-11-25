@@ -271,10 +271,16 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 
 ## Rendering, captures and profiling
 
+Screenshot `--time` accepts 0..60 seconds normally, 0..900 in Skerry Reach (one full
+day/night cycle), and 0..600 for replays. Use `--demo-idle` to review the same harbour view
+as the cycle and local boats advance.
+
 `--daylight day|sunset|dusk` selects a fixed legacy lighting preset (default day); a numeric
 phase 0..1 blends between them. In the title, SETTINGS → LIGHTING cycles 27 fixed choices:
 DAY (default), SUNSET, DUSK, then 00:00 through 23:00. The choice is remembered per local player
-and injected into new solo, joined and hosted sessions. The same `lighting` key stores exact
+and injected into new solo, joined and hosted sessions. Working Harbour keeps its saved
+cycle; Skerry Reach uses its noon-start cycle when the title choice is DAY. Other saved
+lighting choices stay fixed in Skerry Reach. The same `lighting` key stores exact
 legacy names or versioned `hour-v1:HH`; malformed values and unknown versions fall back to Day.
 Explicit CLI launches use their own options rather than the saved title choice.
 
@@ -282,8 +288,8 @@ Explicit CLI launches use their own options rather than the saved title choice.
 `[0,24)` (`24` is midnight, `-1` is 23:00); fractional hours remain supported, and non-finite
 values are rejected. It overrides `--daylight` regardless of argument order. If either explicit
 option is present, the title's saved lighting is not injected. `--time` still selects the
-scripted drive and wave time, not the light, so the same hour can be captured at different
-moments:
+scripted drive and wave time. It also seeks Skerry Reach’s default cycle; with an explicit
+fixed-lighting option the same hour can be captured at different moments:
 
 ```sh
 ./build/wake_velocity --renderer cpu --location outer --lighting-hour 21 --time 3 \

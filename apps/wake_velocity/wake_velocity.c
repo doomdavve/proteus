@@ -12,6 +12,7 @@
 #include "platform/boat_capture.h"
 #include "platform/cli_usage.h"
 #include "plugins/boat_plugin_catalog.h"
+#include "render/boat_archipelago_view.h"
 #include "render/boat_course_view.h"
 #include "render/boat_gpu.h"
 #include "render/boat_hud.h"
@@ -31,8 +32,8 @@
 #include "wake_velocity/wake_console_bridge.h"
 #include "wake_velocity/wake_velocity_app.h"
 #include "wake_velocity/wake_velocity_controls.h"
-#include "wake_velocity/wake_velocity_drive.h"
 #include "wake_velocity/wake_velocity_discovery.h"
+#include "wake_velocity/wake_velocity_drive.h"
 #include "wake_velocity/wake_velocity_input.h"
 #include "wake_velocity/wake_velocity_lighting_review.h"
 #include "wake_velocity/wake_velocity_menu.h"
@@ -221,7 +222,7 @@ static void usage(void)
     cli_usage_line(stdout, "--title --screenshot FILE [OPTIONS]", "Capture the title screen");
     cli_usage_line(stdout, "--solo --ask --content NAME --save-mode MODE --data-dir DIR",
         "Title capture options; --save-mode is continue, new or delete");
-    cli_usage_line(stdout, "--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
+    cli_usage_line(stdout, "--time SECONDS", "Screenshot: 0..60; archipelago 0..900; replay 0..600");
     cli_usage_line(
         stdout, "--time-scale N", "Initial solo live speed 0.25, 0.5, 1, 2, 4 or 8 (default 1)");
     cli_usage_line(stdout, "--frames COUNT", "Stop a smoke run after COUNT frames");
@@ -858,8 +859,7 @@ static int study(int argc, char **argv)
             char *end;
             const char *value = argv[++i];
             time = strtof(value, &end);
-            if (end == value || *end || !isfinite(time) || time < 0
-                || time > BOAT_REPLAY_MAX_SECONDS)
+            if (end == value || *end || !isfinite(time) || time < 0 || time > 900)
                 goto invalid;
             time_set = true;
         } else if (strcmp(argv[i], "--time-scale") == 0 && i + 1 < argc) {
@@ -933,8 +933,7 @@ static int study(int argc, char **argv)
     }
     work_mode = plugin_path ? wake_work_probe_directory(plugin_path)
                             : package_id && wake_work_probe_catalog(package_id);
-    if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
-        || (!replay_path && time > 60))
+    if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit))
         goto invalid;
     if (demo_idle
         && (!(screenshot || demo) || connect_to || host_mode || work_mode || replay_path
@@ -1105,6 +1104,11 @@ static int study(int argc, char **argv)
             return 1;
         }
     }
+    // A full Skerry Reach day can be captured directly; other modes keep their bounded limits.
+    double capture_limit = replay_path ? BOAT_REPLAY_MAX_SECONDS
+        : location->id == BOAT_LOCATION_ARCHIPELAGO ? 900 : 60;
+    if (time > capture_limit)
+        goto invalid;
     if (start_set && (!location->mapped || course || replay_path || ghost_path || connect_to)) {
         fprintf(stderr, "--start places the boat in a mapped location's free boating.\n");
         goto invalid;
@@ -1407,6 +1411,9 @@ static int study(int argc, char **argv)
     if (demo_idle)
         session.presentation.camera_heading = session.boat.heading;
     // A replay is viewed in its own recorded water, never by writing into the live session.
+    const bool archipelago_cycle = location->id == BOAT_LOCATION_ARCHIPELAGO && !daylight_set
+        && !lighting_hour_set && !work_mode && !course;
+    BoatViewProps archipelago_light = { 0 };
     BoatViewState live_view, playback;
     BoatPresentation playback_presentation;
     BoatWorld playback_world;
@@ -1467,6 +1474,10 @@ static int study(int argc, char **argv)
     live_view.skin = skin;
     if (work_mode)
         live_view.props = wake_work_props(&work);
+    else if (archipelago_cycle) {
+        archipelago_light = boat_archipelago_lighting(live_view.time);
+        live_view.props = &archipelago_light;
+    }
     if (view == &playback)
         playback.skin = skin;
     // Course attempts record from here on; screenshots above never save a run.
@@ -2299,6 +2310,10 @@ static int study(int argc, char **argv)
         live_view.skin = skin;
         if (work_mode)
             live_view.props = wake_work_props(&work);
+        else if (archipelago_cycle) {
+            archipelago_light = boat_archipelago_lighting(live_view.time);
+            live_view.props = &archipelago_light;
+        }
 #ifdef PROTEUS_BOAT_NET
         if (net) {
             live_view.skin = wake_room_skin(net->client.slot); // Every client agrees.
@@ -2904,9 +2919,11 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
     const char *lighting_option, *lighting_value;
-    // WORKING HARBOUR keeps its session clock's default cycle; a saved title preset must not
-    // become an explicit fixed override there. Other modes still inject the saved choice.
-    if (!working_harbour
+    // Working Harbour owns a saved cycle. Skerry Reach uses a simulation-time cycle when
+    // the title keeps the default Day choice; explicit CLI light and other title choices win.
+    bool archipelago_default = settings->location == BOAT_LOCATION_ARCHIPELAGO
+        && settings->lighting == BOAT_TITLE_LIGHTING_DAY;
+    if (!working_harbour && !archipelago_default
         && boat_title_lighting_cli(
             settings->lighting, extra_count, extra, &lighting_option, &lighting_value)) {
         arguments[count++] = (char *)lighting_option;
@@ -2923,7 +2940,8 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 
 // --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
 // proves that every PLACE the panel offers opens. PLACE is basin, outer, outer-standard,
-// archipelago, outer-harbor-life, outer-grodan, outer-canal-tour, outer-working-harbour or basin-trial.
+// archipelago, outer-harbor-life, outer-grodan, outer-canal-tour, outer-working-harbour or
+// basin-trial.
 static int title_start(int argc, char **argv)
 {
     BoatTitleSettings settings;
