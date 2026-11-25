@@ -1,0 +1,495 @@
+{
+  "name": "Skerry Reach",
+  "location": "archipelago",
+  "recipe": 1,
+  "seed": 41717,
+  "generator": "tools/generate_archipelago.py",
+  "sources": "Entirely synthetic; no external geographic source data",
+  "coordinates": "Metres; places/routes simulation X/Z; mesh X=-simulation X",
+  "bounds_simulation_xz": [
+    -1600,
+    -3104,
+    1600,
+    608
+  ],
+  "lattice_step_m": 32,
+  "spawn": {
+    "position": [
+      0,
+      0
+    ],
+    "heading_radians": 0
+  },
+  "scenery_sha256": "a7387d6a60d2437f61f77a03264a71ba255b4492693fe7058704bf1610321303",
+  "water_header_sha256": "6b4d29a978c330cb320be6cd44a0b5501c67e3ae1a626328cc5f99db0d684bba",
+  "counts": {
+    "island_recipes": 37,
+    "trees": 153,
+    "filled_inland_lattice_pockets": 0,
+    "vertices": 19280,
+    "triangles": 33142,
+    "water_triangles": 20814,
+    "shore_edges": 2246,
+    "scenery_bytes": 214729
+  },
+  "places": [
+    {
+      "name": "HOME HARBOUR",
+      "id": "home",
+      "position": [
+        0.0,
+        0.0
+      ],
+      "arrival_radius_m": 65,
+      "capture": {
+        "start": [
+          -2.457695761557119,
+          -1.720387033089983
+        ],
+        "heading_degrees": -55.01,
+        "target": [
+          -55.707770595294754,
+          -38.995439416706326
+        ]
+      }
+    },
+    {
+      "name": "NET SHEDS",
+      "id": "net_sheds",
+      "position": [
+        -683.2873800916293,
+        -650.9915436024112
+      ],
+      "arrival_radius_m": 70,
+      "capture": {
+        "start": [
+          -726.2873800916293,
+          -650.9915436024112
+        ],
+        "heading_degrees": -90.0,
+        "target": [
+          -791.2873800916293,
+          -650.9915436024112
+        ]
+      }
+    },
+    {
+      "name": "NEEDLE PASS",
+      "id": "narrows",
+      "position": [
+        -170.570316609426,
+        -1161.4809605029654
+      ],
+      "arrival_radius_m": 60,
+      "capture": {
+        "start": [
+          -341.57031660942596,
+          -1161.4809605029654
+        ],
+        "heading_degrees": -90.0,
+        "target": [
+          -406.57031660942596,
+          -1161.4809605029654
+        ]
+      }
+    },
+    {
+      "name": "BELL ROCK",
+      "id": "beacon",
+      "position": [
+        -498.9103574489107,
+        -1800.1963826053973
+      ],
+      "arrival_radius_m": 70,
+      "capture": {
+        "start": [
+          -400.18346141748464,
+          -1743.1963826053973
+        ],
+        "heading_degrees": 120.0,
+        "target": [
+          -304.9206670011964,
+          -1688.1963826053973
+        ]
+      }
+    },
+    {
+      "name": "HIDDEN LAGOON",
+      "id": "lagoon",
+      "position": [
+        791.2802216899038,
+        -1226.7346263481302
+      ],
+      "arrival_radius_m": 75,
+      "capture": {
+        "start": [
+          934.2802216899038,
+          -1226.7346263481302
+        ],
+        "heading_degrees": 90.0,
+        "target": [
+          999.2802216899038,
+          -1226.7346263481302
+        ]
+      }
+    },
+    {
+      "name": "OUTER LIGHT",
+      "id": "outer_light",
+      "position": [
+        116.69233947715594,
+        -2599.8837016861335
+      ],
+      "arrival_radius_m": 90,
+      "capture": {
+        "start": [
+          -44.38838562674968,
+          -2692.8837016861335
+        ],
+        "heading_degrees": -60.0,
+        "target": [
+          -139.65118004303793,
+          -2747.8837016861335
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "from": "home",
+      "to": "mouth",
+      "minimum_recipe_half_width_m": 38,
+      "length_m": 360.0,
+      "points": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -360.0
+        ]
+      ]
+    },
+    {
+      "from": "mouth",
+      "to": "net_sheds",
+      "minimum_recipe_half_width_m": 54,
+      "length_m": 779.4,
+      "points": [
+        [
+          0.0,
+          -360.0
+        ],
+        [
+          -290,
+          -455
+        ],
+        [
+          -520,
+          -470
+        ],
+        [
+          -683.2873800916293,
+          -650.9915436024112
+        ]
+      ]
+    },
+    {
+      "from": "net_sheds",
+      "to": "narrows",
+      "minimum_recipe_half_width_m": 48,
+      "length_m": 848.5,
+      "points": [
+        [
+          -683.2873800916293,
+          -650.9915436024112
+        ],
+        [
+          -700,
+          -910
+        ],
+        [
+          -430,
+          -1070
+        ],
+        [
+          -170.570316609426,
+          -1161.4809605029654
+        ]
+      ]
+    },
+    {
+      "from": "mouth",
+      "to": "narrows",
+      "minimum_recipe_half_width_m": 37,
+      "length_m": 867.2,
+      "points": [
+        [
+          0.0,
+          -360.0
+        ],
+        [
+          75,
+          -650
+        ],
+        [
+          -40,
+          -870
+        ],
+        [
+          -170.570316609426,
+          -1161.4809605029654
+        ]
+      ]
+    },
+    {
+      "from": "narrows",
+      "to": "beacon",
+      "minimum_recipe_half_width_m": 42,
+      "length_m": 795.9,
+      "points": [
+        [
+          -170.570316609426,
+          -1161.4809605029654
+        ],
+        [
+          -190,
+          -1390
+        ],
+        [
+          -430,
+          -1510
+        ],
+        [
+          -498.9103574489107,
+          -1800.1963826053973
+        ]
+      ]
+    },
+    {
+      "from": "narrows",
+      "to": "lagoon",
+      "minimum_recipe_half_width_m": 38,
+      "length_m": 1172.6,
+      "points": [
+        [
+          -170.570316609426,
+          -1161.4809605029654
+        ],
+        [
+          180,
+          -1120
+        ],
+        [
+          455,
+          -1390
+        ],
+        [
+          720,
+          -1380
+        ],
+        [
+          791.2802216899038,
+          -1226.7346263481302
+        ]
+      ]
+    },
+    {
+      "from": "lagoon",
+      "to": "east_sound",
+      "minimum_recipe_half_width_m": 44,
+      "length_m": 1060.2,
+      "points": [
+        [
+          791.2802216899038,
+          -1226.7346263481302
+        ],
+        [
+          1030,
+          -1440
+        ],
+        [
+          1000,
+          -1730
+        ],
+        [
+          632.5643704354862,
+          -1987.300580766041
+        ]
+      ]
+    },
+    {
+      "from": "beacon",
+      "to": "outer_light",
+      "minimum_recipe_half_width_m": 95,
+      "length_m": 1255.5,
+      "points": [
+        [
+          -498.9103574489107,
+          -1800.1963826053973
+        ],
+        [
+          -620,
+          -2110
+        ],
+        [
+          -360,
+          -2440
+        ],
+        [
+          116.69233947715594,
+          -2599.8837016861335
+        ]
+      ]
+    },
+    {
+      "from": "beacon",
+      "to": "east_sound",
+      "minimum_recipe_half_width_m": 58,
+      "length_m": 1198.0,
+      "points": [
+        [
+          -498.9103574489107,
+          -1800.1963826053973
+        ],
+        [
+          -60,
+          -1890
+        ],
+        [
+          340,
+          -1810
+        ],
+        [
+          632.5643704354862,
+          -1987.300580766041
+        ]
+      ]
+    },
+    {
+      "from": "east_sound",
+      "to": "outer_light",
+      "minimum_recipe_half_width_m": 115,
+      "length_m": 954.4,
+      "points": [
+        [
+          632.5643704354862,
+          -1987.300580766041
+        ],
+        [
+          660,
+          -2310
+        ],
+        [
+          410,
+          -2520
+        ],
+        [
+          116.69233947715594,
+          -2599.8837016861335
+        ]
+      ]
+    }
+  ],
+  "structures": [
+    {
+      "place": "net_sheds",
+      "shore": [
+        -791.2873800916293,
+        -650.9915436024112
+      ]
+    },
+    {
+      "place": "lagoon",
+      "shore": [
+        999.2802216899038,
+        -1226.7346263481302
+      ]
+    },
+    {
+      "place": "beacon",
+      "shore": [
+        -304.9206670011964,
+        -1688.1963826053973
+      ]
+    },
+    {
+      "place": "beacon",
+      "lighthouse": [
+        -304.9206670011964,
+        -1688.1963826053973
+      ]
+    },
+    {
+      "place": "outer_light",
+      "lighthouse": [
+        -139.65118004303793,
+        -2747.8837016861335
+      ]
+    }
+  ],
+  "dock_footprints": [
+    {
+      "start": [
+        -29.13172727880335,
+        -13.24169421763789
+      ],
+      "end": [
+        -54.62198864775628,
+        -24.828176658071044
+      ],
+      "width_m": 4.2
+    },
+    {
+      "start": [
+        31.857056005751364,
+        -16.766871581974403
+      ],
+      "end": [
+        56.63476623244687,
+        -29.807771701287827
+      ],
+      "width_m": 4.2
+    },
+    {
+      "start": [
+        -763.2873800916293,
+        -650.9915436024112
+      ],
+      "end": [
+        -791.2873800916293,
+        -650.9915436024112
+      ],
+      "width_m": 4.2
+    },
+    {
+      "start": [
+        971.2802216899038,
+        -1226.7346263481302
+      ],
+      "end": [
+        999.2802216899038,
+        -1226.7346263481302
+      ],
+      "width_m": 4.2
+    },
+    {
+      "start": [
+        -329.1693783071607,
+        -1702.1963826053973
+      ],
+      "end": [
+        -304.9206670011964,
+        -1688.1963826053973
+      ],
+      "width_m": 4.2
+    }
+  ],
+  "limits": [
+    "Bounded offline bake; outside rectangle is collision shore",
+    "Seed variation preserves the same region/route grammar",
+    "Coast and solid pier footprints supply static collision; land buildings are scenery",
+    "No bathymetry, tides, dynamic population or infinite streaming"
+  ]
+}
