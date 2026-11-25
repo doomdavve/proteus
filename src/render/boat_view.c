@@ -688,8 +688,15 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     const Boat *boat = &view->boat;
     double time = view->time;
     _Static_assert(BOAT_WATER_PARTICLES <= WATERFRONT_PLAYER_PARTICLES, "Player particle capacity");
-    waterfront_scene_evaluate_ground_scene(
-        view->scene, time, world->water, waterfront_kit_ground(world->definition->map), frame);
+    bool map_only
+        = world->definition->mapped && !waterfront_map_has_river_kit(world->definition->map);
+    if (map_only)
+        *frame = (WaterfrontSceneFrame) {
+            .time = time, .map_only = true, .lighting = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY)
+        };
+    else
+        waterfront_scene_evaluate_ground_scene(
+            view->scene, time, world->water, waterfront_kit_ground(world->definition->map), frame);
     frame->camera = boat_camera(boat, presentation, world->definition, camera);
     frame->player_active = true;
     frame->hide_player = view->props && view->props->hide_player;
@@ -703,7 +710,7 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     boat_player_pose(view, &presentation->flag, p);
     if (world->combat && world->combat->enabled)
         cannon_visit(boat, basin_box, frame);
-    if (world->definition->mapped)
+    if (waterfront_map_has_river_kit(world->definition->map))
         waterfront_boating_gulls_scene(view->scene, time, p->hull.position,
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
     p->particle_count
@@ -870,7 +877,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         renderer3d_draw_emissive_mesh(renderer, surface, (Transform3D) { .scale = { 1, 1, 1 } });
         renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
-    if (world->definition->mapped) {
+    if (waterfront_map_has_river_kit(world->definition->map)) {
         WaterfrontTrafficFrame traffic;
         waterfront_traffic_evaluate_scene(view->scene, world->water, time, &traffic);
         // Wakes and gulls share the frame's unlit tint; navigation lamps keep their own colour.

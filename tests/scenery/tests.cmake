@@ -30,3 +30,11 @@ target_compile_options(validate_building_windows PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME building_windows COMMAND validate_building_windows)
 set_tests_properties(building_windows PROPERTIES PASS_REGULAR_EXPRESSION "building_windows=ok"
   LABELS "core;cpu")
+
+# Procedural P2: actual C shoreline clearance on the generated routes, independent life and pack.
+add_executable(validate_boat_archipelago tests/scenery/validate_boat_archipelago.c)
+target_link_libraries(validate_boat_archipelago PRIVATE proteus_render)
+target_compile_options(validate_boat_archipelago PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_archipelago COMMAND validate_boat_archipelago)
+set_tests_properties(boat_archipelago PROPERTIES LABELS "core;cpu"
+  PASS_REGULAR_EXPRESSION "boat_archipelago=ok")

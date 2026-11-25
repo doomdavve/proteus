@@ -3,8 +3,8 @@
 file I/O.
 
 Sources: every quoted include must be another core header (or raylib.h/raymath.h for vector
-types and math, or a map's compiled water, water.h), system headers come from a short
-allowlist without <stdio.h>, raylib-style PascalCase calls must be raymath, and C library
+types and math, a map's compiled water, or the archipelago's generated places), system headers
+come from a short allowlist without <stdio.h>, raylib-style PascalCase calls must be raymath, and C library
 I/O/process calls are rejected. Archives (when nm is given): every undefined symbol is defined in one of the archives or is
 raymath, libm, libc memory/sort/assert, clock(), or the Accelerate DFT backend.
 
@@ -18,7 +18,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-ALLOWED_QUOTED = {"raylib.h", "raymath.h"}
+ALLOWED_QUOTED = {
+    "raylib.h", "raymath.h",
+    # Generated immutable approach-point data, alongside the compiled shoreline.
+    "../../assets/geometry/archipelago/places.h",
+}
 GEOMETRY_INCLUDE = re.compile(r"\.\./\.\./assets/geometry/[a-z]+/water\.h")
 ALLOWED_SYSTEM = {
     "assert.h", "float.h", "limits.h", "math.h", "stdbool.h", "stddef.h", "stdint.h",
@@ -147,6 +151,7 @@ def self_test():
     headers = {"boat.h", "boat_water.h"}
     violations = {
         "drawing header": '#include "renderer3d.h"\n',
+        "arbitrary geometry header": '#include "../../assets/geometry/outer/places.h"\n',
         "scene header": '#include "waterfront_scene.h"\n',
         "lua header": '#include "lua.h"\n',
         "plugin header": '#include "boat_plugin.h"\n',
@@ -163,6 +168,7 @@ def self_test():
     }
     failures = [k for k, v in violations.items() if not check_source(k, v, headers)]
     clean = ('#include "boat.h"\n#include "raymath.h"\n#include <math.h>\n'
+             '#include "../../assets/geometry/archipelago/places.h"\n'
              "// DrawCube(fopen) in a comment\n"
              "typedef struct { BoatStats (*stats)(void *context); } Table;\n"
              'float f(Vector2 v) { const char *s = "printf("; (void)s;\n'

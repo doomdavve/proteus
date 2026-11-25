@@ -787,7 +787,7 @@ bool waterfront_scenery_init_tiled(
         return false;
     }
     scenery->ground = waterfront_kit_ground(map);
-    scenery->river = map == &waterfront_city_river_map || scenery->ground;
+    scenery->river = waterfront_map_has_river_kit(map);
     unsigned char *authored = NULL;
     Builder builder = { .out = scenery,
         .origin = { -71.82f, 3.5f, 105.9f },

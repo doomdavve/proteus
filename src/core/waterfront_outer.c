@@ -1,4 +1,5 @@
 #include "core/waterfront_outer.h"
+#include "core/waterfront_city.h"
 
 #include "../../assets/geometry/outer/water.h"
 
@@ -33,6 +34,11 @@ const BoatMapDescription waterfront_outer_map
 WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map)
 {
     return map == &waterfront_outer_map ? waterfront_outer_ground : NULL;
+}
+
+bool waterfront_map_has_river_kit(const BoatMapDescription *map)
+{
+    return map == &waterfront_outer_map || map == &waterfront_city_river_map;
 }
 
 float waterfront_outer_overhead(float x, float z)

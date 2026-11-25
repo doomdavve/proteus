@@ -2378,7 +2378,7 @@ static const Color QUAY_LIGHT_COLOR = { 255, 206, 128, 255 };
 // lenses and light scale with the window light, so daytime has none.
 static int dusk_fixtures(const WaterfrontSceneFrame *frame, Vector3 *lenses, int capacity)
 {
-    if (frame->boating_basin || frame->lighting.window_light <= 0)
+    if (frame->boating_basin || frame->map_only || frame->lighting.window_light <= 0)
         return 0;
     const WaterfrontHarborFrame *harbor = &frame->harbor;
     const WaterfrontFerry *ferry = waterfront_harbor_ferry();
@@ -2618,7 +2618,8 @@ static bool light_clusters_ready(WaterfrontGpuScene *scene)
 static void prepare_lights(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
 {
     static LightCandidate candidates[LIGHT_CANDIDATES]; // Drawing is single-threaded.
-    int candidate_count = frame->boating_basin ? 0 : gather_lights(scene, frame, candidates);
+    int candidate_count
+        = frame->boating_basin || frame->map_only ? 0 : gather_lights(scene, frame, candidates);
     scene->light_clusters_active = false;
     scene->light_stats = (WaterfrontLightStats) { 0 };
     scene->light_rows = 0;
@@ -3234,8 +3235,10 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
 {
     if (!frame->boating_basin) {
         add_scenery(scene, frame, material);
-        draw_harbor(scene, material, frame, emissive);
-        draw_traffic(scene, material, frame, emissive);
+        if (!frame->map_only) {
+            draw_harbor(scene, material, frame, emissive);
+            draw_traffic(scene, material, frame, emissive);
+        }
     }
     // By part, so each part's flock forms one instanced run. Gulls are self-coloured.
     Vector3 unlit = frame->lighting.unlit;

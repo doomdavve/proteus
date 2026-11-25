@@ -4,6 +4,7 @@
 #include "core/boat_pose.h"
 #include "core/boat_steering.h"
 #include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
 #include "core/waterfront_traffic.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -157,7 +158,7 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
         if (world->definition->mapped) {
             water = boat_map_water_contact(
                 &world->resources->map, point, HULL_SHORE_CLEARANCE, &normal);
-            if (water
+            if (water && waterfront_map_has_river_kit(world->definition->map)
                 && waterfront_harbor_contact_height_scene(world->scene, point, HULL_SHORE_CLEARANCE,
                     bottom, top, world->water, time, &normal))
                 water = false;
@@ -212,7 +213,7 @@ static void resolve_hull_contact(
 
 static void resolve_traffic(Boat *boat, const BoatHull *hull, const BoatWorld *world, double time)
 {
-    if (!world->definition->mapped)
+    if (!waterfront_map_has_river_kit(world->definition->map))
         return;
     float bottom, top;
     hull_vertical_bounds(boat, hull, &bottom, &top);
@@ -240,7 +241,7 @@ bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneD
 {
     if (!scene)
         return true;
-    if (!world->definition->mapped)
+    if (!waterfront_map_has_river_kit(world->definition->map))
         return !boat_scene_has_content(scene);
     float bottom, top;
     hull_vertical_bounds(boat, &SPEEDBOAT_HULL, &bottom, &top);
