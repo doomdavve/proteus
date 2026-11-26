@@ -35,6 +35,10 @@ uniform float fogOpacity;
 uniform int atmosphereEnabled;
 // Windows pass: vertex alpha is the occupied share. Zero window light keeps daytime glass.
 uniform int windowPass;
+// The clock of the window schedules (building_window_lit), a minute of the day, or -1 for none:
+// every occupied window is then lit. windowMean is each profile's lit share of all windows at it.
+uniform int windowMinute;
+uniform vec4 windowMean;
 uniform float windowLight;
 uniform vec3 windowLit;
 uniform vec3 windowDark;
@@ -180,6 +184,39 @@ uint fmix32(uint h)
     return h;
 }
 
+// building_window_lit in src/scenery/building_windows.c, exactly: whether the window of SEED on a
+// facade of lighting PROFILE is lit at MINUTE of the day (negative: no clock).
+bool window_lit(uint profile, uint seed, int minute)
+{
+    if (((((seed ^ (seed >> 15)) * 2654435761u) >> 29) >= 3u))
+        return false;
+    if (minute < 0)
+        return true;
+    uint onBase = 960u, onSpan = 240u, offBase = 1320u, offSpan = 180u;
+    uint evening = 16u, night = 3u, early = 2u;
+    if (profile == 1u) {
+        onBase = 420u; onSpan = 120u; offBase = 1080u; offSpan = 240u;
+        evening = 16u; night = 1u; early = 0u;
+    } else if (profile == 2u) {
+        onBase = 420u; onSpan = 120u; offBase = 1260u; offSpan = 120u;
+        evening = 4u; night = 1u; early = 1u;
+    } else if (profile == 3u) {
+        onBase = 420u; onSpan = 120u; offBase = 1140u; offSpan = 120u;
+        evening = 4u; night = 0u; early = 0u;
+    }
+    uint r = fmix32(seed + 0x7F4A7C15u);
+    uint role = r & 15u, a = (r >> 8) & 255u, b = (r >> 16) & 255u;
+    uint m = uint(minute) % 1440u;
+    uint on = onBase + onSpan * a / 256u, off = offBase + offSpan * b / 256u;
+    if (role < night)
+        return m >= on || m < 300u;
+    if (role < night + early && m >= 300u + 120u * a / 256u && m < 480u)
+        return true;
+    if (role >= evening)
+        return false;
+    return (m >= on && m < off) || (off > 1440u && m < off - 1440u);
+}
+
 // The share of this pixel a migrated facade's window covers, and its colour: the same grid, seed,
 // glass and lit rule as building_windows.c, filtered by the pixel's footprint. Many windows under
 // one pixel (a footprint near the pitch) settle on the mean of the palette and the lit share, so
@@ -198,8 +235,10 @@ float window_mask(out vec3 color)
     vec4 seedBays = texelFetch(facadeData, at, 0);
     vec4 grid = texelFetch(facadeData, at + ivec2(1, 0), 0);
     vec4 sizes = texelFetch(facadeData, at + ivec2(2, 0), 0);
+    uint profile = uint(seedBays.w) >> 16;
+    float floors = float(uint(seedBays.w) & 65535u);
     if (p.x < grid.x || p.y < grid.z || p.x >= grid.x + seedBays.z * grid.y
-        || p.y >= grid.z + seedBays.w * grid.w)
+        || p.y >= grid.z + floors * grid.w)
         return 0.0;
     float bay = floor((p.x - grid.x) / grid.y);
     float level = floor((p.y - grid.z) / grid.w);
@@ -219,9 +258,9 @@ float window_mask(out vec3 color)
         : kind == 3u ? vec3(181.0, 211.0, 221.0) / 255.0 : vec3(66.0, 100.0, 120.0) / 255.0;
     vec3 palette = (3.0 * vec3(138.0, 185.0, 204.0) + vec3(181.0, 211.0, 221.0)
                        + 3.0 * vec3(66.0, 100.0, 120.0)) / (7.0 * 255.0);
-    float lit = float(((((seed ^ (seed >> 15)) * 2654435761u) >> 29) < 3u));
+    float lit = window_lit(profile, seed, windowMinute) ? 1.0 : 0.0;
     glass = mix(glass, palette, settle);
-    lit = mix(lit, 0.375, settle);
+    lit = mix(lit, windowMean[profile], settle);
     // The reveal bands building_window_faces draws on the pane: a dark band under the lintel, a mid
     // one on the left jamb and a light sill, each with its lit share. Beyond a pixel per window
     // they settle toward the mean (a little darker than the glass), like the cover.
@@ -373,9 +412,18 @@ void main()
         if (reflectionPass != 0 && fragWorldPosition.y < 0.0)
             discard;
         if (windowPass != 0) {
+            // Alpha: the face's lit share in 6 bits over the lighting profile in 2; the texture
+            // coordinates: the window seed (builder_window_quad in renderer_gpu.c).
+            int packed = int(fragColor.a * 255.0 + 0.5);
+            float share = float(packed >> 2) / 63.0;
+            if (share > 0.0 && windowLight > 0.0) {
+                uint seed = uint(fragTexCoord.x + 0.5) | (uint(fragTexCoord.y + 0.5) << 16);
+                if (!window_lit(uint(packed & 3), seed, windowMinute))
+                    share = 0.0;
+            }
             if (windowLight > 0.0)
                 albedo.rgb = mix(albedo.rgb,
-                    mix(albedo.rgb * windowDark, windowLit, fragColor.a), windowLight);
+                    mix(albedo.rgb * windowDark, windowLit, share), windowLight);
             albedo.a = 1.0;
         }
         // The 8-bit reflection keeps unit gain; its streaks come from the water.

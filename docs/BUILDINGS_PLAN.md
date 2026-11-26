@@ -1,17 +1,16 @@
-# Buildings and waterfront architecture overhaul
-
-Status, 2026-11-21: B0 done. B1 and B2 implemented; the user accepted the B2 look (balcony stacks,
-projecting-surround reveal, 40 m relief range; no cut-wall holes). B3 implemented: every mapped
-building is built from facade records (automatic families plus overrides, pack v4,
-`tools/building_report.py`). The user played it, accepted the frame cost and agreed that untagged
-buildings stay plain blocks (2026-11-21); PR authorized. Pausing after B3. Checks, numbers, limits:
-[B3 results](#b3-results--2026-11-21).
+Status, 2026-11-21: done. B0 to B4 merged (#226, #228) and the contract is the
+[buildings spec](BUILDINGS.md); this plan is history. The user accepted the B2 look, the B3 frame
+cost and plain untagged buildings, and the B3b window distribution in play ("Much better!").
+Open items (not scheduled): browser run of the building packs and window lighting (no Emscripten
+here; web packaging checked by reading only), Windows and Linux visual and Release checks (CI
+passes the CTest lane only), dusk and night in motion through the full day cycle, balconies over
+streets that only touch the 6 m street polygon, a deeper stepped-block cut, spreading cell
+expansion over frames (dropped: no hitch measured), a GLSL-versus-C bit test of `window_lit`,
+the Gotaverken sheds at boat level. Deferred elsewhere: crane and landmark work and living-city
+actors keep their owners.
+Done when: met (spec written, packs verified, user accepted the visuals listed above).
 Goal: inviting, stylized buildings with coherent silhouettes, facade depth and street edges.
 Scope: Eriksberg pilot, reusable families across the outer city, and a finished generation spec.
-Open: B3b window lighting by hour and district (queued), expansion hitch and qualification (B4).
-Done when: the implementation is verified and reviewed, rollout is complete, and BUILDINGS.md
-specifies the shipped source-to-rendering system with reproducible authoring commands.
-Next: B3b, then B4 qualification. Delivery: one branch and one PR.
 
 ## Intent and boundaries
 
@@ -185,17 +184,13 @@ user's visual review separately from automated checks. Refine this group before 
 Acceptance: matched comparison districts show appropriate variety and complete coverage, with
 no disappeared buildings, doubled parts or obvious intersections. Next: B4 qualification.
 
-### B3b — Window lighting by hour and district (queued, user request 2026-11-21)
+### B3b — Window lighting by hour and district (implemented 2026-11-21, user request)
 
-Windows light up in the evening and dim through the night while people sleep. Proposal: a pure
-`building_window_lit(seed, hour)` beside `building_window_occupied`, mirrored bit for bit in
-`waterfront_city.fs`, fed by the lighting hour (fixed `--lighting-hour` settings and the Working
-Harbour clock). Per-window switch-on (about 16:00-20:00) and bedtime (about 22:00-01:00) offsets
-come from the seed; about 5-8% stay lit overnight; a few early risers come on around 05:00-07:00.
-The user agreed that districts differ: a schedule profile per family (residential as above;
-industrial and warehouse mostly dark in the evening with sparse shift and security lights; shop
-and office floors lit through the working evening, dark at night; boatyards and clubhouses mostly
-dark), carried in the building records. Tests drive a virtual hour. Not started.
+Windows light up in the evening and dim through the night while people sleep, by district. A pure
+`building_window_lit(profile, seed, minute)` beside `building_window_occupied`, mirrored bit for
+bit in `waterfront_city.fs`, fed by the lighting hour (fixed `--lighting-hour` and the Working
+Harbour clock). Four profiles in the facade record (residential, workplace, industrial, quiet);
+details in [BUILDINGS.md](BUILDINGS.md#window-lighting). Tests drive a virtual minute.
 
 ### B4 — Distance, motion and platform qualification
 
@@ -224,7 +219,7 @@ is a B4 candidate if a hitch is measured.
 Acceptance: measured budgets hold, required automated checks pass and review artifacts expose
 motion/pop/shadow/reflection behaviour. Automated demo exit is not human acceptance. Next: B5.
 
-### B5 — Close with the implemented specification
+### B5 — Close with the implemented specification (done 2026-11-21)
 
 - Finish BUILDINGS.md as the source-to-rendering spec: source/provenance and coordinates;
   identities and parts; terrain/height policy; recipe selection and override precedence;
@@ -743,3 +738,68 @@ close. Nothing was seen disappearing or doubling, but only nine camera positions
 
 Not verified: browser build and load time, other platforms, motion/pop and the shadow pass in
 motion, the minimap, human review. Next: the user's review of the stills and a playtest, then B4.
+
+## B3b results — 2026-11-21
+
+Implemented locally on `feat/buildings-b3b` (from main after PR #226); no PR, no user acceptance.
+
+What changed: the facade record's spare byte is the lighting profile (pack version unchanged, both
+packs rebaked: 5,331 / 19,044 residential, 899 / 2,382 workplace, 32 / 4,718 industrial facades in
+river / outer, none quiet). `tools/building_kit.py` assigns it from style, family and district and
+an authored `lighting` key overrides it. `building_window_lit` and `building_window_lit_share` are
+in `src/scenery/building_windows.[ch]`; `WaterfrontLighting` carries the clock; the CPU renderer
+evaluates per window, the GPU shader per fragment (quads: seed in the texture coordinates, profile
+and lit share in the vertex alpha; mask: profile in the facade texel, `windowMean` uniform), so a
+changing hour rebuilds nothing. Far merged generic windows now light as their first window (they
+were a mean before).
+
+Checks run (2026-11-21, macOS, Debug, display awake): `ctest --preset full` 611 of 611 (with the
+shapely venv so the Python tool tests ran); new `building_windows` schedule cases (virtual
+minutes: no window lit by day, rising switch-on 16:00-20:00, falling bedtime past midnight, 7% and
+5% overnight and early residential shares, workplace and industrial/quiet shares, sample against
+`building_window_lit_share`), the pack profile range and a `boat_scenery` invalid-profile case;
+`building_kit`, `map_pack` self-tests. Stills (Gothenburg Harbour, `outer`, GPU 1280x800, one
+building group, warm window pixels by hour): 19:00 232, 20:00 1,778, 21:00 1,792, 22:00 1,762,
+23:00 1,221, 00:00 602, 01:00 113, 02:00 26, 03:00 26: a spread-out switch-on and bedtime.
+
+Correction found by the user's first look: the first commit lit every window at once and put them
+all out at once, because window meshes were uploaded as `STATIC_UNLIT`, which stores no texture
+coordinates, so the shader read seed 0 for every quad. Window meshes now use `STATIC_WINDOW`
+(unlit, with coordinates). My earlier stills compared only 21:00 with 03:00 and could not show it;
+check an hour sweep, not two hours.
+
+Not verified: the shader's integer schedule against the C one beyond the shared formulas (no
+GLSL test; the stills agree in character, not bit for bit), browser/WebGL2, Windows and Linux, the
+Working Harbour clock sweeping through an evening in motion, a district-by-district look (industrial
+and workplace profiles were not inspected on screen), human review. Known limit: `quiet` is only
+reachable by an authored `lighting` entry or a shed with windows (none today).
+
+## B4 results — 2026-11-21
+
+Machine: MacBook Pro M1 Max, macOS, AC power, Release (`-O3`). B3 = the merged build in
+`/private/tmp/proteus-buildings` (30714a7), B3b = `cd65507`. Three interleaved runs each, 600 frames
+per fixed view (`--demo-idle`) and 1,800 frames per scripted drive, `--no-vsync`, `--performance-report`.
+The B3 binary predates `--no-audio`, so only B3b ran with it. Other work was idle on the machine.
+
+- GPU cost of B3b window lighting: no measurable change. gpu p50 (ms, B3 to B3b, three runs each)
+  eriksberg-near day 4.53-4.61 to 4.16-4.65, night 4.88-5.09 to 4.54-5.08; quay day 5.19-5.38 to
+  4.85-5.22, night 5.37-5.47 to 5.23-5.48; masth drive 6.12-6.25 to 5.78-6.23. Night costs about
+  0.3 ms more than day in both builds (lit windows). render p50 is bimodal run to run (1.6 or 4.5
+  ms) in B3b and B3 alike, so gpu p50 is the figure to read.
+- Expansion hitch: none beyond the first frame. Excluding the first three frames, the worst render
+  submit in the 1,800-frame Masthugget and Lindholmen drives was 9.4-15.7 ms in both builds, with at
+  most 30 frames over 10 ms (B3 Lindholmen run 3). The first frame is 220-270 ms in both (startup
+  upload, pre-existing). Spreading cell expansion over frames is not needed; lever dropped.
+- Pack size: outer `scenery.bin` 5,899,814 to 5,901,046 B, river 981,158 to 981,382 B (profile byte
+  only); no new sidecar.
+- Packaging: macOS (`tools/macos/package.py`, `macos-boat.yml`), Windows (`windows-boat.yml`) and web
+  (`cmake/Web.cmake`, `tools/package_web.py`) already ship `ambient.bin` and `water_atlas.bin` for
+  `outer` (read from the scripts; no package was built here). The "macOS omits sidecars" hazard above is
+  stale. River sidecars are not shipped, matching the retired river location.
+- Staleness: `ambient_river` and `ambient_outer` CTest checks pass on the rebaked packs.
+- Full CTest preset at `cdf1e5a`: 611 of 611 (before the plan edits).
+
+Not verified: browser (web build not run), Windows and Linux, Instruments (no measurement warranted
+it), first-frame upload split, bounds of projecting features in shadow and reflection passes beyond
+the existing validators, human review of dusk and night in motion beyond "Much better!" on the
+window distribution.

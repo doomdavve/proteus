@@ -56,7 +56,7 @@ TRIANGLE = struct.Struct("<3I4B")
 #     (a, c, b) and (a, d, c), which gives the wall's origin a, end b, base y and top y, so a
 #     rebake or draping cannot disagree with the mesh; u16 facade number in its building (the
 #     window seed input; walls without windows leave gaps), u16 bays, u16 floors, u8 style
-#     (index into the styles), u8 zero.
+#     (index into the styles), u8 lighting profile (PROFILES; 0 residential).
 #   style (36 bytes): f32 first bay offset along the wall, bay pitch, first floor height above the
 #     base, floor pitch, ground floor window width and height, upper floor window width and
 #     height, and the offset of the window plane from the wall. Window F of bay B spans
@@ -70,6 +70,8 @@ BUILDING_HEAD = struct.Struct("<5I")
 BUILDING = struct.Struct("<8I6f")
 RUN = struct.Struct("<3I")
 FACADE = struct.Struct("<I3HBB")
+# Window lighting schedules (scenery/building_windows.h BUILDING_PROFILE_*), the facade's last byte.
+PROFILES = ("residential", "workplace", "industrial", "quiet")
 STYLE = struct.Struct("<9f")
 # Wall roles take facade records (windows). ROLE_WALL is the fallback building's wall: the
 # renderers pick its material from its tint (the retained palette). PLASTER, BRICK and PANEL name
@@ -171,10 +173,12 @@ def building_block(vertices, triangles, water, buildings, styles=()):
             wall = f["wall"]
             if not (first <= wall and wall + 2 <= end) or not last < f["index"] <= 0xFFFF \
                     or not (1 <= f["bays"] <= 0xFFFF and 1 <= f["floors"] <= 0xFFFF) \
-                    or not 0 <= f["style"] < len(styles):
+                    or not 0 <= f["style"] < len(styles) \
+                    or not 0 <= f.get("profile", 0) < len(PROFILES):
                 raise ValueError(f"{b.get('id', ident)}: bad facade {f!r}")
             last = f["index"]
-            facades_out.append(FACADE.pack(wall, f["index"], f["bays"], f["floors"], f["style"], 0))
+            facades_out.append(FACADE.pack(wall, f["index"], f["bays"], f["floors"], f["style"],
+                                         f.get("profile", 0)))
         records.append(BUILDING.pack(ident, first, end, detail, run_first,
                                      len(runs_out) - run_first, facade_first,
                                      len(facades_out) - facade_first, *low, *high))
@@ -257,9 +261,9 @@ def read_buildings(blob):
             runs.append((a, b, packed & 255, packed >> 8 & 255, packed >> 16))
         facades = []
         for j in range(facade_first, facade_first + facade_n):
-            wall, index, bays, floors, style, _ = FACADE.unpack_from(blob, facades_at + j * FACADE.size)
+            wall, index, bays, floors, style, profile = FACADE.unpack_from(blob, facades_at + j * FACADE.size)
             facades.append({"wall": wall, "index": index, "bays": bays, "floors": floors,
-                            "style": style})
+                            "style": style, "profile": profile})
         out.append({"hash": ident, "first": first, "end": end, "detail_first": detail,
                     "min": box[:3], "max": box[3:], "runs": runs, "facades": facades})
     return out, [STYLE.unpack_from(blob, styles_at + j * STYLE.size) for j in range(style_count)]
@@ -407,7 +411,7 @@ def building_test():
         assert records[0]["hash"] == stable_id_hash("way/2") and read_styles == [STYLE.unpack(STYLE.pack(*STYLE_FIXTURE))]
         assert records[0]["min"][1] == 3.5 and records[0]["max"][1] == 9.5
         assert records[1]["runs"][1] == (7, 8, ROLE_DETAIL, NO_FACADE, 100)
-        assert records[1]["facades"] == [{"wall": 5, "index": 3, "bays": 2, "floors": 1, "style": 0}]
+        assert records[1]["facades"] == [{"wall": 5, "index": 3, "bays": 2, "floors": 1, "style": 0, "profile": 0}]
         # Identity is the id, not the input order or the list position.
         assert pack_bytes(vertices, triangles, 8, buildings[::-1], styles) == blob
         # The deflated block holds byte-shuffled arrays; shuffling is its own inverse step.
@@ -441,6 +445,7 @@ def building_test():
            lambda b: b[0]["facades"].__setitem__(0, {**wall, "bays": 0}),
            lambda b: b[0]["facades"].__setitem__(0, {**wall, "floors": 70000}),
            lambda b: b[0]["facades"].__setitem__(0, {**wall, "style": 1}),  # no such style
+           lambda b: b[0]["facades"].__setitem__(0, {**wall, "profile": len(PROFILES)}),
            lambda b: b[0]["facades"].append({**wall, "index": 0})]  # numbers must increase
     for mutate in bad:
         v, t, b = building_fixture()

@@ -346,6 +346,9 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --screenshot build/replay.png --time 5
 ```
 
+The title capture follows the saved RESOLUTION and EDGES settings: `--title --screenshot` writes
+320×200 at LOW and 1280×800 at HIGH.
+
 Screenshots use a deterministic scripted drive, not interactive elapsed time. `--time`
 selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to its finish.
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.

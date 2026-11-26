@@ -10,8 +10,9 @@
 int main(int argc, char **argv)
 {
     test_scenery_load();
-    if (argc != 2) {
-        fprintf(stderr, "Usage: title_backdrop OUTPUT.png (requires desktop graphics)\n");
+    if (argc != 2 && argc != 3) {
+        fprintf(
+            stderr, "Usage: title_backdrop OUTPUT.png [HIGH.png] (requires desktop graphics)\n");
         return 2;
     }
     SetTraceLogLevel(LOG_WARNING);
@@ -42,6 +43,17 @@ int main(int argc, char **argv)
     BeginTextureMode(target);
     waterfront_gpu_scene_draw(&gpu.scene, &frame, target.texture.width, target.texture.height);
     EndTextureMode();
+    if (argc == 3) {
+        image = LoadImageFromTexture(target.texture);
+        if (!IsImageValid(image))
+            goto cleanup;
+        ImageFlipVertical(&image);
+        ImageFlipHorizontal(&image);
+        if (!ExportImage(image, argv[2]))
+            goto cleanup;
+        UnloadImage(image);
+        image = (Image) { 0 };
+    }
     BeginTextureMode(gpu.target);
     ClearBackground(BLACK);
     BeginShaderMode(gpu.downsample);

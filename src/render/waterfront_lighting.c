@@ -436,6 +436,8 @@ bool waterfront_lighting_hour(float hour, WaterfrontLighting *lighting)
         azimuth = Lerp(a->azimuth, b->azimuth, t);
     }
     result.phase = WATERFRONT_DAYLIGHT_DAY;
+    result.window_clock = true;
+    result.window_minute = (int)floorf(h * 60.0f) % 1440;
     result.sun_direction = sun_path(elevation, azimuth);
     apply_horizon(&result, elevation);
     *lighting = result;

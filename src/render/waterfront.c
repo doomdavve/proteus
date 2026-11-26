@@ -122,7 +122,9 @@ static Color window_tint(Color glass, bool occupied, const WaterfrontLighting *l
 // Daytime glass, toward warm occupied rooms and darkened empty ones as the window light rises.
 static Color window_color(unsigned int seed, const WaterfrontLighting *lighting)
 {
-    return window_tint(waterfront_window_glass(seed), waterfront_window_occupied(seed), lighting);
+    return window_tint(waterfront_window_glass(seed),
+        building_window_lit(BUILDING_PROFILE_RESIDENTIAL, seed, waterfront_window_minute(lighting)),
+        lighting);
 }
 
 // Windows of the land triangles of one tile, in index order.
@@ -187,7 +189,10 @@ static void draw_window(const BuildingWindow *w, void *user)
 {
     const WindowDraw *draw = user;
     BuildingWindowFace faces[BUILDING_WINDOW_REVEAL_MAX];
-    size_t n = building_window_faces(w, faces);
+    BuildingWindow lit = *w;
+    lit.occupied
+        = building_window_lit(w->profile, w->seed, waterfront_window_minute(draw->lighting));
+    size_t n = building_window_faces(&lit, faces);
     for (size_t i = 0; i < n; ++i)
         draw_face(&faces[i], draw);
     float dx = draw->eye.x - w->corners[0].x, dz = draw->eye.z - w->corners[0].z;

@@ -12,7 +12,9 @@ payouts, fuel or progression. Open: S1's review of fun, broader S0c qualificatio
 DAMAGED hint and `.rejected` set-aside path were not exercised by hand. Proposed, unscheduled:
 a [structured HUD](BOAT_HUD.md#structured-contextual-information-proposed-2026-11-07); T0/S2.
 Done when: the user judges S1 fun and S0c's qualification limits are closed or dropped.
-Next task: none scheduled; future PRs need the user's approval. This plan owns
+Next task: none scheduled here; the player-facing ladder (default entry, errands, boat
+choice, progression) is proposed in the [citizen ladder plan](CITIZEN_LADDER_PLAN.md);
+future PRs need the user's approval. This plan owns
 free ride's interactive cargo, player changes to places, Creative/Working Harbour rules, boat
 ownership and economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography,
 weather and the journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static

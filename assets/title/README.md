@@ -5,7 +5,9 @@
 3 px letter spacing and a 10 px word space. Diagonals are rasterized directly at the final
 pixel grid. A one-pixel cyan edge and two-pixel coral depth complete the 256×26 RGBA image.
 The warm/cartoon build remaps the title interior to a single sunny yellow ink,
-with a dark navy edge and shadow; the cyan build uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1; the window's final integer scaling enlarges the whole screen.
+with a dark navy edge and shadow; the cyan build uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1 at LOW resolution and 2× at
+HIGH, where the menu keeps its native type size; the window's final integer scaling enlarges the
+whole screen.
 
 Regenerate the wordmark using a Python environment with Pillow installed:
 
@@ -20,17 +22,21 @@ scene time 73.350 s. No player layer or player wake is drawn. The native GPU ren
 renders at 1280×800 and downsamples to 320×200 using the ordinary game shader. The title
 uses the original bright daylight colours by default. `-DPROTEUS_WARM_MENU=OFF` retains the original dusk
 grade and occupied-window pixels. Both load the same source without moving the backdrop.
+`river-backdrop-high.png` is the same fixed view exported at 1280×800 for the HIGH title; the
+640×400 UI overlay is composited over it. Generate both together so the pair matches; rerunning the
+tool against newer scene code refreshes the pair rather than only the high-resolution copy.
 
 Regenerate from the repository root with a working desktop graphics context:
 
 ```sh
 cmake --build build --target title_backdrop
-./build/title_backdrop assets/title/river-backdrop.png
+./build/title_backdrop assets/title/river-backdrop.png assets/title/river-backdrop-high.png
 cmake --build build --target wake_velocity
 ./build/wake_velocity --title --screenshot build/title.png
 ```
 
-The second build copies the freshly rendered source into the executable's asset directory.
+The second build copies the freshly rendered sources into the executable's asset directory. The
+title capture is 320×200 at LOW and 1280×800 at HIGH.
 The original moving-boat capture and coarse title alphabets are historical; they are no
 longer the current title assets. The owning design and review status is in
 [the title plan](../../docs/TITLE_SCREEN_PLAN.md).

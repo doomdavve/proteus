@@ -41,6 +41,28 @@ uint32_t building_window_seed(uint32_t facade_seed, unsigned bay, unsigned floor
 Color building_window_glass(uint32_t seed);
 bool building_window_occupied(uint32_t seed);
 
+// When a window is lit. A facade record names one of these schedules (the lighting profile of its
+// building's family); a window follows it only if it is occupied, so the profile says how many of
+// the lit rooms keep their light on, and when. MINUTE is the minute of the day, 0..1439; a
+// negative MINUTE means no clock (a fixed daylight phase) and every occupied window is lit.
+// Integer arithmetic only: assets/shaders/waterfront_city.fs repeats it exactly.
+//   RESIDENTIAL  evening from 16:00-20:00 to 22:00-01:00, 3 in 16 stay lit until 05:00 and 2 in 16
+//                rise at 05:00-07:00 (about 7% and 5% of all windows).
+//   WORKPLACE    shops and offices: lit through a working evening to 18:00-22:00, 1 in 16 all
+//   night. INDUSTRIAL   a quarter lit until a 21:00-23:00 shift end, 1 in 16 all night, 1 in 16
+//   early. QUIET        boatyards and clubhouses: 1 in 4 lit until 19:00-21:00, otherwise dark.
+enum {
+    BUILDING_PROFILE_RESIDENTIAL,
+    BUILDING_PROFILE_WORKPLACE,
+    BUILDING_PROFILE_INDUSTRIAL,
+    BUILDING_PROFILE_QUIET,
+    BUILDING_PROFILE_COUNT
+};
+bool building_window_lit(unsigned profile, uint32_t seed, int minute);
+// The share of all windows of PROFILE lit at MINUTE (3/8 without a clock): what distant facades,
+// where windows are under a pixel, settle on.
+float building_window_lit_share(unsigned profile, int minute);
+
 // A facade's wall as the mesh gives it: its base corners ORIGIN (a) and END (b), top y, unit
 // direction ALONG from a to b and the outward unit normal (the wall is a, c, b above b).
 typedef struct {
@@ -57,8 +79,10 @@ bool building_wall(const Mesh3D *mesh, const BoatSceneryFacade *facade, Building
 typedef struct {
     Vector3 corners[4];
     Color glass;
-    bool occupied;
+    bool occupied; // Lit when it is the only state given: callers set it from building_window_lit.
     unsigned bay, floor;
+    uint32_t seed;
+    uint8_t profile;
 } BuildingWindow;
 
 // Number of windows of FACADE: bays * floors.

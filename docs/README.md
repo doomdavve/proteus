@@ -18,8 +18,9 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 | Area | Open loop (human check or unfinished step) | Since | Owner |
 | --- | --- | --- | --- |
-| Procedural world | Reference-led fishing boat, home marina and solo day/night cycle qualified locally; human play review remains. Browser work remains deferred. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
+| Procedural world | Reference-led fishing boat, home marina and solo day/night cycle accepted by the user; PR integration underway. Broader qualification and browser work remain deferred. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
 | Wakes | R2b experimental CPU basin trial available; curved handling preservation failed, user comparison next; production recipe unchanged, broader performance/platform review open | 2026-11-19 | [wake research](WAKE_RESEARCH_PLAN.md) |
+| Citizen ladder | Proposed 2026-11-21: boat switching (at a quay) and the first-purchase model (standing, then a free first boat) decided; next task CL0 | 2026-11-21 | [citizen ladder plan](CITIZEN_LADDER_PLAN.md) |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
 | Plugins | P5 follow-ups: hunt tick cost has Debug and Release numbers (M1 Max, ENet bots) but no WebRTC clients or other platform, and Release reading slower than Debug is unexplained (the browser hunt case and old-bundle rejection passed on Chrome/macOS 2026-11-14); P5g recording not qualified beyond macOS Debug, with disk cost and a human view of a reconstruction open; R2 loaded maps not scheduled | 2026-11-14 | [P5 plan](PLUGIN_P5_PLAN.md#p5i-closing-step) |
 | Plugins | Marina M1-M5 complete (M4 merged #209; M5 merged #211). Open: M4 leftovers (parked visitor, serviced-vessel wakes undecided, repeat and loop-path services); browser/Wasm, room, Windows/Linux and Release runs of module packages; motion of both demos watched by the user 2026-11-15 ("Looks ok"); an unconfirmed mirrored-lettering observation in GPU stills | 2026-11-15 | [marina closing leftovers](MARINA_AUTHORING_PLAN.md#closing-leftovers--2026-11-15) |
@@ -60,14 +61,13 @@ empty rooms after ten seconds while keeping connections and maintenance alive. I
 locally; the Debug build and all 571 CTests passed on macOS on 2026-11-15, including real-ENet
 pause/resume checks. Winterfell CPU and native/browser qualification remain after release.
 
-## Building architecture overhaul — 2026-11-11
+## Building architecture overhaul — done 2026-11-21
 
-The [building overhaul plan](BUILDINGS_PLAN.md) defines an Eriksberg pilot followed by
-reusable building families across the city: distinct silhouettes, facade depth and readable
-street edges at the default resolution. The deliverable includes implementation and a
-`BUILDINGS.md` specification of the source-to-rendering construction system. B0 and B1 (shared
-foundation) and the Eriksberg pilot (B2) are implemented locally; B2 awaits visual review. Crane/landmark work and living-city actors
-remain with their existing owners. No implementation PR is authorized.
+Eriksberg pilot, reusable families across the outer city and per-window lighting by hour and
+district shipped (B0 to B4, #226 and #228). The contract is the [buildings spec](BUILDINGS.md);
+the [plan](BUILDINGS_PLAN.md) is history and lists the open items (browser, Windows and Linux
+visuals, dusk and night in motion). Crane/landmark work and living-city actors remain with their
+existing owners.
 
 ## Cloud deck — grouping and drift follow-up, 2026-11-10
 
@@ -179,6 +179,7 @@ and broader network/platform qualification remain open.
 | Area and owning document | Implemented | Remaining / next task |
 | --- | --- | --- |
 | [Free ride sandbox / working harbour](FREE_RIDE_SANDBOX_PLAN.md) | S0a-S0b and S1a-S1e are merged and user-accepted, with fixtures as plugin package data, automatic save/resume and a WORKING HARBOUR Single Player entry with discovered saves (SV1, [#169](https://github.com/doomdavve/proteus/pull/169), 2026-11-07); no economy, fuel or progression. | S1 fun review, then broader S0c qualification; T4 day/night cycling is implemented (15 minutes at 1×, 112.5 seconds at 8×); the user accepted the documented playtest invocation; nothing is scheduled and future PRs need approval ([status](FREE_RIDE_SANDBOX_PLAN.md)). |
+| [Citizen ladder](CITIZEN_LADDER_PLAN.md) | Proposed 2026-11-21: make the working harbour the default new-player path, with capability-first rungs (small boat and free errands first, then crane, tow, tug, Explorer) and speed within each hull class; nothing implemented | CL0; no PR authorized |
 | [Marina authoring expansion](MARINA_AUTHORING_PLAN.md) | Done 2026-11-15: M1 structures, M2 appearance, M3 authored routes/clearance (#201), M4 vessel services (#209) and M5 package-local modules with an integrated example (#211); contract in the [Plugin API](PLUGIN_API.md#package-modules-m5) | Open items are on the [Open loops](#open-loops) board; nothing is scheduled |
 | [Room content loading and distribution](ROOM_CONTENT_PLAN.md) | Overall architecture and staged direction documented (2026-10-30); no implementation | Select a first map/scenario and refine the manifest/loading contract with plugin P5; then local loading, preinstalled room packages and automatic distribution |
 | [Free-riding adventure / Vinga](FREE_RIDING_ADVENTURE_PLAN.md) | A0–A2 foundations and the A3 outer-river/Långedrag outing implemented; city coverage extends upstream. Vinga terrain catalogue and download authentication verified 2026-11-15; full raster coverage remains uninspected. | [Vinga integration V0–V6](VINGA_INTEGRATION_PLAN.md): acquire/validate terrain and corridor, extend the connected map, qualify rendering costs, add full/short voyages and lighthouse, then compatibility/playtest and spec closure. Planning only; V0 next. |

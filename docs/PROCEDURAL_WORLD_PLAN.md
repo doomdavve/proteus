@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 native implementation and qualification complete locally; recipe 4 ready.
-**Open** — Human review of boats, marina, cycle/night readability; broader platforms deferred.
+**State** — A0–A10 complete; recipe 4 accepted by the user; PR integration in progress.
+**Open** — Broader platform/night qualification and deferred art/life work.
 **Done when** — Native evidence is recorded (complete); human acceptance is recorded separately.
-**Next** — Human play review of recipe 4; then choose the next art/life improvement.
+**Next** — Integrate current main, pass PR CI and merge the accepted milestone.
 
 ## Additional art direction — 2026-11-25
 
@@ -345,3 +345,11 @@ Human input/gameplay, audio listening, full live-cycle timing, night acceptance,
 Windows/Linux and Release qualification remain open. The small marina has no dedicated night
 lamps or interactive berth services. Breaking surf/spray, reactive AI, jobs/economy, physical
 traffic wakes, runtime seeds and streaming stay deferred. No PR, push or publication is made.
+
+## User acceptance and PR integration — 2026-11-26
+
+The user accepted the result ("I like it") and explicitly requested merging through a PR.
+This accepts the current native art/life milestone; it does not establish unperformed audio,
+platform or full-cycle timing checks. Current main is integrated before PR qualification,
+including the newer building windows and RESOLUTION/EDGES title controls. The playing-guide
+conflict preserves those controls alongside the Skerry Reach cycle instructions.
