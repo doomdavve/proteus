@@ -238,7 +238,9 @@ static int life(void)
     CHECK(frame.traffic.vessel_count == 4 && !frame.traffic.lift);
     CHECK(frame.traffic.routes == &scene->traffic);
     CHECK(frame.gull_count == 26 && !frame.lamp_count);
-    CHECK(!frame.harbor.berth_count && frame.harbor.ferry.scale.x == 0);
+    CHECK(frame.harbor.berth_count == 4 && frame.harbor.omit_ferry);
+    CHECK(frame.harbor.line_count == 8);
+    CHECK(frame.harbor.ferry.scale.x == 0);
     size_t moving = 0, stopped = 0;
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
@@ -297,6 +299,83 @@ static int life(void)
     return 0;
 }
 
+static int marina_and_clock(void)
+{
+    BoatWorldResources resources;
+    CHECK(boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_ARCHIPELAGO)));
+    BoatWorld world;
+    boat_world_init(&world, &resources, (BoatWater) { 0 });
+    const BoatSceneDefinition *scene = boat_archipelago_life();
+    BoatModelSpec fishing = waterfront_route_spec(&scene->traffic, 1);
+    CHECK(fishing.mast_height > 6 && fishing.cabin_offset > 0);
+    CHECK(boat_model_spec_valid(fishing));
+    const Mesh3D *mesh = waterfront_route_mesh(&scene->traffic, 1);
+    CHECK(mesh && mesh->triangle_count > 0 && mesh->triangle_count <= BOAT_MODEL_MAX_TRIANGLES);
+    Transform3D rest = { .scale = { 1, 1, 1 } };
+    float low, high;
+    boat_model_vertical_bounds(fishing, rest, &low, &high);
+    for (size_t i = 0; i < mesh->triangle_count * 3; ++i) {
+        Vector3 v = mesh->vertices[i];
+        CHECK(isfinite(v.x) && isfinite(v.y) && isfinite(v.z));
+        CHECK(v.y >= low && v.y <= high);
+        CHECK(fabsf(v.x) <= fishing.beam * .5f + .4f);
+        CHECK(fabsf(v.z) <= fishing.length * .5f + .8f);
+    }
+    WaterfrontVesselMotion motion = waterfront_route_motion(&scene->traffic, 1, 0);
+    printf("archipelago_fishing position=%g,%g heading=%g triangles=%zu\n", -motion.position.x,
+        motion.position.z, motion.heading * RAD2DEG, mesh->triangle_count);
+    CHECK(scene->berths_present && scene->berth_count == 4);
+    WaterfrontSceneFrame frame = { 0 };
+    boat_archipelago_evaluate(world.water, 0, (Vector3) { 0 }, (Vector3) { 0 }, &frame);
+    for (unsigned i = 0; i < scene->berth_count; ++i) {
+        const BoatSceneBerth *berth = &scene->berths[i];
+        BoatModelSpec spec = boat_scene_berth_resolve(berth);
+        CHECK(frame.harbor.visible[i]);
+        CHECK(fabsf(frame.harbor.boats[i].position.x + berth->x) < .001f);
+        CHECK(fabsf(frame.harbor.boats[i].position.z - berth->z) < .001f);
+        CHECK(waterfront_harbor_berths_contact_height_scene(
+            scene, (Vector2) { berth->x, berth->z }, 0, -1, 2, world.water, 0, NULL));
+        CHECK(!waterfront_harbor_berths_contact_height_scene(
+            scene, (Vector2) { berth->x, berth->z }, 0, 20, 22, world.water, 0, NULL));
+        // Sample the full conservative contact rectangle, including wave excursion.
+        for (int x = -1; x <= 1; ++x)
+            for (int z = -1; z <= 1; ++z) {
+                Vector3 p = boat_model_point(frame.harbor.boats[i],
+                    (Vector3) { x * (spec.beam * .5f + .45f), 0, z * (spec.length * .5f + .9f) });
+                if (!boat_map_water(&resources.map, (Vector2) { -p.x, p.z }, .1f))
+                    fprintf(stderr, "marina %u corner %d,%d at %g,%g\n", i, x, z, -p.x, p.z);
+                CHECK(boat_map_water(&resources.map, (Vector2) { -p.x, p.z }, .1f));
+            }
+    }
+    for (int z = 10; z >= -80; --z)
+        CHECK(!waterfront_harbor_berths_contact_height_scene(
+            scene, (Vector2) { 0, z }, 12, -1, 3, world.water, 0, NULL));
+    // No imported ferry collision in this local marina.
+    CHECK(!waterfront_harbor_berths_contact_height_scene(
+        scene, (Vector2) { -237, -376 }, 1, -1, 3, world.water, 0, NULL));
+    BoatViewState view = { 0 };
+    const double times[] = { 0, 225, 450, 675, 900, 112.5, -225, 225 };
+    const float hours[] = { 12, 18, 0, 6, 12, 15, 6, 18 };
+    for (unsigned i = 0; i < sizeof(times) / sizeof(times[0]); ++i) {
+        BoatViewProps props = boat_archipelago_lighting(times[i]);
+        view.props = &props;
+        float hour;
+        double glitter, expected;
+        CHECK(boat_view_lighting_clock(&view, &hour, &glitter));
+        CHECK(hour == hours[i]);
+        CHECK(waterfront_glitter_clock(12 + times[i] * 24 / 900, 900, &expected));
+        CHECK(fabs(glitter - expected) < 1e-9);
+    }
+    BoatViewProps invalid = boat_archipelago_lighting(NAN);
+    view.props = &invalid;
+    float hour;
+    double glitter;
+    CHECK(!boat_view_lighting_clock(&view, &hour, &glitter));
+    boat_world_resources_destroy(&resources);
+    puts("archipelago_marina_and_clock=ok");
+    return 0;
+}
+
 static int scenery(void)
 {
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_ARCHIPELAGO);
@@ -340,6 +419,7 @@ int main(void)
     CHECK(drive() == 0);
     CHECK(isolation() == 0);
     CHECK(life() == 0);
+    CHECK(marina_and_clock() == 0);
     CHECK(scenery() == 0);
     puts("boat_archipelago=ok");
     return 0;

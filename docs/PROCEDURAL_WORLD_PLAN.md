@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A6 qualified locally; A7–A10 art-direction follow-up in progress.
-**Open** — Fishing-boat character, inhabited marinas and solo day/night cycle; human review.
-**Done when** — Reference-led boats/marina and deterministic cycle pass native checks and visual review.
-**Next** — A10 final verification, evidence and native review handoff.
+**State** — A0–A10 native implementation and qualification complete locally; recipe 4 ready.
+**Open** — Human review of boats, marina, cycle/night readability; broader platforms deferred.
+**Done when** — Native evidence is recorded (complete); human acceptance is recorded separately.
+**Next** — Human play review of recipe 4; then choose the next art/life improvement.
 
 ## Additional art direction — 2026-11-25
 
@@ -122,7 +122,7 @@ Apple Silicon/macOS 26.6.2, Debug, `PROTEUS_GPU_TESTS=ON`:
   deterministic seeking, land-foot paths and bird terrain clearance. Its direct explorer
   drive returns home after 8.46 km in 909.22 simulated seconds with traffic present.
 - CPU/GPU review captures and a 1,200-frame native `--demo-idle --demo` windowed check complete
-  with `--no-audio`. The [recipe 3 images](procedural/README.md#recipe-3--finer-shores-and-local-life)
+  with `--no-audio`. The [recipe 3 images](procedural/README.md#recipe-3--finer-shores-and-local-life-history)
   preserve the launch waiting/departing and the finer passage beside the old recipe 2 view.
   These establish scripted operation and agent inspection, not human acceptance.
 
@@ -313,3 +313,35 @@ inspected; an explicit fixed 18:00 title-start capture and the 1,800-frame windo
 8× run exited successfully with audio disabled. The latter advanced 14,556 ticks (121.3
 simulated seconds); it is a motion smoke check, not a measured full-cycle speed qualification.
 Night remains deliberately dark with no new marina lamps. A10 records the final suite.
+
+### A10 qualification and closing — 2026-11-26
+
+A7–A10 close this native implementation milestone. The current behavior, cycle controls,
+marina contacts, reproduction commands and remaining limitations now live in
+[the world guide](PROCEDURAL_WORLD.md); dated results stay here. The
+[recipe 4 gallery](procedural/README.md#recipe-4--fishing-boat-marina-and-daynight)
+contains the inspected fishing/marina GPU frames, GPU sunset/midnight and CPU sunset reference.
+
+Apple Silicon/macOS 26.6.2, native Debug, `PROTEUS_GPU_TESTS=ON`:
+
+- Complete native build passed without warnings in the final build log.
+- Final `ctest --preset full`: **655/655 passed in 118.70 s**, including 36 GPU checks.
+  This includes the three-seed generator validator, local-session parity, hull/height and
+  marina-water clearance, cycle seek/glitter tests and the two capture-limit regressions.
+- The native route drive still completes 8,462.1 m in 909.22 simulated seconds, with maximum
+  route departure 32.11 m. New moorings leave a 12 m central departure corridor clear.
+- CPU/GPU home views, a close GPU fishing/marina view, matched sunset/midnight cycle
+  captures and the explicit 18:00 title-start override were inspected. Captures at 225/450 s
+  each ran through the private local session (27,000/54,000 ticks); the frame light came from
+  the same displayed simulation time. All graphics checks used `--no-audio`.
+- The 1,800-frame native windowed 8× neutral-helm run exited 0 and its frame was inspected;
+  it advanced 121.3 simulated seconds. No full-cycle real-time performance claim is made.
+- All 353 local Markdown links/anchors checked across the changed documentation resolve;
+  `git diff --check` passes. Evidence logs and extra captures are in ignored `build/a10-*`.
+
+The first sandbox full run was interrupted after socket failures and a stalled GPU lane;
+complete native reruns with socket/graphics access passed. No test failures are outstanding.
+Human input/gameplay, audio listening, full live-cycle timing, night acceptance, browser,
+Windows/Linux and Release qualification remain open. The small marina has no dedicated night
+lamps or interactive berth services. Breaking surf/spray, reactive AI, jobs/economy, physical
+traffic wakes, runtime seeds and streaming stay deferred. No PR, push or publication is made.

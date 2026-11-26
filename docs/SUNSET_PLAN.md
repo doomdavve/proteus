@@ -62,8 +62,8 @@ Working Harbour’s T4 cycle and solo Skerry Reach; other modes keep their fixed
 
 A fixed hour is a complete useful result: selecting or seeking a time must work without
 waiting through a cycle. Smooth evaluation between hours supports later transitions and
-remains the foundation for the sandbox's 900-active-second cycle. Other modes keep their
-fixed lighting choices and Day default.
+remains the foundation for the sandbox and Skerry Reach cycles. Outside these two cycles,
+modes keep their fixed lighting choices and Day default.
 
 ## Evening foundation and original qualification (2026-11-03–06)
 
