@@ -20,8 +20,9 @@ wooden fishing recipe; four moored craft and eight lines populate the home jetti
 ![CPU reference at the same evening cycle phase](home-sunset-cpu.png)
 
 The cycle starts at noon and takes 900 simulated seconds. Explicit lighting holds a fixed
-phase. There are no new marina night lamps; darkness/readability and the overall composition
-still need human review. Breaking surf, spray and interactive marina services remain deferred.
+phase. The user accepted this visual pass on 2026-11-26. There are no new marina night lamps;
+broader night/readability qualification remains open. Breaking surf, spray and interactive
+marina services remain deferred.
 
 ```sh
 ./build/wake_velocity --no-audio --location archipelago --demo-idle \

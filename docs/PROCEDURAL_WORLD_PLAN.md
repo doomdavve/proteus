@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 complete; recipe 4 accepted by the user; PR integration in progress.
+**State** — A0–A10 complete; recipe 4 accepted by the user; integration qualified in PR #232.
 **Open** — Broader platform/night qualification and deferred art/life work.
 **Done when** — Native evidence is recorded (complete); human acceptance is recorded separately.
-**Next** — Integrate current main, pass PR CI and merge the accepted milestone.
+**Next** — Choose the next art/life improvement; PR #232 owns CI/merge status.
 
 ## Additional art direction — 2026-11-25
 
@@ -353,3 +353,10 @@ This accepts the current native art/life milestone; it does not establish unperf
 platform or full-cycle timing checks. Current main is integrated before PR qualification,
 including the newer building windows and RESOLUTION/EDGES title controls. The playing-guide
 conflict preserves those controls alongside the Skerry Reach cycle instructions.
+
+Integrated native verification passed on Apple Silicon/macOS 26.6.2: warning-free Debug build
+and **655/655 full CTests in 118.51 s**, including 36 GPU checks. An integrated title-start
+archipelago capture at 225 s was inspected: the cycle reaches sunset with the newer title
+resolution controls intact. Graphics checks used `--no-audio`. Broader interactive/platform
+limits above remain unchanged. [PR #232](https://github.com/doomdavve/proteus/pull/232) owns
+remote CI results and merge status; no release/deployment is part of this integration.
