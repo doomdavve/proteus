@@ -2404,7 +2404,7 @@ static const Color QUAY_LIGHT_COLOR = { 255, 206, 128, 255 };
 // lenses and light scale with the window light, so daytime has none.
 static int dusk_fixtures(const WaterfrontSceneFrame *frame, Vector3 *lenses, int capacity)
 {
-    if (frame->boating_basin || frame->lighting.window_light <= 0)
+    if (frame->boating_basin || frame->map_only || frame->lighting.window_light <= 0)
         return 0;
     const WaterfrontHarborFrame *harbor = &frame->harbor;
     const WaterfrontFerry *ferry = waterfront_harbor_ferry();
@@ -2644,7 +2644,8 @@ static bool light_clusters_ready(WaterfrontGpuScene *scene)
 static void prepare_lights(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
 {
     static LightCandidate candidates[LIGHT_CANDIDATES]; // Drawing is single-threaded.
-    int candidate_count = frame->boating_basin ? 0 : gather_lights(scene, frame, candidates);
+    int candidate_count
+        = frame->boating_basin || frame->map_only ? 0 : gather_lights(scene, frame, candidates);
     scene->light_clusters_active = false;
     scene->light_stats = (WaterfrontLightStats) { 0 };
     scene->light_rows = 0;
@@ -3176,7 +3177,8 @@ static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
         draw_colored_mesh(
             scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
     }
-    draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
+    if (!harbor->omit_ferry)
+        draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     for (int i = 0; i < harbor->berth_count; ++i)
         if (harbor->visible[i])
             draw_colored_mesh(scene->harbor_custom[i].vaoId
@@ -3268,7 +3270,9 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
 {
     if (!frame->boating_basin) {
         add_scenery(scene, frame, material);
-        draw_harbor(scene, material, frame, emissive);
+        if (!frame->map_only || frame->harbor.berth_count) {
+            draw_harbor(scene, material, frame, emissive);
+        }
         draw_traffic(scene, material, frame, emissive);
     }
     // By part, so each part's flock forms one instanced run. Gulls are self-coloured.

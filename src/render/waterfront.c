@@ -308,7 +308,8 @@ bool waterfront_draw_harbor(
         renderer3d_draw_mesh(r, waterfront_harbor_pontoon_mesh(), frame->pontoon);
         renderer3d_draw_box(r, frame->gangway, (Color) { 154, 123, 84, 255 });
     }
-    renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
+    if (!frame->omit_ferry)
+        renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
     for (int i = 0; i < frame->berth_count; ++i)
         if (frame->visible[i])
             renderer3d_draw_mesh(

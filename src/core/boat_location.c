@@ -1,4 +1,5 @@
 #include "core/boat_location.h"
+#include "core/boat_archipelago.h"
 #include "core/waterfront_outer.h"
 
 #include <string.h>
@@ -23,6 +24,17 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
         .current_center = -12,
         .wake_offset = { -140, -220 },
         .upstream = true,
+        .camera_distance = 12,
+        .camera_height = 6,
+        .far_plane = 4500,
+        .particle_water = { 45, 79, 104, 255 } },
+    [BOAT_LOCATION_ARCHIPELAGO] = { .id = BOAT_LOCATION_ARCHIPELAGO,
+        .name = "archipelago",
+        .title = "SKERRY REACH",
+        .mapped = true,
+        .map = &boat_archipelago_map,
+        .spawn = { 0, 0 },
+        .fleet_spawn = { 0, 0 },
         .camera_distance = 12,
         .camera_height = 6,
         .far_plane = 4500,

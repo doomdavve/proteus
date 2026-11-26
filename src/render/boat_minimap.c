@@ -1,5 +1,7 @@
 #include "render/boat_minimap.h"
+#include "core/boat_archipelago.h"
 #include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
 #include "render/boat_hud.h"
 #include "scenery/boat_scenery.h"
 
@@ -653,29 +655,47 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         memcpy(&frame[(y + TRIM) * layer->frame.width + TRIM], &base[y * layer->base.width],
             sizeof(Color) * (size_t)layer->base.width);
 
-    for (size_t i = 0; chart && i < sizeof(bridges) / sizeof(bridges[0]); ++i)
-        bridge(layer, &bridges[i], true);
-    for (size_t i = 0; chart && i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
-        Vector2 p = project_map(layer, landmarks[i].map);
-        int x = (int)floorf(p.x), y = (int)floorf(p.y);
-        if (inside(layer, x, y))
-            text(layer, landmarks[i].name, x + landmarks[i].label_dx, y + landmarks[i].label_dy,
-                ink);
+    if (waterfront_map_has_river_kit(minimap->location->map)) {
+        for (size_t i = 0; chart && i < sizeof(bridges) / sizeof(bridges[0]); ++i)
+            bridge(layer, &bridges[i], true);
+        for (size_t i = 0; chart && i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
+            Vector2 p = project_map(layer, landmarks[i].map);
+            int x = (int)floorf(p.x), y = (int)floorf(p.y);
+            if (inside(layer, x, y))
+                text(layer, landmarks[i].name, x + landmarks[i].label_dx, y + landmarks[i].label_dy,
+                    ink);
+        }
+        for (size_t i = 0; i < sizeof(bridges) / sizeof(bridges[0]); ++i)
+            bridge(layer, &bridges[i], false);
+        ferry(layer, chart);
+        marks(layer);
+        room_marks(layer, minimap->room_marks, chart);
+        for (size_t i = 0; i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
+            Vector2 p = project_map(layer, landmarks[i].map);
+            int x = (int)floorf(p.x), y = (int)floorf(p.y);
+            if (!inside(layer, x, y))
+                continue;
+            // Conspicuous object: a ring with its position dot.
+            ring(layer, x, y, 2, ink);
+            dot(layer, x, y, ink);
+        }
     }
-    for (size_t i = 0; i < sizeof(bridges) / sizeof(bridges[0]); ++i)
-        bridge(layer, &bridges[i], false);
-    ferry(layer, chart);
-    marks(layer);
-    room_marks(layer, minimap->room_marks, chart);
-    for (size_t i = 0; i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
-        Vector2 p = project_map(layer, landmarks[i].map);
-        int x = (int)floorf(p.x), y = (int)floorf(p.y);
-        if (!inside(layer, x, y))
-            continue;
-        // Conspicuous object: a ring with its position dot.
-        ring(layer, x, y, 2, ink);
-        dot(layer, x, y, ink);
+    if (minimap->location->id == BOAT_LOCATION_ARCHIPELAGO) {
+        size_t count;
+        const BoatArchipelagoPlace *places = boat_archipelago_places(&count);
+        for (size_t i = 0; i < count; ++i) {
+            Vector2 p = project_map(layer, to_map(places[i].position));
+            int x = (int)floorf(p.x), y = (int)floorf(p.y);
+            if (!inside(layer, x, y))
+                continue;
+            ring(layer, x, y, 2, ink);
+            dot(layer, x, y, ink);
+            if (chart)
+                text(layer, places[i].name, x, y + 6, ink);
+        }
     }
+    if (!waterfront_map_has_river_kit(minimap->location->map))
+        room_marks(layer, minimap->room_marks, chart);
     const BoatVoyageRoute *route = voyage ? voyage->route : NULL;
     if (route) {
         if (route->exposure.radius > 0) {

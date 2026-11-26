@@ -160,10 +160,11 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         : kind == BOAT_PLUGIN_KIND_COURSE              ? !strcmp(m.location, "basin")
         : kind == BOAT_PLUGIN_KIND_RACE                ? !strcmp(m.location, "outer")
         : kind == BOAT_PLUGIN_KIND_MATCH ? known_location || !strcmp(m.location, "any")
-                                         : known_location;
+                                         : known_location || !strcmp(m.location, "archipelago");
     if (!location_ok)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
-            "must be any or a compiled location for match, basin or outer for free, outer for "
+            "must be any, basin or outer for match; basin, outer or archipelago for free; outer "
+            "for "
             "voyage, basin for course, outer for race");
     const char *grant = kind == BOAT_PLUGIN_KIND_VOYAGE ? "voyage.define"
         : kind == BOAT_PLUGIN_KIND_FREE                 ? "free.define"
@@ -222,6 +223,11 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
                 "is not granted in the order scene.define, objective.hud, objective.timers");
     }
+    // The procedural pilot has baked scenery and local presentation discoveries only. Its
+    // scene/default actor and room-objective contracts are not exposed to authored packages.
+    if (!strcmp(m.location, "archipelago") && (m.scene || m.objective))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
+            "archipelago currently supports free.define only");
     if (!boat_json_int(json, &tokens[at[7]], &state) || state < 1 || state > 65535
         || (!m.objective && state != BOAT_PLUGIN_STATE_VERSION))
         return diagnose(

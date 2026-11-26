@@ -65,7 +65,7 @@ def main():
     shutil.copy2(build / "assets/music/a-little-boat.xm", assets / "music")
     # The outer location's scenery pack, which the game loads at start (A3.5i), and the
     # Eriksberg river crop's, which lays out the river kit on it.
-    for name in ("river", "outer"):
+    for name in ("river", "outer", "archipelago"):
         (assets / "geometry" / name).mkdir(parents=True)
         # The outer location also loads its water atlas and ambient occlusion sidecars; the river
         # crop is not a location and loads none (boat_scenery_load_location).

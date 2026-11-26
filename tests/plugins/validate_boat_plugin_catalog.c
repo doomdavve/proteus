@@ -140,8 +140,15 @@ static int defaults_match_compiled(void)
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "outer");
     CHECK(outer_free);
     CHECK(boat_plugin_catalog_decode(outer_free, &r, &d) && r.free.digest == 0);
-    // The deathmatch package equals the native defaults at every location.
-    for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
+    const BoatPluginCatalogEntry *islands
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "archipelago");
+    CHECK(islands && !strcmp(islands->id, BOAT_PLUGIN_DEFAULT_ARCHIPELAGO_FREE));
+    CHECK(boat_plugin_catalog_decode(islands, &r, &d));
+    CHECK(r.free.digest == 0 && !r.free.has_scene && !r.free.marks.count);
+    CHECK(!boat_plugin_catalog_default(BOAT_PLUGIN_KIND_MATCH, "archipelago"));
+    CHECK(!boat_plugin_catalog_work_default("archipelago"));
+    // The deathmatch package equals the native defaults at each public-room location.
+    for (int id = 0; id <= BOAT_LOCATION_OUTER; ++id) {
         const char *name = boat_location((BoatLocationId)id)->name;
         const BoatPluginCatalogEntry *match
             = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_MATCH, name);
@@ -190,11 +197,34 @@ static int reachable_by_id(void)
     return 0;
 }
 
+static int archipelago_manifest(void)
+{
+    static const char *grants[] = { "[\"free.define\"]", "[\"free.define\",\"scene.define\"]",
+        "[\"free.define\",\"objective.hud\"]" };
+    for (unsigned i = 0; i < sizeof(grants) / sizeof(*grants); ++i) {
+        char json[512];
+        snprintf(json, sizeof(json),
+            "{\"id\":\"test\",\"name\":\"Test\",\"api\":1,\"kind\":\"free\","
+            "\"entry\":\"main.lua\",\"location\":\"archipelago\",\"capabilities\":%s,"
+            "\"state_version\":1}",
+            grants[i]);
+        BoatPluginManifest manifest;
+        BoatPluginDiagnostic d = { 0 };
+        BoatPluginStatus status
+            = boat_plugin_parse_manifest(json, strlen(json), NULL, &manifest, &d);
+        CHECK(status == (i ? BOAT_PLUGIN_MANIFEST : BOAT_PLUGIN_OK));
+        if (i)
+            CHECK(!strcmp(d.field, "capabilities"));
+    }
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(entries_equal_source),
     TEST_CASE(defaults_match_compiled),
     TEST_CASE(work_defaults),
     TEST_CASE(reachable_by_id),
+    TEST_CASE(archipelago_manifest),
 };
 
 int main(int argc, char **argv)

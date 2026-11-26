@@ -3,7 +3,8 @@
 Current status reconciled on 2026-11-07. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
-Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`), a
+Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`),
+plus the local experimental Skerry Reach archipelago (`archipelago`), a
 basin time trial, the Långedrag voyage and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
 display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrack, the separate
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git
@@ -17,6 +18,7 @@ the detail; where plans disagreed, the entry with the newer date was used.
 
 | Area | Open loop (human check or unfinished step) | Since | Owner |
 | --- | --- | --- | --- |
+| Procedural world | Reference-led fishing boat, home marina and solo day/night cycle accepted by the user ([PR #232](https://github.com/doomdavve/proteus/pull/232)). Broader interactive/platform qualification remains deferred. | 2026-11-25 | [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md) |
 | Wakes | R2b experimental CPU basin trial available; curved handling preservation failed, user comparison next; production recipe unchanged, broader performance/platform review open | 2026-11-19 | [wake research](WAKE_RESEARCH_PLAN.md) |
 | Citizen ladder | Proposed 2026-11-21: boat switching (at a quay) and the first-purchase model (standing, then a free first boat) decided; next task CL0 | 2026-11-21 | [citizen ladder plan](CITIZEN_LADDER_PLAN.md) |
 | Sandbox | S1 fun review; broader S0c qualification; the DAMAGED hint and `.rejected` set-aside were not exercised by hand; structured HUD and T0/S2 proposed, unscheduled | 2026-11-07 | [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) |
@@ -39,6 +41,18 @@ the detail; where plans disagreed, the entry with the newer date was used.
 | Living city | Step 06 people and cyclists; perched gulls | 2026-10-31 | [living city plan](LIVING_CITY_PLAN.md) |
 | Platforms | Human checks on macOS 13, Windows and Linux builds, browsers and physical devices | 2026-10-24 | [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md), [Linux](LINUX_BUILD.md), [web](WEB_BUILD.md) |
 | Releases | v0.0.26 recorded; v0.0.31 is the latest published/deployed release; human input/audio, physical-device/network and browser timing/freshness review remain | 2026-11-14 | [releases](RELEASES.md#status-and-verification) |
+
+## Skerry Reach
+
+Skerry Reach is a local solo boating location generated from a repeatable seed, with branching
+routes, six named places and solid jetties. The first user drive found it bland; the native
+revision adds a granite passage, enclosed wooded lagoon and more distinct shore sites. The
+user found it better; the follow-up adds finer shores, local craft, seabirds and shore residents.
+The [world guide](PROCEDURAL_WORLD.md) owns the current contract; the
+[plan](PROCEDURAL_WORLD_PLAN.md) records checks, limitations and the next human review.
+The reference-led follow-up adds a wooden fishing boat, four moored home-marina craft and a
+noon-start day/night cycle. Runtime seed selection, jobs and reactive traffic AI remain deferred.
+No PR or publication is authorized.
 
 ## Empty-room server CPU
 

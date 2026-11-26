@@ -696,8 +696,9 @@ static bool module_camera(
         p.y + clearance + 2, water, time, NULL);
 }
 
-bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,
-    float clearance, float bottom, float top, BoatWater water, double time, Vector2 *normal)
+bool waterfront_harbor_berths_contact_height_scene(const BoatSceneDefinition *scene,
+    Vector2 position, float clearance, float bottom, float top, BoatWater water, double time,
+    Vector2 *normal)
 {
     Vector2 p = { -position.x, position.y }, world_normal;
     bool hit = false;
@@ -718,6 +719,19 @@ bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Ve
             hit = bottom <= high && top >= low;
         }
     }
+    if (hit && normal)
+        *normal = (Vector2) { -world_normal.x, world_normal.y };
+    return hit;
+}
+
+bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,
+    float clearance, float bottom, float top, BoatWater water, double time, Vector2 *normal)
+{
+    if (waterfront_harbor_berths_contact_height_scene(
+            scene, position, clearance, bottom, top, water, time, normal))
+        return true;
+    Vector2 p = { -position.x, position.y }, world_normal;
+    bool hit = false;
     bool authored_modules = scene && scene->modules_present;
     if (!hit && authored_modules)
         hit = module_contact(scene, p, clearance, bottom, top, water, time, &world_normal);

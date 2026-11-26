@@ -1,5 +1,12 @@
 # Lighting through the day
 
+Archipelago follow-up, 2026-11-25: the [Skerry Reach plan](PROCEDURAL_WORLD_PLAN.md)
+extends the existing shared cycle to solo exploration, starting at noon with one day per
+900 simulated seconds. Its title-default DAY enables the cycle; other saved choices and
+explicit CLI lighting hold a fixed light. Working Harbour retains its saved clock. General
+Auto, room clock ownership and replay persistence remain deferred. Earlier statements that
+only Working Harbour cycles describe the baseline before this follow-up.
+
 Day-sky follow-up, 2026-11-10: the [cloud deck track](CLOUD_DECK_PLAN.md) now changes
 the Day/noon background palette for user play review. Earlier claims of exact preservation
 of the original Day sky below describe their dated baselines; other lighting values are retained.
@@ -50,13 +57,13 @@ light, distant haze, water/reflections, grading and occupied windows should agre
 the selected time. Keep navigation, shorelines and boats legible at 320×200. Preserve the
 integer-scaled aesthetic, calm glitter and storm readability. The day is an artistic
 lighting recipe with a coherent sun path; it need not match Gothenburg's latitude,
-season or any particular date. Real-world astronomy is unnecessary. A running clock is
-limited to Working Harbour's T4 cycle; other modes keep their fixed choices.
+season or any particular date. Real-world astronomy is unnecessary. Running clocks belong to
+Working Harbour’s T4 cycle and solo Skerry Reach; other modes keep their fixed choices.
 
 A fixed hour is a complete useful result: selecting or seeking a time must work without
 waiting through a cycle. Smooth evaluation between hours supports later transitions and
-remains the foundation for the sandbox's 900-active-second cycle. Other modes keep their
-fixed lighting choices and Day default.
+remains the foundation for the sandbox and Skerry Reach cycles. Outside these two cycles,
+modes keep their fixed lighting choices and Day default.
 
 ## Evening foundation and original qualification (2026-11-03–06)
 

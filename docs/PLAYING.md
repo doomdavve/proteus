@@ -15,7 +15,8 @@ name, boat livery, steering mode, soundtrack, RESOLUTION, EDGES and LIGHTING. LI
 (the default), SUNSET, DUSK, then 00:00 through 23:00 with Left/Right, Enter or a click.
 It sets your view in each new solo or multiplayer session; other players keep their own choice.
 Working Harbour is the exception: it starts at noon and follows its own day/night clock by
-default, so the saved LIGHTING choice does not fix that view.
+default, so the saved LIGHTING choice does not fix that view. Skerry Reach also cycles from
+noon when LIGHTING is left at DAY; SUNSET, DUSK and specific hours remain fixed there.
 RESOLUTION (LOW or HIGH) applies to the title screen and to each new session. LOW is the plain
 320×200 scene; HIGH draws the scene at up to 1280×800 behind a HUD and title menu on a finer
 640×400 grid (half the old size), with a matching 1280×800 title backdrop. HIGH needs a GPU and
@@ -98,6 +99,21 @@ capsize the boat and stop propulsion; hold Backspace or choose the menu's explic
 reset/recovery action to get moving again.
 
 ## Explore
+
+SKERRY REACH is a separate fictional archipelago. In a source build, choose SINGLE PLAYER,
+PLACE SKERRY REACH, or run `./build/wake_velocity --location archipelago`. Leave the home
+harbour to explore the island channels and outer coast, then find your way back. The chart
+(`N`) names the landings and navigation landmarks; approaching a place shows its name once
+per trip. Holding Backspace resets the boat to the home harbour. Discoveries are not saved.
+Local boats travel and pause on their own schedules, with gulls around the fishing circuit
+and people near the landings. Give moving boats room: their hulls are solid and their routes
+do not react to you. Their foam trails are cosmetic. Four moored boats populate the home
+jetties; leave room for their solid hulls. A day/night cycle takes 15 simulated minutes and
+pauses with the world; select a fixed LIGHTING choice or use `--daylight day` to hold the light.
+This first procedural location is solo free boating, with a fixed baked seed; it has no
+work jobs or multiplayer rooms. See [the world guide](PROCEDURAL_WORLD.md) for the generation
+recipe and alternate-seed review commands. Public downloads and the hosted browser change
+only when a release containing this work is published.
 
 Gothenburg Harbour (the title's default PLACE; `--location outer`) starts in the Eriksberg dock, with moored craft,
 moving traffic and gulls. Leave the dock and follow the river southwest towards Älvsborgsbron.

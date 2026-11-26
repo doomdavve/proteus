@@ -23,6 +23,10 @@ typedef float (*WaterfrontGround)(float x, float z);
 // any other map: the river keeps the kit's own flat 3.5 m ground, and other maps have no kit.
 WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map);
 
+// Compiled Gothenburg life belongs only to the outer map and its retired river-kit fixture.
+// Other mapped water does not inherit its marina, ferry, traffic, streets or chart marks.
+bool waterfront_map_has_river_kit(const BoatMapDescription *map);
+
 // GH2: a canal bridge deck in renderer X/Z (east, north): the span runs along the unit axis UX/UZ
 // from station S0 to S1 about the centre, over water from WET0 to WET1, and HALF_WIDTH either
 // side. The underside stands UNDER above the water at the middle of the water and SPRING at its

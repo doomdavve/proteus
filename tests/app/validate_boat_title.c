@@ -314,6 +314,28 @@ static void check_other_fields(void)
     CHECK(file_contains("lighting=hour-v1:17\n"));
 }
 
+static void check_archipelago_selection(void)
+{
+    BoatTitleSettings saved, loaded;
+    boat_title_defaults(&saved);
+    saved.location = BOAT_LOCATION_ARCHIPELAGO;
+    saved.host_location = BOAT_LOCATION_OUTER;
+    boat_title_save(&saved);
+    boat_title_load(&loaded);
+    CHECK(loaded.location == BOAT_LOCATION_ARCHIPELAGO);
+    CHECK(loaded.host_location == BOAT_LOCATION_OUTER);
+    CHECK(file_contains("location=archipelago\n"));
+    // A hand-edited title file cannot offer the solo-only pilot as a hosted room.
+    load_text(&loaded, "location=archipelago\nhost_location=archipelago\n");
+    CHECK(loaded.location == BOAT_LOCATION_ARCHIPELAGO);
+    CHECK(loaded.host_location == BOAT_LOCATION_OUTER);
+    saved.location = BOAT_LOCATION_COUNT;
+    boat_title_save(&saved);
+    boat_title_load(&loaded);
+    CHECK(loaded.location == BOAT_LOCATION_COUNT);
+    CHECK(file_contains("location=course\n"));
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc == 2);
@@ -329,6 +351,7 @@ int main(int argc, char **argv)
     check_cli();
     check_cli_priority();
     check_other_fields();
+    check_archipelago_selection();
     printf("boat title settings checks passed\n");
     return 0;
 }

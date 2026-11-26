@@ -1,9 +1,11 @@
 #include "core/boat.h"
+#include "core/boat_archipelago.h"
 #include "core/boat_map.h"
 #include "core/boat_model.h"
 #include "core/boat_pose.h"
 #include "core/boat_steering.h"
 #include "core/waterfront_harbor.h"
+#include "core/waterfront_outer.h"
 #include "core/waterfront_traffic.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -157,9 +159,13 @@ static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld
         if (world->definition->mapped) {
             water = boat_map_water_contact(
                 &world->resources->map, point, HULL_SHORE_CLEARANCE, &normal);
-            if (water
+            if (water && waterfront_map_has_river_kit(world->definition->map)
                 && waterfront_harbor_contact_height_scene(world->scene, point, HULL_SHORE_CLEARANCE,
                     bottom, top, world->water, time, &normal))
+                water = false;
+            if (water && world->definition->map == &boat_archipelago_map
+                && waterfront_harbor_berths_contact_height_scene(boat_archipelago_life(), point,
+                    HULL_SHORE_CLEARANCE, bottom, top, world->water, time, &normal))
                 water = false;
         } else {
             Vector2 half = world->definition->half_extent;
@@ -212,15 +218,17 @@ static void resolve_hull_contact(
 
 static void resolve_traffic(Boat *boat, const BoatHull *hull, const BoatWorld *world, double time)
 {
-    if (!world->definition->mapped)
+    bool archipelago = world->definition->map == &boat_archipelago_map;
+    if (!archipelago && !waterfront_map_has_river_kit(world->definition->map))
         return;
+    const BoatSceneDefinition *scene = archipelago ? boat_archipelago_life() : world->scene;
     float bottom, top;
     hull_vertical_bounds(boat, hull, &bottom, &top);
     // Separate the full hull footprints, then match contact velocity against the moving hull.
     // Multiple passes cover a rare simultaneous contact without advancing traffic time.
     for (int pass = 0; pass < 4; ++pass) {
         WaterfrontTrafficContact traffic;
-        if (!waterfront_traffic_contact_height_scene(world->scene, boat->position, boat->heading,
+        if (!waterfront_traffic_contact_height_scene(scene, boat->position, boat->heading,
                 hull->bow, hull->stern, hull->half_beam, bottom, top, world->water, time, &traffic))
             break;
         Vector2 previous = boat->position;
@@ -240,7 +248,7 @@ bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneD
 {
     if (!scene)
         return true;
-    if (!world->definition->mapped)
+    if (!waterfront_map_has_river_kit(world->definition->map))
         return !boat_scene_has_content(scene);
     float bottom, top;
     hull_vertical_bounds(boat, &SPEEDBOAT_HULL, &bottom, &top);

@@ -103,6 +103,7 @@ give it `--save` or `--data-dir` to keep its session.
 ```sh
 ./build/wake_velocity --location outer
 ./build/wake_velocity --location basin --waves
+./build/wake_velocity --location archipelago
 ./build/wake_velocity --location outer --skin explorer
 ./build/wake_velocity --location outer --start 1980,-1196,75
 ```
@@ -110,6 +111,10 @@ give it `--save` or `--data-dir` to keep its session.
 `outer` covers the Eriksberg waterfront towards Älvsborgsbron, upstream past Hisingsbron and out
 along the fjord, with the solo voyage to Långedrag. The former `river` location, a crop of the same
 water, was retired on 2026-11-04; `--location river` now names `outer` and exits.
+`archipelago` is Skerry Reach, a fictional seeded coast for solo free boating. It selects
+`proteus.archipelago-free`; the title's PLACE row offers the same location. Its seed is baked
+into the build, so there is no runtime `--seed` option. Generation and comparison commands
+are in [the world guide](PROCEDURAL_WORLD.md). Hosting and server rooms use `basin` or `outer`.
 `--start X,Z[,DEGREES]` places a boat on mapped water using simulation coordinates; heading zero
 faces −Z. It is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
 or solo squall.
@@ -132,7 +137,7 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ```
 
 Every native solo session starts from a package compiled into the executable at build time; the
-default for the basin is free boating, for `outer` the Långedrag voyage, and for
+default for the basin and `archipelago` is free boating, for `outer` the Långedrag voyage, and for
 `--course` the basin time trial. `--package ID` selects another bundled package, which must
 belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
 Launching a package starts no Lua VM, polls no files and shows no authoring panel. There is no
@@ -142,7 +147,7 @@ package for another location, fails with an explicit message. The title's single
 panel selects Standard, Harbor life, the Grodan tour or the canal tour for `outer` on native and
 web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
 `--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
-so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
+so tests can prove each PLACE opens (`basin`, `archipelago`, `outer`, `outer-standard`, `outer-harbor-life`,
 `outer-grodan`, `outer-canal-tour`, `outer-working-harbour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring
@@ -266,10 +271,16 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 
 ## Rendering, captures and profiling
 
+Screenshot `--time` accepts 0..60 seconds normally, 0..900 in Skerry Reach (one full
+day/night cycle), and 0..600 for replays. Use `--demo-idle` to review the same harbour view
+as the cycle and local boats advance.
+
 `--daylight day|sunset|dusk` selects a fixed legacy lighting preset (default day); a numeric
 phase 0..1 blends between them. In the title, SETTINGS → LIGHTING cycles 27 fixed choices:
 DAY (default), SUNSET, DUSK, then 00:00 through 23:00. The choice is remembered per local player
-and injected into new solo, joined and hosted sessions. The same `lighting` key stores exact
+and injected into new solo, joined and hosted sessions. Working Harbour keeps its saved
+cycle; Skerry Reach uses its noon-start cycle when the title choice is DAY. Other saved
+lighting choices stay fixed in Skerry Reach. The same `lighting` key stores exact
 legacy names or versioned `hour-v1:HH`; malformed values and unknown versions fall back to Day.
 Explicit CLI launches use their own options rather than the saved title choice.
 
@@ -277,8 +288,8 @@ Explicit CLI launches use their own options rather than the saved title choice.
 `[0,24)` (`24` is midnight, `-1` is 23:00); fractional hours remain supported, and non-finite
 values are rejected. It overrides `--daylight` regardless of argument order. If either explicit
 option is present, the title's saved lighting is not injected. `--time` still selects the
-scripted drive and wave time, not the light, so the same hour can be captured at different
-moments:
+scripted drive and wave time. It also seeks Skerry Reach’s default cycle; with an explicit
+fixed-lighting option the same hour can be captured at different moments:
 
 ```sh
 ./build/wake_velocity --renderer cpu --location outer --lighting-hour 21 --time 3 \

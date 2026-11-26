@@ -53,7 +53,7 @@ if(NOT EMSCRIPTEN)
   add_test(NAME cargo_shadow_wave_cpu COMMAND cargo_sandbox --location basin --renderer cpu --shadow-review)
   if(PROTEUS_GPU_TESTS)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
-    set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" TIMEOUT 30)
+    set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 30)
   endif()
   foreach(scenario shadow-high shadow-low remoor crossing receiver-approach delivered
     landing-built redelivered job-reset build-blocked quay-pickup jetty-approach jetty-delivered)
@@ -170,12 +170,12 @@ foreach(place_package
     "basin=proteus.basin-free" "outer-standard=proteus.langedrag"
     "outer-harbor-life=proteus.harbor-life" "outer-grodan=proteus.grodan"
     "outer-canal-tour=proteus.grodan"
-    "basin-trial=proteus.time-trial")
+    "basin-trial=proteus.time-trial" "archipelago=proteus.archipelago-free")
   string(REPLACE "=" ";" place_package "${place_package}")
   list(GET place_package 0 place)
   list(GET place_package 1 package)
   add_test(NAME wake_velocity_title_start.${place}
-    COMMAND wake_velocity --title-start ${place} --renderer cpu
+    COMMAND wake_velocity --no-audio --title-start ${place} --renderer cpu
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/title_start_${place}.png --time 0.1
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   set_tests_properties(wake_velocity_title_start.${place} PROPERTIES TIMEOUT 60
@@ -365,6 +365,15 @@ set_tests_properties(
   wake_velocity_time_scale_missing_rejected
   wake_velocity_time_scale_multiplayer_rejected
   PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
+# Extending Skerry Reach to a full lighting day keeps the older mode limits intact.
+add_test(NAME wake_velocity_capture_basin_limit_rejected COMMAND wake_velocity --no-audio --renderer cpu
+  --location basin --time 61 --screenshot unused.png)
+add_test(NAME wake_velocity_capture_archipelago_limit_rejected COMMAND wake_velocity --no-audio --renderer cpu
+  --location archipelago --time 901 --screenshot unused.png)
+set_tests_properties(
+  wake_velocity_capture_basin_limit_rejected
+  wake_velocity_capture_archipelago_limit_rejected
+  PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 
@@ -387,3 +396,16 @@ add_test(NAME choreography_language COMMAND validate_choreography
 add_test(NAME dance_screenshot
   COMMAND dance_study --time 8.8 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/dance-screenshot.png
 )
+
+# Presentation discoveries use virtual simulation time; recovery retains the current trip.
+add_executable(validate_wake_discovery tests/app/validate_wake_discovery.c)
+target_link_libraries(validate_wake_discovery PRIVATE proteus_boat_drive)
+target_compile_options(validate_wake_discovery PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME wake_discovery COMMAND validate_wake_discovery)
+set_tests_properties(wake_discovery PROPERTIES LABELS "cpu;quick")
+add_test(NAME wake_velocity_archipelago_host_rejected
+  COMMAND wake_velocity --no-audio --location archipelago --host free)
+set_tests_properties(wake_velocity_archipelago_host_rejected PROPERTIES WILL_FAIL TRUE)
+add_test(NAME boat_server_archipelago_rejected
+  COMMAND boat_server --location archipelago --scripted)
+set_tests_properties(boat_server_archipelago_rejected PROPERTIES WILL_FAIL TRUE)

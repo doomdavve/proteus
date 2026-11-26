@@ -81,6 +81,7 @@ typedef struct {
     bool player_active;
     bool hide_player; // Keep the water/focus anchor while a caller draws a custom boat.
     bool boating_basin;
+    bool map_only; // Baked scenery without the compiled Gothenburg actors and fixtures.
     int scenery_count;
     struct {
         Transform3D transform;

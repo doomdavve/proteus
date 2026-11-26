@@ -228,7 +228,7 @@ buffering does not change the wire layout or channels.
 Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 9), `u64` content digest,
 then the name (≤16), room token (≤32) and build label (≤32) strings.
 
-The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped
+The content digest is FNV-1a 64 over the public-room locations in ID order (basin and outer): identity, mapped
 flag, basin half-extents, single-player spawn, multiplayer start centre, current centre and
 crossing offset and upstream-traffic enable flag (u64, A3.5j); for each mapped location,
 the compiled map's triangle count, then every triangle's three vertex indices and referenced
@@ -242,7 +242,10 @@ longer covers the race course, match or combat rules, or (since PD3) the authore
 berths and ferry: those travel in the room definition. GO anchors the weather clock in both the
 authority and prediction; no per-player weather position is sent.
 `boat_net_content_digest()` defines the exact order. Fingerprinting the whole bundle lets a
-client send Hello before it knows which location the server will select.
+client send Hello before it knows which location the server will select. Solo-only
+`archipelago` is excluded from this bundle, so rebaking it does not change compatibility
+with existing rooms. Its private local authority can use location ID 2; public servers
+and clients reject that location. The public wire layout and protocol version remain unchanged.
 
 The server checks, in order: version (from the header), handling revision, content digest,
 token, free slot. The first failure is answered with Reject and a disconnect, before any slot
@@ -823,7 +826,7 @@ rate limit in the process; the firewall owns that (hardening plan H4).
 - Any change to a byte layout, a message type, a channel or a rule above increments the
   protocol version. v16 rejects every other version, v1–v15 included; there is no negotiation or
   migration.
-- A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
+- A handling change increments `BOAT_PHYSICS_REVISION`; a change to public-room location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
   Either is rejected at Hello. Room content (course, rules, scenes) instead travels in the
   definition and must validate on the client.

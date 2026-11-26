@@ -4,6 +4,7 @@
 # harbor/traffic contacts and boat/city geometry data. It must not draw, read input, open
 # windows or audio, or touch files; boat_core_boundary checks its sources and symbols.
 set(PROTEUS_BOAT_CORE_SOURCES
+  boat_archipelago.c boat_archipelago.h
   boat_cargo.c boat_cargo.h
   boat_vessel_wake.c boat_vessel_wake.h
   boat.c boat.h boat_clock.h boat_course.c boat_course.h

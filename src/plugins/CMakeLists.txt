@@ -62,13 +62,13 @@ endif()
 # generator as a Node program for the browser and lets CMake run it through the cross-compiling
 # emulator; only solo entries are linked into the game.
 set(BOAT_PLUGIN_PACKAGES
-  plugins/basin-free plugins/outer-free plugins/time-trial
+  plugins/basin-free plugins/outer-free plugins/archipelago-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
   plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work
   plugins/basin-work plugins/outer-hunt)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
-    plugins/basin-free plugins/time-trial plugins/langedrag
+    plugins/basin-free plugins/archipelago-free plugins/time-trial plugins/langedrag
     plugins/harbor-life plugins/grodan)
 else()
   set(BOAT_PLUGIN_CATALOG_PACKAGES ${BOAT_PLUGIN_PACKAGES})

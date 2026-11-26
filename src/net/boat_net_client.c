@@ -581,6 +581,10 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         return;
     }
     if (m.header.type == BOAT_NET_ACCEPT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
+        if (!c->local.enabled && !boat_net_room_location((BoatLocationId)m.accept.location)) {
+            definition_fail(c, 3);
+            return;
+        }
         c->accept = m.accept;
         c->epoch = m.header.epoch;
         c->heard_at = now;
@@ -1175,6 +1179,8 @@ const char *boat_net_client_failure(const BoatNetClient *c)
         return "the room definition was malformed or did not match its digest";
     if (c->definition_error == 2)
         return "the room definition and checkpoint combat rules differ";
+    if (c->definition_error == 3)
+        return "the room selected a solo-only location";
     if (c->timed_out == 1)
         return "no answer within 10 s (is the room running and its network endpoint reachable?)";
     if (c->timed_out == 2)

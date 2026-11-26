@@ -160,8 +160,8 @@ static int large_time_locations(void)
                 CHECK(boat_finite(boat) && fabsf(boat->height) < 1.5f);
                 CHECK(boat_session_time(&session)
                     == boat_tick_seconds(starts[s] + (uint64_t)tick + 1));
-                if (location)
-                    CHECK(test_river_water(boat->position, 0));
+                if (definition->mapped)
+                    CHECK(boat_map_water(&session.world.resources->map, boat->position, 0));
                 else
                     CHECK(fabsf(boat->position.x) < BOAT_BASIN_HALF_X
                         && fabsf(boat->position.y) < BOAT_BASIN_HALF_Z);
@@ -175,7 +175,7 @@ static int large_time_locations(void)
             CHECK(frame.time == boat_session_time(&session));
         }
     }
-    puts("large_time_locations=ok basin,river starts=1d,30d waves+d3");
+    puts("large_time_locations=ok all_locations starts=1d,30d waves+d3");
     return 0;
 }
 

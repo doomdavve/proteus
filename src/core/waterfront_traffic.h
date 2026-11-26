@@ -4,7 +4,7 @@
 #include "core/boat_model.h"
 #include "core/boat_water.h"
 
-#define WATERFRONT_TRAFFIC_VESSELS 4 // The river's circuits, on every mapped location.
+#define WATERFRONT_TRAFFIC_VESSELS 4 // Gothenburg defaults; other maps can supply their own routes.
 // A3.5j: the outer map's upstream ferries and schooner (waterfront_upstream.h) follow them at
 // indices WATERFRONT_TRAFFIC_VESSELS and up, active only where BoatWater.upstream is set.
 #define WATERFRONT_TRAFFIC_ALL (WATERFRONT_TRAFFIC_VESSELS + 4)
