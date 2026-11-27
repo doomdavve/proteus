@@ -15,16 +15,19 @@ if [ "$(uname -s)" != Linux ]; then
     exit 2
 fi
 
+# LSAN_JOBS bounds the build and test parallelism (default: all cores); LSAN_CMAKE_ARGS replaces
+# the GLFW backend flags on a host without the Wayland development packages.
+jobs=${LSAN_JOBS:-$(nproc)}
 cmake -S "$root" -B "$build" -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_SANITIZE=address,undefined \
-    -DPROTEUS_GPU_TESTS=OFF -DGLFW_BUILD_X11=ON -DGLFW_BUILD_WAYLAND=ON
-cmake --build "$build" -j"$(nproc)"
+    -DPROTEUS_GPU_TESTS=OFF ${LSAN_CMAKE_ARGS:--DGLFW_BUILD_X11=ON -DGLFW_BUILD_WAYLAND=ON}
+cmake --build "$build" -j"$jobs"
 
 export ASAN_OPTIONS="detect_leaks=1:abort_on_error=0:exitcode=23"
 export LSAN_OPTIONS="suppressions=$root/tests/lint/lsan.supp:print_suppressions=0:max_leaks=0"
 export UBSAN_OPTIONS="print_stacktrace=1"
 
 status=0
-ctest --test-dir "$build" -j"$(nproc)" --timeout 600 --output-on-failure "$@" \
+ctest --test-dir "$build" -j"$jobs" --timeout 600 --output-on-failure "$@" \
     >"$build/lsan.log" 2>&1 || status=$?
 tail -n 12 "$build/lsan.log"
 
