@@ -1075,9 +1075,21 @@ on synthetic ELF files on every platform; on Linux `boat_server_hardening` runs 
 `-DPROTEUS_SANITIZE=address,undefined` (`cmake/Sanitize.cmake`) instruments the project and its
 fetched dependencies; a finding aborts the test. Linux CI runs it for changes under `src/net`,
 `src/room`, `src/core`, `tests/fuzz`, `tests/net` and `cmake` (`.github/workflows/linux-sanitize.yml`):
-the `fuzz_*` and `boat_net*` tests and longer fuzz runs. Detecting leaks is off because the validators
-exit without freeing their rooms. ENet's sign-bit shift (`-fno-sanitize=shift-base`, only for that
+the `fuzz_*` and `boat_net*` tests and longer fuzz runs. The CI job keeps leak detection off (see
+[Leak detection](#leak-detection)). ENet's sign-bit shift (`-fno-sanitize=shift-base`, only for that
 target) is the one exemption.
+
+#### Leak detection
+
+macOS ASan has no leak detection, so leaks are checked on Linux with LeakSanitizer.
+`tools/lsan_run.sh [build-dir]` builds with `-DPROTEUS_SANITIZE=address,undefined
+-DPROTEUS_GPU_TESTS=OFF`, runs the whole display-free suite with `detect_leaks=1`, writes
+`<build-dir>/lsan.log` and prints the leaks grouped by allocation site. It needs no window or
+GPU, so a headless host is enough. `tests/lint/lsan.supp` suppresses only third-party leaks
+(currently libjuice); a leak in our code is fixed or recorded in the plan that owns it. Some
+validators exit without freeing their rooms, so the first run is expected to report those;
+triage them before turning detection on in CI. Windowed and GPU-renderer paths are not covered
+(on macOS use `MallocStackLogging=1 leaks --atExit -- ./build/wake_velocity ...`).
 
 `tests/fuzz/` holds libFuzzer-style harnesses (`LLVMFuzzerTestOneInput`): `fuzz_net_decode` (message,
 checkpoint and LAN codecs, with a decode-encode-decode round trip), `fuzz_net_server` (a joined client
