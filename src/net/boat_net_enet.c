@@ -284,6 +284,14 @@ void boat_net_enet_close(BoatNetEnet *enet, double seconds)
         if (enet_host_service(enet->host, &event, 10) > 0 && event.type == ENET_EVENT_TYPE_RECEIVE)
             enet_packet_destroy(event.packet);
     }
+    // Events stashed by a wait or settle but never polled still own their packets.
+    while (enet->stashed) {
+        ENetEvent *event = &enet->stash[enet->stash_first];
+        if (event->type == ENET_EVENT_TYPE_RECEIVE)
+            enet_packet_destroy(event->packet);
+        enet->stash_first = (enet->stash_first + 1) % STASH_EVENTS;
+        --enet->stashed;
+    }
     enet_host_destroy(enet->host);
     free(enet);
 }
