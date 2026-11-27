@@ -106,6 +106,7 @@ static int measure_render(const BoatSceneDefinition *scene, const BoatSession *s
         if (!boat_draw_scene(&renderer, &cpu, pixels, WIDTH, HEIGHT, &view, &presentation, &world,
                 BOAT_CAMERA_DEFAULT, NULL, NULL, NULL, 0)) {
             boat_cpu_view_destroy(&cpu);
+            renderer3d_destroy(&renderer);
             return 1;
         }
         samples[frame] = now_ms() - start;
@@ -117,6 +118,7 @@ static int measure_render(const BoatSceneDefinition *scene, const BoatSession *s
         waterfront_harbor_models_bytes(&cpu.harbor), cpu.harbor.builds, sizeof(*snapshot),
         sizeof(BoatPluginHost));
     boat_cpu_view_destroy(&cpu);
+    renderer3d_destroy(&renderer);
     printf("render %s p50_ms=%.3f p95_ms=%.3f frames=%d\n", label, *p50, *p95, FRAMES);
     return 0;
 }
