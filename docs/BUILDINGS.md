@@ -121,6 +121,13 @@ uploaded as `windowMean`. A merged far window of the untagged generic windows st
 first window's seed. Unmigrated generic windows follow `residential`. No building family yields
 `quiet` facades by default (houses and sheds take no windows); authored entries can.
 
+Skerry Reach's authored timber houses store individual pane geometry and room seeds in
+`assets/geometry/archipelago/life.h`, rather than imported facade grids. Their CPU/GPU
+presentation shares this glass palette and residential schedule, and the CPU window blend
+(`waterfront_window_tint` in `render/waterfront_lighting`) also colours those panes before
+both renderers draw them. They keep their authored white frames and mullions. See the
+[procedural world contract](PROCEDURAL_WORLD.md#resource-contract).
+
 Windows have a reveal in three tiers, all from this module so the CPU and GPU draw the same faces.
 `building_window_faces` splits the pane into four coplanar faces: the glass, a dark band under the
 lintel (14% of the height, glass x 0.4), a mid band on the left jamb (8% of the width, x 0.7) and

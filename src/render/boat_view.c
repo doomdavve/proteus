@@ -908,8 +908,10 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         boat_archipelago_evaluate(world->water, time,
             (Vector3) { -boat->position.x, boat->height, boat->position.y },
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, &life);
+        life.camera = renderer->camera;
         life.lighting = lighting;
         boat_archipelago_lanterns_evaluate(time, &life);
+        boat_archipelago_windows_evaluate(&life);
         renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &life.traffic);
         if (!waterfront_draw_harbor(renderer, &cpu->harbor, &life.harbor))

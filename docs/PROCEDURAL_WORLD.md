@@ -17,6 +17,8 @@ Choose SINGLE PLAYER, PLACE SKERRY REACH, or launch from the repository root:
 Home Harbour has four moored small craft alongside its two timber jetties, including two
 sailboats with masts. The mooring lines follow the shared wave-driven hull poses. Give these
 boats room: their hulls have height-aware contacts, while the baked piers remain solid shore.
+The sea surface continues beneath jetty decks; their solid collision footprints do not cut
+holes in the rendered water.
 The central launch/departure lane stays open.
 
 The boat starts at Home Harbour, facing the harbour mouth. The inner channels and more open
@@ -38,9 +40,10 @@ repeat independently. Gulls circle the inhabited shores and follow the fishing b
 residents walk and carry crates near the landings, with relaxed, bent-elbow arm swings.
 Timber houses have terracotta pitched roofs with solid overhangs (0.70 m at the gables and
 0.75 m at the eaves), white verge boards and corner posts, divided windows, framed doors
-and attic windows. Most windows use warm amber interior colours with lighter upper panes;
-a few retain cool sky reflections. This static room variation suggests occupancy without
-dynamic lights or light spilling onto the surroundings. Smaller huts omit the
+and attic windows. Runtime panes use the same glass palette, residential occupancy schedule
+and day/night window-light blend as Outer. Occupied rooms turn warm in the evening; most
+go dark overnight and a few stay lit or rise early. Panes are emissive in both renderers,
+without dynamic light spilling onto the surroundings. Smaller huts omit the
 chimney and use lower walls; Home Harbour varies the depth and roof proportions between
 its shore groups. Stone foundation skirts follow the ground, and the home settlement sits
 on a low rock shelf that blends into the surrounding hills.
@@ -111,13 +114,17 @@ The spawn is simulation `(0,0)`, heading zero towards decreasing Z.
 Terrain and shores use a 16 m lattice. Water clear of land stays at 32 m, with explicitly
 stitched shared edges at transitions and jetties. This increases shore detail while keeping
 offshore collision and rendering data compact. `life.h` contains the seed's local traffic,
-gull groups, surveyed resident paths and a smooth conservative terrain envelope for birds.
+gull groups, surveyed resident paths, window identities and pane geometry, lighthouse
+lantern geometry and a smooth conservative terrain envelope for birds.
 
 ## Resource contract
 
 The core owns immutable water triangles and approach points compiled from the generated
 headers. Collision caches remain caller-owned. The scenery loader reads the matching pack
-and checks its leading water against the compiled mesh, just as it does for Gothenburg.
+and checks its leading water against the compiled navigation prefix, just as it does for
+Gothenburg. The same generated arrays append the exact sea removed beneath pier footprints;
+a separate presentation description includes these triangles for flat and displaced water.
+Navigation retains only the prefix, so restoring the visible sea does not make piers passable.
 Rendering and file loading remain outside the core. Archipelago map identity suppresses
 the Gothenburg kit, ferries, traffic, street actors and permanent chart landmarks.
 Its own traffic and birds use the existing native route/flock evaluators. Shore people,

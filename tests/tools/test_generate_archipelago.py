@@ -174,6 +174,29 @@ def check_seed(seed, output):
         t = min(3/math.dist(a,b),.4)
         p = a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])
         assert not mesh.contains(p), ('ghost pier',seed,p)
+    def under_pier(point):
+        for triangle in world.pier_water:
+            points = [(p[0],p[2]) for p in triangle]
+            cross = [(b[0]-a[0])*(point[1]-a[1])-(b[1]-a[1])*(point[0]-a[0])
+                     for a,b in zip(points,points[1:]+points[:1])]
+            if min(cross) >= -1e-6 or max(cross) <= 1e-6:
+                return True
+        return False
+    samples = 0
+    for pier in manifest['dock_footprints']:
+        a,b = pier['start'],pier['end']
+        dx,dz = b[0]-a[0],b[1]-a[1]
+        length = math.hypot(dx,dz)
+        for along in (.05,.15,.3,.5,.7):
+            for across in (-1.7,0,1.7):
+                point = (a[0]+along*dx-across*dz/length,
+                         a[1]+along*dz+across*dx/length)
+                if world.field(*point)[0] < -4:
+                    assert under_pier(point), ('missing sea under deck',seed,point)
+                    assert not mesh.contains(point), ('pier collision lost',seed,point)
+                    samples += 1
+    assert samples > 10
+    assert len(world.pier_water) == manifest['counts']['pier_surface_triangles']
     assert 'OpenStreetMap' not in (output/'water.h').read_text()
     print(f'seed={seed} route_clearance=12m topology=connected piers=solid '
           f'inner_routes={direct:.0f}/{alternate:.0f}m pack={manifest["counts"]["scenery_bytes"]}B')

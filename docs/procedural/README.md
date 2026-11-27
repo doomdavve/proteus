@@ -3,10 +3,28 @@
 The [additional art direction](../PROCEDURAL_WORLD_PLAN.md#additional-art-direction--2026-11-25)
 records the user’s fishing-boat, sea, sunset and marina photographs for future iterations.
 
+## Jetty water and clocked windows — 2026-11-27
+
+The current house panes use Outer's glass palette, residential occupancy and day/night blend.
+These Home Harbour captures use `--no-audio --location archipelago --start -28,-24,-55
+--demo-idle --time 0`, CPU at hours 12/21/3 and GPU at 21. Water now continues below the
+solid jetty decks. The [plan](../PROCEDURAL_WORLD_PLAN.md#jetty-water-and-outer-style-house-windows--2026-11-27)
+records the geometry, checks and remaining user review.
+
+| CPU, noon | CPU, 21:00 | CPU, 03:00 |
+| --- | --- | --- |
+| ![Daylight glass](shore-day.png) | ![Warm occupied rooms in the evening](shore-evening.png) | ![Most rooms dark overnight](shore-late.png) |
+
+| GPU, 21:00 | GPU with waves, 21:00 at two seconds |
+| --- | --- |
+| ![Lit rooms reflected in the sea](shore-evening-gpu.png) | ![Continuous wave surface beside the jetty](shore-evening-waves-gpu.png) |
+
 ## Red-house rebuild — 2026-11-27
 
-Reference-led replacement of the red box houses, pending visual GPU and user review.
-The current captures include the extended overhangs and warm/cool room variation.
+Reference-led replacement of the red box houses. Current CPU/GPU captures appear above;
+user review remains open.
+These earlier captures include the extended overhangs and the superseded static room colours;
+the captures above show the current clocked glass.
 These isolated flat-ground fixtures were rendered by the actual CPU renderer at 320×200
 on macOS; they are geometry reviews, not game-camera captures or concept art.
 

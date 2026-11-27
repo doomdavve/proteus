@@ -53,6 +53,10 @@ typedef struct {
     int window_minute;
 } WaterfrontLighting;
 
+// Shared window blend: daylight glass toward occupied warm light or dark unoccupied glass.
+// LIT is a lit share in 0..1 (also used for reveal bands by the Outer renderer).
+Color waterfront_window_tint(Color glass, float lit, const WaterfrontLighting *lighting);
+
 // The minute building_window_lit takes: the lighting's clock, or -1 without one.
 static inline int waterfront_window_minute(const WaterfrontLighting *lighting)
 {

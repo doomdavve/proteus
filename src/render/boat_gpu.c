@@ -376,8 +376,10 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     } else {
         frame.lighting = waterfront_lighting(gpu->daylight);
     }
-    if (map == &boat_archipelago_map)
+    if (map == &boat_archipelago_map) {
         boat_archipelago_lanterns_evaluate(view->time, &frame);
+        boat_archipelago_windows_evaluate(&frame);
+    }
     boat_scene_rivals(rivals, world, view->time, &frame);
     if (ghost && opacity > 0) {
         WaterfrontPlayerState pose = { 0 };

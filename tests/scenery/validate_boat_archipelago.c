@@ -13,7 +13,9 @@
 #include "render/boat_archipelago_view.h"
 #include "render/boat_minimap.h"
 #include "render/boat_view.h"
+#include "render/boat_water_mesh.h"
 #include "scenery/boat_scenery.h"
+#include "scenery/building_windows.h"
 
 #include "../../assets/geometry/archipelago/routes.h"
 
@@ -412,6 +414,90 @@ static int lanterns(void)
     return 0;
 }
 
+static bool surface_contains(const Mesh3D *mesh, Vector3 p)
+{
+    for (size_t i = 0; i < mesh->triangle_count; ++i) {
+        const Triangle3D *t = &mesh->triangles[i];
+        Vector3 a = mesh->vertices[t->vertices[0]], b = mesh->vertices[t->vertices[1]],
+                c = mesh->vertices[t->vertices[2]];
+        if (CheckCollisionPointTriangle((Vector2) { p.x, p.z }, (Vector2) { a.x, a.z },
+                (Vector2) { b.x, b.z }, (Vector2) { c.x, c.z }))
+            return true;
+    }
+    return false;
+}
+
+static int pier_surface(void)
+{
+    const BoatMapDescription *surface = boat_water_render_map(&boat_archipelago_map);
+    CHECK(surface == &boat_archipelago_water_surface);
+    CHECK(surface->mesh->triangle_count > boat_archipelago_map.mesh->triangle_count);
+    CHECK(boat_water_render_map(NULL) == NULL);
+    CHECK(boat_water_render_map(&waterfront_outer_map) == &waterfront_outer_map);
+    size_t samples = 0;
+    for (size_t i = boat_archipelago_map.mesh->triangle_count; i < surface->mesh->triangle_count;
+        ++i) {
+        const Triangle3D *t = &surface->mesh->triangles[i];
+        Vector3 a = surface->mesh->vertices[t->vertices[0]],
+                b = surface->mesh->vertices[t->vertices[1]],
+                c = surface->mesh->vertices[t->vertices[2]];
+        if (Vector3Length(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a))) < .1f)
+            continue;
+        Vector3 p = Vector3Scale(Vector3Add(Vector3Add(a, b), c), 1.0f / 3);
+        CHECK(!surface_contains(boat_archipelago_map.mesh, p));
+        BoatWaterMeshCache cache = { 0 };
+        const Mesh3D *patch
+            = boat_water_patch(&cache, &boat_archipelago_map, (Vector2) { p.x, p.z });
+        CHECK(patch && surface_contains(patch, p));
+        patch = boat_water_patch_arcade(&cache, &boat_archipelago_map, (Vector2) { p.x, p.z });
+        CHECK(patch && surface_contains(patch, p));
+        boat_water_mesh_cache_destroy(&cache);
+        ++samples;
+    }
+    CHECK(samples > 10);
+    puts("archipelago_pier_surface=ok collision=solid gpu_patches=covered");
+    return 0;
+}
+
+static int house_windows(void)
+{
+    size_t count;
+    const BoatArchipelagoWindow *windows = boat_archipelago_windows(&count);
+    CHECK(count > 40);
+    int evening = 0, late = 0;
+    const float hours[] = { 12, 18, 21, 3, 6, 12 };
+    for (size_t h = 0; h < sizeof(hours) / sizeof(hours[0]); ++h) {
+        WaterfrontSceneFrame frame = { 0 };
+        CHECK(waterfront_lighting_hour(hours[h], &frame.lighting));
+        boat_archipelago_windows_evaluate(&frame);
+        int emitted = 0;
+        for (size_t i = 0; i < count; ++i) {
+            const BoatArchipelagoWindow *w = &windows[i];
+            float dx = w->position.x, dz = w->position.z;
+            if (dx * dx + dz * dz > BUILDING_WINDOW_NEAR_RANGE * BUILDING_WINDOW_NEAR_RANGE)
+                continue;
+            bool lit = building_window_lit(
+                BUILDING_PROFILE_RESIDENTIAL, w->seed, waterfront_window_minute(&frame.lighting));
+            Color expected = waterfront_window_tint(
+                building_window_glass(w->seed), lit ? 1.0f : 0.0f, &frame.lighting);
+            CHECK(emitted + 3 <= frame.scenery_count);
+            CHECK(Vector3Equals(w->position, frame.scenery[emitted].transform.position));
+            CHECK(ColorIsEqual(expected, frame.scenery[emitted].color));
+            CHECK(frame.scenery[emitted].emissive);
+            emitted += 3;
+            if (hours[h] == 21 && lit)
+                ++evening;
+            if (hours[h] == 3 && lit)
+                ++late;
+        }
+        CHECK(emitted == frame.scenery_count);
+    }
+    CHECK(evening > 0 && late < evening);
+    printf(
+        "archipelago_house_windows=ok outer_schedule=shared evening=%d late=%d\n", evening, late);
+    return 0;
+}
+
 static int scenery(void)
 {
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_ARCHIPELAGO);
@@ -457,6 +543,8 @@ int main(void)
     CHECK(life() == 0);
     CHECK(marina_and_clock() == 0);
     CHECK(lanterns() == 0);
+    CHECK(pier_surface() == 0);
+    CHECK(house_windows() == 0);
     CHECK(scenery() == 0);
     puts("boat_archipelago=ok");
     return 0;

@@ -7,10 +7,13 @@
 #include "../../assets/geometry/archipelago/places.h"
 #include "../../assets/geometry/archipelago/water.h"
 
-static const Mesh3D archipelago = { archipelago_water_vertices, archipelago_water_triangles,
+static const Mesh3D archipelago
+    = { archipelago_water_vertices, archipelago_water_triangles, archipelago_navigation_triangles };
+static const Mesh3D archipelago_surface = { archipelago_water_vertices, archipelago_water_triangles,
     sizeof(archipelago_water_triangles) / sizeof(archipelago_water_triangles[0]) };
 
-const BoatMapDescription boat_archipelago_map = { &archipelago,
+const BoatMapDescription boat_archipelago_map = { &archipelago, archipelago_navigation_triangles };
+const BoatMapDescription boat_archipelago_water_surface = { &archipelago_surface,
     sizeof(archipelago_water_triangles) / sizeof(archipelago_water_triangles[0]) };
 
 const BoatArchipelagoPlace *boat_archipelago_places(size_t *count)
@@ -72,4 +75,11 @@ const BoatArchipelagoLantern *boat_archipelago_lanterns(size_t *count)
     if (count)
         *count = sizeof(archipelago_lanterns) / sizeof(archipelago_lanterns[0]);
     return archipelago_lanterns;
+}
+
+const BoatArchipelagoWindow *boat_archipelago_windows(size_t *count)
+{
+    if (count)
+        *count = sizeof(archipelago_windows) / sizeof(archipelago_windows[0]);
+    return archipelago_windows;
 }

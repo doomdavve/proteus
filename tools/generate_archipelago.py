@@ -171,6 +171,7 @@ class World:
         self.sites = {}
         self.buildings = []
         self.lighthouses = []
+        self.windows = []
 
     def field(self, x, z):
         result, peak = -10000., 0
@@ -289,6 +290,7 @@ class World:
                     poly = clip(points, wet)
                     for i in range(1, len(poly) - 1):
                         target.append((poly[0], poly[i], poly[i + 1]))
+        self.pier_water = []
         # Piers have actual collision footprints. Subtract their convex deck rectangle
         # before compiling water, then conform shared triangle edges after clipping.
         for start, end in self.docks:
@@ -324,6 +326,10 @@ class World:
                     polygon = inside
                     if len(polygon) < 3:
                         break
+                # Keep exactly the removed sea for presentation, not navigation. The deck
+                # remains solid to boats while water still runs underneath it.
+                for i in range(1, len(polygon)-1):
+                    self.pier_water.append((polygon[0], polygon[i], polygon[i+1]))
             water = new_water
         water = conform_water(water)
         for points in water:
@@ -364,7 +370,7 @@ class World:
         base = max(self.ground(xx, zz) for xx, zz in corners) + .15
         wall = 3.8 if width < 11 else 4.4
         rise = depth * .42
-        white, glass = (225, 220, 197), (48, 69, 76)
+        white = (225, 220, 197)
         x0, x1, z0, z1 = x-width/2, x+width/2, z-depth/2, z+depth/2
         # A stone skirt follows the local ground instead of a single oversized plinth.
         for side in (-1, 1):
@@ -444,20 +450,18 @@ class World:
                          zz+outward*offset if across_x else zz,
                          ww if across_x else .09, .09 if across_x else ww, yy, hh, tint)
             panel(.07,w+.3,h+.28,y-.1,white)
-            # Stable room variation without consuming the layout RNG. Warm panes suggest
-            # lamplight; cool rooms retain a sky reflection instead of a flat black fill.
-            room = (round(xx*7)+round(zz*11)) % 4
-            lit = room != 0
-            pane = (204, 151, 77) if lit else glass
-            panel(.14,w,h,y,(103,59,42) if door else pane)
             if door:
+                panel(.14,w,h,y,(103,59,42))
                 panel(.21,w-.25,.07,y+.65,white)
                 panel(.21,w-.25,.07,y+1.45,white)
             else:
-                panel(.195,w-.08,h*.42,y+h*.54,
-                      (229, 182, 103) if lit else (81, 109, 118))
-                panel(.195,w-.08,h*.40,y+.04,
-                      (181, 119, 57) if lit else (42, 62, 69))
+                # Runtime glass uses the same residential schedule and light blend as Outer.
+                identity = f"archipelago/house/{len(self.buildings)-1}/window/{len(self.windows)}"
+                self.windows.append(dict(
+                    position=[-(xx if across_x else xx+outward*.14), y+h/2,
+                              zz+outward*.14 if across_x else zz],
+                    normal=[0 if across_x else -outward, 0, outward if across_x else 0],
+                    width=w, height=h, seed=map_pack.stable_id_hash(identity)))
                 panel(.21,.10,h,y,white)
                 panel(.21,w,.10,y+h*.52,white)
                 panel(.20,w+.42,.13,y-.14,white)
@@ -899,7 +903,13 @@ class World:
         lines += ['};', 'static const BoatArchipelagoLantern archipelago_lanterns[] = {']
         for x,y,z,width in self.lighthouses:
             lines += [f'    {{ {{ {f(x)}, {f(y)}, {f(z)} }}, {f(width)} }},']
-        # The common final terminator below closes the lantern table first.
+        lines += ['};', 'static const BoatArchipelagoWindow archipelago_windows[] = {']
+        for window in self.windows:
+            position = ', '.join(f(v) for v in window['position'])
+            normal = ', '.join(f(v) for v in window['normal'])
+            lines += [f"    {{ {{ {position} }}, {{ {normal} }}, "
+                      f"{f(window['width'])}, {f(window['height'])}, {window['seed']}u }},"]
+        # The common final terminator below closes the window table first.
         columns = (BOUNDS[2]-BOUNDS[0])//32+1
         rows = (BOUNDS[3]-BOUNDS[1])//32+1
         lines += ['};', f'enum {{ archipelago_ground_columns = {columns}, '
@@ -910,16 +920,28 @@ class World:
         lines += ['};', '']
         (output/'life.h').write_text('\n'.join(lines), newline='\n')
         return dict(actors=actors, residents=residents,
-                    gulls=sum(flock[2] for flock in flocks), physical_traffic_wakes=False)
+                    gulls=sum(flock[2] for flock in flocks), windows=len(self.windows),
+                    physical_traffic_wakes=False)
 
     def write(self, output):
         output.mkdir(parents=True, exist_ok=True)
         blob = map_pack.write(output, "archipelago", "tools/generate_archipelago.py",
                               self.vertices, self.triangles, self.terrain_end)
         # map_pack's legacy default attribution names OSM; this recipe uses no real map data.
-        header = (output/"water.h").read_text().replace(
+        surface_vertices = [tuple(map_pack.f32(f"{v:.4f}") for v in p) for p in self.vertices]
+        surface_triangles = list(self.triangles[:self.water_count])
+        for triangle in self.pier_water:
+            start = len(surface_vertices)
+            surface_vertices.extend(tuple(map_pack.f32(f"{v:.4f}") for v in (-x,y,z))
+                                    for x,y,z in triangle)
+            surface_triangles.append(((start,start+1,start+2), WATER))
+        header = map_pack.water_header("archipelago", "tools/generate_archipelago.py",
+            surface_vertices, surface_triangles,
+            f"enum {{ archipelago_navigation_triangles = {self.water_count} }};\n").replace(
             "// Map data (c) OpenStreetMap contributors, ODbL 1.0; see manifest.json.",
-            "// Synthetic geometry; no external geographic sources. See manifest.json.")
+            "// Synthetic geometry; no external geographic sources. See manifest.json.").replace(
+            "// The leading water triangles of scenery.bin, which the loader checks against these.",
+            "// Navigation prefix matches scenery.bin; appended sea beneath piers is render-only.")
         (output/"water.h").write_text(header, newline='\n')
         places = ['// Generated by tools/generate_archipelago.py. Do not edit.',
                   'static const BoatArchipelagoPlace archipelago_places[] = {']
@@ -959,7 +981,8 @@ class World:
             "counts": {"island_recipes": len(self.islands), "trees": self.tree_count,
                        "filled_inland_lattice_pockets": self.filled_pockets,
                        "vertices": len(self.vertices), "triangles": len(self.triangles),
-                       "water_triangles": self.water_count, "shore_edges": len(self.shore_edges),
+                       "water_triangles": self.water_count,
+                       "pier_surface_triangles": len(self.pier_water), "shore_edges": len(self.shore_edges),
                        "scenery_bytes": len(blob)},
             "places": [{"name": name, "id": node, "position": self.nodes[node],
                         "arrival_radius_m": radius}

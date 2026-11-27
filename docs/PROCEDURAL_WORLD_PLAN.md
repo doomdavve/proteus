@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 accepted in PR #232; reference-led red-house rebuild implemented locally.
-**Open** — Visual GPU/user review; missing water under jetties; broader platform/night qualification.
+**State** — A0–A10 accepted in PR #232; shore refinements, pier water and clocked windows local.
+**Open** — User review of shore refinements; broader platform/night qualification.
 **Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
-**Next** — Review the extended roofs, warm windows and villager poses in a native window.
+**Next** — Review restored jetty water, clocked house windows and villager poses.
 
 ## Additional art direction — 2026-11-25
 
@@ -429,7 +429,8 @@ each eave (previously 0.40/0.45 m). Verge boards, fascia, ridge and tile courses
 the same dimensions. Existing underside probes now reach into the added overhang.
 Most windows have amber interior panes, with lighter upper and darker lower panes;
 a deterministic minority retain cool sky reflections. The variation does not consume
-layout randomness. These are static mesh colours, without dynamic lights or exterior spill.
+layout randomness. These were static mesh colours, without dynamic lights or exterior spill;
+the clocked-window step below supersedes this window treatment.
 
 The Debug build passes. Updated isolated house/hut and in-world Home Harbour/Net Sheds
 CPU captures were inspected and replace the review images. A no-audio native GPU
@@ -458,4 +459,39 @@ time. CPU day/night/rotated-lens captures from `--start -70,-260,90`, hours 12/2
 times 0/2 were inspected. The no-audio 180-frame native GPU night demo from
 `--start 0,-260,90 --lighting-hour 23` completed successfully. Visual GPU inspection and
 user acceptance remain open. Changed local documentation links and `git diff --check` pass.
-Next: investigate missing water under jetties; this report is documented, not fixed here.
+At this checkpoint the next task was missing water under jetties; the step below resolves it.
+
+## Jetty water and Outer-style house windows — 2026-11-27
+
+Implemented both user-requested follow-ups. The generator retains the exact sea triangles
+removed by each solid pier cutter. `water.h` contains the unchanged navigation prefix plus
+44 presentation-only infill triangles for the default seed. Flat CPU/GPU water and both
+GPU wave patches and CPU displaced water select the complete surface through one render
+map accessor. The scenery loader still checks the navigation prefix, and boat collision
+still excludes the pier footprints. No additional coastal water is invented beneath land.
+
+Baked amber glass is replaced by 166 runtime window records with stable room seeds and
+pane positions. The panes use Outer's `building_window_glass`, residential
+`building_window_lit` schedule and the existing light blend, extracted into a shared
+lighting helper without changing its formula. Daylight gives cool glass; occupied rooms
+light in the evening, then most switch off overnight. CPU/GPU draw the same emissive panes
+behind the existing white mullions and frames, within the shared 430 m window range.
+Clock overrides, pause and direct seeks are stateless. Dynamic spill and volumetric beams
+remain deferred alongside the existing broader platform/night qualification.
+
+Verification on macOS Debug: warning-clean build and all 619 full tests passed in 112.70 s
+with `caffeinate -i ctest --preset full -j 8`. The three-seed generator regression samples
+restored sea beneath each jetty while checking that navigation still blocks those points.
+The C validator checks the presentation source, solid navigation and both GPU patch modes;
+window colours match the shared residential recipe at noon, evening, overnight and dawn
+(in the home range: 26 lit rooms at 21:00, three at 03:00). Existing Outer lighting tests
+remain green after the blend extraction.
+
+CPU Home Harbour captures at hours 12/21/3, GPU at 21 and both CPU/GPU with `--waves`
+were captured and inspected with `--no-audio --demo-idle --start -28,-24,-55`.
+Flat captures use time 0; wave captures use time 2. The GPU view shows warm windows and
+water reflections, with the restored sea beside the jetty. A no-audio 360-frame GPU demo at
+21:00 completed successfully. [Current review images](procedural/README.md#jetty-water-and-clocked-windows--2026-11-27)
+replace the static-glass recipe as the active baseline. Changed local documentation links
+and `git diff --check` pass. User acceptance and broader platform qualification remain open;
+no known jetty-water or clocked-window implementation items remain. Next: user review.

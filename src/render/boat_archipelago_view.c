@@ -3,6 +3,7 @@
 #include "core/boat_archipelago.h"
 #include "core/boat_scene_definition.h"
 #include "raymath.h"
+#include "scenery/building_windows.h"
 
 #include <math.h>
 
@@ -136,6 +137,45 @@ void boat_archipelago_lanterns_evaluate(double time, WaterfrontSceneFrame *frame
                       .rotation = { 0, angle, 0 },
                       .scale = { lamps[lamp].width, 2.6f, .04f } };
             frame->scenery[i].color = (Color) { 255 * gain, 228 * gain, 156 * gain, 255 };
+            frame->scenery[i].emissive = true;
+        }
+    }
+}
+
+void boat_archipelago_windows_evaluate(WaterfrontSceneFrame *frame)
+{
+    size_t count;
+    const BoatArchipelagoWindow *windows = boat_archipelago_windows(&count);
+    for (size_t window = 0; window < count; ++window) {
+        const BoatArchipelagoWindow *w = &windows[window];
+        float dx = w->position.x - frame->camera.position.x;
+        float dz = w->position.z - frame->camera.position.z;
+        if (dx * dx + dz * dz > BUILDING_WINDOW_NEAR_RANGE * BUILDING_WINDOW_NEAR_RANGE)
+            continue;
+        float lit = building_window_lit(BUILDING_PROFILE_RESIDENTIAL, w->seed,
+                        waterfront_window_minute(&frame->lighting))
+            ? 1.0f
+            : 0.0f;
+        Color glass = building_window_glass(w->seed);
+        for (int pane = 0; pane < 3; ++pane) {
+            if (frame->scenery_count >= (int)(sizeof(frame->scenery) / sizeof(frame->scenery[0])))
+                return;
+            Vector3 position = w->position;
+            float width = w->width, height = w->height;
+            Color tint = glass;
+            if (pane) {
+                position = Vector3Add(position, Vector3Scale(w->normal, .055f));
+                position.y += (pane == 1 ? .25f : -.28f) * w->height;
+                width -= .08f;
+                height *= pane == 1 ? .42f : .40f;
+                float shade = pane == 1 ? 1.2f : .8f;
+                tint = (Color) { Clamp(glass.r * shade, 0, 255), Clamp(glass.g * shade, 0, 255),
+                    Clamp(glass.b * shade, 0, 255), 255 };
+            }
+            int i = frame->scenery_count++;
+            frame->scenery[i].transform = (Transform3D) { .position = position,
+                .scale = { w->normal.x ? .09f : width, height, w->normal.x ? width : .09f } };
+            frame->scenery[i].color = waterfront_window_tint(tint, lit, &frame->lighting);
             frame->scenery[i].emissive = true;
         }
     }

@@ -6,6 +6,9 @@
 
 // Presentation-side water geometry built from the shared water queries. Physics never reads it.
 
+// Drawing source, including sea underneath solid piers; collision keeps the original map.
+const BoatMapDescription *boat_water_render_map(const BoatMapDescription *map);
+
 typedef struct {
     Vector3 *vertices;
     Triangle3D *triangles;

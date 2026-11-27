@@ -529,3 +529,16 @@ bool waterfront_daylight_parse(const char *text, float *phase)
     *phase = value;
     return true;
 }
+
+Color waterfront_window_tint(Color glass, float lit, const WaterfrontLighting *lighting)
+{
+    float t = lighting->window_light;
+    if (!(t > 0))
+        return (Color) { glass.r, glass.g, glass.b, 255 };
+    Vector3 day = { glass.r, glass.g, glass.b };
+    Vector3 night = Vector3Lerp(
+        Vector3Multiply(day, lighting->window_dark), Vector3Scale(lighting->window_lit, 255), lit);
+    Vector3 c = Vector3Lerp(day, night, t);
+    return (Color) { (unsigned char)roundf(Clamp(c.x, 0, 255)),
+        (unsigned char)roundf(Clamp(c.y, 0, 255)), (unsigned char)roundf(Clamp(c.z, 0, 255)), 255 };
+}
