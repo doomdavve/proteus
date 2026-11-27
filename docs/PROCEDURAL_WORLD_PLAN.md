@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 complete; recipe 4 accepted by the user; integration qualified in PR #232.
-**Open** — Broader platform/night qualification and deferred art/life work.
-**Done when** — Native evidence is recorded (complete); human acceptance is recorded separately.
-**Next** — Choose the next art/life improvement; PR #232 owns CI/merge status.
+**State** — A0–A10 complete and accepted in PR #232; shore visual fixes implemented locally.
+**Open** — GPU/motion and user review of the shore fixes; broader platform/night qualification.
+**Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
+**Next** — Review the local villager poses and closed house eaves in a native window.
 
 ## Additional art direction — 2026-11-25
 
@@ -360,3 +360,25 @@ archipelago capture at 225 s was inspected: the cycle reaches sunset with the ne
 resolution controls intact. Graphics checks used `--no-audio`. Broader interactive/platform
 limits above remain unchanged. [PR #232](https://github.com/doomdavve/proteus/pull/232) owns
 remote CI results and merge status; no release/deployment is part of this integration.
+
+## Shore feedback fixes — 2026-11-27
+
+The user reported outstretched, zombie-like arms and gaps in the houses. Residents now
+have shoulder-pivoted upper arms, slightly bent forearms, visible hands and a smaller
+walking swing. House roofs include a bottom soffit across the overhang, closing the opening
+between the extended gables and the wall box. Corner trim uses four protruding posts
+instead of nearly flush panels. The default scenery pack and manifest were regenerated.
+
+This follow-up defers the existing open-loop board items, reactive life and new jobs.
+The existing Debug build completed on macOS; the dependency's stb_vorbis warning remains.
+CPU Home Harbour stills at 4 s were inspected (`build/shore-close.png` and
+`build/shore-detail.png`, `--no-audio --renderer cpu --demo-idle`, start `-28,-24,-90`).
+An angled house view (`build/house-angle.png`) uses the same options at 1 s and
+start `-28,-24,-55`. These game-scale views do not replace a close native GPU review.
+The windowed no-audio 180-frame check was attempted, but GLFW could not initialize the
+platform/monitor in this session, including outside the sandbox. GPU appearance, motion
+and human acceptance remain unverified. The first sandboxed full CTest run passed
+602/619 tests; 17 networking/process tests failed while local sockets were denied.
+The full run outside the sandbox passed all 619 tests (65.90 s, macOS Debug;
+GPU qualification tests were not enabled).
+`clang-format --dry-run --Werror` and `git diff --check` pass.

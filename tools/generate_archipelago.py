@@ -365,9 +365,13 @@ class World:
         self.quad(p, d, c, q, (57, 61, 65))
         self.tri((a, p, d), color)
         self.tri((b, c, q), color)
+        # Close the roof volume below its overhanging gables and eaves. The wall
+        # box stops inside this footprint; without a soffit the sky shows through.
+        self.quad(a, b, c, d, (177, 174, 153))
         # White painted corners and window surrounds survive the game's low resolution.
-        for xx in (x-width/2+.18, x+width/2-.18):
-            self.box(xx, z, .34, depth+.05, base, 5.05, (209, 209, 186))
+        for xx in (x-width/2+.12, x+width/2-.12):
+            for zz in (z-depth/2+.12, z+depth/2-.12):
+                self.box(xx, zz, .34, .34, base, 5.05, (209, 209, 186))
         for xx in (x-width*.26, x+width*.26):
             for zz in (z-depth/2-.06, z+depth/2+.06):
                 self.box(xx, zz, 1.7, .13, base+2.2, 1.8, (214, 216, 192))

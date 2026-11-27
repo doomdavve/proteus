@@ -88,9 +88,21 @@ void boat_archipelago_evaluate(
             trousers, -stride);
         part(frame, position, heading, (Vector3) { 0, 1.03f, 0 }, (Vector3) { .52f, .65f, .3f },
             r->coat, 0);
-        for (int side = -1; side <= 1; side += 2)
-            part(frame, position, heading, (Vector3) { side * .34f, 1.0f, 0 },
-                (Vector3) { .16f, .58f, .18f }, r->coat, side * -stride);
+        for (int side = -1; side <= 1; side += 2) {
+            // Swing from the shoulder, with a relaxed elbow and hands beside the hips.
+            float upper = -side * stride * .55f;
+            float lower = upper - .18f;
+            Vector3 shoulder = { side * .33f, 1.29f, 0 };
+            Vector3 elbow = Vector3Add(
+                shoulder, Vector3Transform((Vector3) { 0, -.29f, 0 }, MatrixRotateX(upper)));
+            Vector3 hand = Vector3Add(
+                elbow, Vector3Transform((Vector3) { 0, -.27f, 0 }, MatrixRotateX(lower)));
+            part(frame, position, heading, Vector3Lerp(shoulder, elbow, .5f),
+                (Vector3) { .16f, .31f, .18f }, r->coat, upper);
+            part(frame, position, heading, Vector3Lerp(elbow, hand, .5f),
+                (Vector3) { .14f, .29f, .16f }, r->coat, lower);
+            part(frame, position, heading, hand, (Vector3) { .13f, .13f, .14f }, skin, lower);
+        }
         part(frame, position, heading, (Vector3) { 0, 1.56f, 0 }, (Vector3) { .3f, .34f, .3f },
             skin, 0);
         if (i % 3 == 0)
