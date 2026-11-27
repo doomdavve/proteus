@@ -1,3 +1,6 @@
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L // gmtime_r and localtime_r under strict C17 (glibc).
+#endif
 #include "wake_velocity/wake_velocity_performance.h"
 
 #include "boat_version.h"
