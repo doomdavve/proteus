@@ -101,6 +101,10 @@ static const Vector3 archipelago_moorings[][2] = {
     { { -31.857056f, 1.6f, -16.7668716f }, { -36.2816471f, 1.6f, -19.0956037f } },
     { { -31.857056f, 1.6f, -16.7668716f }, { -36.2816471f, 1.6f, -19.0956037f } },
 };
+static const BoatArchipelagoLantern archipelago_lanterns[] = {
+    { { -74.4f, 21.212322f, -260.8f }, 2.59f },
+    { { 80.3565291f, 46.7815683f, -2652.68279f }, 5.18f },
+};
 enum { archipelago_ground_columns = 101, archipelago_ground_rows = 117 };
 static const unsigned short archipelago_ground_cm[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

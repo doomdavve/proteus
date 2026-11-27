@@ -3253,8 +3253,8 @@ static void add_scenery(
     const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
 {
     for (int i = 0; i < frame->scenery_count; ++i)
-        draw_colored_mesh(
-            scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
+        draw_colored_mesh(scene->cube, material, frame->scenery[i].transform,
+            frame->scenery[i].color, frame->scenery[i].emissive);
 }
 
 static void draw_scenery(

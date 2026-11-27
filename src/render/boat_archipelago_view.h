@@ -8,6 +8,10 @@
 // No retained state: pause and direct/backward seeks follow the displayed simulation time.
 BoatViewProps boat_archipelago_lighting(double time);
 
+// Append dusk-to-dawn lantern panes after the caller selects the frame lighting.
+// A slow rotating brightness pattern suggests a turning lens, without volumetric beams.
+void boat_archipelago_lanterns_evaluate(double time, WaterfrontSceneFrame *frame);
+
 // Append native local boats, birds and shore residents to the caller's scene snapshot.
 // Pure simulation-time evaluation; CPU, GPU, reflections and shadows share these poses.
 void boat_archipelago_evaluate(

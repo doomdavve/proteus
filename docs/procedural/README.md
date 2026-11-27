@@ -23,6 +23,14 @@ CPU game-camera captures at Home Harbour (1 s, start `-28,-24,-55`) and Net Shed
 | --- | --- |
 | ![Red houses on the low home rock shelf](red-houses-harbour.png) | ![Red shed group beside the landing](red-houses-net-sheds.png) |
 
+Lighthouse CPU captures from `--start -70,-260,90`, at fixed hours 12 and 23.
+Night times 0 and 2 show the rotating lens brightness; see the
+[lamp checks and open jetty issue](../PROCEDURAL_WORLD_PLAN.md#lighthouse-lamps--2026-11-27).
+
+| Day | Night | Night, two seconds later |
+| --- | --- | --- |
+| ![Unlit lighthouse in daylight](lighthouse-day.png) | ![Lit lantern at night](lighthouse-night.png) | ![Brighter lantern face as the lens turns](lighthouse-sweep.png) |
+
 Earlier screenshots below retain the previous house recipe as history.
 
 ## Recipe 4 — fishing boat, marina and day/night

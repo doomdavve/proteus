@@ -16,6 +16,12 @@ typedef struct {
 // Stable bake order, home harbour first. The caller borrows process-lifetime data.
 const BoatArchipelagoPlace *boat_archipelago_places(size_t *count);
 
+typedef struct {
+    Vector3 position; // Lantern centre in renderer coordinates, matched to the baked tower.
+    float width;
+} BoatArchipelagoLantern;
+const BoatArchipelagoLantern *boat_archipelago_lanterns(size_t *count);
+
 BoatModelSpec boat_archipelago_fishing_spec(void);
 // Two fixed jetty tie points in renderer coordinates for each local berth.
 const Vector3 *boat_archipelago_moorings(unsigned berth);

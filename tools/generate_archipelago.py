@@ -170,6 +170,7 @@ class World:
         self.docks = []
         self.sites = {}
         self.buildings = []
+        self.lighthouses = []
 
     def field(self, x, z):
         result, peak = -10000., 0
@@ -515,6 +516,7 @@ class World:
     def lighthouse(self, x, z, small=False):
         base = self.ground(x, z)
         h, w = (13, 3.5) if small else (29, 7)
+        self.lighthouses.append((-x, base+h+2.05, z, w*.74))
         self.box(x, z, w+3, w+3, max(0, base-3), 3.7, (126, 122, 109))
         self.box(x, z, w, w, base+.5, h, (222, 220, 194))
         self.box(x, z, w+.5, w+.5, base+h*.65, h*.16, (158, 55, 43))
@@ -894,7 +896,10 @@ class World:
         for berth in self.marina():
             ties = ', '.join('{ '+f(-x)+', 1.6f, '+f(z)+' }' for x,z in berth['ties'])
             lines += ['    { '+ties+' },']
-        # The common final terminator below closes the mooring table first.
+        lines += ['};', 'static const BoatArchipelagoLantern archipelago_lanterns[] = {']
+        for x,y,z,width in self.lighthouses:
+            lines += [f'    {{ {{ {f(x)}, {f(y)}, {f(z)} }}, {f(width)} }},']
+        # The common final terminator below closes the lantern table first.
         columns = (BOUNDS[2]-BOUNDS[0])//32+1
         rows = (BOUNDS[3]-BOUNDS[1])//32+1
         lines += ['};', f'enum {{ archipelago_ground_columns = {columns}, '

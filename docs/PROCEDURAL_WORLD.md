@@ -62,6 +62,9 @@ simulated seconds** (15 minutes at 1×; 112.5 active seconds at 8×). Pause/help
 with the simulation. `--time-scale` and the existing solo speed controls move the world and
 light together. Resetting session time returns the light to noon; the clock is not saved.
 Scripted `--time` seeks the cycle along with local life, without waiting in real time.
+Lighthouse lanterns emit warm light from 18:00 until 06:00; fixed DUSK also enables them.
+Their four faces brighten in sequence over eight simulated seconds, suggesting a rotating
+lens. CPU and GPU use the same panes and phase; there is no volumetric beam or light spill.
 
 The title's default DAY choice enables this cycle for Skerry Reach. Choosing SUNSET, DUSK
 or a specific hour keeps that selected light fixed. Explicit `--daylight day|sunset|dusk` or

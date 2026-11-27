@@ -1,7 +1,7 @@
 # Skerry Reach procedural archipelago
 
 **State** — A0–A10 accepted in PR #232; reference-led red-house rebuild implemented locally.
-**Open** — Visual GPU and user review of the shore fixes; broader platform/night qualification.
+**Open** — Visual GPU/user review; missing water under jetties; broader platform/night qualification.
 **Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
 **Next** — Review the extended roofs, warm windows and villager poses in a native window.
 
@@ -437,3 +437,25 @@ CPU captures were inspected and replace the review images. A no-audio native GPU
 block for runtime execution. Visual GPU inspection and user acceptance remain open.
 `caffeinate -i ctest --preset full -j 8` passed all 619 tests in 77.66 s.
 `git diff --check` passes.
+
+## Lighthouse lamps — 2026-11-27
+
+Implemented the user-requested dusk-to-dawn lamps on both baked lighthouse lanterns.
+The generator exports the actual lantern centres and widths; no approximate terrain height
+or duplicated placement is used. Four emissive panes replace the dark glass visually from
+18:00 to 06:00 (or fixed DUSK), with an eight-second rotating brightness pattern. CPU/GPU
+consume the same simulation-time evaluation after lighting overrides are resolved. No
+volumetric beam, dynamic spill, or navigational flash-character contract is claimed.
+This step defers the existing broader platform qualification and the newly reported
+missing water beneath jetties. Investigate the latter separately: check shoreline/water
+mask generation beneath pier decks and ensure water extends below the decking without
+changing the navigable shore or dock collision inadvertently.
+
+Verification on macOS Debug: build without new warnings; all 619 full tests passed in
+69.34 s using `caffeinate -i ctest --preset full -j 8`. The archipelago validator covers
+dusk/dawn boundaries, midnight, fixed DUSK, rotating brightness, repeat seeks and invalid
+time. CPU day/night/rotated-lens captures from `--start -70,-260,90`, hours 12/23 and
+times 0/2 were inspected. The no-audio 180-frame native GPU night demo from
+`--start 0,-260,90 --lighting-hour 23` completed successfully. Visual GPU inspection and
+user acceptance remain open. Changed local documentation links and `git diff --check` pass.
+Next: investigate missing water under jetties; this report is documented, not fixed here.

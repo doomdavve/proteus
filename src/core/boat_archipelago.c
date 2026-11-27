@@ -66,3 +66,10 @@ float boat_archipelago_ground(Vector2 position)
     return ((a[0] + (a[1] - (float)a[0]) * tx) * (1 - tz) + (b[0] + (b[1] - (float)b[0]) * tx) * tz)
         * .01f;
 }
+
+const BoatArchipelagoLantern *boat_archipelago_lanterns(size_t *count)
+{
+    if (count)
+        *count = sizeof(archipelago_lanterns) / sizeof(archipelago_lanterns[0]);
+    return archipelago_lanterns;
+}

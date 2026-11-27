@@ -376,6 +376,42 @@ static int marina_and_clock(void)
     return 0;
 }
 
+static int lanterns(void)
+{
+    size_t count;
+    const BoatArchipelagoLantern *lamps = boat_archipelago_lanterns(&count);
+    CHECK(count >= 2 && count <= 8);
+    for (size_t i = 0; i < count; ++i) {
+        CHECK(lamps[i].width > 2 && lamps[i].width < 6);
+        CHECK(lamps[i].position.y > 15);
+    }
+    const float hours[] = { 12, 17.99f, 18, 23, 0, 5.99f, 6, 12 };
+    for (size_t h = 0; h < sizeof(hours) / sizeof(hours[0]); ++h) {
+        WaterfrontSceneFrame frame = { 0 };
+        CHECK(waterfront_lighting_hour(hours[h], &frame.lighting));
+        boat_archipelago_lanterns_evaluate(0, &frame);
+        bool night = hours[h] >= 18 || hours[h] < 6;
+        CHECK(frame.scenery_count == (night ? (int)count * 4 : 0));
+        for (int i = 0; i < frame.scenery_count; ++i)
+            CHECK(frame.scenery[i].emissive);
+    }
+    WaterfrontSceneFrame first = { 0 }, later = { 0 }, repeat = { 0 };
+    first.lighting = later.lighting = repeat.lighting
+        = waterfront_lighting(WATERFRONT_DAYLIGHT_DUSK);
+    boat_archipelago_lanterns_evaluate(0, &first);
+    boat_archipelago_lanterns_evaluate(2, &later);
+    boat_archipelago_lanterns_evaluate(8, &repeat);
+    CHECK(first.scenery_count == (int)count * 4);
+    CHECK(first.scenery[0].color.r > later.scenery[0].color.r);
+    CHECK(first.scenery[1].color.r < later.scenery[1].color.r);
+    CHECK(memcmp(first.scenery, repeat.scenery, sizeof(first.scenery)) == 0);
+    repeat.scenery_count = 0;
+    boat_archipelago_lanterns_evaluate(NAN, &repeat);
+    CHECK(repeat.scenery_count == 0);
+    puts("archipelago_lanterns=ok dusk_dawn=ok rotating_lens=ok seek=ok");
+    return 0;
+}
+
 static int scenery(void)
 {
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_ARCHIPELAGO);
@@ -420,6 +456,7 @@ int main(void)
     CHECK(isolation() == 0);
     CHECK(life() == 0);
     CHECK(marina_and_clock() == 0);
+    CHECK(lanterns() == 0);
     CHECK(scenery() == 0);
     puts("boat_archipelago=ok");
     return 0;

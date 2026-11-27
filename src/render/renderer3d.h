@@ -84,6 +84,7 @@ bool renderer3d_box_visible(Renderer3D *renderer, Vector3 min, Vector3 max);
 void renderer3d_destroy(Renderer3D *renderer);
 
 // Shared unit box centered at the origin, spanning [-0.5, 0.5] on each axis.
+void renderer3d_draw_emissive_box(Renderer3D *renderer, Transform3D transform, Color color);
 void renderer3d_draw_box(Renderer3D *renderer, Transform3D transform, Color color);
 
 void renderer3d_draw_textured_box(

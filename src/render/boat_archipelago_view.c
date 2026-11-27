@@ -110,3 +110,33 @@ void boat_archipelago_evaluate(
                 (Vector3) { .65f, .45f, .45f }, (Color) { 151, 116, 71, 255 }, 0);
     }
 }
+
+void boat_archipelago_lanterns_evaluate(double time, WaterfrontSceneFrame *frame)
+{
+    const WaterfrontLighting *light = &frame->lighting;
+    bool night = light->window_clock
+        ? light->window_minute >= 18 * 60 || light->window_minute < 6 * 60
+        : light->phase >= .75f;
+    if (!night || !isfinite(time))
+        return;
+    size_t count;
+    const BoatArchipelagoLantern *lamps = boat_archipelago_lanterns(&count);
+    float rotation = (float)remainder(time, 8) * (2 * PI / 8);
+    for (size_t lamp = 0; lamp < count; ++lamp) {
+        for (int face = 0; face < 4; ++face) {
+            if (frame->scenery_count >= (int)(sizeof(frame->scenery) / sizeof(frame->scenery[0])))
+                return;
+            float angle = face * PI / 2;
+            float gain = .4f + .6f * powf(fmaxf(0, cosf(angle - rotation)), 12);
+            int i = frame->scenery_count++;
+            frame->scenery[i].transform
+                = (Transform3D) { .position = Vector3Add(lamps[lamp].position,
+                                      (Vector3) { sinf(angle) * (lamps[lamp].width / 2 + .035f), 0,
+                                          cosf(angle) * (lamps[lamp].width / 2 + .035f) }),
+                      .rotation = { 0, angle, 0 },
+                      .scale = { lamps[lamp].width, 2.6f, .04f } };
+            frame->scenery[i].color = (Color) { 255 * gain, 228 * gain, 156 * gain, 255 };
+            frame->scenery[i].emissive = true;
+        }
+    }
+}
