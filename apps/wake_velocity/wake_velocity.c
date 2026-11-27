@@ -666,6 +666,8 @@ static BoatInput idle_demo_input(void *context, const Boat *boat, uint64_t tick)
 static int study(int argc, char **argv)
 {
     WakeLightingReview lighting_review = { 0 };
+    // Read by cleanup:, which early exits reach before the capture setup below.
+    BoatGpuTimer performance_timer = { 0 };
     const char *screenshot = NULL;
     unsigned int skin = BOAT_SKIN_SWEDEN;
     unsigned soundtrack = BOAT_MUSIC_LITTLE_BOAT;
@@ -1663,7 +1665,6 @@ static int study(int argc, char **argv)
     // runs again from the title, so clear it here.
     static BoatCapture capture;
     memset(&capture, 0, sizeof(capture));
-    BoatGpuTimer performance_timer = { 0 };
     unsigned long long performance_serial = 0;
     double previous_performance_start = -1;
     double performance_notice_until = 0;

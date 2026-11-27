@@ -1,0 +1,7 @@
+# LeakSanitizer suppressions for tools/lsan_run.sh (docs/TESTING.md#leak-detection).
+# Only third-party code that is known to leak or to keep process-lifetime globals. Keep each
+# entry narrow, name the reason, and never suppress our own code here: fix it or record it in
+# the plan that owns it.
+
+# libjuice allocation leak (docs/SERVER_HARDENING_PLAN.md, SERVER_SECURITY.md Known limits).
+leak:juice_*

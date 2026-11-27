@@ -208,3 +208,5 @@ if(PROTEUS_OPTIMIZE_TESTS)
       $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:AppleClang,Clang,GNU>>:-O2>)
   endforeach()
 endif()
+
+proteus_scale_test_timeouts()

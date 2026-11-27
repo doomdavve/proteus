@@ -20,3 +20,21 @@ if(PROTEUS_FUZZ AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
   add_link_options(-fsanitize=address,undefined)
   set(PROTEUS_SANITIZED TRUE)
 endif()
+
+# A sanitized build runs several times slower, so tests whose own TIMEOUT is tight fail on speed
+# alone (ctest --timeout only sets the default). Call at the end of the top-level project, after
+# every test is registered: -DPROTEUS_TEST_TIMEOUT_SCALE=4 multiplies each TIMEOUT.
+set(PROTEUS_TEST_TIMEOUT_SCALE "1" CACHE STRING "Multiplier for every test's TIMEOUT property")
+function(proteus_scale_test_timeouts)
+  if(PROTEUS_TEST_TIMEOUT_SCALE LESS_EQUAL 1)
+    return()
+  endif()
+  get_property(tests DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY TESTS)
+  foreach(test IN LISTS tests)
+    get_test_property(${test} TIMEOUT timeout)
+    if(timeout)
+      math(EXPR scaled "${timeout} * ${PROTEUS_TEST_TIMEOUT_SCALE}")
+      set_tests_properties(${test} PROPERTIES TIMEOUT ${scaled})
+    endif()
+  endforeach()
+endfunction()

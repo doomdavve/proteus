@@ -3,6 +3,10 @@
 #include "core/boat_scene_definition.h"
 
 #include <math.h>
+
+#ifndef M_PI // Strict C17 on glibc hides it.
+#define M_PI 3.14159265358979323846
+#endif
 #include <stdio.h>
 #include <string.h>
 
