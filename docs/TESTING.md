@@ -1088,7 +1088,10 @@ macOS ASan has no leak detection, so leaks are checked on Linux with LeakSanitiz
 GPU, so a headless host is enough. `tests/lint/lsan.supp` suppresses only third-party leaks
 (currently libjuice); a leak in our code is fixed or recorded in the plan that owns it. Some
 validators exit without freeing their rooms, so the first run is expected to report those;
-triage them before turning detection on in CI. Windowed and GPU-renderer paths are not covered
+triage them before turning detection on in CI. `boat_lockdown_process` (seccomp kills the ASan runtime), `boat_plugin_author` and
+`boat_plugin_capture` (fixed 60 s deadlines) are excluded by default (`LSAN_EXCLUDE`);
+`PROTEUS_TEST_TIMEOUT_SCALE` (`LSAN_TIMEOUT_SCALE`, default 5) multiplies every test's `TIMEOUT`.
+Windowed and GPU-renderer paths are not covered
 (on macOS use `MallocStackLogging=1 leaks --atExit -- ./build/wake_velocity ...`).
 
 `tests/fuzz/` holds libFuzzer-style harnesses (`LLVMFuzzerTestOneInput`): `fuzz_net_decode` (message,

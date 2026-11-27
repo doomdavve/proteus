@@ -19,7 +19,8 @@ fi
 # the GLFW backend flags on a host without the Wayland development packages.
 jobs=${LSAN_JOBS:-$(nproc)}
 cmake -S "$root" -B "$build" -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_SANITIZE=address,undefined \
-    -DPROTEUS_GPU_TESTS=OFF ${LSAN_CMAKE_ARGS:--DGLFW_BUILD_X11=ON -DGLFW_BUILD_WAYLAND=ON}
+    -DPROTEUS_GPU_TESTS=OFF -DPROTEUS_TEST_TIMEOUT_SCALE=${LSAN_TIMEOUT_SCALE:-5} \
+    ${LSAN_CMAKE_ARGS:--DGLFW_BUILD_X11=ON -DGLFW_BUILD_WAYLAND=ON}
 cmake --build "$build" -j"$jobs"
 
 export ASAN_OPTIONS="detect_leaks=1:abort_on_error=0:exitcode=23"
@@ -27,7 +28,14 @@ export LSAN_OPTIONS="suppressions=$root/tests/lint/lsan.supp:print_suppressions=
 export UBSAN_OPTIONS="print_stacktrace=1"
 
 status=0
-ctest --test-dir "$build" -j"$jobs" --timeout 600 --output-on-failure "$@" \
+# Excluded by default (override with LSAN_EXCLUDE, a ctest -E regex):
+#  - boat_lockdown_process runs the server under a seccomp allowlist that the ASan runtime's own
+#    syscalls violate (SIGSYS), so it cannot run in a sanitized build.
+#  - boat_plugin_author and boat_plugin_capture drive the sanitized game from Python with fixed
+#    60 s subprocess deadlines that a slow host exceeds (they pass on a fast one).
+exclude=${LSAN_EXCLUDE:-^(boat_lockdown_process|boat_plugin_author|boat_plugin_capture)$}
+ctest --test-dir "$build" -j"$jobs" --timeout 600 --output-on-failure \
+    -E "$exclude" "$@" \
     >"$build/lsan.log" 2>&1 || status=$?
 tail -n 12 "$build/lsan.log"
 
@@ -42,7 +50,9 @@ for block in re.split(r"\n(?=(?:Direct|Indirect) leak of )", text):
     head = re.match(r"(?:Direct|Indirect) leak of (\d+) byte", block)
     if not head:
         continue
-    frame = next((m.group(1) for m in re.finditer(r"#\d+ \S+ in (\S+ \S*(?:/src/|/apps/|/tools/)\S+)", block)),
+    frame = next((m.group(1) for m in re.finditer(r"#\d+ \S+ in (\S+ \S+)", block)
+                 if "/_deps/" not in m.group(1) and "libsanitizer" not in m.group(1)
+                 and re.search(r"/(?:src|apps|tools|tests)/", m.group(1))),
                  "(no project frame)")
     sites[frame] += 1
     sizes[frame] += int(head.group(1))
