@@ -170,6 +170,8 @@ class World:
         self.docks = []
         self.sites = {}
         self.buildings = []
+        self.lighthouses = []
+        self.windows = []
 
     def field(self, x, z):
         result, peak = -10000., 0
@@ -201,6 +203,12 @@ class World:
             blend = max(0, min(1, (distance-55)/55))
             terrace = min(3.2, max(0, d)*.28)
             height = terrace + (height-terrace)*blend
+        # Home Harbour is an inhabited rock shelf, like the other shore settlements.
+        # Keep the coast at zero and blend into the original hills outside the houses.
+        distance = math.hypot(x, z+65)
+        blend = max(0, min(1, (distance-115)/55))
+        terrace = min(height, min(3.2, max(0,d)*.28) + max(0,d-40)*.06)
+        height = terrace + (height-terrace)*blend
         return height
 
     def vertex(self, p):
@@ -282,6 +290,7 @@ class World:
                     poly = clip(points, wet)
                     for i in range(1, len(poly) - 1):
                         target.append((poly[0], poly[i], poly[i + 1]))
+        self.pier_water = []
         # Piers have actual collision footprints. Subtract their convex deck rectangle
         # before compiling water, then conform shared triangle edges after clipping.
         for start, end in self.docks:
@@ -317,6 +326,10 @@ class World:
                     polygon = inside
                     if len(polygon) < 3:
                         break
+                # Keep exactly the removed sea for presentation, not navigation. The deck
+                # remains solid to boats while water still runs underneath it.
+                for i in range(1, len(polygon)-1):
+                    self.pier_water.append((polygon[0], polygon[i], polygon[i+1]))
             water = new_water
         water = conform_water(water)
         for points in water:
@@ -354,26 +367,118 @@ class World:
         self.buildings.append((x,z,width,depth))
         corners = [(xx, zz) for xx in (x-width/2, x+width/2)
                    for zz in (z-depth/2, z+depth/2)]
-        base = max(self.ground(xx, zz) for xx, zz in corners) + .2
-        bottom = max(0, min(self.ground(xx, zz) for xx, zz in corners)-2)
-        self.box(x, z, width + .5, depth + .5, bottom, base-bottom, (111, 109, 99))
-        self.box(x, z, width, depth, base, 5, color)
-        x0, x1, z0, z1 = x-width/2-.6, x+width/2+.6, z-depth/2-.6, z+depth/2+.6
-        a, b, c, d = (x0, base+5, z0), (x1, base+5, z0), (x1, base+5, z1), (x0, base+5, z1)
-        p, q = (x0, base+8, z), (x1, base+8, z)
-        self.quad(a, p, q, b, (69, 73, 76))
-        self.quad(p, d, c, q, (57, 61, 65))
-        self.tri((a, p, d), color)
-        self.tri((b, c, q), color)
-        # White painted corners and window surrounds survive the game's low resolution.
-        for xx in (x-width/2+.18, x+width/2-.18):
-            self.box(xx, z, .34, depth+.05, base, 5.05, (209, 209, 186))
-        for xx in (x-width*.26, x+width*.26):
-            for zz in (z-depth/2-.06, z+depth/2+.06):
-                self.box(xx, zz, 1.7, .13, base+2.2, 1.8, (214, 216, 192))
-                self.box(xx, zz + (-.08 if zz < z else .08), 1.2, .10, base+2.45, 1.3,
-                         (56, 77, 82))
-        self.box(x+width*.25, z, 1, 1, base+6.5, 3, (104, 93, 81))
+        base = max(self.ground(xx, zz) for xx, zz in corners) + .15
+        wall = 3.8 if width < 11 else 4.4
+        rise = depth * .42
+        white = (225, 220, 197)
+        x0, x1, z0, z1 = x-width/2, x+width/2, z-depth/2, z+depth/2
+        # A stone skirt follows the local ground instead of a single oversized plinth.
+        for side in (-1, 1):
+            for along_x, length in ((True, width), (False, depth)):
+                pieces = math.ceil(length/2)
+                for i in range(pieces):
+                    offset = -length/2 + (i+.5)*length/pieces
+                    xx, zz = (x+offset, z+side*depth/2) if along_x else (x+side*width/2, z+offset)
+                    bottom = max(0, self.ground(xx, zz)-.7)
+                    tone = (i+int(side == 1)) % 3 * 7
+                    self.box(xx, zz, length/pieces+.03 if along_x else .35,
+                             .35 if along_x else length/pieces+.03, bottom,
+                             max(.15, base-bottom), (119+tone, 116+tone, 106+tone))
+        self.box(x, z, width, depth, base, wall, color)
+        # Gables meet the wall footprint, not the outer edge of the roof overhang.
+        a,b,c,d = (x0,base+wall,z0), (x1,base+wall,z0), (x1,base+wall,z1), (x0,base+wall,z1)
+        p,q = (x0,base+wall+rise,z), (x1,base+wall+rise,z)
+        self.tri((a,p,d), color)
+        self.tri((b,c,q), color)
+
+        def roof_strip(left, right, near, far, tint, lift=0):
+            # A closed sloping slab; shared coordinates keep its edges watertight.
+            def point(xx, zz, top):
+                return (xx, base+wall+rise*(1-abs(zz-z)/(depth/2)) + top + lift, zz)
+            lo = [point(left,near,0), point(right,near,0),
+                  point(right,far,0), point(left,far,0)]
+            hi = [point(left,near,.24), point(right,near,.24),
+                  point(right,far,.24), point(left,far,.24)]
+            # Order the perimeter clockwise when viewed from above.
+            if near > far:
+                lo.reverse()
+                hi.reverse()
+            self.quad(*lo, tuple(max(0,k-25) for k in tint))
+            self.quad(hi[3],hi[2],hi[1],hi[0],tint)
+            for j in range(4):
+                k = (j+1)%4
+                self.quad(lo[j],hi[j],hi[k],lo[k],tint)
+
+        gable_overhang, eave_overhang = .7, .75
+        roof = (177, 91, 53) if width < 12 else (187, 98, 58)
+        for side in (-1, 1):
+            edge = z+side*(depth/2+eave_overhang)
+            roof_strip(x0-gable_overhang, x1+gable_overhang, z, edge, roof)
+            # Broad, low-contrast tile courses, rather than subpixel individual tiles.
+            courses = math.ceil((depth/2+eave_overhang)/.8)
+            for row in range(1,courses):
+                zz = z+side*(depth/2+eave_overhang)*row/courses
+                far = zz+side*.045
+                points = [(xx, base+wall+rise*(1-abs(zt-z)/(depth/2))+.255, zt)
+                          for xx,zt in ((x0-gable_overhang+.26,zz),(x1+gable_overhang-.26,zz),
+                                        (x1+gable_overhang-.26,far),(x0-gable_overhang+.26,far))]
+                if side > 0:
+                    points.reverse()
+                self.quad(*points, tuple(k-12 for k in roof))
+            # Broad white verge boards describe the pitched silhouette at game scale.
+            for xx in (x0-gable_overhang-.03, x1+gable_overhang-.21):
+                roof_strip(xx, xx+.24, z, edge, white, lift=.035)
+            eave = base+wall-rise*eave_overhang/(depth/2)
+            self.box(x, edge, width+2*gable_overhang+.06, .18, eave-.16, .34, white)
+        self.box(x, z, width+2*gable_overhang+.05, .28, base+wall+rise+.20, .16, (151, 76, 45))
+        # Sparse battens suggest vertical timber without a noisy stripe on every board.
+        batten = tuple(min(255,k+8) for k in color)
+        for i in range(1, math.ceil(width/.85)):
+            xx = x0+i*width/math.ceil(width/.85)
+            for zz in (z0-.025,z1+.025):
+                self.box(xx, zz, .045, .07, base, wall-.05, batten)
+        for xx in (x0+.1,x1-.1):
+            for zz in (z0+.1,z1-.1):
+                self.box(xx, zz, .34, .34, base, wall+.08, white)
+
+        def opening(xx, zz, across_x, door=False, small=False):
+            w,h = (1.45,2.8) if door else ((1.1,1.25) if small else (1.65,1.95))
+            y = base+.08 if door else base+(wall+.45 if small else 1.35)
+            outward = -1 if (zz < z if across_x else xx < x) else 1
+            def panel(offset, ww, hh, yy, tint):
+                self.box(xx if across_x else xx+outward*offset,
+                         zz+outward*offset if across_x else zz,
+                         ww if across_x else .09, .09 if across_x else ww, yy, hh, tint)
+            panel(.07,w+.3,h+.28,y-.1,white)
+            if door:
+                panel(.14,w,h,y,(103,59,42))
+                panel(.21,w-.25,.07,y+.65,white)
+                panel(.21,w-.25,.07,y+1.45,white)
+            else:
+                # Runtime glass uses the same residential schedule and light blend as Outer.
+                identity = f"archipelago/house/{len(self.buildings)-1}/window/{len(self.windows)}"
+                self.windows.append(dict(
+                    position=[-(xx if across_x else xx+outward*.14), y+h/2,
+                              zz+outward*.14 if across_x else zz],
+                    normal=[0 if across_x else -outward, 0, outward if across_x else 0],
+                    width=w, height=h, seed=map_pack.stable_id_hash(identity)))
+                panel(.21,.10,h,y,white)
+                panel(.21,w,.10,y+h*.52,white)
+                panel(.20,w+.42,.13,y-.14,white)
+        for xx in (x-width*.27,x+width*.27):
+            for zz in (z0,z1):
+                opening(xx,zz,True)
+        for xx in (x0,x1):
+            opening(xx,z,False,door=True)
+            if depth >= 8:
+                for zz in (z-depth*.29,z+depth*.29):
+                    opening(xx,zz,False)
+            opening(xx,z,False,small=True)
+        # Low steps belong to the facade; the surrounding rock remains the main terrace.
+        for side in (-1,1):
+            self.box(x+side*(width/2+.35), z, .7, 1.9, base-.35, .35, (128,124,112))
+        if width >= 12:
+            self.box(x+width*.23,z+.7, .7,.85,base+wall+rise-.9,2.0,(116,99,81))
 
     def cone(self, x, z, base, radius, height, color, sides=6):
         tip = (x, base+height, z)
@@ -415,6 +520,7 @@ class World:
     def lighthouse(self, x, z, small=False):
         base = self.ground(x, z)
         h, w = (13, 3.5) if small else (29, 7)
+        self.lighthouses.append((-x, base+h+2.05, z, w*.74))
         self.box(x, z, w+3, w+3, max(0, base-3), 3.7, (126, 122, 109))
         self.box(x, z, w, w, base+.5, h, (222, 220, 194))
         self.box(x, z, w+.5, w+.5, base+h*.65, h*.16, (158, 55, 43))
@@ -478,7 +584,9 @@ class World:
         for x,z in ((-100,-25),(-100,-70),(-100,-130),(100,-25),(100,-70),(100,-130)):
             shore = self.shore_at("home", math.atan2(z, x), 240)
             if shore:
-                self.house(*shore, width=r.uniform(10, 16), color=r.choice(
+                self.house(*shore, width=r.uniform(10, 16),
+                           depth=8 if z == -25 else 9.5 if z == -70 else 10.5,
+                           color=r.choice(
                     [(151, 62, 46), (137, 57, 45), (165, 69, 48)]))
         mouth_beacon = self.shore_at("mouth", math.atan2(160,120), 300)
         if mouth_beacon:
@@ -792,7 +900,16 @@ class World:
         for berth in self.marina():
             ties = ', '.join('{ '+f(-x)+', 1.6f, '+f(z)+' }' for x,z in berth['ties'])
             lines += ['    { '+ties+' },']
-        # The common final terminator below closes the mooring table first.
+        lines += ['};', 'static const BoatArchipelagoLantern archipelago_lanterns[] = {']
+        for x,y,z,width in self.lighthouses:
+            lines += [f'    {{ {{ {f(x)}, {f(y)}, {f(z)} }}, {f(width)} }},']
+        lines += ['};', 'static const BoatArchipelagoWindow archipelago_windows[] = {']
+        for window in self.windows:
+            position = ', '.join(f(v) for v in window['position'])
+            normal = ', '.join(f(v) for v in window['normal'])
+            lines += [f"    {{ {{ {position} }}, {{ {normal} }}, "
+                      f"{f(window['width'])}, {f(window['height'])}, {window['seed']}u }},"]
+        # The common final terminator below closes the window table first.
         columns = (BOUNDS[2]-BOUNDS[0])//32+1
         rows = (BOUNDS[3]-BOUNDS[1])//32+1
         lines += ['};', f'enum {{ archipelago_ground_columns = {columns}, '
@@ -803,16 +920,28 @@ class World:
         lines += ['};', '']
         (output/'life.h').write_text('\n'.join(lines), newline='\n')
         return dict(actors=actors, residents=residents,
-                    gulls=sum(flock[2] for flock in flocks), physical_traffic_wakes=False)
+                    gulls=sum(flock[2] for flock in flocks), windows=len(self.windows),
+                    physical_traffic_wakes=False)
 
     def write(self, output):
         output.mkdir(parents=True, exist_ok=True)
         blob = map_pack.write(output, "archipelago", "tools/generate_archipelago.py",
                               self.vertices, self.triangles, self.terrain_end)
         # map_pack's legacy default attribution names OSM; this recipe uses no real map data.
-        header = (output/"water.h").read_text().replace(
+        surface_vertices = [tuple(map_pack.f32(f"{v:.4f}") for v in p) for p in self.vertices]
+        surface_triangles = list(self.triangles[:self.water_count])
+        for triangle in self.pier_water:
+            start = len(surface_vertices)
+            surface_vertices.extend(tuple(map_pack.f32(f"{v:.4f}") for v in (-x,y,z))
+                                    for x,y,z in triangle)
+            surface_triangles.append(((start,start+1,start+2), WATER))
+        header = map_pack.water_header("archipelago", "tools/generate_archipelago.py",
+            surface_vertices, surface_triangles,
+            f"enum {{ archipelago_navigation_triangles = {self.water_count} }};\n").replace(
             "// Map data (c) OpenStreetMap contributors, ODbL 1.0; see manifest.json.",
-            "// Synthetic geometry; no external geographic sources. See manifest.json.")
+            "// Synthetic geometry; no external geographic sources. See manifest.json.").replace(
+            "// The leading water triangles of scenery.bin, which the loader checks against these.",
+            "// Navigation prefix matches scenery.bin; appended sea beneath piers is render-only.")
         (output/"water.h").write_text(header, newline='\n')
         places = ['// Generated by tools/generate_archipelago.py. Do not edit.',
                   'static const BoatArchipelagoPlace archipelago_places[] = {']
@@ -852,7 +981,8 @@ class World:
             "counts": {"island_recipes": len(self.islands), "trees": self.tree_count,
                        "filled_inland_lattice_pockets": self.filled_pockets,
                        "vertices": len(self.vertices), "triangles": len(self.triangles),
-                       "water_triangles": self.water_count, "shore_edges": len(self.shore_edges),
+                       "water_triangles": self.water_count,
+                       "pier_surface_triangles": len(self.pier_water), "shore_edges": len(self.shore_edges),
                        "scenery_bytes": len(blob)},
             "places": [{"name": name, "id": node, "position": self.nodes[node],
                         "arrival_radius_m": radius}

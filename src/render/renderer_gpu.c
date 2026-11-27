@@ -1105,7 +1105,19 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
+    const BoatMapDescription *surface_water = boat_water_render_map(scenery->map);
+    bool separate_water = surface_water != scenery->map;
     size_t facade_count = 0, facade_tile = 0;
+    if (separate_water) {
+        const Mesh3D *surface = surface_water->mesh;
+        for (size_t i = 0; i < surface->triangle_count; ++i) {
+            const Triangle3D *t = &surface->triangles[i];
+            if (!builder_triangle(&water_builder, surface->vertices[t->vertices[0]],
+                    surface->vertices[t->vertices[1]], surface->vertices[t->vertices[2]],
+                    (Color) { 67, 151, 180, 255 }))
+                goto failed;
+        }
+    }
     for (size_t i = 0; i < sizeof(builders) / sizeof(builders[0]); ++i)
         if (!tiled_builder_init(&builders[i], tiles))
             goto failed;
@@ -1117,7 +1129,8 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         const unsigned char *corners = occlusion ? &occlusion[i * 3] : NULL;
         unsigned char role = roles ? roles[i] : 0;
         if (is_water_triangle(triangle)) {
-            if (!builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
+            if (!separate_water
+                && !builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
                 goto failed;
             continue;
         }
@@ -3253,8 +3266,8 @@ static void add_scenery(
     const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
 {
     for (int i = 0; i < frame->scenery_count; ++i)
-        draw_colored_mesh(
-            scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
+        draw_colored_mesh(scene->cube, material, frame->scenery[i].transform,
+            frame->scenery[i].color, frame->scenery[i].emissive);
 }
 
 static void draw_scenery(

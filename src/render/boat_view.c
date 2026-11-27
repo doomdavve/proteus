@@ -908,6 +908,10 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         boat_archipelago_evaluate(world->water, time,
             (Vector3) { -boat->position.x, boat->height, boat->position.y },
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, &life);
+        life.camera = renderer->camera;
+        life.lighting = lighting;
+        boat_archipelago_lanterns_evaluate(time, &life);
+        boat_archipelago_windows_evaluate(&life);
         renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &life.traffic);
         if (!waterfront_draw_harbor(renderer, &cpu->harbor, &life.harbor))
@@ -917,8 +921,13 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
                 renderer3d_draw_emissive_mesh(
                     renderer, waterfront_gull_mesh(part), life.gulls[i][part]);
         renderer->emissive_tint = (Vector3) { 1, 1, 1 };
-        for (int i = 0; i < life.scenery_count; ++i)
-            renderer3d_draw_box(renderer, life.scenery[i].transform, life.scenery[i].color);
+        for (int i = 0; i < life.scenery_count; ++i) {
+            if (life.scenery[i].emissive)
+                renderer3d_draw_emissive_box(
+                    renderer, life.scenery[i].transform, life.scenery[i].color);
+            else
+                renderer3d_draw_box(renderer, life.scenery[i].transform, life.scenery[i].color);
+        }
     }
     if (view->props) {
         // The working harbour's own geometry, in renderer coordinates (identity transform). Only

@@ -3,6 +3,54 @@
 The [additional art direction](../PROCEDURAL_WORLD_PLAN.md#additional-art-direction--2026-11-25)
 records the user’s fishing-boat, sea, sunset and marina photographs for future iterations.
 
+## Jetty water and clocked windows — 2026-11-27
+
+The current house panes use Outer's glass palette, residential occupancy and day/night blend.
+These Home Harbour captures use `--no-audio --location archipelago --start -28,-24,-55
+--demo-idle --time 0`, CPU at hours 12/21/3 and GPU at 21. Water now continues below the
+solid jetty decks. The [plan](../PROCEDURAL_WORLD_PLAN.md#jetty-water-and-outer-style-house-windows--2026-11-27)
+records the geometry, checks and user acceptance for PR review.
+
+| CPU, noon | CPU, 21:00 | CPU, 03:00 |
+| --- | --- | --- |
+| ![Daylight glass](shore-day.png) | ![Warm occupied rooms in the evening](shore-evening.png) | ![Most rooms dark overnight](shore-late.png) |
+
+| GPU, 21:00 | GPU with waves, 21:00 at two seconds |
+| --- | --- |
+| ![Lit rooms reflected in the sea](shore-evening-gpu.png) | ![Continuous wave surface beside the jetty](shore-evening-waves-gpu.png) |
+
+## Red-house rebuild — 2026-11-27
+
+Reference-led replacement of the red box houses. Current CPU/GPU captures appear above;
+the user accepted the current iteration for PR review.
+These earlier captures include the extended overhangs and the superseded static room colours;
+the captures above show the current clocked glass.
+These isolated flat-ground fixtures were rendered by the actual CPU renderer at 320×200
+on macOS; they are geometry reviews, not game-camera captures or concept art.
+
+| House | Small hut |
+| --- | --- |
+| ![Red house with terracotta roof, white verge boards and divided windows](red-house-recipe.png) | ![Lower red hut without a chimney](red-hut-recipe.png) |
+
+The [plan](../PROCEDURAL_WORLD_PLAN.md#red-house-rebuild--2026-11-27) records the
+user's references, revised roof construction, home rock shelf, checks and remaining review.
+CPU game-camera captures at Home Harbour (1 s, start `-28,-24,-55`) and Net Sheds
+(0 s, start `-683.287,-650.992,-90`) use `--no-audio --renderer cpu --demo-idle`:
+
+| Home Harbour | Net Sheds |
+| --- | --- |
+| ![Red houses on the low home rock shelf](red-houses-harbour.png) | ![Red shed group beside the landing](red-houses-net-sheds.png) |
+
+Lighthouse CPU captures from `--start -70,-260,90`, at fixed hours 12 and 23.
+Night times 0 and 2 show the rotating lens brightness; see the
+[lamp checks and open jetty issue](../PROCEDURAL_WORLD_PLAN.md#lighthouse-lamps--2026-11-27).
+
+| Day | Night | Night, two seconds later |
+| --- | --- | --- |
+| ![Unlit lighthouse in daylight](lighthouse-day.png) | ![Lit lantern at night](lighthouse-night.png) | ![Brighter lantern face as the lens turns](lighthouse-sweep.png) |
+
+Earlier screenshots below retain the previous house recipe as history.
+
 ## Recipe 4 — fishing boat, marina and day/night
 
 Native reference-led follow-up, Apple Silicon/macOS, 2026-11-25–26. These are game captures

@@ -174,13 +174,76 @@ def check_seed(seed, output):
         t = min(3/math.dist(a,b),.4)
         p = a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])
         assert not mesh.contains(p), ('ghost pier',seed,p)
+    def under_pier(point):
+        for triangle in world.pier_water:
+            points = [(p[0],p[2]) for p in triangle]
+            cross = [(b[0]-a[0])*(point[1]-a[1])-(b[1]-a[1])*(point[0]-a[0])
+                     for a,b in zip(points,points[1:]+points[:1])]
+            if min(cross) >= -1e-6 or max(cross) <= 1e-6:
+                return True
+        return False
+    samples = 0
+    for pier in manifest['dock_footprints']:
+        a,b = pier['start'],pier['end']
+        dx,dz = b[0]-a[0],b[1]-a[1]
+        length = math.hypot(dx,dz)
+        for along in (.05,.15,.3,.5,.7):
+            for across in (-1.7,0,1.7):
+                point = (a[0]+along*dx-across*dz/length,
+                         a[1]+along*dz+across*dx/length)
+                if world.field(*point)[0] < -4:
+                    assert under_pier(point), ('missing sea under deck',seed,point)
+                    assert not mesh.contains(point), ('pier collision lost',seed,point)
+                    samples += 1
+    assert samples > 10
+    assert len(world.pier_water) == manifest['counts']['pier_surface_triangles']
     assert 'OpenStreetMap' not in (output/'water.h').read_text()
     print(f'seed={seed} route_clearance=12m topology=connected piers=solid '
           f'inner_routes={direct:.0f}/{alternate:.0f}m pack={manifest["counts"]["scenery_bytes"]}B')
     return manifest
 
 
+def check_house_seams():
+    """Probe the wall/gable junction and overhang from inside, including both windings."""
+    def sub(a,b):
+        return tuple(x-y for x,y in zip(a,b))
+    def cross(a,b):
+        return (a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+    def dot(a,b):
+        return sum(x*y for x,y in zip(a,b))
+    def hit(world, origin, direction):
+        for ids,_ in world.triangles:
+            a,b,c = (world.vertices[i] for i in ids)
+            ab,ac = sub(b,a),sub(c,a)
+            p = cross(direction,ac)
+            det = dot(ab,p)
+            if abs(det) < 1e-9:
+                continue
+            offset = sub(origin,a)
+            u = dot(offset,p)/det
+            q = cross(offset,ab)
+            v,t = dot(direction,q)/det,dot(ac,q)/det
+            if u >= -1e-7 and v >= -1e-7 and u+v <= 1+1e-7 and t > 0:
+                return True
+        return False
+    for width,depth in ((7,6),(13,9),(16,10.5)):
+        world = generator.World(generator.DEFAULT_SEED)
+        world.ground = lambda x,z: 0
+        world.house(0,0,width,depth)
+        eave = .15+(3.8 if width < 11 else 4.4)
+        for side in (-1,1):
+            for fraction in (-.98,-.5,0,.5,.98):
+                for dy in (-.01,0,.01):
+                    assert hit(world,(0,eave+dy,fraction*depth/2),(side,0,0)), \
+                        ('open wall/gable seam',width,depth,side,fraction,dy)
+            for end in (-1,1):
+                assert hit(world,(side*(width/2+.6),eave-1,end*(depth/2+.65)),(0,1,0)), \
+                    ('open roof underside',width,depth,side,end)
+    print('house_seams=ok sizes=3 gables=both overhangs=all')
+
+
 def main():
+    check_house_seams()
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         manifests = [check_seed(seed,root/str(seed)) for seed in

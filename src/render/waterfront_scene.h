@@ -86,6 +86,7 @@ typedef struct {
     struct {
         Transform3D transform;
         Color color;
+        bool emissive;
     } scenery[704];
     BoatWater player_water; // Shared analytic boating parameters.
     WaterfrontPlayerState player;

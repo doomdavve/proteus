@@ -1,4 +1,5 @@
 #include "render/boat_water_mesh.h"
+#include "core/boat_archipelago.h"
 #include "raylib.h"
 #include "raymath.h"
 
@@ -8,6 +9,11 @@
 #include <string.h>
 
 typedef BoatWaterMeshSurface Surface;
+
+const BoatMapDescription *boat_water_render_map(const BoatMapDescription *map)
+{
+    return map == &boat_archipelago_map ? &boat_archipelago_water_surface : map;
+}
 
 static bool surface_triangle(Surface *s, Vector3 a, Vector3 b, Vector3 c)
 {
@@ -434,13 +440,13 @@ static const Mesh3D *water_patch(
 const Mesh3D *boat_water_patch(
     BoatWaterMeshCache *cache, const BoatMapDescription *map, Vector2 center)
 {
-    return water_patch(cache, map, center, false);
+    return water_patch(cache, boat_water_render_map(map), center, false);
 }
 
 const Mesh3D *boat_water_patch_arcade(
     BoatWaterMeshCache *cache, const BoatMapDescription *map, Vector2 center)
 {
-    return water_patch(cache, map, center, true);
+    return water_patch(cache, boat_water_render_map(map), center, true);
 }
 
 // Same presentation-only phase/energy proxy as waveCrestFoam in the water shader.
@@ -498,6 +504,7 @@ static bool rest_triangle(BoatWaterMeshCache *cache, const BoatMapDescription *m
 const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMapDescription *map,
     BoatWater water, double time, BoatWaterMeshVisible visible, void *context)
 {
+    map = boat_water_render_map(map);
     cache_bind(cache, map);
     Surface *s = &cache->surface;
     if (!cache->index.ready && !index_build(&cache->index, map))

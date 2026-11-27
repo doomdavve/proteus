@@ -301,7 +301,8 @@ void renderer3d_draw_emissive_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3
     draw_mesh(r, mesh, transform, NULL, true);
 }
 
-static void draw_box(Renderer3D *r, Transform3D transform, Color color, const Material3D *material)
+static void draw_box(
+    Renderer3D *r, Transform3D transform, Color color, const Material3D *material, bool emissive)
 {
     static const Vector3 vertices[] = {
         { -0.5f, -0.5f, -0.5f },
@@ -328,12 +329,17 @@ static void draw_box(Renderer3D *r, Transform3D transform, Color color, const Ma
         { { 4, 0, 1 }, color },
     };
     Mesh3D mesh = { vertices, triangles, sizeof(triangles) / sizeof(triangles[0]) };
-    draw_mesh(r, &mesh, transform, material, false);
+    draw_mesh(r, &mesh, transform, material, emissive);
+}
+
+void renderer3d_draw_emissive_box(Renderer3D *r, Transform3D transform, Color color)
+{
+    draw_box(r, transform, color, NULL, true);
 }
 
 void renderer3d_draw_box(Renderer3D *r, Transform3D transform, Color color)
 {
-    draw_box(r, transform, color, NULL);
+    draw_box(r, transform, color, NULL, false);
 }
 
 void renderer3d_draw_textured_box(Renderer3D *r, Transform3D transform, const Material3D *material)
@@ -341,5 +347,5 @@ void renderer3d_draw_textured_box(Renderer3D *r, Transform3D transform, const Ma
     if (!material || !material->texels || !material->palette || material->width <= 0
         || material->height <= 0 || !(material->texels_per_unit > 0))
         return;
-    draw_box(r, transform, WHITE, material);
+    draw_box(r, transform, WHITE, material, false);
 }

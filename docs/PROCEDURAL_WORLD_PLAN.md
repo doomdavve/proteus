@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 complete; recipe 4 accepted by the user; integration qualified in PR #232.
-**Open** — Broader platform/night qualification and deferred art/life work.
-**Done when** — Native evidence is recorded (complete); human acceptance is recorded separately.
-**Next** — Choose the next art/life improvement; PR #232 owns CI/merge status.
+**State** — A0–A10 accepted in PR #232; shore refinements accepted by the user for PR.
+**Open** — PR/CI review and integration; broader platform/night qualification remains deferred.
+**Done when** — Shore fixes pass PR/CI review and merge; local checks and user review complete.
+**Next** — Publish the shore-fix branch for PR/CI review.
 
 ## Additional art direction — 2026-11-25
 
@@ -360,3 +360,146 @@ archipelago capture at 225 s was inspected: the cycle reaches sunset with the ne
 resolution controls intact. Graphics checks used `--no-audio`. Broader interactive/platform
 limits above remain unchanged. [PR #232](https://github.com/doomdavve/proteus/pull/232) owns
 remote CI results and merge status; no release/deployment is part of this integration.
+
+## Shore feedback fixes — 2026-11-27
+
+The user reported outstretched, zombie-like arms and gaps in the houses. Residents now
+have shoulder-pivoted upper arms, slightly bent forearms, visible hands and a smaller
+walking swing. House roofs include a bottom soffit across the overhang, closing the opening
+between the extended gables and the wall box. Corner trim uses four protruding posts
+instead of nearly flush panels. The default scenery pack and manifest were regenerated.
+
+This follow-up defers the existing open-loop board items, reactive life and new jobs.
+The existing Debug build completed on macOS; the dependency's stb_vorbis warning remains.
+CPU Home Harbour stills at 4 s were inspected (`build/shore-close.png` and
+`build/shore-detail.png`, `--no-audio --renderer cpu --demo-idle`, start `-28,-24,-90`).
+An angled house view (`build/house-angle.png`) uses the same options at 1 s and
+start `-28,-24,-55`. These game-scale views do not replace a close native GPU review.
+The windowed no-audio 180-frame check was attempted, but GLFW could not initialize the
+platform/monitor in this session, including outside the sandbox. GPU appearance, motion
+and human acceptance remain unverified. The first sandboxed full CTest run passed
+602/619 tests; 17 networking/process tests failed while local sockets were denied.
+The full run outside the sandbox passed all 619 tests (65.90 s, macOS Debug;
+GPU qualification tests were not enabled).
+`clang-format --dry-run --Werror` and `git diff --check` pass.
+
+## Red-house rebuild — 2026-11-27
+
+The user rejected the capped-box appearance and supplied a
+[red timber house](procedural/references/red-timber-house.png) and
+[quayside house cluster](procedural/references/red-quay-houses.png), then authorized rebuilding
+the recipe. These user-provided photographs are art references, not textures; original
+source URLs and reuse rights were not supplied. This supersedes the initial roof-cap fix
+above. Existing open-loop owners, reactive life, jobs, multiplayer and broader platform
+qualification remain deferred.
+
+Implemented: lower walls, warm terracotta pitched roofs and subtle tile courses, white
+verge/eave boards and corner posts, larger divided windows, framed doors, attic windows,
+low entrance steps and sparse timber battens. Small huts omit chimneys; the existing home
+shore groups vary in depth as well as width. Stone skirts follow the ground. Home Harbour's
+land is a low rock shelf blended back into the hills so the foundations no longer require
+tall podiums. Its water contour and navigation remain unchanged.
+
+Gables now share the actual wall footprint; sloping roof slabs have thickness and closed
+undersides, and white verge boards stand clear of the roof surfaces. A new geometric
+regression probes both wall/gable joins around the eave height and all four overhang
+undersides on three building sizes. Isolated front/back house and hut views use the actual
+CPU renderer at 320×200 via a temporary review harness in ignored `build/`.
+[Review images](procedural/README.md#red-house-rebuild--2026-11-27) distinguish these
+fixtures from in-world captures.
+
+Verification on macOS Debug: the final build passes without new warnings. CPU Home Harbour
+(1 s, `--start -28,-24,-55`) and Net Sheds (0 s, `--start -683.287,-650.992,-90`)
+captures were inspected with `--no-audio --renderer cpu --demo-idle`; the home houses sit
+on low foundations and both sites show the new roof/trim silhouettes. The geometric seam
+regression, changed documentation links and `git diff --check` pass.
+`ctest --preset full -j 2` completed 616/619 successfully; three tests timed out amid
+large elapsed-time jumps (8,316.45 s total). An earlier eight-job run also timed out.
+`caffeinate -i ctest --preset full --rerun-failed -j 1` passed the remaining three in
+78.70 s: plugin authoring 29.85 s, plugin captures 14.47 s, multi-seed generation 34.37 s.
+All 619 checks therefore have successful final results, with timeout retries recorded;
+GPU qualification tests were not enabled. No further code changes followed these checks.
+The no-audio 180-frame GPU demo was attempted again, but GLFW could not initialize a
+monitor/platform. Native GPU appearance, motion and user acceptance remain open.
+
+## Roof overhangs and occupied windows — 2026-11-27
+
+Following user feedback, the roof extends 0.70 m beyond each gable and 0.75 m beyond
+each eave (previously 0.40/0.45 m). Verge boards, fascia, ridge and tile courses follow
+the same dimensions. Existing underside probes now reach into the added overhang.
+Most windows have amber interior panes, with lighter upper and darker lower panes;
+a deterministic minority retain cool sky reflections. The variation does not consume
+layout randomness. These were static mesh colours, without dynamic lights or exterior spill;
+the clocked-window step below supersedes this window treatment.
+
+The Debug build passes. Updated isolated house/hut and in-world Home Harbour/Net Sheds
+CPU captures were inspected and replace the review images. A no-audio native GPU
+180-frame demo now runs successfully; this supersedes the previous display-initialization
+block for runtime execution. Visual GPU inspection and user acceptance remain open.
+`caffeinate -i ctest --preset full -j 8` passed all 619 tests in 77.66 s.
+`git diff --check` passes.
+
+## Lighthouse lamps — 2026-11-27
+
+Implemented the user-requested dusk-to-dawn lamps on both baked lighthouse lanterns.
+The generator exports the actual lantern centres and widths; no approximate terrain height
+or duplicated placement is used. Four emissive panes replace the dark glass visually from
+18:00 to 06:00 (or fixed DUSK), with an eight-second rotating brightness pattern. CPU/GPU
+consume the same simulation-time evaluation after lighting overrides are resolved. No
+volumetric beam, dynamic spill, or navigational flash-character contract is claimed.
+This step defers the existing broader platform qualification and the newly reported
+missing water beneath jetties. Investigate the latter separately: check shoreline/water
+mask generation beneath pier decks and ensure water extends below the decking without
+changing the navigable shore or dock collision inadvertently.
+
+Verification on macOS Debug: build without new warnings; all 619 full tests passed in
+69.34 s using `caffeinate -i ctest --preset full -j 8`. The archipelago validator covers
+dusk/dawn boundaries, midnight, fixed DUSK, rotating brightness, repeat seeks and invalid
+time. CPU day/night/rotated-lens captures from `--start -70,-260,90`, hours 12/23 and
+times 0/2 were inspected. The no-audio 180-frame native GPU night demo from
+`--start 0,-260,90 --lighting-hour 23` completed successfully. Visual GPU inspection and
+user acceptance remain open. Changed local documentation links and `git diff --check` pass.
+At this checkpoint the next task was missing water under jetties; the step below resolves it.
+
+## Jetty water and Outer-style house windows — 2026-11-27
+
+Implemented both user-requested follow-ups. The generator retains the exact sea triangles
+removed by each solid pier cutter. `water.h` contains the unchanged navigation prefix plus
+44 presentation-only infill triangles for the default seed. Flat CPU/GPU water and both
+GPU wave patches and CPU displaced water select the complete surface through one render
+map accessor. The scenery loader still checks the navigation prefix, and boat collision
+still excludes the pier footprints. No additional coastal water is invented beneath land.
+
+Baked amber glass is replaced by 166 runtime window records with stable room seeds and
+pane positions. The panes use Outer's `building_window_glass`, residential
+`building_window_lit` schedule and the existing light blend, extracted into a shared
+lighting helper without changing its formula. Daylight gives cool glass; occupied rooms
+light in the evening, then most switch off overnight. CPU/GPU draw the same emissive panes
+behind the existing white mullions and frames, within the shared 430 m window range.
+Clock overrides, pause and direct seeks are stateless. Dynamic spill and volumetric beams
+remain deferred alongside the existing broader platform/night qualification.
+
+Verification on macOS Debug: warning-clean build and all 619 full tests passed in 112.70 s
+with `caffeinate -i ctest --preset full -j 8`. The three-seed generator regression samples
+restored sea beneath each jetty while checking that navigation still blocks those points.
+The C validator checks the presentation source, solid navigation and both GPU patch modes;
+window colours match the shared residential recipe at noon, evening, overnight and dawn
+(in the home range: 26 lit rooms at 21:00, three at 03:00). Existing Outer lighting tests
+remain green after the blend extraction.
+
+CPU Home Harbour captures at hours 12/21/3, GPU at 21 and both CPU/GPU with `--waves`
+were captured and inspected with `--no-audio --demo-idle --start -28,-24,-55`.
+Flat captures use time 0; wave captures use time 2. The GPU view shows warm windows and
+water reflections, with the restored sea beside the jetty. A no-audio 360-frame GPU demo at
+21:00 completed successfully. [Current review images](procedural/README.md#jetty-water-and-clocked-windows--2026-11-27)
+replace the static-glass recipe as the active baseline. Changed local documentation links
+and `git diff --check` pass. User acceptance and broader platform qualification remain open;
+no known jetty-water or clocked-window implementation items remain. Next: user review.
+
+## Shore-fix PR authorization — 2026-11-27
+
+The user accepted the current iteration for now and explicitly requested a pull request.
+The current contract is recorded in `PROCEDURAL_WORLD.md` and the shared window behavior
+in `BUILDINGS.md`; no implementation items remain in this shore-fix step. Local full tests
+and CPU/GPU review are recorded above. PR/CI review and merge are next; broader platform
+and interactive qualification remain deferred rather than inferred from this acceptance.

@@ -1,5 +1,6 @@
 #include "render/waterfront.h"
 #include "core/waterfront_upstream.h"
+#include "render/boat_water_mesh.h"
 #include "render/waterfront_corner.h"
 #include "scenery/boat_scenery.h"
 #include "scenery/building_windows.h"
@@ -99,31 +100,13 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
     r->emissive_tint = tint;
 }
 
-// Glass tinted by the window light, for a legacy seed or a generated window (colour and occupancy).
-// LIT is the share of the window light the face takes at night (0..1).
-static Color window_tint_lit(Color glass, float lit, const WaterfrontLighting *lighting)
-{
-    float t = lighting->window_light;
-    if (!(t > 0))
-        return (Color) { glass.r, glass.g, glass.b, 255 };
-    Vector3 day = { glass.r, glass.g, glass.b };
-    Vector3 night = Vector3Lerp(
-        Vector3Multiply(day, lighting->window_dark), Vector3Scale(lighting->window_lit, 255), lit);
-    Vector3 c = Vector3Lerp(day, night, t);
-    return (Color) { (unsigned char)roundf(Clamp(c.x, 0, 255)),
-        (unsigned char)roundf(Clamp(c.y, 0, 255)), (unsigned char)roundf(Clamp(c.z, 0, 255)), 255 };
-}
-
-static Color window_tint(Color glass, bool occupied, const WaterfrontLighting *lighting)
-{
-    return window_tint_lit(glass, occupied ? 1.0f : 0.0f, lighting);
-}
-
 // Daytime glass, toward warm occupied rooms and darkened empty ones as the window light rises.
 static Color window_color(unsigned int seed, const WaterfrontLighting *lighting)
 {
-    return window_tint(waterfront_window_glass(seed),
-        building_window_lit(BUILDING_PROFILE_RESIDENTIAL, seed, waterfront_window_minute(lighting)),
+    return waterfront_window_tint(waterfront_window_glass(seed),
+        building_window_lit(BUILDING_PROFILE_RESIDENTIAL, seed, waterfront_window_minute(lighting))
+            ? 1.0f
+            : 0.0f,
         lighting);
 }
 
@@ -180,7 +163,7 @@ typedef struct {
 static void draw_face(const BuildingWindowFace *face, const WindowDraw *draw)
 {
     glow_quad(draw->r, face->corners[0], face->corners[1], face->corners[2], face->corners[3],
-        window_tint_lit(face->color, face->color.a / 255.0f, draw->lighting));
+        waterfront_window_tint(face->color, face->color.a / 255.0f, draw->lighting));
 }
 
 // A window: its pane and the reveal bands on it, and within the deep range its relief too, from
@@ -339,6 +322,9 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
     if (!omit_water) {
         Mesh3D water = *city;
         water.triangle_count = tiles->water_count;
+        const BoatMapDescription *surface = boat_water_render_map(scenery->map);
+        if (surface != scenery->map)
+            water = *surface->mesh;
         // Apply the frame water light once with the normal CPU ambient/direct/tint shading.
         // The same ordering is used by the basin's flat-water block.
         Vector3 tint = r->tint;
