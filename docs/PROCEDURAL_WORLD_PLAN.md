@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 accepted in PR #232; shore refinements, pier water and clocked windows local.
-**Open** — User review of shore refinements; broader platform/night qualification.
-**Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
-**Next** — Review restored jetty water, clocked house windows and villager poses.
+**State** — A0–A10 accepted in PR #232; shore refinements accepted by the user for PR.
+**Open** — PR/CI review and integration; broader platform/night qualification remains deferred.
+**Done when** — Shore fixes pass PR/CI review and merge; local checks and user review complete.
+**Next** — Publish the shore-fix branch for PR/CI review.
 
 ## Additional art direction — 2026-11-25
 
@@ -495,3 +495,11 @@ water reflections, with the restored sea beside the jetty. A no-audio 360-frame 
 replace the static-glass recipe as the active baseline. Changed local documentation links
 and `git diff --check` pass. User acceptance and broader platform qualification remain open;
 no known jetty-water or clocked-window implementation items remain. Next: user review.
+
+## Shore-fix PR authorization — 2026-11-27
+
+The user accepted the current iteration for now and explicitly requested a pull request.
+The current contract is recorded in `PROCEDURAL_WORLD.md` and the shared window behavior
+in `BUILDINGS.md`; no implementation items remain in this shore-fix step. Local full tests
+and CPU/GPU review are recorded above. PR/CI review and merge are next; broader platform
+and interactive qualification remain deferred rather than inferred from this acceptance.

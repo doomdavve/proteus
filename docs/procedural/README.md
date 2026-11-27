@@ -9,7 +9,7 @@ The current house panes use Outer's glass palette, residential occupancy and day
 These Home Harbour captures use `--no-audio --location archipelago --start -28,-24,-55
 --demo-idle --time 0`, CPU at hours 12/21/3 and GPU at 21. Water now continues below the
 solid jetty decks. The [plan](../PROCEDURAL_WORLD_PLAN.md#jetty-water-and-outer-style-house-windows--2026-11-27)
-records the geometry, checks and remaining user review.
+records the geometry, checks and user acceptance for PR review.
 
 | CPU, noon | CPU, 21:00 | CPU, 03:00 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ records the geometry, checks and remaining user review.
 ## Red-house rebuild — 2026-11-27
 
 Reference-led replacement of the red box houses. Current CPU/GPU captures appear above;
-user review remains open.
+the user accepted the current iteration for PR review.
 These earlier captures include the extended overhangs and the superseded static room colours;
 the captures above show the current clocked glass.
 These isolated flat-ground fixtures were rendered by the actual CPU renderer at 320×200
