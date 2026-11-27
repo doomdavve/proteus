@@ -1,5 +1,7 @@
-#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
-#define _POSIX_C_SOURCE 200809L // gmtime_r and localtime_r under strict C17 (glibc).
+#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+// gmtime_r and localtime_r under strict C17 (glibc). Not on macOS: it would hide the BSD types
+// that <sys/sysctl.h> needs.
+#define _POSIX_C_SOURCE 200809L
 #endif
 #include "wake_velocity/wake_velocity_performance.h"
 
