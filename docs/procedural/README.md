@@ -3,6 +3,27 @@
 The [additional art direction](../PROCEDURAL_WORLD_PLAN.md#additional-art-direction--2026-11-25)
 records the user’s fishing-boat, sea, sunset and marina photographs for future iterations.
 
+## Red-house rebuild — 2026-11-27
+
+Reference-led replacement of the red box houses, pending native GPU and user review.
+These isolated flat-ground fixtures were rendered by the actual CPU renderer at 320×200
+on macOS; they are geometry reviews, not game-camera captures or concept art.
+
+| House | Small hut |
+| --- | --- |
+| ![Red house with terracotta roof, white verge boards and divided windows](red-house-recipe.png) | ![Lower red hut without a chimney](red-hut-recipe.png) |
+
+The [plan](../PROCEDURAL_WORLD_PLAN.md#red-house-rebuild--2026-11-27) records the
+user's references, revised roof construction, home rock shelf, checks and remaining review.
+CPU game-camera captures at Home Harbour (1 s, start `-28,-24,-55`) and Net Sheds
+(0 s, start `-683.287,-650.992,-90`) use `--no-audio --renderer cpu --demo-idle`:
+
+| Home Harbour | Net Sheds |
+| --- | --- |
+| ![Red houses on the low home rock shelf](red-houses-harbour.png) | ![Red shed group beside the landing](red-houses-net-sheds.png) |
+
+Earlier screenshots below retain the previous house recipe as history.
+
 ## Recipe 4 — fishing boat, marina and day/night
 
 Native reference-led follow-up, Apple Silicon/macOS, 2026-11-25–26. These are game captures

@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
-**State** — A0–A10 complete and accepted in PR #232; shore visual fixes implemented locally.
+**State** — A0–A10 accepted in PR #232; reference-led red-house rebuild implemented locally.
 **Open** — GPU/motion and user review of the shore fixes; broader platform/night qualification.
 **Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
-**Next** — Review the local villager poses and closed house eaves in a native window.
+**Next** — Review the rebuilt houses, home rock shelf and villager poses in a native window.
 
 ## Additional art direction — 2026-11-25
 
@@ -382,3 +382,42 @@ and human acceptance remain unverified. The first sandboxed full CTest run passe
 The full run outside the sandbox passed all 619 tests (65.90 s, macOS Debug;
 GPU qualification tests were not enabled).
 `clang-format --dry-run --Werror` and `git diff --check` pass.
+
+## Red-house rebuild — 2026-11-27
+
+The user rejected the capped-box appearance and supplied a
+[red timber house](procedural/references/red-timber-house.png) and
+[quayside house cluster](procedural/references/red-quay-houses.png), then authorized rebuilding
+the recipe. These user-provided photographs are art references, not textures; original
+source URLs and reuse rights were not supplied. This supersedes the initial roof-cap fix
+above. Existing open-loop owners, reactive life, jobs, multiplayer and broader platform
+qualification remain deferred.
+
+Implemented: lower walls, warm terracotta pitched roofs and subtle tile courses, white
+verge/eave boards and corner posts, larger divided windows, framed doors, attic windows,
+low entrance steps and sparse timber battens. Small huts omit chimneys; the existing home
+shore groups vary in depth as well as width. Stone skirts follow the ground. Home Harbour's
+land is a low rock shelf blended back into the hills so the foundations no longer require
+tall podiums. Its water contour and navigation remain unchanged.
+
+Gables now share the actual wall footprint; sloping roof slabs have thickness and closed
+undersides, and white verge boards stand clear of the roof surfaces. A new geometric
+regression probes both wall/gable joins around the eave height and all four overhang
+undersides on three building sizes. Isolated front/back house and hut views use the actual
+CPU renderer at 320×200 via a temporary review harness in ignored `build/`.
+[Review images](procedural/README.md#red-house-rebuild--2026-11-27) distinguish these
+fixtures from in-world captures.
+
+Verification on macOS Debug: the final build passes without new warnings. CPU Home Harbour
+(1 s, `--start -28,-24,-55`) and Net Sheds (0 s, `--start -683.287,-650.992,-90`)
+captures were inspected with `--no-audio --renderer cpu --demo-idle`; the home houses sit
+on low foundations and both sites show the new roof/trim silhouettes. The geometric seam
+regression, changed documentation links and `git diff --check` pass.
+`ctest --preset full -j 2` completed 616/619 successfully; three tests timed out amid
+large elapsed-time jumps (8,316.45 s total). An earlier eight-job run also timed out.
+`caffeinate -i ctest --preset full --rerun-failed -j 1` passed the remaining three in
+78.70 s: plugin authoring 29.85 s, plugin captures 14.47 s, multi-seed generation 34.37 s.
+All 619 checks therefore have successful final results, with timeout retries recorded;
+GPU qualification tests were not enabled. No further code changes followed these checks.
+The no-audio 180-frame GPU demo was attempted again, but GLFW could not initialize a
+monitor/platform. Native GPU appearance, motion and user acceptance remain open.

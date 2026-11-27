@@ -201,6 +201,12 @@ class World:
             blend = max(0, min(1, (distance-55)/55))
             terrace = min(3.2, max(0, d)*.28)
             height = terrace + (height-terrace)*blend
+        # Home Harbour is an inhabited rock shelf, like the other shore settlements.
+        # Keep the coast at zero and blend into the original hills outside the houses.
+        distance = math.hypot(x, z+65)
+        blend = max(0, min(1, (distance-115)/55))
+        terrace = min(height, min(3.2, max(0,d)*.28) + max(0,d-40)*.06)
+        height = terrace + (height-terrace)*blend
         return height
 
     def vertex(self, p):
@@ -354,30 +360,110 @@ class World:
         self.buildings.append((x,z,width,depth))
         corners = [(xx, zz) for xx in (x-width/2, x+width/2)
                    for zz in (z-depth/2, z+depth/2)]
-        base = max(self.ground(xx, zz) for xx, zz in corners) + .2
-        bottom = max(0, min(self.ground(xx, zz) for xx, zz in corners)-2)
-        self.box(x, z, width + .5, depth + .5, bottom, base-bottom, (111, 109, 99))
-        self.box(x, z, width, depth, base, 5, color)
-        x0, x1, z0, z1 = x-width/2-.6, x+width/2+.6, z-depth/2-.6, z+depth/2+.6
-        a, b, c, d = (x0, base+5, z0), (x1, base+5, z0), (x1, base+5, z1), (x0, base+5, z1)
-        p, q = (x0, base+8, z), (x1, base+8, z)
-        self.quad(a, p, q, b, (69, 73, 76))
-        self.quad(p, d, c, q, (57, 61, 65))
-        self.tri((a, p, d), color)
-        self.tri((b, c, q), color)
-        # Close the roof volume below its overhanging gables and eaves. The wall
-        # box stops inside this footprint; without a soffit the sky shows through.
-        self.quad(a, b, c, d, (177, 174, 153))
-        # White painted corners and window surrounds survive the game's low resolution.
-        for xx in (x-width/2+.12, x+width/2-.12):
-            for zz in (z-depth/2+.12, z+depth/2-.12):
-                self.box(xx, zz, .34, .34, base, 5.05, (209, 209, 186))
-        for xx in (x-width*.26, x+width*.26):
-            for zz in (z-depth/2-.06, z+depth/2+.06):
-                self.box(xx, zz, 1.7, .13, base+2.2, 1.8, (214, 216, 192))
-                self.box(xx, zz + (-.08 if zz < z else .08), 1.2, .10, base+2.45, 1.3,
-                         (56, 77, 82))
-        self.box(x+width*.25, z, 1, 1, base+6.5, 3, (104, 93, 81))
+        base = max(self.ground(xx, zz) for xx, zz in corners) + .15
+        wall = 3.8 if width < 11 else 4.4
+        rise = depth * .42
+        white, glass = (225, 220, 197), (48, 69, 76)
+        x0, x1, z0, z1 = x-width/2, x+width/2, z-depth/2, z+depth/2
+        # A stone skirt follows the local ground instead of a single oversized plinth.
+        for side in (-1, 1):
+            for along_x, length in ((True, width), (False, depth)):
+                pieces = math.ceil(length/2)
+                for i in range(pieces):
+                    offset = -length/2 + (i+.5)*length/pieces
+                    xx, zz = (x+offset, z+side*depth/2) if along_x else (x+side*width/2, z+offset)
+                    bottom = max(0, self.ground(xx, zz)-.7)
+                    tone = (i+int(side == 1)) % 3 * 7
+                    self.box(xx, zz, length/pieces+.03 if along_x else .35,
+                             .35 if along_x else length/pieces+.03, bottom,
+                             max(.15, base-bottom), (119+tone, 116+tone, 106+tone))
+        self.box(x, z, width, depth, base, wall, color)
+        # Gables meet the wall footprint, not the outer edge of the roof overhang.
+        a,b,c,d = (x0,base+wall,z0), (x1,base+wall,z0), (x1,base+wall,z1), (x0,base+wall,z1)
+        p,q = (x0,base+wall+rise,z), (x1,base+wall+rise,z)
+        self.tri((a,p,d), color)
+        self.tri((b,c,q), color)
+
+        def roof_strip(left, right, near, far, tint, lift=0):
+            # A closed sloping slab; shared coordinates keep its edges watertight.
+            def point(xx, zz, top):
+                return (xx, base+wall+rise*(1-abs(zz-z)/(depth/2)) + top + lift, zz)
+            lo = [point(left,near,0), point(right,near,0),
+                  point(right,far,0), point(left,far,0)]
+            hi = [point(left,near,.24), point(right,near,.24),
+                  point(right,far,.24), point(left,far,.24)]
+            # Order the perimeter clockwise when viewed from above.
+            if near > far:
+                lo.reverse()
+                hi.reverse()
+            self.quad(*lo, tuple(max(0,k-25) for k in tint))
+            self.quad(hi[3],hi[2],hi[1],hi[0],tint)
+            for j in range(4):
+                k = (j+1)%4
+                self.quad(lo[j],hi[j],hi[k],lo[k],tint)
+
+        roof = (177, 91, 53) if width < 12 else (187, 98, 58)
+        for side in (-1, 1):
+            edge = z+side*(depth/2+.45)
+            roof_strip(x0-.4, x1+.4, z, edge, roof)
+            # Broad, low-contrast tile courses, rather than subpixel individual tiles.
+            courses = math.ceil((depth/2+.45)/.8)
+            for row in range(1,courses):
+                zz = z+side*(depth/2+.45)*row/courses
+                far = zz+side*.045
+                points = [(xx, base+wall+rise*(1-abs(zt-z)/(depth/2))+.255, zt)
+                          for xx,zt in ((x0-.14,zz),(x1+.14,zz),
+                                        (x1+.14,far),(x0-.14,far))]
+                if side > 0:
+                    points.reverse()
+                self.quad(*points, tuple(k-12 for k in roof))
+            # Broad white verge boards describe the pitched silhouette at game scale.
+            for xx in (x0-.43, x1+.19):
+                roof_strip(xx, xx+.24, z, edge, white, lift=.035)
+            eave = base+wall-rise*.45/(depth/2)
+            self.box(x, edge, width+.86, .18, eave-.16, .34, white)
+        self.box(x, z, width+.85, .28, base+wall+rise+.20, .16, (151, 76, 45))
+        # Sparse battens suggest vertical timber without a noisy stripe on every board.
+        batten = tuple(min(255,k+8) for k in color)
+        for i in range(1, math.ceil(width/.85)):
+            xx = x0+i*width/math.ceil(width/.85)
+            for zz in (z0-.025,z1+.025):
+                self.box(xx, zz, .045, .07, base, wall-.05, batten)
+        for xx in (x0+.1,x1-.1):
+            for zz in (z0+.1,z1-.1):
+                self.box(xx, zz, .34, .34, base, wall+.08, white)
+
+        def opening(xx, zz, across_x, door=False, small=False):
+            w,h = (1.45,2.8) if door else ((1.1,1.25) if small else (1.65,1.95))
+            y = base+.08 if door else base+(wall+.45 if small else 1.35)
+            outward = -1 if (zz < z if across_x else xx < x) else 1
+            def panel(offset, ww, hh, yy, tint):
+                self.box(xx if across_x else xx+outward*offset,
+                         zz+outward*offset if across_x else zz,
+                         ww if across_x else .09, .09 if across_x else ww, yy, hh, tint)
+            panel(.07,w+.3,h+.28,y-.1,white)
+            panel(.14,w,h,y,(103,59,42) if door else glass)
+            if door:
+                panel(.21,w-.25,.07,y+.65,white)
+                panel(.21,w-.25,.07,y+1.45,white)
+            else:
+                panel(.21,.10,h,y,white)
+                panel(.21,w,.10,y+h*.52,white)
+                panel(.20,w+.42,.13,y-.14,white)
+        for xx in (x-width*.27,x+width*.27):
+            for zz in (z0,z1):
+                opening(xx,zz,True)
+        for xx in (x0,x1):
+            opening(xx,z,False,door=True)
+            if depth >= 8:
+                for zz in (z-depth*.29,z+depth*.29):
+                    opening(xx,zz,False)
+            opening(xx,z,False,small=True)
+        # Low steps belong to the facade; the surrounding rock remains the main terrace.
+        for side in (-1,1):
+            self.box(x+side*(width/2+.35), z, .7, 1.9, base-.35, .35, (128,124,112))
+        if width >= 12:
+            self.box(x+width*.23,z+.7, .7,.85,base+wall+rise-.9,2.0,(116,99,81))
 
     def cone(self, x, z, base, radius, height, color, sides=6):
         tip = (x, base+height, z)
@@ -482,7 +568,9 @@ class World:
         for x,z in ((-100,-25),(-100,-70),(-100,-130),(100,-25),(100,-70),(100,-130)):
             shore = self.shore_at("home", math.atan2(z, x), 240)
             if shore:
-                self.house(*shore, width=r.uniform(10, 16), color=r.choice(
+                self.house(*shore, width=r.uniform(10, 16),
+                           depth=8 if z == -25 else 9.5 if z == -70 else 10.5,
+                           color=r.choice(
                     [(151, 62, 46), (137, 57, 45), (165, 69, 48)]))
         mouth_beacon = self.shore_at("mouth", math.atan2(160,120), 300)
         if mouth_beacon:

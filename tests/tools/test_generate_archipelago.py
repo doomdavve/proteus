@@ -180,7 +180,47 @@ def check_seed(seed, output):
     return manifest
 
 
+def check_house_seams():
+    """Probe the wall/gable junction and overhang from inside, including both windings."""
+    def sub(a,b):
+        return tuple(x-y for x,y in zip(a,b))
+    def cross(a,b):
+        return (a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+    def dot(a,b):
+        return sum(x*y for x,y in zip(a,b))
+    def hit(world, origin, direction):
+        for ids,_ in world.triangles:
+            a,b,c = (world.vertices[i] for i in ids)
+            ab,ac = sub(b,a),sub(c,a)
+            p = cross(direction,ac)
+            det = dot(ab,p)
+            if abs(det) < 1e-9:
+                continue
+            offset = sub(origin,a)
+            u = dot(offset,p)/det
+            q = cross(offset,ab)
+            v,t = dot(direction,q)/det,dot(ac,q)/det
+            if u >= -1e-7 and v >= -1e-7 and u+v <= 1+1e-7 and t > 0:
+                return True
+        return False
+    for width,depth in ((7,6),(13,9),(16,10.5)):
+        world = generator.World(generator.DEFAULT_SEED)
+        world.ground = lambda x,z: 0
+        world.house(0,0,width,depth)
+        eave = .15+(3.8 if width < 11 else 4.4)
+        for side in (-1,1):
+            for fraction in (-.98,-.5,0,.5,.98):
+                for dy in (-.01,0,.01):
+                    assert hit(world,(0,eave+dy,fraction*depth/2),(side,0,0)), \
+                        ('open wall/gable seam',width,depth,side,fraction,dy)
+            for end in (-1,1):
+                assert hit(world,(side*(width/2+.25),eave-1,end*(depth/2+.25)),(0,1,0)), \
+                    ('open roof underside',width,depth,side,end)
+    print('house_seams=ok sizes=3 gables=both overhangs=all')
+
+
 def main():
+    check_house_seams()
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         manifests = [check_seed(seed,root/str(seed)) for seed in

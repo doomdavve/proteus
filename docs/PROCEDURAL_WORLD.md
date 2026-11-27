@@ -36,9 +36,12 @@ A harbour launch waits and departs, the fishing boat makes a circuit, a sailboat
 the outer reach and a small runabout circles the lagoon. Their routes include pauses and
 repeat independently. Gulls circle the inhabited shores and follow the fishing boat; shore
 residents walk and carry crates near the landings, with relaxed, bent-elbow arm swings.
-Timber houses have closed roof soffits beneath their overhangs and pale corner posts.
-Boats have moving hull contacts and
-cosmetic foam trails. Their wakes do not add physical waves, and the scheduled boats do
+Timber houses have terracotta pitched roofs with solid overhangs, white verge boards and
+corner posts, divided windows, framed doors and attic windows. Smaller huts omit the
+chimney and use lower walls; Home Harbour varies the depth and roof proportions between
+its shore groups. Stone foundation skirts follow the ground, and the home settlement sits
+on a low rock shelf that blends into the surrounding hills.
+Boats have moving hull contacts and cosmetic foam trails. Their wakes do not add physical waves, and the scheduled boats do
 not steer around the player.
 
 This location supports a plain free package, baked scenery and native local life. Room hosting,
