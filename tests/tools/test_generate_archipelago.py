@@ -214,7 +214,7 @@ def check_house_seams():
                     assert hit(world,(0,eave+dy,fraction*depth/2),(side,0,0)), \
                         ('open wall/gable seam',width,depth,side,fraction,dy)
             for end in (-1,1):
-                assert hit(world,(side*(width/2+.25),eave-1,end*(depth/2+.25)),(0,1,0)), \
+                assert hit(world,(side*(width/2+.6),eave-1,end*(depth/2+.65)),(0,1,0)), \
                     ('open roof underside',width,depth,side,end)
     print('house_seams=ok sizes=3 gables=both overhangs=all')
 

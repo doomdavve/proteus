@@ -402,27 +402,28 @@ class World:
                 k = (j+1)%4
                 self.quad(lo[j],hi[j],hi[k],lo[k],tint)
 
+        gable_overhang, eave_overhang = .7, .75
         roof = (177, 91, 53) if width < 12 else (187, 98, 58)
         for side in (-1, 1):
-            edge = z+side*(depth/2+.45)
-            roof_strip(x0-.4, x1+.4, z, edge, roof)
+            edge = z+side*(depth/2+eave_overhang)
+            roof_strip(x0-gable_overhang, x1+gable_overhang, z, edge, roof)
             # Broad, low-contrast tile courses, rather than subpixel individual tiles.
-            courses = math.ceil((depth/2+.45)/.8)
+            courses = math.ceil((depth/2+eave_overhang)/.8)
             for row in range(1,courses):
-                zz = z+side*(depth/2+.45)*row/courses
+                zz = z+side*(depth/2+eave_overhang)*row/courses
                 far = zz+side*.045
                 points = [(xx, base+wall+rise*(1-abs(zt-z)/(depth/2))+.255, zt)
-                          for xx,zt in ((x0-.14,zz),(x1+.14,zz),
-                                        (x1+.14,far),(x0-.14,far))]
+                          for xx,zt in ((x0-gable_overhang+.26,zz),(x1+gable_overhang-.26,zz),
+                                        (x1+gable_overhang-.26,far),(x0-gable_overhang+.26,far))]
                 if side > 0:
                     points.reverse()
                 self.quad(*points, tuple(k-12 for k in roof))
             # Broad white verge boards describe the pitched silhouette at game scale.
-            for xx in (x0-.43, x1+.19):
+            for xx in (x0-gable_overhang-.03, x1+gable_overhang-.21):
                 roof_strip(xx, xx+.24, z, edge, white, lift=.035)
-            eave = base+wall-rise*.45/(depth/2)
-            self.box(x, edge, width+.86, .18, eave-.16, .34, white)
-        self.box(x, z, width+.85, .28, base+wall+rise+.20, .16, (151, 76, 45))
+            eave = base+wall-rise*eave_overhang/(depth/2)
+            self.box(x, edge, width+2*gable_overhang+.06, .18, eave-.16, .34, white)
+        self.box(x, z, width+2*gable_overhang+.05, .28, base+wall+rise+.20, .16, (151, 76, 45))
         # Sparse battens suggest vertical timber without a noisy stripe on every board.
         batten = tuple(min(255,k+8) for k in color)
         for i in range(1, math.ceil(width/.85)):
@@ -442,11 +443,20 @@ class World:
                          zz+outward*offset if across_x else zz,
                          ww if across_x else .09, .09 if across_x else ww, yy, hh, tint)
             panel(.07,w+.3,h+.28,y-.1,white)
-            panel(.14,w,h,y,(103,59,42) if door else glass)
+            # Stable room variation without consuming the layout RNG. Warm panes suggest
+            # lamplight; cool rooms retain a sky reflection instead of a flat black fill.
+            room = (round(xx*7)+round(zz*11)) % 4
+            lit = room != 0
+            pane = (204, 151, 77) if lit else glass
+            panel(.14,w,h,y,(103,59,42) if door else pane)
             if door:
                 panel(.21,w-.25,.07,y+.65,white)
                 panel(.21,w-.25,.07,y+1.45,white)
             else:
+                panel(.195,w-.08,h*.42,y+h*.54,
+                      (229, 182, 103) if lit else (81, 109, 118))
+                panel(.195,w-.08,h*.40,y+.04,
+                      (181, 119, 57) if lit else (42, 62, 69))
                 panel(.21,.10,h,y,white)
                 panel(.21,w,.10,y+h*.52,white)
                 panel(.20,w+.42,.13,y-.14,white)

@@ -36,8 +36,11 @@ A harbour launch waits and departs, the fishing boat makes a circuit, a sailboat
 the outer reach and a small runabout circles the lagoon. Their routes include pauses and
 repeat independently. Gulls circle the inhabited shores and follow the fishing boat; shore
 residents walk and carry crates near the landings, with relaxed, bent-elbow arm swings.
-Timber houses have terracotta pitched roofs with solid overhangs, white verge boards and
-corner posts, divided windows, framed doors and attic windows. Smaller huts omit the
+Timber houses have terracotta pitched roofs with solid overhangs (0.70 m at the gables and
+0.75 m at the eaves), white verge boards and corner posts, divided windows, framed doors
+and attic windows. Most windows use warm amber interior colours with lighter upper panes;
+a few retain cool sky reflections. This static room variation suggests occupancy without
+dynamic lights or light spilling onto the surroundings. Smaller huts omit the
 chimney and use lower walls; Home Harbour varies the depth and roof proportions between
 its shore groups. Stone foundation skirts follow the ground, and the home settlement sits
 on a low rock shelf that blends into the surrounding hills.

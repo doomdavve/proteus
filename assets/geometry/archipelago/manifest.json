@@ -21,17 +21,17 @@
     ],
     "heading_radians": 0
   },
-  "scenery_sha256": "dd3493409a77230c2e37facfd80cab705bb6fc81fd46b20c9e7c7a2c3dbbfccc",
+  "scenery_sha256": "87e17a581ec2778c75c3a21ac960a994e3d78544169d40f3e13dd13a0906777a",
   "water_header_sha256": "2ad13de5a9114ca7d39efc7707848df70347ac208268314f399f61f46dccb044",
   "counts": {
     "island_recipes": 48,
     "trees": 331,
     "filled_inland_lattice_pockets": 1,
-    "vertices": 56592,
-    "triangles": 90886,
+    "vertices": 59256,
+    "triangles": 94210,
     "water_triangles": 36192,
     "shore_edges": 4422,
-    "scenery_bytes": 630402
+    "scenery_bytes": 654653
   },
   "places": [
     {

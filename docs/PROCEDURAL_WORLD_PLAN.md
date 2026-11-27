@@ -1,9 +1,9 @@
 # Skerry Reach procedural archipelago
 
 **State** — A0–A10 accepted in PR #232; reference-led red-house rebuild implemented locally.
-**Open** — GPU/motion and user review of the shore fixes; broader platform/night qualification.
+**Open** — Visual GPU and user review of the shore fixes; broader platform/night qualification.
 **Done when** — Shore fixes pass full checks and native/user review; A0–A10 remains complete.
-**Next** — Review the rebuilt houses, home rock shelf and villager poses in a native window.
+**Next** — Review the extended roofs, warm windows and villager poses in a native window.
 
 ## Additional art direction — 2026-11-25
 
@@ -421,3 +421,19 @@ All 619 checks therefore have successful final results, with timeout retries rec
 GPU qualification tests were not enabled. No further code changes followed these checks.
 The no-audio 180-frame GPU demo was attempted again, but GLFW could not initialize a
 monitor/platform. Native GPU appearance, motion and user acceptance remain open.
+
+## Roof overhangs and occupied windows — 2026-11-27
+
+Following user feedback, the roof extends 0.70 m beyond each gable and 0.75 m beyond
+each eave (previously 0.40/0.45 m). Verge boards, fascia, ridge and tile courses follow
+the same dimensions. Existing underside probes now reach into the added overhang.
+Most windows have amber interior panes, with lighter upper and darker lower panes;
+a deterministic minority retain cool sky reflections. The variation does not consume
+layout randomness. These are static mesh colours, without dynamic lights or exterior spill.
+
+The Debug build passes. Updated isolated house/hut and in-world Home Harbour/Net Sheds
+CPU captures were inspected and replace the review images. A no-audio native GPU
+180-frame demo now runs successfully; this supersedes the previous display-initialization
+block for runtime execution. Visual GPU inspection and user acceptance remain open.
+`caffeinate -i ctest --preset full -j 8` passed all 619 tests in 77.66 s.
+`git diff --check` passes.

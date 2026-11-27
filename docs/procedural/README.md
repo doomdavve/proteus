@@ -5,7 +5,8 @@ records the user’s fishing-boat, sea, sunset and marina photographs for future
 
 ## Red-house rebuild — 2026-11-27
 
-Reference-led replacement of the red box houses, pending native GPU and user review.
+Reference-led replacement of the red box houses, pending visual GPU and user review.
+The current captures include the extended overhangs and warm/cool room variation.
 These isolated flat-ground fixtures were rendered by the actual CPU renderer at 320×200
 on macOS; they are geometry reviews, not game-camera captures or concept art.
 
